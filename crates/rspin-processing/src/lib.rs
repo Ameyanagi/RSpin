@@ -1,6 +1,7 @@
 //! Signal processing operations.
 
 mod baseline;
+mod contours;
 mod one_d;
 mod traits;
 mod transform;
@@ -9,6 +10,7 @@ mod two_d;
 pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
 };
+pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, extract_contours};
 pub use one_d::{
     NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill, normalize_max_abs,
     offset_intensity, scale_intensity, shift_axis, zero_fill,
