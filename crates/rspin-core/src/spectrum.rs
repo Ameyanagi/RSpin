@@ -298,9 +298,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn creates_linear_axis() {
-        let axis = Axis::linear("shift", Unit::Ppm, 10.0, 8.0, 3).unwrap();
+    fn creates_linear_axis() -> Result<()> {
+        let axis = Axis::linear("shift", Unit::Ppm, 10.0, 8.0, 3)?;
         assert_eq!(axis.values, vec![10.0, 9.0, 8.0]);
+        Ok(())
     }
 
     #[test]
@@ -309,34 +310,36 @@ mod tests {
     }
 
     #[test]
-    fn creates_1d_spectrum() {
-        let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3).unwrap();
-        let spectrum = Spectrum1D::new(x, vec![1.0, 2.0, 3.0], Metadata::default()).unwrap();
+    fn creates_1d_spectrum() -> Result<()> {
+        let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?;
+        let spectrum = Spectrum1D::new(x, vec![1.0, 2.0, 3.0], Metadata::default())?;
         assert_eq!(
             spectrum.points().collect::<Vec<_>>(),
             vec![(0.0, 1.0), (1.0, 2.0), (2.0, 3.0)]
         );
+        Ok(())
     }
 
     #[test]
-    fn rejects_mismatched_1d_data() {
-        let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3).unwrap();
+    fn rejects_mismatched_1d_data() -> Result<()> {
+        let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?;
         assert!(Spectrum1D::new(x, vec![1.0, 2.0], Metadata::default()).is_err());
+        Ok(())
     }
 
     #[test]
-    fn reads_2d_row_major_values() {
-        let x = Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2).unwrap();
-        let y = Axis::linear("y", Unit::Ppm, 10.0, 12.0, 3).unwrap();
+    fn reads_2d_row_major_values() -> Result<()> {
+        let x = Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?;
+        let y = Axis::linear("y", Unit::Ppm, 10.0, 12.0, 3)?;
         let spectrum = Spectrum2D::new(
             x,
             y,
             vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
             Metadata::default(),
-        )
-        .unwrap();
+        )?;
         assert_eq!(spectrum.shape(), (2, 3));
         assert_eq!(spectrum.value_at(1, 2), Some(6.0));
         assert_eq!(spectrum.value_at(2, 2), None);
+        Ok(())
     }
 }

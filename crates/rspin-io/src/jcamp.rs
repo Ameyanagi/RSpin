@@ -73,10 +73,11 @@ pub fn read_jcamp_dx_1d(input: &str) -> Result<Spectrum1D> {
         });
     }
 
-    let first_x = raw.first_x.unwrap_or(0.0);
-    let last_x = raw
-        .last_x
-        .unwrap_or_else(|| u32::try_from(intensities.len() - 1).map_or(0.0, f64::from));
+    let first_x = option_or(raw.first_x, 0.0);
+    let last_x = match raw.last_x {
+        Some(value) => value,
+        None => u32::try_from(intensities.len() - 1).map_or(0.0, f64::from),
+    };
     let axis = Axis::linear("x", raw.x_unit, first_x, last_x, intensities.len())?;
     let metadata = Metadata {
         name: raw.title,
@@ -102,7 +103,7 @@ pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
         return Err(RSpinError::NonFinite { field: "spectrum" });
     }
 
-    let title = spectrum.metadata.name.as_deref().unwrap_or("untitled");
+    let title = option_ref_or(spectrum.metadata.name.as_deref(), "untitled");
     let first_x =
         spectrum
             .x
@@ -215,6 +216,24 @@ fn parse_usize(field: &'static str, value: &str) -> Result<usize> {
             format: "JCAMP-DX",
             message: format!("{field}: {error}"),
         })
+}
+
+fn option_or<T>(value: Option<T>, default: T) -> T {
+    let mut values = value.into_iter();
+    if let Some(value) = values.next() {
+        value
+    } else {
+        default
+    }
+}
+
+fn option_ref_or<'a>(value: Option<&'a str>, default: &'a str) -> &'a str {
+    let mut values = value.into_iter();
+    if let Some(value) = values.next() {
+        value
+    } else {
+        default
+    }
 }
 
 fn parse_unit(value: &str) -> Unit {

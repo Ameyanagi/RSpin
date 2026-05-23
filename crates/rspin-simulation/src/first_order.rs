@@ -168,14 +168,15 @@ pub fn simulate_multiplet_1d(
 }
 
 fn split_lines(lines: &[(f64, f64)], coupling: CouplingGroup) -> Vec<(f64, f64)> {
-    let coefficients = binomial_coefficients(coupling.equivalent_spins);
     let denominator = 2.0_f64.powf(f64::from(coupling.equivalent_spins));
     let half = f64::from(coupling.equivalent_spins) / 2.0;
-    let mut split = Vec::with_capacity(lines.len() * coefficients.len());
+    let target_len = usize::try_from(coupling.equivalent_spins)
+        .map_or(lines.len(), |spins| lines.len() * (spins + 1));
+    let mut split = Vec::with_capacity(target_len);
 
     for &(offset_hz, intensity) in lines {
-        for (index, coefficient) in coefficients.iter().copied().enumerate() {
-            let index = u32::try_from(index).expect("binomial index should fit u32");
+        for index in 0..=coupling.equivalent_spins {
+            let coefficient = f64::from(binomial(coupling.equivalent_spins, index));
             let group_offset = (f64::from(index) - half) * coupling.j_hz;
             split.push((
                 offset_hz + group_offset,
@@ -185,12 +186,6 @@ fn split_lines(lines: &[(f64, f64)], coupling: CouplingGroup) -> Vec<(f64, f64)>
     }
 
     split
-}
-
-fn binomial_coefficients(order: u32) -> Vec<f64> {
-    (0..=order)
-        .map(|index| f64::from(binomial(order, index)))
-        .collect()
 }
 
 fn binomial(n: u32, k: u32) -> u32 {
