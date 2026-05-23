@@ -1,8 +1,8 @@
 //! Analysis traits.
 
-use rspin_core::{Result, Spectrum1D};
+use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
-use crate::{DetectedRange, Integral, IntegralRegion, Peak};
+use crate::{DetectedRange, DetectedZone, Integral, IntegralRegion, Peak};
 
 /// Picks peaks from a one-dimensional spectrum.
 pub trait PeakPicker {
@@ -32,4 +32,14 @@ pub trait RangeDetector {
     ///
     /// Returns an error when detector options are invalid for the spectrum.
     fn detect(&self, spectrum: &Spectrum1D) -> Result<Vec<DetectedRange>>;
+}
+
+/// Detects zones from a two-dimensional spectrum.
+pub trait ZoneDetector {
+    /// Returns detected zones.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when detector options are invalid for the spectrum.
+    fn detect(&self, spectrum: &Spectrum2D) -> Result<Vec<DetectedZone>>;
 }
