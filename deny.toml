@@ -1,3 +1,10 @@
+[advisories]
+# `nalgebra` depends on `simba`, which currently depends on archived `paste`.
+# There is no safe upgrade in this chain yet, and `nalgebra` is an explicit
+# numeric dependency for RSpin. Keep this exception visible and revisit when
+# nalgebra/simba remove the transitive dependency.
+ignore = ["RUSTSEC-2024-0436"]
+
 [licenses]
 allow = [
     "Apache-2.0",
@@ -5,4 +12,3 @@ allow = [
     "Unicode-3.0",
 ]
 confidence-threshold = 0.8
-

@@ -7,8 +7,12 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+nalgebra.workspace = true
 rspin-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
 
 [lints]
 workspace = true
-
