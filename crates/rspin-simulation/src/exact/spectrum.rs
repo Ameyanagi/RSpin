@@ -8,7 +8,7 @@ use crate::{LineShape, Simulator};
 use super::{ExactSpinOptions, ExactTransition, SpinHalfSystem, exact_spin_half_transitions};
 
 /// Dense one-dimensional rendering options for exact spin-1/2 simulations.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExactSpectrumOptions {
     /// Left axis bound in ppm.
     pub from_ppm: f64,
@@ -44,7 +44,7 @@ impl Simulator<SpinHalfSystem> for ExactSpectrumOptions {
     type Output = Spectrum1D;
 
     fn simulate(&self, model: &SpinHalfSystem) -> Result<Self::Output> {
-        simulate_exact_spin_half_1d(model, *self)
+        simulate_exact_spin_half_1d(model, self)
     }
 }
 
@@ -60,10 +60,10 @@ impl Simulator<SpinHalfSystem> for ExactSpectrumOptions {
 /// options are invalid.
 pub fn simulate_exact_spin_half_1d(
     system: &SpinHalfSystem,
-    options: ExactSpectrumOptions,
+    options: &ExactSpectrumOptions,
 ) -> Result<Spectrum1D> {
     validate_options(options)?;
-    let transitions = exact_spin_half_transitions(system, options.transition_options)?;
+    let transitions = exact_spin_half_transitions(system, &options.transition_options)?;
     let axis = Axis::linear(
         "chemical shift",
         Unit::Ppm,
@@ -92,7 +92,7 @@ pub fn simulate_exact_spin_half_1d(
 fn synthesize(
     axis: &[f64],
     transitions: &[ExactTransition],
-    options: ExactSpectrumOptions,
+    options: &ExactSpectrumOptions,
 ) -> Vec<f64> {
     let total_intensity = transitions
         .iter()
@@ -119,7 +119,7 @@ fn synthesize(
     values
 }
 
-fn validate_options(options: ExactSpectrumOptions) -> Result<()> {
+fn validate_options(options: &ExactSpectrumOptions) -> Result<()> {
     require_finite("from_ppm", options.from_ppm)?;
     require_finite("to_ppm", options.to_ppm)?;
     require_positive("area", options.area)?;

@@ -16,7 +16,7 @@ fn renders_single_spin_with_requested_area() -> anyhow::Result<()> {
         line_shape: LineShape::Lorentzian,
         transition_options: ExactSpinOptions::default(),
     };
-    let spectrum = simulate_exact_spin_half_1d(&system, options)?;
+    let spectrum = simulate_exact_spin_half_1d(&system, &options)?;
     let expected_center = LineShape::Lorentzian.value(2.0, 2.0, 2.0, 400.0, 3.0);
 
     assert_eq!(spectrum.len(), 11);
@@ -34,7 +34,7 @@ fn preserves_negative_shift_position() -> anyhow::Result<()> {
     };
     let spectrum = simulate_exact_spin_half_1d(
         &system,
-        ExactSpectrumOptions {
+        &ExactSpectrumOptions {
             from_ppm: -1.0,
             to_ppm: 1.0,
             points: 9,
@@ -88,7 +88,7 @@ fn rejects_invalid_rendering_options() {
     };
     let error = simulate_exact_spin_half_1d(
         &system,
-        ExactSpectrumOptions {
+        &ExactSpectrumOptions {
             points: 0,
             ..ExactSpectrumOptions::default()
         },
@@ -98,7 +98,7 @@ fn rejects_invalid_rendering_options() {
 
     let error = simulate_exact_spin_half_1d(
         &system,
-        ExactSpectrumOptions {
+        &ExactSpectrumOptions {
             area: 0.0,
             ..ExactSpectrumOptions::default()
         },

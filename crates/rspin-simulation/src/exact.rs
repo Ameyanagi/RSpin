@@ -2,13 +2,15 @@
 
 use std::collections::BTreeSet;
 
-use nalgebra::DMatrix;
 use rspin_core::{RSpinError, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::Simulator;
 
+mod hamiltonian;
 mod spectrum;
+
+use hamiltonian::{basis_dimension, hamiltonian_matrix, observation_matrix, total_z_expectations};
 
 pub use spectrum::{ExactSpectrumOptions, simulate_exact_spin_half_1d};
 
@@ -43,7 +45,7 @@ pub struct SpinHalfSystem {
 }
 
 /// Options for exact spin-1/2 transition simulation.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExactSpinOptions {
     /// Spectrometer frequency in MHz.
     pub spectrometer_mhz: f64,
@@ -53,6 +55,11 @@ pub struct ExactSpinOptions {
     pub frequency_tolerance_hz: f64,
     /// Per-call spin-count limit, capped by [`MAX_EXACT_SPINS`].
     pub max_spins: usize,
+    /// Spin indices included in the transverse detection operator.
+    ///
+    /// An empty list detects all spins in the system.
+    #[serde(default)]
+    pub detected_spins: Vec<usize>,
 }
 
 impl Default for ExactSpinOptions {
@@ -62,6 +69,7 @@ impl Default for ExactSpinOptions {
             intensity_threshold: 1.0e-12,
             frequency_tolerance_hz: 1.0e-9,
             max_spins: 10,
+            detected_spins: Vec::new(),
         }
     }
 }
@@ -70,7 +78,7 @@ impl Simulator<SpinHalfSystem> for ExactSpinOptions {
     type Output = Vec<ExactTransition>;
 
     fn simulate(&self, model: &SpinHalfSystem) -> Result<Self::Output> {
-        exact_spin_half_transitions(model, *self)
+        exact_spin_half_transitions(model, self)
     }
 }
 
@@ -102,15 +110,16 @@ pub struct ExactTransition {
 /// diagonalization.
 pub fn exact_spin_half_transitions(
     system: &SpinHalfSystem,
-    options: ExactSpinOptions,
+    options: &ExactSpinOptions,
 ) -> Result<Vec<ExactTransition>> {
     validate_system(system)?;
     validate_options(options)?;
     validate_spin_count(system.spins.len(), options.max_spins)?;
+    let detected_spins = detected_spin_indices(system.spins.len(), &options.detected_spins)?;
 
     let dimension = basis_dimension(system.spins.len());
     let hamiltonian = hamiltonian_matrix(system, options.spectrometer_mhz, dimension);
-    let observation = observation_matrix(system.spins.len(), dimension);
+    let observation = observation_matrix(&detected_spins, dimension);
     let eigen = hamiltonian.symmetric_eigen();
     let transition_operator = eigen.eigenvectors.transpose() * observation * &eigen.eigenvectors;
     let magnetizations = total_z_expectations(&eigen.eigenvectors, system.spins.len(), dimension);
@@ -146,83 +155,34 @@ pub fn exact_spin_half_transitions(
     ))
 }
 
-fn hamiltonian_matrix(
-    system: &SpinHalfSystem,
-    spectrometer_mhz: f64,
-    dimension: usize,
-) -> DMatrix<f64> {
-    let mut matrix = DMatrix::zeros(dimension, dimension);
-    for state in 0..dimension {
-        matrix[(state, state)] += chemical_shift_energy(system, spectrometer_mhz, state);
-        matrix[(state, state)] += scalar_coupling_z_energy(system, state);
-        add_scalar_flip_flop_terms(&mut matrix, system, state);
-    }
-    matrix
-}
-
-fn chemical_shift_energy(system: &SpinHalfSystem, spectrometer_mhz: f64, state: usize) -> f64 {
-    system
-        .spins
-        .iter()
-        .enumerate()
-        .map(|(spin, definition)| -definition.shift_ppm * spectrometer_mhz * spin_z(state, spin))
-        .sum()
-}
-
-fn scalar_coupling_z_energy(system: &SpinHalfSystem, state: usize) -> f64 {
-    system
-        .couplings
-        .iter()
-        .map(|coupling| {
-            coupling.j_hz * spin_z(state, coupling.spin_a) * spin_z(state, coupling.spin_b)
-        })
-        .sum()
-}
-
-fn add_scalar_flip_flop_terms(matrix: &mut DMatrix<f64>, system: &SpinHalfSystem, state: usize) {
-    for coupling in &system.couplings {
-        if spin_is_up(state, coupling.spin_a) != spin_is_up(state, coupling.spin_b) {
-            let flipped = state ^ spin_bit(coupling.spin_a) ^ spin_bit(coupling.spin_b);
-            matrix[(flipped, state)] += coupling.j_hz / 2.0;
-        }
-    }
-}
-
-fn observation_matrix(spin_count: usize, dimension: usize) -> DMatrix<f64> {
-    let mut matrix = DMatrix::zeros(dimension, dimension);
-    for state in 0..dimension {
-        for spin in 0..spin_count {
-            let flipped = state ^ spin_bit(spin);
-            matrix[(flipped, state)] += 0.5;
-        }
-    }
-    matrix
-}
-
-fn total_z_expectations(
-    eigenvectors: &DMatrix<f64>,
-    spin_count: usize,
-    dimension: usize,
-) -> Vec<f64> {
-    (0..dimension)
-        .map(|state| {
-            (0..dimension)
-                .map(|basis| eigenvectors[(basis, state)].powi(2) * total_spin_z(basis, spin_count))
-                .sum()
-        })
-        .collect()
-}
-
-fn total_spin_z(state: usize, spin_count: usize) -> f64 {
-    (0..spin_count).map(|spin| spin_z(state, spin)).sum()
-}
-
 fn signed_offset(energy_delta_hz: f64, lower_magnetization: f64, upper_magnetization: f64) -> f64 {
     if upper_magnetization - lower_magnetization > f64::EPSILON {
         -energy_delta_hz
     } else {
         energy_delta_hz
     }
+}
+
+fn detected_spin_indices(spin_count: usize, configured: &[usize]) -> Result<Vec<usize>> {
+    if configured.is_empty() {
+        return Ok((0..spin_count).collect());
+    }
+
+    let mut seen = BTreeSet::new();
+    for &spin in configured {
+        if spin >= spin_count {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "detected spin index is outside the system".to_owned(),
+            });
+        }
+        if !seen.insert(spin) {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "duplicate detected spin index".to_owned(),
+            });
+        }
+    }
+
+    Ok(configured.to_vec())
 }
 
 fn merge_transitions(
@@ -306,7 +266,7 @@ fn validate_coupling(
     Ok(())
 }
 
-fn validate_options(options: ExactSpinOptions) -> Result<()> {
+fn validate_options(options: &ExactSpinOptions) -> Result<()> {
     require_positive("spectrometer_mhz", options.spectrometer_mhz)?;
     require_finite("intensity_threshold", options.intensity_threshold)?;
     require_finite("frequency_tolerance_hz", options.frequency_tolerance_hz)?;
@@ -354,22 +314,6 @@ fn require_positive(field: &'static str, value: f64) -> Result<()> {
         });
     }
     Ok(())
-}
-
-fn spin_z(state: usize, spin: usize) -> f64 {
-    if spin_is_up(state, spin) { 0.5 } else { -0.5 }
-}
-
-fn spin_is_up(state: usize, spin: usize) -> bool {
-    state & spin_bit(spin) != 0
-}
-
-fn spin_bit(spin: usize) -> usize {
-    1_usize << spin
-}
-
-fn basis_dimension(spin_count: usize) -> usize {
-    1_usize << spin_count
 }
 
 fn ordered_pair(left: usize, right: usize) -> (usize, usize) {

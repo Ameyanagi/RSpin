@@ -94,7 +94,7 @@ pub fn simulate_exact_spin_half_transitions_json(
 ) -> Result<String> {
     let system: SpinHalfSystem = from_json(system_json)?;
     let options: ExactSpinOptions = from_json(options_json)?;
-    let transitions = exact_spin_half_transitions(&system, options)?;
+    let transitions = exact_spin_half_transitions(&system, &options)?;
     to_json(&transitions)
 }
 
@@ -109,7 +109,7 @@ pub fn simulate_exact_spin_half_spectrum_json(
 ) -> Result<String> {
     let system: SpinHalfSystem = from_json(system_json)?;
     let options: ExactSpectrumOptions = from_json(options_json)?;
-    let spectrum = simulate_exact_spin_half_1d(&system, options)?;
+    let spectrum = simulate_exact_spin_half_1d(&system, &options)?;
     to_json(&spectrum)
 }
 
@@ -240,6 +240,19 @@ mod tests {
 
         assert_eq!(transitions.len(), 4);
         assert!((transitions[0].center_ppm - 6.987_639_320_225_002).abs() < 1.0e-10);
+        Ok(())
+    }
+
+    #[test]
+    fn simulates_exact_detected_spin_json() -> anyhow::Result<()> {
+        let transitions_json = simulate_exact_spin_half_transitions_json(
+            r#"{"spins":[{"shift_ppm":1.0},{"shift_ppm":2.0}],"couplings":[]}"#,
+            r#"{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10,"detected_spins":[1]}"#,
+        )?;
+        let transitions: Vec<rspin_simulation::ExactTransition> = from_json(&transitions_json)?;
+
+        assert_eq!(transitions.len(), 1);
+        assert!((transitions[0].center_ppm - 2.0).abs() < 1.0e-12);
         Ok(())
     }
 

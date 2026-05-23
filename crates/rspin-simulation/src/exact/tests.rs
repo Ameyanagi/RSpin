@@ -6,7 +6,7 @@ fn single_spin_transition_matches_shift() -> anyhow::Result<()> {
         spins: vec![SpinHalf { shift_ppm: 2.0 }],
         couplings: Vec::new(),
     };
-    let transitions = exact_spin_half_transitions(&system, ExactSpinOptions::default())?;
+    let transitions = exact_spin_half_transitions(&system, &ExactSpinOptions::default())?;
 
     assert_eq!(transitions.len(), 1);
     assert_close(transitions[0].frequency_hz, 800.0, 1.0e-10);
@@ -23,7 +23,7 @@ fn single_spin_transition_preserves_negative_shift() -> anyhow::Result<()> {
         spins: vec![SpinHalf { shift_ppm: -0.5 }],
         couplings: Vec::new(),
     };
-    let transitions = exact_spin_half_transitions(&system, ExactSpinOptions::default())?;
+    let transitions = exact_spin_half_transitions(&system, &ExactSpinOptions::default())?;
 
     assert_eq!(transitions.len(), 1);
     assert_close(transitions[0].frequency_hz, 200.0, 1.0e-10);
@@ -38,7 +38,7 @@ fn uncoupled_spins_merge_degenerate_state_transitions() -> anyhow::Result<()> {
         spins: vec![SpinHalf { shift_ppm: 1.0 }, SpinHalf { shift_ppm: 2.0 }],
         couplings: Vec::new(),
     };
-    let transitions = exact_spin_half_transitions(&system, ExactSpinOptions::default())?;
+    let transitions = exact_spin_half_transitions(&system, &ExactSpinOptions::default())?;
 
     assert_eq!(transitions.len(), 2);
     assert_close(transitions[0].frequency_hz, 400.0, 1.0e-10);
@@ -55,6 +55,28 @@ fn uncoupled_spins_merge_degenerate_state_transitions() -> anyhow::Result<()> {
 }
 
 #[test]
+fn detects_selected_spin_only() -> anyhow::Result<()> {
+    let system = SpinHalfSystem {
+        spins: vec![SpinHalf { shift_ppm: 1.0 }, SpinHalf { shift_ppm: 2.0 }],
+        couplings: Vec::new(),
+    };
+    let transitions = exact_spin_half_transitions(
+        &system,
+        &ExactSpinOptions {
+            detected_spins: vec![1],
+            ..ExactSpinOptions::default()
+        },
+    )?;
+
+    assert_eq!(transitions.len(), 1);
+    assert_close(transitions[0].frequency_hz, 800.0, 1.0e-10);
+    assert_close(transitions[0].center_ppm, 2.0, 1.0e-12);
+    assert_close(transitions[0].intensity, 0.5, 1.0e-12);
+    assert_eq!(transitions[0].contribution_count, 2);
+    Ok(())
+}
+
+#[test]
 fn scalar_coupling_splits_two_spin_transitions() -> anyhow::Result<()> {
     let system = SpinHalfSystem {
         spins: vec![SpinHalf { shift_ppm: 1.0 }, SpinHalf { shift_ppm: 1.05 }],
@@ -64,7 +86,7 @@ fn scalar_coupling_splits_two_spin_transitions() -> anyhow::Result<()> {
             j_hz: 12.0,
         }],
     };
-    let transitions = exact_spin_half_transitions(&system, ExactSpinOptions::default())?;
+    let transitions = exact_spin_half_transitions(&system, &ExactSpinOptions::default())?;
 
     assert_eq!(transitions.len(), 4);
     assert!(
@@ -90,7 +112,7 @@ fn matches_ab_reference_fixture() -> anyhow::Result<()> {
             j_hz: 8.0,
         }],
     };
-    let transitions = exact_spin_half_transitions(&system, ExactSpinOptions::default())?;
+    let transitions = exact_spin_half_transitions(&system, &ExactSpinOptions::default())?;
     let expected = [
         (
             2_795.055_728_090_000_7,
@@ -147,7 +169,7 @@ fn rejects_invalid_couplings_and_options() {
             j_hz: 8.0,
         }],
     };
-    let error = exact_spin_half_transitions(&invalid_coupling, ExactSpinOptions::default())
+    let error = exact_spin_half_transitions(&invalid_coupling, &ExactSpinOptions::default())
         .expect_err("out-of-range coupling should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
 
@@ -157,12 +179,39 @@ fn rejects_invalid_couplings_and_options() {
     };
     let error = exact_spin_half_transitions(
         &valid_system,
-        ExactSpinOptions {
+        &ExactSpinOptions {
             intensity_threshold: -1.0,
             ..ExactSpinOptions::default()
         },
     )
     .expect_err("negative intensity threshold should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+}
+
+#[test]
+fn rejects_invalid_detected_spin_indices() {
+    let system = SpinHalfSystem {
+        spins: vec![SpinHalf { shift_ppm: 1.0 }, SpinHalf { shift_ppm: 2.0 }],
+        couplings: Vec::new(),
+    };
+    let error = exact_spin_half_transitions(
+        &system,
+        &ExactSpinOptions {
+            detected_spins: vec![2],
+            ..ExactSpinOptions::default()
+        },
+    )
+    .expect_err("out-of-range detected spin should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+
+    let error = exact_spin_half_transitions(
+        &system,
+        &ExactSpinOptions {
+            detected_spins: vec![0, 0],
+            ..ExactSpinOptions::default()
+        },
+    )
+    .expect_err("duplicate detected spin should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
 }
 
@@ -183,7 +232,7 @@ fn rejects_duplicate_couplings() {
             },
         ],
     };
-    let error = exact_spin_half_transitions(&system, ExactSpinOptions::default())
+    let error = exact_spin_half_transitions(&system, &ExactSpinOptions::default())
         .expect_err("duplicate coupling should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
 }
