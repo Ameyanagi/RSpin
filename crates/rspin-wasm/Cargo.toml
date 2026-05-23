@@ -10,8 +10,18 @@ version.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+rspin-analysis.workspace = true
 rspin-core.workspace = true
+rspin-io.workspace = true
+rspin-prediction.workspace = true
+rspin-processing.workspace = true
+rspin-simulation.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
 
 [lints]
 workspace = true
-
