@@ -2,7 +2,10 @@
 
 use serde::{Serialize, de::DeserializeOwned};
 
-use rspin_analysis::{IntegralRegion, PeakPickOptions, integrate_region, pick_peaks};
+use rspin_analysis::{
+    IntegralRegion, PeakOptimizationOptions, PeakPickOptions, integrate_region,
+    optimize_peaks_quadratic, pick_peaks,
+};
 use rspin_core::{RSpinError, Result, Spectrum1D};
 use rspin_io::read_jcamp_dx_1d;
 use rspin_prediction::PredictionSet;
@@ -55,6 +58,23 @@ pub fn pick_peaks_json(spectrum_json: &str, options_json: &str) -> Result<String
     let options: PeakPickOptions = from_json(options_json)?;
     let peaks = pick_peaks(&spectrum, options)?;
     to_json(&peaks)
+}
+
+/// Optimizes serialized peaks from serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn optimize_peaks_json(
+    spectrum_json: &str,
+    peaks_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let peaks: Vec<rspin_analysis::Peak> = from_json(peaks_json)?;
+    let options: PeakOptimizationOptions = from_json(options_json)?;
+    let optimized = optimize_peaks_quadratic(&spectrum, &peaks, options)?;
+    to_json(&optimized)
 }
 
 /// Integrates serialized `Spectrum1D` JSON over a serialized region.
@@ -214,6 +234,34 @@ mod tests {
         )?;
         let peaks: Vec<rspin_analysis::Peak> = from_json(&peaks_json)?;
         assert_eq!(peaks.len(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn optimizes_peaks_json() -> anyhow::Result<()> {
+        let spectrum_json = parse_jcamp_dx_1d_json(
+            "\
+##TITLE=demo
+##FIRSTX=0
+##LASTX=4
+##XYDATA=(X++(Y..Y))
+0 0 0.75 1 0.75 0
+##END=
+",
+        )?;
+        let peaks_json = pick_peaks_json(
+            &spectrum_json,
+            r#"{"min_abs_intensity":0.0,"min_prominence":0.0,"polarity":"Positive"}"#,
+        )?;
+        let optimized_json = optimize_peaks_json(
+            &spectrum_json,
+            &peaks_json,
+            r#"{"require_vertex_inside":true,"require_matching_curvature":true}"#,
+        )?;
+        let optimized: Vec<rspin_analysis::OptimizedPeak> = from_json(&optimized_json)?;
+
+        assert_eq!(optimized.len(), 1);
+        assert!(optimized[0].optimized);
         Ok(())
     }
 

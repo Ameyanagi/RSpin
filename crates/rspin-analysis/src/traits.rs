@@ -2,7 +2,7 @@
 
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
-use crate::{DetectedRange, DetectedZone, Integral, IntegralRegion, Peak};
+use crate::{DetectedRange, DetectedZone, Integral, IntegralRegion, OptimizedPeak, Peak};
 
 /// Picks peaks from a one-dimensional spectrum.
 pub trait PeakPicker {
@@ -12,6 +12,16 @@ pub trait PeakPicker {
     ///
     /// Returns an error when picker options are invalid for the spectrum.
     fn pick(&self, spectrum: &Spectrum1D) -> Result<Vec<Peak>>;
+}
+
+/// Optimizes picked peaks from a one-dimensional spectrum.
+pub trait PeakOptimizer {
+    /// Returns optimized peaks corresponding to `peaks`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when peaks cannot be mapped onto the spectrum.
+    fn optimize(&self, spectrum: &Spectrum1D, peaks: &[Peak]) -> Result<Vec<OptimizedPeak>>;
 }
 
 /// Integrates a one-dimensional spectrum over a region.
