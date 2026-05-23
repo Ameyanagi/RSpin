@@ -118,6 +118,18 @@ fn detects_multiplets_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn validates_j_coupling_graph_json() -> anyhow::Result<()> {
+    let graph_json = validate_j_coupling_graph_json(
+        r#"{"nodes":[{"id":"H1","label":"H-1","nucleus":"Hydrogen1"},{"id":"H2","label":null,"nucleus":"Hydrogen1"}],"couplings":[{"id":"j:H1-H2","node_a":"H1","node_b":"H2","j_hz":7.2,"confidence":0.9,"source":"measured"}]}"#,
+    )?;
+    let graph: rspin_analysis::JCouplingGraph = from_json(&graph_json)?;
+
+    assert_eq!(graph.nodes.len(), 2);
+    assert_eq!(graph.couplings.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn integrates_region_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\

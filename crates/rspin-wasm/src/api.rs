@@ -3,8 +3,8 @@
 use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
-    IntegralRegion, MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions,
-    detect_multiplets, integrate_region, optimize_peaks_quadratic, pick_peaks,
+    IntegralRegion, JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions,
+    PeakPickOptions, detect_multiplets, integrate_region, optimize_peaks_quadratic, pick_peaks,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D};
 use rspin_io::read_jcamp_dx_1d;
@@ -92,6 +92,17 @@ pub fn detect_multiplets_json(
     let options: MultipletDetectionOptions = from_json(options_json)?;
     let multiplets = detect_multiplets(&spectrum, &peaks, options)?;
     to_json(&multiplets)
+}
+
+/// Validates serialized J-coupling graph JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_j_coupling_graph_json(graph_json: &str) -> Result<String> {
+    let graph: JCouplingGraph = from_json(graph_json)?;
+    graph.validate()?;
+    to_json(&graph)
 }
 
 /// Integrates serialized `Spectrum1D` JSON over a serialized region.

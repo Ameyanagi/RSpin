@@ -10,7 +10,7 @@ pub use api::{
     normalize_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json, pick_peaks_json,
     scale_spectrum_1d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
-    validate_prediction_json,
+    validate_j_coupling_graph_json, validate_prediction_json,
 };
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
@@ -88,6 +88,17 @@ pub fn detect_multiplets_1d(
 ) -> std::result::Result<String, JsValue> {
     detect_multiplets_json(spectrum_json, peaks_json, options_json)
         .map_err(|error| js_error(&error))
+}
+
+/// Validates a serialized J-coupling graph and returns its normalized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateJCouplingGraph)]
+pub fn validate_j_coupling_graph(graph_json: &str) -> std::result::Result<String, JsValue> {
+    validate_j_coupling_graph_json(graph_json).map_err(|error| js_error(&error))
 }
 
 /// Integrates a serialized one-dimensional spectrum over a region.
