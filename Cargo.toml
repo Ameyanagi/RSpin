@@ -24,6 +24,8 @@ rspin-io = { path = "crates/rspin-io", version = "0.1.0" }
 rspin-prediction = { path = "crates/rspin-prediction", version = "0.1.0" }
 rspin-processing = { path = "crates/rspin-processing", version = "0.1.0" }
 rspin-simulation = { path = "crates/rspin-simulation", version = "0.1.0" }
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.18"
 
 [workspace.lints.rust]
 missing_docs = "warn"
@@ -32,4 +34,3 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = "warn"
 pedantic = "warn"
-
