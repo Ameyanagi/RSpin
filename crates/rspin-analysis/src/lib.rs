@@ -1,5 +1,6 @@
 //! Spectrum analysis operations.
 
+mod alignment;
 mod assignments;
 mod integration;
 mod matrix;
@@ -8,6 +9,10 @@ mod ranges;
 mod traits;
 mod zones;
 
+pub use alignment::{
+    AlignmentWindow, PeakAlignmentOptions, PeakAlignmentResult1D, SpectrumAlignmentShift,
+    align_spectra_by_peak,
+};
 pub use assignments::{
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,
 };
