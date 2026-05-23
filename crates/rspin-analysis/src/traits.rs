@@ -2,7 +2,9 @@
 
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
-use crate::{DetectedRange, DetectedZone, Integral, IntegralRegion, OptimizedPeak, Peak};
+use crate::{
+    DetectedMultiplet, DetectedRange, DetectedZone, Integral, IntegralRegion, OptimizedPeak, Peak,
+};
 
 /// Picks peaks from a one-dimensional spectrum.
 pub trait PeakPicker {
@@ -22,6 +24,16 @@ pub trait PeakOptimizer {
     ///
     /// Returns an error when peaks cannot be mapped onto the spectrum.
     fn optimize(&self, spectrum: &Spectrum1D, peaks: &[Peak]) -> Result<Vec<OptimizedPeak>>;
+}
+
+/// Detects one-dimensional multiplets from picked peaks.
+pub trait MultipletDetector {
+    /// Returns detected multiplets corresponding to `peaks`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when detector options or peak data are invalid.
+    fn detect(&self, spectrum: &Spectrum1D, peaks: &[Peak]) -> Result<Vec<DetectedMultiplet>>;
 }
 
 /// Integrates a one-dimensional spectrum over a region.

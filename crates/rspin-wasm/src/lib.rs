@@ -6,10 +6,11 @@ use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
 
 pub use api::{
-    decompose_exact_spin_half_spectrum_json, integrate_region_json, normalize_spectrum_1d_json,
-    optimize_peaks_json, parse_jcamp_dx_1d_json, pick_peaks_json, scale_spectrum_1d_json,
-    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
-    simulate_first_order_multiplet_json, validate_prediction_json,
+    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, integrate_region_json,
+    normalize_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json, pick_peaks_json,
+    scale_spectrum_1d_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
+    validate_prediction_json,
 };
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
@@ -71,6 +72,22 @@ pub fn optimize_peaks_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     optimize_peaks_json(spectrum_json, peaks_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Detects serialized one-dimensional multiplets.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, analysis, or
+/// serialization fails.
+#[wasm_bindgen(js_name = detectMultiplets1d)]
+pub fn detect_multiplets_1d(
+    spectrum_json: &str,
+    peaks_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    detect_multiplets_json(spectrum_json, peaks_json, options_json)
+        .map_err(|error| js_error(&error))
 }
 
 /// Integrates a serialized one-dimensional spectrum over a region.
