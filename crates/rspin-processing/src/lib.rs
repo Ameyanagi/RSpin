@@ -1,5 +1,6 @@
 //! Signal processing operations.
 
+mod apodization_2d;
 mod baseline;
 mod contours;
 mod one_d;
@@ -8,6 +9,7 @@ mod transform;
 mod two_d;
 mod zero_fill_2d;
 
+pub use apodization_2d::{ExponentialApodization2D, exponential_apodization_2d};
 pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
 };
