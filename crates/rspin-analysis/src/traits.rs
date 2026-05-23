@@ -2,7 +2,7 @@
 
 use rspin_core::{Result, Spectrum1D};
 
-use crate::{Integral, IntegralRegion, Peak};
+use crate::{DetectedRange, Integral, IntegralRegion, Peak};
 
 /// Picks peaks from a one-dimensional spectrum.
 pub trait PeakPicker {
@@ -22,4 +22,14 @@ pub trait Integrator {
     ///
     /// Returns an error when the region is invalid for the spectrum.
     fn integrate(&self, spectrum: &Spectrum1D, region: IntegralRegion) -> Result<Integral>;
+}
+
+/// Detects ranges from a one-dimensional spectrum.
+pub trait RangeDetector {
+    /// Returns detected ranges.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when detector options are invalid for the spectrum.
+    fn detect(&self, spectrum: &Spectrum1D) -> Result<Vec<DetectedRange>>;
 }
