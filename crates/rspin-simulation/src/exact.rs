@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::Simulator;
 
+mod spectrum;
+
+pub use spectrum::{ExactSpectrumOptions, simulate_exact_spin_half_1d};
+
 /// Maximum number of spin-1/2 particles supported by the dense exact solver.
 pub const MAX_EXACT_SPINS: usize = 12;
 
@@ -87,8 +91,9 @@ pub struct ExactTransition {
 
 /// Simulates exact spin-1/2 transition lines by dense Hamiltonian diagonalization.
 ///
-/// The Hamiltonian uses chemical-shift offsets and isotropic scalar coupling in
-/// Hz. The observable is the sum of transverse single-spin operators.
+/// The Hamiltonian uses chemical-shift offsets and the full isotropic scalar
+/// coupling term in Hz, including transverse flip-flop terms. The observable is
+/// the sum of transverse single-spin operators.
 ///
 /// # Errors
 ///
