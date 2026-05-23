@@ -8,6 +8,7 @@ version.workspace = true
 
 [dependencies]
 rspin-core.workspace = true
+rustfft.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true
