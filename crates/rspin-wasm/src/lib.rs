@@ -7,7 +7,9 @@ use wasm_bindgen::prelude::*;
 
 pub use api::{
     integrate_region_json, normalize_spectrum_1d_json, parse_jcamp_dx_1d_json, pick_peaks_json,
-    scale_spectrum_1d_json, simulate_first_order_multiplet_json, validate_prediction_json,
+    scale_spectrum_1d_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
+    validate_prediction_json,
 };
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
@@ -82,6 +84,36 @@ pub fn simulate_first_order_multiplet(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     simulate_first_order_multiplet_json(multiplet_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Simulates exact spin-1/2 transitions as serialized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, simulation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = simulateExactSpinHalfTransitions)]
+pub fn simulate_exact_spin_half_transitions(
+    system_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    simulate_exact_spin_half_transitions_json(system_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Simulates an exact spin-1/2 system as a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, simulation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = simulateExactSpinHalfSpectrum)]
+pub fn simulate_exact_spin_half_spectrum(
+    system_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    simulate_exact_spin_half_spectrum_json(system_json, options_json)
         .map_err(|error| js_error(&error))
 }
 

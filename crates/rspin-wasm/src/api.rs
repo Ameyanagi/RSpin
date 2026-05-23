@@ -7,7 +7,10 @@ use rspin_core::{RSpinError, Result, Spectrum1D};
 use rspin_io::read_jcamp_dx_1d;
 use rspin_prediction::PredictionSet;
 use rspin_processing::{normalize_max_abs, scale_intensity};
-use rspin_simulation::{FirstOrderMultiplet, SimulationOptions, simulate_multiplet_1d};
+use rspin_simulation::{
+    ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
+    exact_spin_half_transitions, simulate_exact_spin_half_1d, simulate_multiplet_1d,
+};
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.
 ///
@@ -77,6 +80,36 @@ pub fn simulate_first_order_multiplet_json(
     let multiplet: FirstOrderMultiplet = from_json(multiplet_json)?;
     let options: SimulationOptions = from_json(options_json)?;
     let spectrum = simulate_multiplet_1d(&multiplet, options)?;
+    to_json(&spectrum)
+}
+
+/// Simulates exact spin-1/2 transitions and returns serialized transition JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, exact simulation, or serialization fails.
+pub fn simulate_exact_spin_half_transitions_json(
+    system_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let system: SpinHalfSystem = from_json(system_json)?;
+    let options: ExactSpinOptions = from_json(options_json)?;
+    let transitions = exact_spin_half_transitions(&system, options)?;
+    to_json(&transitions)
+}
+
+/// Simulates an exact spin-1/2 system into serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, exact simulation, or serialization fails.
+pub fn simulate_exact_spin_half_spectrum_json(
+    system_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let system: SpinHalfSystem = from_json(system_json)?;
+    let options: ExactSpectrumOptions = from_json(options_json)?;
+    let spectrum = simulate_exact_spin_half_1d(&system, options)?;
     to_json(&spectrum)
 }
 
@@ -194,6 +227,33 @@ mod tests {
         )?;
         let spectrum: Spectrum1D = from_json(&spectrum_json)?;
         assert_eq!(spectrum.len(), 16);
+        Ok(())
+    }
+
+    #[test]
+    fn simulates_exact_transitions_json() -> anyhow::Result<()> {
+        let transitions_json = simulate_exact_spin_half_transitions_json(
+            r#"{"spins":[{"shift_ppm":7.0},{"shift_ppm":7.04}],"couplings":[{"spin_a":0,"spin_b":1,"j_hz":8.0}]}"#,
+            r#"{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}"#,
+        )?;
+        let transitions: Vec<rspin_simulation::ExactTransition> = from_json(&transitions_json)?;
+
+        assert_eq!(transitions.len(), 4);
+        assert!((transitions[0].center_ppm - 6.987_639_320_225_002).abs() < 1.0e-10);
+        Ok(())
+    }
+
+    #[test]
+    fn simulates_exact_spectrum_json() -> anyhow::Result<()> {
+        let spectrum_json = simulate_exact_spin_half_spectrum_json(
+            r#"{"spins":[{"shift_ppm":2.0}],"couplings":[]}"#,
+            r#"{"from_ppm":1.99,"to_ppm":2.01,"points":11,"area":2.0,"line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
+        )?;
+        let spectrum: Spectrum1D = from_json(&spectrum_json)?;
+
+        assert_eq!(spectrum.len(), 11);
+        assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
+        assert!(spectrum.intensities.iter().any(|value| *value > 0.0));
         Ok(())
     }
 
