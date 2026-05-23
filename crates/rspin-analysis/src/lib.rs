@@ -1,3 +1,9 @@
 //! Spectrum analysis operations.
 
-pub use rspin_core as core;
+mod integration;
+mod peaks;
+mod traits;
+
+pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
+pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pick_peaks};
+pub use traits::{Integrator, PeakPicker};

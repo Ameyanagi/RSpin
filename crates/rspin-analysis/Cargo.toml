@@ -8,7 +8,10 @@ version.workspace = true
 
 [dependencies]
 rspin-core.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
 
 [lints]
 workspace = true
-
