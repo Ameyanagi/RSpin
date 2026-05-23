@@ -1,11 +1,15 @@
 //! Spectrum analysis operations.
 
+mod assignments;
 mod integration;
 mod peaks;
 mod ranges;
 mod traits;
 mod zones;
 
+pub use assignments::{
+    AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,
+};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
 pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pick_peaks};
 pub use ranges::{DetectedRange, RangeDetectionOptions, ThresholdRangeDetector, detect_ranges};

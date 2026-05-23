@@ -30,6 +30,13 @@ pub enum RSpinError {
         message: String,
     },
 
+    /// Assignment data is incomplete or inconsistent.
+    #[error("invalid assignment: {message}")]
+    InvalidAssignment {
+        /// Human-readable validation message.
+        message: String,
+    },
+
     /// The requested operation is not supported.
     #[error("unsupported feature: {feature}")]
     Unsupported {
