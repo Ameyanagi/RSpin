@@ -48,6 +48,26 @@ impl Simulator<SpinHalfSystem> for ExactSpectrumOptions {
     }
 }
 
+/// One rendered contribution from a single exact transition.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExactTransitionContribution1D {
+    /// Exact transition that generated this contribution.
+    pub transition: ExactTransition,
+    /// Contribution intensities on the shared output axis.
+    pub intensities: Vec<f64>,
+}
+
+/// Dense exact spectrum plus per-transition rendered contributions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ExactSpectrumDecomposition1D {
+    /// Total simulated spectrum.
+    pub spectrum: Spectrum1D,
+    /// Exact transitions used for rendering.
+    pub transitions: Vec<ExactTransition>,
+    /// Per-transition rendered intensities on `spectrum.x`.
+    pub contributions: Vec<ExactTransitionContribution1D>,
+}
+
 /// Simulates a dense one-dimensional spectrum from exact spin-1/2 transitions.
 ///
 /// Exact Hamiltonian transition intensities are normalized before rendering so
@@ -62,6 +82,23 @@ pub fn simulate_exact_spin_half_1d(
     system: &SpinHalfSystem,
     options: &ExactSpectrumOptions,
 ) -> Result<Spectrum1D> {
+    decompose_exact_spin_half_1d(system, options).map(|result| result.spectrum)
+}
+
+/// Simulates a dense one-dimensional spectrum and per-transition contributions.
+///
+/// The Hamiltonian transition intensities are normalized before rendering so
+/// [`ExactSpectrumOptions::area`] controls the integrated area of the rendered
+/// transition set.
+///
+/// # Errors
+///
+/// Returns an error when the spin system, exact transition options, or rendering
+/// options are invalid.
+pub fn decompose_exact_spin_half_1d(
+    system: &SpinHalfSystem,
+    options: &ExactSpectrumOptions,
+) -> Result<ExactSpectrumDecomposition1D> {
     validate_options(options)?;
     let transitions = exact_spin_half_transitions(system, &options.transition_options)?;
     let axis = Axis::linear(
@@ -71,14 +108,15 @@ pub fn simulate_exact_spin_half_1d(
         options.to_ppm,
         options.points,
     )?;
-    let intensities = synthesize(&axis.values, &transitions, options);
+    let contributions = render_contributions(&axis.values, &transitions, options);
+    let intensities = sum_contributions(axis.len(), &contributions);
     let metadata = Metadata {
         name: Some("simulated exact spin-1/2 spectrum".to_owned()),
         frequency_mhz: Some(options.transition_options.spectrometer_mhz),
         ..Metadata::default()
     };
 
-    Spectrum1D::new(axis, intensities, metadata).map(|spectrum| {
+    let spectrum = Spectrum1D::new(axis, intensities, metadata).map(|spectrum| {
         spectrum.with_processing_record(
             ProcessingRecord::new("simulate_exact_spin_half_1d").with_details(format!(
                 "{} transitions rendered with {:?}",
@@ -86,36 +124,71 @@ pub fn simulate_exact_spin_half_1d(
                 options.line_shape
             )),
         )
+    })?;
+
+    Ok(ExactSpectrumDecomposition1D {
+        spectrum,
+        transitions,
+        contributions,
     })
 }
 
-fn synthesize(
+fn render_contributions(
     axis: &[f64],
     transitions: &[ExactTransition],
     options: &ExactSpectrumOptions,
-) -> Vec<f64> {
+) -> Vec<ExactTransitionContribution1D> {
     let total_intensity = transitions
         .iter()
         .map(|transition| transition.intensity)
         .sum::<f64>();
-    let mut values = vec![0.0; axis.len()];
     if total_intensity <= 0.0 || !total_intensity.is_finite() {
-        return values;
+        return Vec::new();
     }
 
-    for transition in transitions {
-        let area = options.area * transition.intensity / total_intensity;
-        for (index, x_ppm) in axis.iter().copied().enumerate() {
-            values[index] += options.line_shape.value(
+    transitions
+        .iter()
+        .copied()
+        .map(|transition| {
+            let area = options.area * transition.intensity / total_intensity;
+            ExactTransitionContribution1D {
+                transition,
+                intensities: render_transition(axis, transition, area, options),
+            }
+        })
+        .collect()
+}
+
+fn render_transition(
+    axis: &[f64],
+    transition: ExactTransition,
+    area: f64,
+    options: &ExactSpectrumOptions,
+) -> Vec<f64> {
+    axis.iter()
+        .copied()
+        .map(|x_ppm| {
+            options.line_shape.value(
                 x_ppm,
                 transition.center_ppm,
                 options.line_width_hz,
                 options.transition_options.spectrometer_mhz,
                 area,
-            );
+            )
+        })
+        .collect()
+}
+
+fn sum_contributions(
+    point_count: usize,
+    contributions: &[ExactTransitionContribution1D],
+) -> Vec<f64> {
+    let mut values = vec![0.0; point_count];
+    for contribution in contributions {
+        for (index, value) in contribution.intensities.iter().copied().enumerate() {
+            values[index] += value;
         }
     }
-
     values
 }
 

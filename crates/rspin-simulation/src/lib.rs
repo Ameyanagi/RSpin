@@ -6,8 +6,9 @@ mod line_shape;
 mod traits;
 
 pub use exact::{
-    ExactSpectrumOptions, ExactSpinOptions, ExactTransition, MAX_EXACT_SPINS, ScalarCoupling,
-    SpinHalf, SpinHalfSystem, exact_spin_half_transitions, simulate_exact_spin_half_1d,
+    ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactSpinOptions, ExactTransition,
+    ExactTransitionContribution1D, MAX_EXACT_SPINS, ScalarCoupling, SpinHalf, SpinHalfSystem,
+    decompose_exact_spin_half_1d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
 };
 pub use first_order::{
     CouplingGroup, FirstOrderMultiplet, FirstOrderOptions, SimulationOptions, Transition,

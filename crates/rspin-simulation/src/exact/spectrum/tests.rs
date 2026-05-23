@@ -81,6 +81,50 @@ fn renders_coupled_ab_system() -> anyhow::Result<()> {
 }
 
 #[test]
+fn decomposes_spectrum_into_transition_contributions() -> anyhow::Result<()> {
+    let system = SpinHalfSystem {
+        spins: vec![SpinHalf { shift_ppm: 7.0 }, SpinHalf { shift_ppm: 7.04 }],
+        couplings: vec![ScalarCoupling {
+            spin_a: 0,
+            spin_b: 1,
+            j_hz: 8.0,
+        }],
+    };
+    let result = decompose_exact_spin_half_1d(
+        &system,
+        &ExactSpectrumOptions {
+            from_ppm: 6.95,
+            to_ppm: 7.08,
+            points: 64,
+            area: 2.0,
+            line_width_hz: 1.0,
+            line_shape: LineShape::Lorentzian,
+            transition_options: ExactSpinOptions::default(),
+        },
+    )?;
+
+    assert_eq!(result.transitions.len(), 4);
+    assert_eq!(result.contributions.len(), result.transitions.len());
+    assert!(
+        result
+            .contributions
+            .iter()
+            .all(|contribution| contribution.intensities.len() == result.spectrum.len())
+    );
+
+    for point in 0..result.spectrum.len() {
+        let sum = result
+            .contributions
+            .iter()
+            .map(|contribution| contribution.intensities[point])
+            .sum::<f64>();
+        assert_close(result.spectrum.intensities[point], sum, 1.0e-10);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_rendering_options() {
     let system = SpinHalfSystem {
         spins: vec![SpinHalf { shift_ppm: 1.0 }],

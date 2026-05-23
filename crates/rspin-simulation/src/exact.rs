@@ -12,7 +12,10 @@ mod spectrum;
 
 use hamiltonian::{basis_dimension, hamiltonian_matrix, observation_matrix, total_z_expectations};
 
-pub use spectrum::{ExactSpectrumOptions, simulate_exact_spin_half_1d};
+pub use spectrum::{
+    ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactTransitionContribution1D,
+    decompose_exact_spin_half_1d, simulate_exact_spin_half_1d,
+};
 
 /// Maximum number of spin-1/2 particles supported by the dense exact solver.
 pub const MAX_EXACT_SPINS: usize = 12;

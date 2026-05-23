@@ -9,7 +9,8 @@ use rspin_prediction::PredictionSet;
 use rspin_processing::{normalize_max_abs, scale_intensity};
 use rspin_simulation::{
     ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
-    exact_spin_half_transitions, simulate_exact_spin_half_1d, simulate_multiplet_1d,
+    decompose_exact_spin_half_1d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
+    simulate_multiplet_1d,
 };
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.
@@ -111,6 +112,21 @@ pub fn simulate_exact_spin_half_spectrum_json(
     let options: ExactSpectrumOptions = from_json(options_json)?;
     let spectrum = simulate_exact_spin_half_1d(&system, &options)?;
     to_json(&spectrum)
+}
+
+/// Simulates exact spin-1/2 spectrum JSON with per-transition contributions.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, exact simulation, or serialization fails.
+pub fn decompose_exact_spin_half_spectrum_json(
+    system_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let system: SpinHalfSystem = from_json(system_json)?;
+    let options: ExactSpectrumOptions = from_json(options_json)?;
+    let decomposition = decompose_exact_spin_half_1d(&system, &options)?;
+    to_json(&decomposition)
 }
 
 /// Validates serialized prediction JSON and returns normalized JSON.
@@ -267,6 +283,23 @@ mod tests {
         assert_eq!(spectrum.len(), 11);
         assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
         assert!(spectrum.intensities.iter().any(|value| *value > 0.0));
+        Ok(())
+    }
+
+    #[test]
+    fn decomposes_exact_spectrum_json() -> anyhow::Result<()> {
+        let decomposition_json = decompose_exact_spin_half_spectrum_json(
+            r#"{"spins":[{"shift_ppm":7.0},{"shift_ppm":7.04}],"couplings":[{"spin_a":0,"spin_b":1,"j_hz":8.0}]}"#,
+            r#"{"from_ppm":6.95,"to_ppm":7.08,"points":32,"area":1.0,"line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
+        )?;
+        let decomposition: rspin_simulation::ExactSpectrumDecomposition1D =
+            from_json(&decomposition_json)?;
+
+        assert_eq!(decomposition.spectrum.len(), 32);
+        assert_eq!(
+            decomposition.contributions.len(),
+            decomposition.transitions.len()
+        );
         Ok(())
     }
 
