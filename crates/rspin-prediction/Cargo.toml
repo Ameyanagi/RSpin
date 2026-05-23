@@ -1,0 +1,14 @@
+[package]
+name = "rspin-prediction"
+description = "Prediction traits and adapter types for RSpin."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+rspin-core.workspace = true
+
+[lints]
+workspace = true
+

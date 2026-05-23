@@ -1,0 +1,19 @@
+[package]
+name = "rspin"
+description = "Facade crate for RSpin."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+rspin-analysis.workspace = true
+rspin-core.workspace = true
+rspin-io.workspace = true
+rspin-prediction.workspace = true
+rspin-processing.workspace = true
+rspin-simulation.workspace = true
+
+[lints]
+workspace = true
+

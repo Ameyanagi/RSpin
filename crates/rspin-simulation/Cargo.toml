@@ -1,0 +1,14 @@
+[package]
+name = "rspin-simulation"
+description = "Spectrum simulation for RSpin."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+rspin-core.workspace = true
+
+[lints]
+workspace = true
+

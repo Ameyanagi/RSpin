@@ -1,0 +1,13 @@
+[package]
+name = "rspin-core"
+description = "Core data model and shared types for RSpin."
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
+
