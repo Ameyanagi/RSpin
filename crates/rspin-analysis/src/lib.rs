@@ -2,6 +2,7 @@
 
 mod assignments;
 mod integration;
+mod matrix;
 mod peaks;
 mod ranges;
 mod traits;
@@ -11,6 +12,7 @@ pub use assignments::{
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,
 };
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
+pub use matrix::{MatrixGenerationOptions, SpectrumMatrix1D, generate_spectrum_matrix_1d};
 pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pick_peaks};
 pub use ranges::{DetectedRange, RangeDetectionOptions, ThresholdRangeDetector, detect_ranges};
 pub use traits::{Integrator, PeakPicker, RangeDetector, ZoneDetector};
