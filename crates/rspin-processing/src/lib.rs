@@ -15,8 +15,8 @@ pub use one_d::{
 };
 pub use traits::ProcessingStep;
 pub use transform::{
-    ExponentialApodization, Fft1D, FftDirection, Magnitude, exponential_apodization, fft_1d,
-    magnitude_spectrum,
+    ExponentialApodization, Fft1D, FftDirection, Magnitude, PhaseCorrection,
+    exponential_apodization, fft_1d, magnitude_spectrum, phase_correct,
 };
 pub use two_d::{
     Normalize2DMaxAbs, ProjectionMode, Scale2D, normalize_2d_max_abs, project_x, project_y,

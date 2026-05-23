@@ -54,6 +54,28 @@ impl ProcessingStep<Spectrum1D> for Fft1D {
     }
 }
 
+/// Manual zero- and first-order phase correction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PhaseCorrection {
+    /// Zero-order phase in degrees.
+    pub zero_order_deg: f64,
+    /// First-order phase in degrees across the full spectrum.
+    pub first_order_deg: f64,
+    /// Pivot position as a fraction of the index range, typically in `[0, 1]`.
+    pub pivot_fraction: f64,
+}
+
+impl ProcessingStep<Spectrum1D> for PhaseCorrection {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        phase_correct(
+            spectrum,
+            self.zero_order_deg,
+            self.first_order_deg,
+            self.pivot_fraction,
+        )
+    }
+}
+
 /// Applies exponential apodization.
 ///
 /// The multiplier at point `i` is `exp(-pi * line_broadening_hz * dwell_time_s * i)`.
@@ -161,6 +183,66 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
     ))
 }
 
+/// Applies manual phase correction to a complex one-dimensional spectrum.
+///
+/// The phase at point `i` is `zero_order_deg + first_order_deg *
+/// (fraction(i) - pivot_fraction)`, where `fraction(i)` spans `0..=1` across
+/// the spectrum. Real-only input is treated as complex data with zero imaginary
+/// values, and the output always contains an imaginary channel.
+///
+/// # Errors
+///
+/// Returns an error when phase parameters are non-finite, the pivot is outside
+/// `[0, 1]`, or the point count is too large for safe conversion.
+pub fn phase_correct(
+    spectrum: &Spectrum1D,
+    zero_order_deg: f64,
+    first_order_deg: f64,
+    pivot_fraction: f64,
+) -> Result<Spectrum1D> {
+    ensure_finite("zero_order_deg", zero_order_deg)?;
+    ensure_finite("first_order_deg", first_order_deg)?;
+    if !pivot_fraction.is_finite() || !(0.0..=1.0).contains(&pivot_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "phase pivot fraction must be finite and between 0 and 1".to_owned(),
+        });
+    }
+
+    let denominator = index_denominator(spectrum.len())?;
+    let mut real = Vec::with_capacity(spectrum.len());
+    let mut imaginary = Vec::with_capacity(spectrum.len());
+    for (index, value) in complex_buffer(spectrum).into_iter().enumerate() {
+        let fraction = if denominator == 0.0 {
+            0.0
+        } else {
+            f64::from(
+                u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                    message: "spectrum is too large for phase correction".to_owned(),
+                })?,
+            ) / denominator
+        };
+        let phase_rad =
+            (zero_order_deg + first_order_deg * (fraction - pivot_fraction)).to_radians();
+        let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+        let corrected = value * rotation;
+        real.push(corrected.re);
+        imaginary.push(corrected.im);
+    }
+
+    let mut processed = Spectrum1D::new_complex(
+        spectrum.x.clone(),
+        real,
+        Some(imaginary),
+        spectrum.metadata.clone(),
+    )?;
+    processed.processing.clone_from(&spectrum.processing);
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("phase_correct").with_details(format!(
+            "zero_order_deg={zero_order_deg},first_order_deg={first_order_deg},pivot_fraction={pivot_fraction}"
+        )),
+    ))
+}
+
 fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
     match &spectrum.imaginary {
         Some(imaginary) => spectrum
@@ -175,6 +257,16 @@ fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
             .map(|real| Complex::new(*real, 0.0))
             .collect(),
     }
+}
+
+fn index_denominator(len: usize) -> Result<f64> {
+    if len <= 1 {
+        return Ok(0.0);
+    }
+    let denominator = u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
+        message: "spectrum is too large for phase correction".to_owned(),
+    })?;
+    Ok(f64::from(denominator))
 }
 
 fn ensure_non_negative(field: &'static str, value: f64) -> Result<()> {
@@ -205,85 +297,4 @@ fn ensure_finite(field: &'static str, value: f64) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use rspin_core::{Axis, Metadata, Unit};
-
-    use super::*;
-
-    #[test]
-    fn apodization_decays_real_and_imaginary_channels() -> anyhow::Result<()> {
-        let spectrum = complex_spectrum()?;
-        let processed = exponential_apodization(&spectrum, 1.0, 0.1)?;
-        assert_close(processed.intensities[0], 1.0);
-        assert!(processed.intensities[1] < 2.0);
-        let imaginary = require_imaginary(&processed)?;
-        assert_close(imaginary[0], 0.5);
-        assert!(imaginary[1] < 1.0);
-        Ok(())
-    }
-
-    #[test]
-    fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
-        let spectrum = complex_spectrum()?;
-        let processed = Magnitude.apply(&spectrum)?;
-        assert_vec_close(
-            &processed.intensities,
-            &[1.118_033_988_749_895, 2.236_067_977_499_79, 4.0],
-        );
-        assert!(processed.imaginary.is_none());
-        Ok(())
-    }
-
-    #[test]
-    fn fft_inverse_roundtrip_recovers_complex_data() -> anyhow::Result<()> {
-        let spectrum = complex_spectrum()?;
-        let transformed = Fft1D {
-            direction: FftDirection::Forward,
-        }
-        .apply(&spectrum)?;
-        let recovered = fft_1d(&transformed, FftDirection::Inverse)?;
-        assert_vec_close(&recovered.intensities, &spectrum.intensities);
-        assert_vec_close(
-            require_imaginary(&recovered)?,
-            require_imaginary(&spectrum)?,
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_negative_line_broadening() -> anyhow::Result<()> {
-        let spectrum = complex_spectrum()?;
-        let error = exponential_apodization(&spectrum, -1.0, 0.1)
-            .expect_err("negative line broadening should fail");
-        assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
-        Ok(())
-    }
-
-    fn complex_spectrum() -> anyhow::Result<Spectrum1D> {
-        let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.2, 3)?;
-        Ok(Spectrum1D::new_complex(
-            axis,
-            vec![1.0, 2.0, 4.0],
-            Some(vec![0.5, 1.0, 0.0]),
-            Metadata::default(),
-        )?)
-    }
-
-    fn require_imaginary(spectrum: &Spectrum1D) -> anyhow::Result<&[f64]> {
-        match &spectrum.imaginary {
-            Some(imaginary) => Ok(imaginary),
-            None => anyhow::bail!("missing imaginary channel"),
-        }
-    }
-
-    fn assert_vec_close(actual: &[f64], expected: &[f64]) {
-        assert_eq!(actual.len(), expected.len());
-        for (left, right) in actual.iter().zip(expected) {
-            assert_close(*left, *right);
-        }
-    }
-
-    fn assert_close(actual: f64, expected: f64) {
-        assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
-    }
-}
+mod tests;
