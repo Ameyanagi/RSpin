@@ -4,6 +4,7 @@ mod analysis;
 mod api;
 mod contours;
 mod io;
+mod processing_1d;
 
 use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
@@ -12,20 +13,29 @@ pub use analysis::{detect_ranges_1d, detect_zones_2d};
 pub use api::{
     auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json,
     decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
-    detect_zones_json, extract_contours_2d_json, fft_spectrum_2d_json, integrate_region_json,
-    normalize_spectrum_1d_json, normalize_spectrum_2d_json, optimize_peaks_json,
-    parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json,
-    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
-    project_spectrum_2d_y_json, render_prediction_1d_json, scale_spectrum_1d_json,
-    scale_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_y_at_x_index_json,
+    detect_zones_json, exponential_apodization_spectrum_1d_json, extract_contours_2d_json,
+    fft_spectrum_1d_json, fft_spectrum_2d_json, integrate_region_json, magnitude_spectrum_1d_json,
+    normalize_spectrum_1d_json, normalize_spectrum_2d_json, offset_spectrum_1d_json,
+    optimize_peaks_json, parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json,
+    parse_spectrum_2d_csv_json, phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
+    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
+    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    simulate_first_order_multiplet_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_y_at_x_index_json, subtract_baseline_spectrum_1d_json,
     summarize_signals_1d_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_2d_json,
+    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
+    zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
     parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
+};
+pub use processing_1d::{
+    auto_phase_spectrum_1d, exponential_apodization_spectrum_1d, fft_spectrum_1d,
+    magnitude_spectrum_1d, normalize_spectrum_1d, offset_spectrum_1d, phase_spectrum_1d,
+    scale_spectrum_1d, shift_spectrum_1d_axis, subtract_baseline_spectrum_1d,
+    zero_fill_spectrum_1d,
 };
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
@@ -36,42 +46,6 @@ pub use io::{
 #[wasm_bindgen(js_name = parseJcampDx1d)]
 pub fn parse_jcamp_dx_1d(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_1d_json(input).map_err(|error| js_error(&error))
-}
-
-/// Scales a serialized one-dimensional spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, processing, or
-/// serialization fails.
-#[wasm_bindgen(js_name = scaleSpectrum1d)]
-pub fn scale_spectrum_1d(spectrum_json: &str, factor: f64) -> std::result::Result<String, JsValue> {
-    scale_spectrum_1d_json(spectrum_json, factor).map_err(|error| js_error(&error))
-}
-
-/// Normalizes a serialized one-dimensional spectrum by maximum absolute value.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, processing, or
-/// serialization fails.
-#[wasm_bindgen(js_name = normalizeSpectrum1d)]
-pub fn normalize_spectrum_1d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
-    normalize_spectrum_1d_json(spectrum_json).map_err(|error| js_error(&error))
-}
-
-/// Automatically phases a serialized one-dimensional spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, processing, or
-/// serialization fails.
-#[wasm_bindgen(js_name = autoPhaseSpectrum1d)]
-pub fn auto_phase_spectrum_1d(
-    spectrum_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    auto_phase_spectrum_1d_json(spectrum_json, options_json).map_err(|error| js_error(&error))
 }
 
 /// Scales a serialized two-dimensional spectrum.

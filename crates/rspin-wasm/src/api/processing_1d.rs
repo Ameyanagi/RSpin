@@ -1,0 +1,200 @@
+//! JSON adapters for one-dimensional WASM processing.
+
+use serde::Deserialize;
+
+use rspin_core::{Result, Spectrum1D};
+use rspin_processing::{
+    BaselineMethod, FftDirection, exponential_apodization, fft_1d, magnitude_spectrum,
+    offset_intensity, phase_correct, shift_axis, subtract_baseline, zero_fill,
+};
+
+use super::{from_json, to_json};
+
+/// Offsets serialized `Spectrum1D` real intensities.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn offset_spectrum_1d_json(spectrum_json: &str, offset: f64) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let processed = offset_intensity(&spectrum, offset)?;
+    to_json(&processed)
+}
+
+/// Shifts the x axis of serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn shift_spectrum_1d_axis_json(spectrum_json: &str, delta: f64) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let processed = shift_axis(&spectrum, delta)?;
+    to_json(&processed)
+}
+
+/// Zero-fills serialized `Spectrum1D` JSON to the requested length.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn zero_fill_spectrum_1d_json(spectrum_json: &str, target_len: usize) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let processed = zero_fill(&spectrum, target_len)?;
+    to_json(&processed)
+}
+
+/// Applies a one-dimensional FFT to serialized `Spectrum1D` JSON.
+///
+/// `direction_json` is a JSON string: `"forward"` or `"inverse"`.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn fft_spectrum_1d_json(spectrum_json: &str, direction_json: &str) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let direction: FftDirectionJson = from_json(direction_json)?;
+    let processed = fft_1d(&spectrum, direction.into())?;
+    to_json(&processed)
+}
+
+/// Applies manual phase correction to serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn phase_spectrum_1d_json(spectrum_json: &str, correction_json: &str) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let correction: PhaseCorrectionJson = from_json(correction_json)?;
+    let processed = phase_correct(
+        &spectrum,
+        correction.zero_order_deg,
+        correction.first_order_deg,
+        correction.pivot_fraction,
+    )?;
+    to_json(&processed)
+}
+
+/// Converts serialized `Spectrum1D` JSON to magnitude mode.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn magnitude_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let processed = magnitude_spectrum(&spectrum)?;
+    to_json(&processed)
+}
+
+/// Applies exponential apodization to serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn exponential_apodization_spectrum_1d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let options: ExponentialApodizationJson = from_json(options_json)?;
+    let processed =
+        exponential_apodization(&spectrum, options.line_broadening_hz, options.dwell_time_s)?;
+    to_json(&processed)
+}
+
+/// Subtracts a fitted baseline from serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn subtract_baseline_spectrum_1d_json(
+    spectrum_json: &str,
+    method_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let method: BaselineMethodJson = from_json(method_json)?;
+    let processed = subtract_baseline(&spectrum, method.into())?;
+    to_json(&processed)
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+enum FftDirectionJson {
+    #[serde(rename = "forward", alias = "Forward")]
+    Forward,
+    #[serde(rename = "inverse", alias = "Inverse")]
+    Inverse,
+}
+
+impl From<FftDirectionJson> for FftDirection {
+    fn from(direction: FftDirectionJson) -> Self {
+        match direction {
+            FftDirectionJson::Forward => Self::Forward,
+            FftDirectionJson::Inverse => Self::Inverse,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(default)]
+struct PhaseCorrectionJson {
+    zero_order_deg: f64,
+    first_order_deg: f64,
+    pivot_fraction: f64,
+}
+
+impl Default for PhaseCorrectionJson {
+    fn default() -> Self {
+        Self {
+            zero_order_deg: 0.0,
+            first_order_deg: 0.0,
+            pivot_fraction: 0.5,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct ExponentialApodizationJson {
+    line_broadening_hz: f64,
+    dwell_time_s: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
+enum BaselineMethodJson {
+    Constant {
+        value: f64,
+    },
+    MovingMinimum {
+        half_window: usize,
+    },
+    WhittakerAsls {
+        lambda: f64,
+        p: f64,
+        max_iter: usize,
+        tolerance: f64,
+    },
+}
+
+impl From<BaselineMethodJson> for BaselineMethod {
+    fn from(method: BaselineMethodJson) -> Self {
+        match method {
+            BaselineMethodJson::Constant { value } => Self::Constant { value },
+            BaselineMethodJson::MovingMinimum { half_window } => {
+                Self::MovingMinimum { half_window }
+            }
+            BaselineMethodJson::WhittakerAsls {
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            } => Self::WhittakerAsls {
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests;
