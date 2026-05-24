@@ -27,14 +27,15 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    parse_spectrum_text_format, parse_spectrum1d_write_format, parse_spectrum2d_write_format,
-    read_assignment_set_json, read_j_coupling_graph_json, read_jcamp_dx_1d,
-    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
-    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
-    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_json,
-    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
-    write_j_coupling_graph_json, write_jcamp_dx_1d, write_nmredata_record,
-    write_nmredata_record_json, write_nmredata_records,
+    inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
+    parse_jcamp_dx_version, parse_spectrum_text_format, parse_spectrum1d_write_format,
+    parse_spectrum2d_write_format, read_assignment_set_json, read_j_coupling_graph_json,
+    read_jcamp_dx_1d, read_nmredata_record_json, read_nmredata_records_json,
+    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text,
+    read_spectrum1d_text_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
+    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d,
+    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum1d_json, write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
 };
@@ -124,6 +125,46 @@ pub fn parse_jcamp_dx_1d_json(input: &str) -> Result<String> {
 pub fn write_jcamp_dx_1d_json(spectrum_json: &str) -> Result<String> {
     let spectrum = spectrum1d_from_json(spectrum_json)?;
     write_jcamp_dx_1d(&spectrum)
+}
+
+/// Parses a JCAMP-DX version label into serialized metadata JSON.
+///
+/// # Errors
+///
+/// Returns an error when the version label is malformed.
+pub fn parse_jcamp_dx_version_json(input: &str) -> Result<String> {
+    let version = parse_jcamp_dx_version(input)?;
+    to_json(&version)
+}
+
+/// Parses Bruker parameter-file routing metadata into serialized JSON.
+///
+/// # Errors
+///
+/// Returns an error when a declared format version is malformed.
+pub fn inspect_bruker_parameter_file_json(input: &str) -> Result<String> {
+    let info = inspect_bruker_parameter_file(input)?;
+    to_json(&info)
+}
+
+/// Parses Agilent/Varian `procpar` routing metadata into serialized JSON.
+///
+/// # Errors
+///
+/// Returns an error when routing fields contain malformed numeric values.
+pub fn inspect_agilent_procpar_json(input: &str) -> Result<String> {
+    let info = inspect_agilent_procpar(input)?;
+    to_json(&info)
+}
+
+/// Parses JEOL Delta `.jdf` header routing metadata into serialized JSON.
+///
+/// # Errors
+///
+/// Returns an error when the payload does not contain a valid JDF header.
+pub fn inspect_jeol_jdf_bytes_json(input: &[u8]) -> Result<String> {
+    let info = inspect_jeol_jdf_bytes(input)?;
+    to_json(&info)
 }
 
 /// Serializes `Spectrum1D` JSON into the requested text format.

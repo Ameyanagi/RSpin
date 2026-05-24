@@ -231,6 +231,54 @@ fn inspects_nmrml_document_info_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn inspects_vendor_and_open_format_metadata_json() -> anyhow::Result<()> {
+    let jcamp_json = parse_jcamp_dx_version_json("5.00")?;
+    let jcamp: serde_json::Value = from_json(&jcamp_json)?;
+    assert_eq!(jcamp["raw"], "5.00");
+    assert_eq!(jcamp["major"], 5);
+    assert_eq!(jcamp["minor"], 0);
+
+    let bruker_json =
+        inspect_bruker_parameter_file_json("##JCAMPDX= 5.00\n##DATATYPE= Parameters\n")?;
+    let bruker: serde_json::Value = from_json(&bruker_json)?;
+    assert_eq!(bruker["jcamp_dx_version"]["major"], 5);
+    assert_eq!(bruker["data_type"], "Parameters");
+
+    let agilent_json = inspect_agilent_procpar_json(
+        "\
+seqfil 2 2 32 0 0 2 1 0 1 64
+1 \"hsqc\"
+0
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"H1\"
+0
+",
+    )?;
+    let agilent: serde_json::Value = from_json(&agilent_json)?;
+    assert_eq!(agilent["sequence"], "hsqc");
+    assert_eq!(agilent["acquisition_dimension"], 2);
+    assert_eq!(agilent["nucleus"], "H1");
+
+    let jeol_json = inspect_jeol_jdf_bytes_json(&minimal_jdf_header())?;
+    let jeol: serde_json::Value = from_json(&jeol_json)?;
+    assert_eq!(jeol["version"]["raw"], "1.2");
+    assert_eq!(jeol["endian"], "little");
+    assert_eq!(jeol["dimension_count"], 1);
+    assert_eq!(jeol["data_format_code"], 1);
+    assert_eq!(jeol["data_type_code"], 0);
+    assert_eq!(jeol["point_counts"][0], 4);
+    assert_eq!(jeol["title"], "wasm jdf");
+
+    let error = inspect_jeol_jdf_bytes_json(b"not jdf")
+        .expect_err("invalid JEOL JDF bytes should fail inspection");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+#[test]
 fn parses_nmredata_to_json() -> anyhow::Result<()> {
     let json = parse_nmredata_json(
         r"
@@ -1033,4 +1081,74 @@ fn integrates_detected_zones_json() -> anyhow::Result<()> {
     assert!((integrals[0].volume - 1.0).abs() < 1e-12);
     assert!((integrals[1].volume - 2.0).abs() < 1e-12);
     Ok(())
+}
+
+fn minimal_jdf_header() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"JEOL.NMR");
+    bytes.push(1);
+    bytes.push(1);
+    push_be_u16(&mut bytes, 2);
+    bytes.push(1);
+    bytes.push(0x80);
+    bytes.push(1);
+    bytes.push(25);
+    bytes.extend_from_slice(&[0; 8]);
+    bytes.extend_from_slice(&[3, 0, 0, 0, 0, 0, 0, 0]);
+    bytes.extend_from_slice(&[0; 16]);
+    push_padded(&mut bytes, "wasm jdf", 124);
+    bytes.extend_from_slice(&[0; 4]);
+    push_be_u32_array(&mut bytes, &[4, 0, 0, 0, 0, 0, 0, 0]);
+    push_be_u32_array(&mut bytes, &[0; 8]);
+    push_be_u32_array(&mut bytes, &[3, 0, 0, 0, 0, 0, 0, 0]);
+    push_be_f64_array(&mut bytes, &[0.0; 8]);
+    push_be_f64_array(&mut bytes, &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+    bytes.extend_from_slice(&[0; 8]);
+    bytes.extend_from_slice(&[0; 16]);
+    bytes.extend_from_slice(&[0; 128]);
+    bytes.extend_from_slice(&[0; 128]);
+    bytes.extend_from_slice(&[0; 128]);
+    bytes.extend_from_slice(&[0; 8 * 32]);
+    bytes.extend_from_slice(&[0; 8 * 8]);
+    bytes.extend_from_slice(&[0; 8 * 8]);
+    bytes.extend_from_slice(&[0; 8]);
+    bytes.extend_from_slice(&[0; 4]);
+    bytes.extend_from_slice(&[0; 8]);
+    push_be_u32(&mut bytes, 0);
+    push_be_u32(&mut bytes, 0);
+    bytes.extend_from_slice(&[0; 8 * 4]);
+    bytes.extend_from_slice(&[0; 8 * 4]);
+    push_be_u32(&mut bytes, 0);
+    bytes
+}
+
+fn push_padded(bytes: &mut Vec<u8>, value: &str, len: usize) {
+    let raw = value.as_bytes();
+    for index in 0..len {
+        let byte = match raw.get(index) {
+            Some(value) => *value,
+            None => 0,
+        };
+        bytes.push(byte);
+    }
+}
+
+fn push_be_u16(bytes: &mut Vec<u8>, value: u16) {
+    bytes.extend_from_slice(&value.to_be_bytes());
+}
+
+fn push_be_u32(bytes: &mut Vec<u8>, value: u32) {
+    bytes.extend_from_slice(&value.to_be_bytes());
+}
+
+fn push_be_u32_array(bytes: &mut Vec<u8>, values: &[u32; 8]) {
+    for value in values {
+        push_be_u32(bytes, *value);
+    }
+}
+
+fn push_be_f64_array(bytes: &mut Vec<u8>, values: &[f64; 8]) {
+    for value in values {
+        bytes.extend_from_slice(&value.to_be_bytes());
+    }
 }

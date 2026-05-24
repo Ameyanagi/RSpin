@@ -41,6 +41,7 @@ pub use api::{
     extract_contours_2d_json, fft_spectrum_1d_json, fft_spectrum_2d_json,
     gaussian_apodization_spectrum_1d_json, gaussian_apodization_spectrum_2d_json,
     generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
+    inspect_agilent_procpar_json, inspect_bruker_parameter_file_json, inspect_jeol_jdf_bytes_json,
     inspect_nmrml_document_json, integrate_ranges_json, integrate_region_2d_json,
     integrate_region_json, integrate_regions_2d_json, integrate_regions_json,
     integrate_zones_2d_json, magnitude_spectrum_1d_json,
@@ -50,8 +51,8 @@ pub use api::{
     normalize_spectrum_2d_json, normalize_spectrum_2d_volume_json, offset_spectrum_1d_json,
     optimize_peaks_json, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
     pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json,
-    parse_exact_transitions_csv_json, parse_jcamp_dx_1d_json, parse_nmredata_json,
-    parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
+    parse_exact_transitions_csv_json, parse_jcamp_dx_1d_json, parse_jcamp_dx_version_json,
+    parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
     parse_prediction_csv_json, parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json,
     parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json,
     parse_spectrum_2d_text_json, pca_bucket_matrix_1d_json, pca_bucket_matrix_2d_json,
@@ -77,10 +78,11 @@ pub use api::{
 };
 pub use contours::extract_contours_2d;
 pub use io::{
+    inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
     inspect_nmrml_document, nmredata_1d_signals_to_assignment_set,
     nmredata_2d_signals_to_assignment_set, nmredata_assignments_to_assignment_set,
-    nmredata_couplings_to_j_coupling_graph, nmredata_to_analysis, parse_nmredata,
-    parse_nmredata_records, parse_nmrml_1d, parse_nmrml_2d, parse_spectrum_1d_csv,
+    nmredata_couplings_to_j_coupling_graph, nmredata_to_analysis, parse_jcamp_dx_version,
+    parse_nmredata, parse_nmredata_records, parse_nmrml_1d, parse_nmrml_2d, parse_spectrum_1d_csv,
     parse_spectrum_1d_text, parse_spectrum_1d_text_as, parse_spectrum_2d_csv,
     parse_spectrum_2d_text, parse_spectrum_2d_text_as, write_analysis_1d_csv,
     write_analysis_2d_csv, write_nmredata, write_nmredata_records, write_nmrml_1d, write_nmrml_2d,

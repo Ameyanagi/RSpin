@@ -3,16 +3,17 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
+    inspect_agilent_procpar_json, inspect_bruker_parameter_file_json, inspect_jeol_jdf_bytes_json,
     inspect_nmrml_document_json, js_error, nmredata_1d_signals_to_assignment_set_json,
     nmredata_2d_signals_to_assignment_set_json, nmredata_assignments_to_assignment_set_json,
-    nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json, parse_nmredata_json,
-    parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json,
-    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
-    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
-    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
-    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
-    write_spectrum_2d_text_json,
+    nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json,
+    parse_jcamp_dx_version_json, parse_nmredata_json, parse_nmredata_records_json,
+    parse_nmrml_1d_json, parse_nmrml_2d_json, parse_spectrum_1d_csv_json,
+    parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
+    parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json, write_analysis_1d_csv_json,
+    write_analysis_2d_csv_json, write_nmredata_json, write_nmredata_records_json,
+    write_nmrml_1d_json, write_nmrml_2d_json, write_spectrum_1d_csv_json,
+    write_spectrum_1d_text_json, write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -23,6 +24,46 @@ use crate::{
 #[wasm_bindgen(js_name = parseSpectrum1dCsv)]
 pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue> {
     parse_spectrum_1d_csv_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses a JCAMP-DX version label into serialized metadata JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the version label is malformed.
+#[wasm_bindgen(js_name = parseJcampDxVersion)]
+pub fn parse_jcamp_dx_version(input: &str) -> std::result::Result<String, JsValue> {
+    parse_jcamp_dx_version_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses Bruker parameter-file routing metadata into serialized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing fails.
+#[wasm_bindgen(js_name = inspectBrukerParameterFile)]
+pub fn inspect_bruker_parameter_file(input: &str) -> std::result::Result<String, JsValue> {
+    inspect_bruker_parameter_file_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses Agilent/Varian `procpar` routing metadata into serialized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing fails.
+#[wasm_bindgen(js_name = inspectAgilentProcpar)]
+pub fn inspect_agilent_procpar(input: &str) -> std::result::Result<String, JsValue> {
+    inspect_agilent_procpar_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses JEOL Delta `.jdf` header routing metadata into serialized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing fails.
+#[wasm_bindgen(js_name = inspectJeolJdfBytes)]
+pub fn inspect_jeol_jdf_bytes(input: &[u8]) -> std::result::Result<String, JsValue> {
+    inspect_jeol_jdf_bytes_json(input).map_err(|error| js_error(&error))
 }
 
 /// Parses auto-detected one-dimensional spectrum text into serialized spectrum JSON.
