@@ -1,12 +1,13 @@
-use rspin_core::{Axis, Metadata, Nucleus, Spectrum1D, Spectrum2D, Unit};
+use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Spectrum1D, Spectrum2D, Unit};
 
 use crate::{
-    AnalyzeSpectrum1D, AnalyzeSpectrum2D, AssignedAtom, Assignment, AssignmentSet,
-    AssignmentTarget, CouplingNode, JCoupling, JCouplingGraph, MultipletDetectionOptions,
-    PeakPickOptions, PeakPolarity, RangeDetectionOptions, SignalSummary2DOptions,
-    SignalSummaryOptions, SpectrumAnalysis1DOptions, SpectrumAnalysis2DOptions, ZoneConnectivity,
-    ZoneDetectionOptions, analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d,
-    analyze_spectrum_1d, analyze_spectrum_2d,
+    AnalyzeSpectrum1D, AnalyzeSpectrum1DResult, AnalyzeSpectrum2D, AnalyzeSpectrum2DResult,
+    AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, CouplingNode, JCoupling,
+    JCouplingGraph, MultipletDetectionOptions, PeakPickOptions, PeakPolarity,
+    RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions, SpectrumAnalysis1DOptions,
+    SpectrumAnalysis2DOptions, ZoneConnectivity, ZoneDetectionOptions,
+    analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d, analyze_spectrum_1d,
+    analyze_spectrum_2d,
 };
 
 #[test]
@@ -140,6 +141,59 @@ fn runs_chainable_one_dimensional_workflow() -> anyhow::Result<()> {
 }
 
 #[test]
+fn runs_chainable_one_dimensional_workflow_from_result() -> anyhow::Result<()> {
+    let spectrum = Ok(spectrum_1d()?);
+    let assignments = AssignmentSet::new(vec![Assignment::deterministic(
+        AssignmentTarget::Range1D {
+            start_index: 2,
+            end_index: 2,
+            from: 2.0,
+            to: 2.0,
+        },
+        vec![AssignedAtom::new("H2", Nucleus::Hydrogen1)],
+    )?])?;
+    let graph = JCouplingGraph::new(
+        vec![
+            CouplingNode::new("H2", Nucleus::Hydrogen1),
+            CouplingNode::new("H3", Nucleus::Hydrogen1),
+        ],
+        vec![JCoupling::deterministic("H2", "H3", 7.2)?],
+    )?;
+
+    let analysis = spectrum
+        .analyze()
+        .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(1.0))
+        .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0))
+        .with_assignments(&assignments)
+        .with_coupling_graph(&graph)
+        .run()?;
+
+    assert_eq!(analysis.peaks.len(), 2);
+    assert_eq!(analysis.signals[0].atoms[0].id, "H2");
+    assert_eq!(analysis.signals[0].couplings.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn one_dimensional_result_workflow_preserves_initial_error() {
+    let spectrum: rspin_core::Result<Spectrum1D> = Err(RSpinError::InvalidSpectrum {
+        message: "load failed".to_owned(),
+    });
+    let error = spectrum
+        .analyze()
+        .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0))
+        .run()
+        .expect_err("initial spectrum error should be preserved");
+
+    assert_eq!(
+        error,
+        RSpinError::InvalidSpectrum {
+            message: "load failed".to_owned()
+        }
+    );
+}
+
+#[test]
 fn analyzes_two_dimensional_spectrum_with_defaults() -> anyhow::Result<()> {
     let spectrum = spectrum_2d()?;
     let options = SpectrumAnalysis2DOptions::new().with_zone_options(
@@ -219,6 +273,46 @@ fn runs_chainable_two_dimensional_workflow() -> anyhow::Result<()> {
         .run()?;
     assert!(analysis_without_assignments.signals[0].atoms.is_empty());
     Ok(())
+}
+
+#[test]
+fn runs_chainable_two_dimensional_workflow_from_result() -> anyhow::Result<()> {
+    let spectrum = Ok(spectrum_2d()?);
+    let assignments = AssignmentSet::new(vec![Assignment::deterministic(
+        AssignmentTarget::Zone2D {
+            id: "zone:x0-0:y0-1".to_owned(),
+        },
+        vec![AssignedAtom::new("C1", Nucleus::Carbon13)],
+    )?])?;
+
+    let analysis = spectrum
+        .analyze()
+        .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0))
+        .with_assignments(&assignments)
+        .run()?;
+
+    assert_eq!(analysis.zones.len(), 2);
+    assert_eq!(analysis.signals[0].atoms[0].id, "C1");
+    Ok(())
+}
+
+#[test]
+fn two_dimensional_result_workflow_preserves_initial_error() {
+    let spectrum: rspin_core::Result<Spectrum2D> = Err(RSpinError::InvalidSpectrum {
+        message: "2d load failed".to_owned(),
+    });
+    let error = spectrum
+        .analyze()
+        .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0))
+        .run()
+        .expect_err("initial spectrum error should be preserved");
+
+    assert_eq!(
+        error,
+        RSpinError::InvalidSpectrum {
+            message: "2d load failed".to_owned()
+        }
+    );
 }
 
 fn spectrum_1d() -> anyhow::Result<Spectrum1D> {

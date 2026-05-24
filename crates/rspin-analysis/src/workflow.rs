@@ -15,7 +15,9 @@ use crate::{
 mod builder;
 
 pub use builder::{
-    AnalyzeSpectrum1D, AnalyzeSpectrum2D, SpectrumAnalysis1DWorkflow, SpectrumAnalysis2DWorkflow,
+    AnalyzeSpectrum1D, AnalyzeSpectrum1DResult, AnalyzeSpectrum2D, AnalyzeSpectrum2DResult,
+    SpectrumAnalysis1DResultWorkflow, SpectrumAnalysis1DWorkflow, SpectrumAnalysis2DResultWorkflow,
+    SpectrumAnalysis2DWorkflow,
 };
 
 /// Options for the default one-dimensional analysis workflow.
