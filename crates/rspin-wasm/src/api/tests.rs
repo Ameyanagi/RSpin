@@ -1,4 +1,4 @@
-use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
+use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
 
 use super::*;
 
@@ -171,6 +171,56 @@ fn inspects_nmrml_document_info_json() -> anyhow::Result<()> {
     assert_eq!(value["namespace"], "http://nmrml.org/schema");
     assert_eq!(value["schema_locations"][0]["location"], "nmrML.xsd");
     Ok(())
+}
+
+#[test]
+fn parses_nmredata_to_json() -> anyhow::Result<()> {
+    let json = parse_nmredata_json(
+        r"
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+
+>  <NMREDATA_J>
+H1, H2, 7.0
+
+>  <NMREDATA_1D_1H>
+Larmor=500.0
+Spectrum_Location=file:./nmr/10
+4.200, L=H1, J=7.0
+",
+    )?;
+    let value: serde_json::Value = from_json(&json)?;
+
+    assert_eq!(value["version"]["major"], 1);
+    assert_eq!(value["version"]["minor"], 1);
+    assert_eq!(value["assignments"][0]["label"], "H1");
+    assert_eq!(value["assignments"][0]["shift_ppm"], 4.2);
+    assert_eq!(value["couplings"][0]["j_hz"], 7.0);
+    assert_eq!(value["spectra"][0]["kind"]["kind"], "one_d");
+    assert_eq!(value["spectra"][0]["kind"]["observed_label"], "1H");
+    assert_eq!(value["spectra"][0]["larmor_mhz"], 500.0);
+    assert_eq!(
+        value["spectra"][0]["spectrum_locations"][0],
+        "file:./nmr/10"
+    );
+    assert_eq!(value["spectra"][0]["signals_1d"][0]["from_ppm"], 4.2);
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_nmredata_json_parse() {
+    let error = parse_nmredata_json(
+        r"
+>  <NMREDATA_ASSIGNMENT>
+H1, not-a-shift, H1
+",
+    )
+    .expect_err("invalid NMReDATA assignment should fail");
+
+    assert!(matches!(error, RSpinError::Parse { .. }));
 }
 
 #[test]

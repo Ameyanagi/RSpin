@@ -27,9 +27,10 @@ use rspin_analysis::{
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
-    read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json, read_spectrum2d_text,
-    write_nmrml_1d, write_nmrml_2d, write_spectrum1d_json, write_spectrum2d_json,
+    read_jcamp_dx_1d, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json,
+    read_spectrum2d_text, write_nmrml_1d, write_nmrml_2d, write_spectrum1d_json,
+    write_spectrum2d_json,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -122,6 +123,16 @@ pub fn parse_nmrml_1d_json(input: &str) -> Result<String> {
 pub fn parse_nmrml_2d_json(input: &str) -> Result<String> {
     let spectrum = read_nmrml_2d_str(input)?;
     spectrum2d_to_json(&spectrum)
+}
+
+/// Parses `NMReDATA` SDF text into serialized record JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_nmredata_json(input: &str) -> Result<String> {
+    let record = read_nmredata_str(input)?;
+    to_json(&record)
 }
 
 /// Parses root-level nmrML document metadata into JSON.

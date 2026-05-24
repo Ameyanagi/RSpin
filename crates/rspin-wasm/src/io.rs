@@ -3,11 +3,11 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    inspect_nmrml_document_json, js_error, parse_nmrml_1d_json, parse_nmrml_2d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
-    parse_spectrum_2d_text_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
-    write_nmrml_1d_json, write_nmrml_2d_json, write_spectrum_1d_csv_json,
-    write_spectrum_2d_csv_json,
+    inspect_nmrml_document_json, js_error, parse_nmredata_json, parse_nmrml_1d_json,
+    parse_nmrml_2d_json, parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json,
+    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_json, write_analysis_1d_csv_json,
+    write_analysis_2d_csv_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -48,6 +48,16 @@ pub fn parse_nmrml_1d(input: &str) -> std::result::Result<String, JsValue> {
 #[wasm_bindgen(js_name = parseNmrMl2d)]
 pub fn parse_nmrml_2d(input: &str) -> std::result::Result<String, JsValue> {
     parse_nmrml_2d_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses `NMReDATA` SDF text into serialized record JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseNmreData)]
+pub fn parse_nmredata(input: &str) -> std::result::Result<String, JsValue> {
+    parse_nmredata_json(input).map_err(|error| js_error(&error))
 }
 
 /// Parses root-level nmrML document metadata into JSON.
