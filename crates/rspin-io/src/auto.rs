@@ -282,6 +282,19 @@ impl AutoSpectrum1DPath {
     pub fn read_path(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
         read_spectrum1d_path(path)
     }
+
+    /// Reads a one-dimensional spectrum from `path` using an explicit format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected reader rejects the path contents.
+    pub fn read_path_as(
+        self,
+        path: impl AsRef<Path>,
+        format: Spectrum1DPathFormat,
+    ) -> Result<Spectrum1D> {
+        read_spectrum1d_path_as(path, format)
+    }
 }
 
 impl SpectrumPathReader for AutoSpectrum1DPath {
@@ -304,6 +317,19 @@ impl AutoSpectrum2DPath {
     /// Returns an error when the path is missing, unsupported, or malformed.
     pub fn read_path(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
         read_spectrum2d_path(path)
+    }
+
+    /// Reads a two-dimensional spectrum from `path` using an explicit format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected reader rejects the path contents.
+    pub fn read_path_as(
+        self,
+        path: impl AsRef<Path>,
+        format: Spectrum2DPathFormat,
+    ) -> Result<Spectrum2D> {
+        read_spectrum2d_path_as(path, format)
     }
 }
 
@@ -330,6 +356,21 @@ impl AutoSpectrum1DPathWriter {
     pub fn write_path(self, spectrum: &Spectrum1D, path: impl AsRef<Path>) -> Result<()> {
         write_spectrum1d_path(spectrum, path)
     }
+
+    /// Writes a one-dimensional spectrum to `path` using an explicit format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the spectrum cannot be represented by the selected
+    /// writer or the file cannot be written.
+    pub fn write_path_as(
+        self,
+        spectrum: &Spectrum1D,
+        path: impl AsRef<Path>,
+        format: Spectrum1DWritePathFormat,
+    ) -> Result<()> {
+        write_spectrum1d_path_as(spectrum, path, format)
+    }
 }
 
 /// Extension-selecting writer for two-dimensional spectrum paths.
@@ -346,6 +387,21 @@ impl AutoSpectrum2DPathWriter {
     /// written.
     pub fn write_path(self, spectrum: &Spectrum2D, path: impl AsRef<Path>) -> Result<()> {
         write_spectrum2d_path(spectrum, path)
+    }
+
+    /// Writes a two-dimensional spectrum to `path` using an explicit format.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the spectrum cannot be represented by the selected
+    /// writer or the file cannot be written.
+    pub fn write_path_as(
+        self,
+        spectrum: &Spectrum2D,
+        path: impl AsRef<Path>,
+        format: Spectrum2DWritePathFormat,
+    ) -> Result<()> {
+        write_spectrum2d_path_as(spectrum, path, format)
     }
 }
 
@@ -413,7 +469,16 @@ pub fn parse_spectrum_text_format(input: &str) -> Result<SpectrumTextFormat> {
 /// Returns an error when the format cannot be detected or the selected parser
 /// rejects the payload.
 pub fn read_spectrum1d_text(input: &str) -> Result<Spectrum1D> {
-    match detect_spectrum_text_format(input)? {
+    read_spectrum1d_text_as(input, detect_spectrum_text_format(input)?)
+}
+
+/// Reads a one-dimensional spectrum from text using an explicit format.
+///
+/// # Errors
+///
+/// Returns an error when the selected parser rejects the payload.
+pub fn read_spectrum1d_text_as(input: &str, format: SpectrumTextFormat) -> Result<Spectrum1D> {
+    match format {
         SpectrumTextFormat::Json => read_spectrum1d_json(input),
         SpectrumTextFormat::NmrMl => read_nmrml_1d_str(input),
         SpectrumTextFormat::JcampDx => read_jcamp_dx_1d(input),
@@ -428,7 +493,17 @@ pub fn read_spectrum1d_text(input: &str) -> Result<Spectrum1D> {
 /// Returns an error when the format cannot be detected, the selected parser
 /// rejects the payload, or the payload is a one-dimensional-only format.
 pub fn read_spectrum2d_text(input: &str) -> Result<Spectrum2D> {
-    match detect_spectrum_text_format(input)? {
+    read_spectrum2d_text_as(input, detect_spectrum_text_format(input)?)
+}
+
+/// Reads a two-dimensional spectrum from text using an explicit format.
+///
+/// # Errors
+///
+/// Returns an error when the selected parser rejects the payload, or when the
+/// selected format is one-dimensional-only.
+pub fn read_spectrum2d_text_as(input: &str, format: SpectrumTextFormat) -> Result<Spectrum2D> {
+    match format {
         SpectrumTextFormat::Json => read_spectrum2d_json(input),
         SpectrumTextFormat::NmrMl => read_nmrml_2d_str(input),
         SpectrumTextFormat::Csv => read_spectrum2d_csv(input),
@@ -672,7 +747,20 @@ pub fn parse_spectrum2d_write_path_format(input: &str) -> Result<Spectrum2DWrite
 /// rejects the path contents.
 pub fn read_spectrum1d_path(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     let path = path.as_ref();
-    match detect_spectrum1d_path_format(path)? {
+    read_spectrum1d_path_as(path, detect_spectrum1d_path_format(path)?)
+}
+
+/// Reads a one-dimensional spectrum from a path using an explicit format.
+///
+/// # Errors
+///
+/// Returns an error when the selected reader rejects the path contents.
+pub fn read_spectrum1d_path_as(
+    path: impl AsRef<Path>,
+    format: Spectrum1DPathFormat,
+) -> Result<Spectrum1D> {
+    let path = path.as_ref();
+    match format {
         Spectrum1DPathFormat::Json => read_spectrum1d_json(&read_text_file(path)?),
         Spectrum1DPathFormat::NmrMl => read_nmrml_1d_str(&read_text_file(path)?),
         Spectrum1DPathFormat::JcampDx => read_jcamp_dx_1d(&read_text_file(path)?),
@@ -693,7 +781,20 @@ pub fn read_spectrum1d_path(path: impl AsRef<Path>) -> Result<Spectrum1D> {
 /// rejects the path contents.
 pub fn read_spectrum2d_path(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     let path = path.as_ref();
-    match detect_spectrum2d_path_format(path)? {
+    read_spectrum2d_path_as(path, detect_spectrum2d_path_format(path)?)
+}
+
+/// Reads a two-dimensional spectrum from a path using an explicit format.
+///
+/// # Errors
+///
+/// Returns an error when the selected reader rejects the path contents.
+pub fn read_spectrum2d_path_as(
+    path: impl AsRef<Path>,
+    format: Spectrum2DPathFormat,
+) -> Result<Spectrum2D> {
+    let path = path.as_ref();
+    match format {
         Spectrum2DPathFormat::Json => read_spectrum2d_json(&read_text_file(path)?),
         Spectrum2DPathFormat::NmrMl => read_nmrml_2d_str(&read_text_file(path)?),
         Spectrum2DPathFormat::Csv => read_spectrum2d_csv(&read_text_file(path)?),
@@ -713,8 +814,22 @@ pub fn read_spectrum2d_path(path: impl AsRef<Path>) -> Result<Spectrum2D> {
 /// represented by the selected writer, or the file cannot be written.
 pub fn write_spectrum1d_path(spectrum: &Spectrum1D, path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref();
-    let payload =
-        write_spectrum1d_text(spectrum, detect_spectrum1d_write_path_format(path)?.into())?;
+    write_spectrum1d_path_as(spectrum, path, detect_spectrum1d_write_path_format(path)?)
+}
+
+/// Writes a one-dimensional spectrum to a path using an explicit text format.
+///
+/// # Errors
+///
+/// Returns an error when the spectrum cannot be represented by the selected
+/// writer or the file cannot be written.
+pub fn write_spectrum1d_path_as(
+    spectrum: &Spectrum1D,
+    path: impl AsRef<Path>,
+    format: Spectrum1DWritePathFormat,
+) -> Result<()> {
+    let path = path.as_ref();
+    let payload = write_spectrum1d_text(spectrum, format.into())?;
     write_text_file(path, &payload)
 }
 
@@ -726,8 +841,22 @@ pub fn write_spectrum1d_path(spectrum: &Spectrum1D, path: impl AsRef<Path>) -> R
 /// represented by the selected writer, or the file cannot be written.
 pub fn write_spectrum2d_path(spectrum: &Spectrum2D, path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref();
-    let payload =
-        write_spectrum2d_text(spectrum, detect_spectrum2d_write_path_format(path)?.into())?;
+    write_spectrum2d_path_as(spectrum, path, detect_spectrum2d_write_path_format(path)?)
+}
+
+/// Writes a two-dimensional spectrum to a path using an explicit text format.
+///
+/// # Errors
+///
+/// Returns an error when the spectrum cannot be represented by the selected
+/// writer or the file cannot be written.
+pub fn write_spectrum2d_path_as(
+    spectrum: &Spectrum2D,
+    path: impl AsRef<Path>,
+    format: Spectrum2DWritePathFormat,
+) -> Result<()> {
+    let path = path.as_ref();
+    let payload = write_spectrum2d_text(spectrum, format.into())?;
     write_text_file(path, &payload)
 }
 
@@ -984,6 +1113,60 @@ mod tests {
             .expect_err("2D JCAMP-DX path format should not parse");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
 
+        Ok(())
+    }
+
+    #[test]
+    fn routes_explicit_text_and_path_formats() -> anyhow::Result<()> {
+        let root = temp_dir("explicit-format-routing")?;
+        let one = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 10.0, 8.0, 3)?,
+            vec![1.0, -2.0, 3.0],
+            Metadata::named("explicit one"),
+        )?;
+        let one_json = write_spectrum1d_json(&one)?;
+        assert_eq!(
+            read_spectrum1d_text_as(&one_json, SpectrumTextFormat::Json)?,
+            one
+        );
+
+        let one_csv_path = root.join("one.payload");
+        AutoSpectrum1DPathWriter.write_path_as(
+            &one,
+            &one_csv_path,
+            Spectrum1DWritePathFormat::Csv,
+        )?;
+        let parsed_one =
+            AutoSpectrum1DPath.read_path_as(&one_csv_path, Spectrum1DPathFormat::Csv)?;
+        assert_eq!(parsed_one.x.unit, one.x.unit);
+        assert_eq!(parsed_one.x.values, one.x.values);
+        assert_eq!(parsed_one.intensities, one.intensities);
+        assert_eq!(parsed_one.metadata.name, one.metadata.name);
+
+        let two = Spectrum2D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+            Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+            vec![1.0, 2.0, 3.0, 4.0],
+            Metadata::named("explicit two"),
+        )?;
+        let two_json = write_spectrum2d_json(&two)?;
+        assert_eq!(
+            read_spectrum2d_text_as(&two_json, SpectrumTextFormat::Json)?,
+            two
+        );
+
+        let two_json_path = root.join("two.payload");
+        write_spectrum2d_path_as(&two, &two_json_path, Spectrum2DWritePathFormat::Json)?;
+        assert_eq!(
+            read_spectrum2d_path_as(&two_json_path, Spectrum2DPathFormat::Json)?,
+            two
+        );
+
+        let error = read_spectrum2d_text_as("##TITLE=demo\n", SpectrumTextFormat::JcampDx)
+            .expect_err("2D JCAMP-DX text routing should fail");
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+        remove_dir(root)?;
         Ok(())
     }
 
