@@ -16,7 +16,10 @@ mod processed_2d;
 mod raw;
 
 pub use processed_2d::{BrukerProcessed2D, read_bruker_processed_2d_dir};
-pub use raw::{BrukerFid1D, BrukerSer2D, read_bruker_fid_1d_dir, read_bruker_ser_2d_dir};
+pub use raw::{
+    BrukerFid1D, BrukerFid1DBytes, BrukerSer2D, read_bruker_fid_1d_bytes, read_bruker_fid_1d_dir,
+    read_bruker_ser_2d_dir,
+};
 
 /// Root metadata from a Bruker JCAMP-DX-style parameter file.
 ///
@@ -92,6 +95,80 @@ impl SpectrumPathReader for BrukerProcessed1D {
     }
 }
 
+/// Byte-oriented reader for Bruker processed one-dimensional spectra.
+///
+/// The required inputs are `procs` text and real `1r` bytes. Optional `acqus`
+/// text, imaginary `1i` bytes, and title text can be attached with chainable
+/// builder methods.
+#[derive(Clone, Copy, Debug)]
+pub struct BrukerProcessed1DBytes<'a> {
+    procs: &'a str,
+    real_bytes: &'a [u8],
+    acqus: Option<&'a str>,
+    imaginary_bytes: Option<&'a [u8]>,
+    title: Option<&'a str>,
+}
+
+impl<'a> BrukerProcessed1DBytes<'a> {
+    /// Creates a byte-oriented Bruker processed 1D reader.
+    #[must_use]
+    pub fn new(procs: &'a str, real_bytes: &'a [u8]) -> Self {
+        Self {
+            procs,
+            real_bytes,
+            acqus: None,
+            imaginary_bytes: None,
+            title: None,
+        }
+    }
+
+    /// Attaches optional `acqus` metadata text.
+    #[must_use]
+    pub fn with_acqus(mut self, acqus: &'a str) -> Self {
+        self.acqus = Some(acqus);
+        self
+    }
+
+    /// Attaches optional imaginary `1i` bytes.
+    #[must_use]
+    pub fn with_imaginary(mut self, imaginary_bytes: &'a [u8]) -> Self {
+        self.imaginary_bytes = Some(imaginary_bytes);
+        self
+    }
+
+    /// Attaches optional Bruker title text.
+    #[must_use]
+    pub fn with_title(mut self, title: &'a str) -> Self {
+        self.title = Some(title);
+        self
+    }
+
+    /// Reads the supplied bytes into a spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when metadata or binary data are missing, malformed, or
+    /// unsupported.
+    pub fn read(self) -> Result<Spectrum1D> {
+        let procs = parse_parameter_file_for_reader(self.procs)?;
+        let acqus = match self.acqus {
+            Some(input) => Some(parse_parameter_file_for_reader(input)?),
+            None => None,
+        };
+        let title = self.title.and_then(first_non_empty_line);
+        let point_count = required_usize(&procs, "SI")?;
+        let intensities = decode_processed_i32_data(self.real_bytes, point_count, &procs, "1r")?;
+        let imaginary = match self.imaginary_bytes {
+            Some(bytes) => Some(decode_processed_i32_data(bytes, point_count, &procs, "1i")?),
+            None => None,
+        };
+        let axis = build_axis(&procs, point_count)?;
+        let metadata = build_metadata(&procs, acqus.as_ref(), title)?;
+
+        Spectrum1D::new_complex(axis, intensities, imaginary, metadata)
+    }
+}
+
 /// Reads a processed one-dimensional spectrum from a Bruker dataset path.
 ///
 /// The path may point to the dataset root or directly to `pdata/1`.
@@ -116,6 +193,18 @@ pub fn read_bruker_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D
     let metadata = build_metadata(&procs, acqus.as_ref(), title)?;
 
     Spectrum1D::new_complex(axis, intensities, imaginary, metadata)
+}
+
+/// Reads processed one-dimensional Bruker `1r` bytes with `procs` metadata.
+///
+/// For optional `acqus`, `1i`, or title metadata, use
+/// [`BrukerProcessed1DBytes`].
+///
+/// # Errors
+///
+/// Returns an error when `procs` or binary data are malformed or unsupported.
+pub fn read_bruker_processed_1d_bytes(procs: &str, real_bytes: &[u8]) -> Result<Spectrum1D> {
+    BrukerProcessed1DBytes::new(procs, real_bytes).read()
 }
 
 fn locate_processed_dir(path: &Path) -> PathBuf {
@@ -157,11 +246,14 @@ fn read_title(processed_dir: &Path) -> Result<Option<String>> {
         return Ok(None);
     }
     let text = read_text(&path, "Bruker title")?;
-    Ok(text
-        .lines()
+    Ok(first_non_empty_line(&text))
+}
+
+fn first_non_empty_line(text: &str) -> Option<String> {
+    text.lines()
         .map(str::trim)
         .find(|line| !line.is_empty())
-        .map(str::to_owned))
+        .map(str::to_owned)
 }
 
 fn parse_parameter_file(input: &str) -> BTreeMap<String, String> {
@@ -233,6 +325,23 @@ fn read_processed_i32_data(
     point_count: usize,
     procs: &BTreeMap<String, String>,
 ) -> Result<Vec<f64>> {
+    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
+        format: "Bruker",
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    let plane = path
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .map_or("processed data", |value| value);
+    decode_processed_i32_data(&bytes, point_count, procs, plane)
+}
+
+fn decode_processed_i32_data(
+    bytes: &[u8],
+    point_count: usize,
+    procs: &BTreeMap<String, String>,
+    plane: &str,
+) -> Result<Vec<f64>> {
     let data_type = optional_i32(procs, "DTYPP")?;
     if matches!(data_type, Some(value) if value != 0) {
         return Err(RSpinError::Unsupported {
@@ -240,20 +349,12 @@ fn read_processed_i32_data(
         });
     }
 
-    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
-        format: "Bruker",
-        message: format!("failed to read {}: {error}", path.display()),
-    })?;
     let required_len = point_count
         .checked_mul(4)
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "Bruker point count is too large".to_owned(),
         })?;
     if bytes.len() < required_len {
-        let plane = path
-            .file_name()
-            .and_then(std::ffi::OsStr::to_str)
-            .map_or("processed data", |value| value);
         return Err(RSpinError::Parse {
             format: "Bruker",
             message: format!(

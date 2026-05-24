@@ -20,6 +20,36 @@ use super::{
 
 pub use two_d::{BrukerSer2D, read_bruker_ser_2d_dir};
 
+/// Byte-oriented reader for Bruker raw one-dimensional FID data.
+///
+/// This builder is useful when callers receive uploaded `acqus` and `fid`
+/// payloads without a native directory tree.
+#[derive(Clone, Copy, Debug)]
+pub struct BrukerFid1DBytes<'a> {
+    acqus: &'a str,
+    fid_bytes: &'a [u8],
+}
+
+impl<'a> BrukerFid1DBytes<'a> {
+    /// Creates a byte-oriented Bruker raw FID reader.
+    #[must_use]
+    pub fn new(acqus: &'a str, fid_bytes: &'a [u8]) -> Self {
+        Self { acqus, fid_bytes }
+    }
+
+    /// Reads the supplied `acqus` text and `fid` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `acqus` or `fid` is malformed, real-only,
+    /// odd-length, or uses an unsupported binary data type.
+    pub fn read(self) -> Result<Spectrum1D> {
+        let acqus = parse_parameter_file_for_reader(self.acqus)?;
+        let values = decode_raw_i32_values(self.fid_bytes, &acqus)?;
+        build_raw_spectrum(&acqus, &values)
+    }
+}
+
 /// Reader for Bruker raw one-dimensional FID datasets.
 ///
 /// The reader accepts either a dataset directory containing `fid` and `acqus`,
@@ -61,6 +91,20 @@ pub fn read_bruker_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     let acqus =
         parse_parameter_file_for_reader(&read_text(&dataset_dir.join("acqus"), "Bruker acqus")?)?;
     let values = read_raw_i32_values(&dataset_dir.join("fid"), &acqus)?;
+    build_raw_spectrum(&acqus, &values)
+}
+
+/// Reads a raw one-dimensional FID from Bruker `acqus` text and `fid` bytes.
+///
+/// # Errors
+///
+/// Returns an error when `acqus` or `fid` is malformed, real-only,
+/// odd-length, or uses an unsupported binary data type.
+pub fn read_bruker_fid_1d_bytes(acqus: &str, fid_bytes: &[u8]) -> Result<Spectrum1D> {
+    BrukerFid1DBytes::new(acqus, fid_bytes).read()
+}
+
+fn build_raw_spectrum(acqus: &BTreeMap<String, String>, values: &[f64]) -> Result<Spectrum1D> {
     if values.len() % 2 != 0 {
         return Err(RSpinError::InvalidSpectrum {
             message: "Bruker raw FID must contain interleaved real/imaginary pairs".to_owned(),
@@ -74,8 +118,8 @@ pub fn read_bruker_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
         imaginary.push(pair[1]);
     }
 
-    let axis = build_raw_axis(real.len(), &acqus)?;
-    let metadata = build_raw_metadata(&acqus)?;
+    let axis = build_raw_axis(real.len(), acqus)?;
+    let metadata = build_raw_metadata(acqus)?;
     Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
 }
 
@@ -88,6 +132,14 @@ pub(super) fn locate_dataset_dir(path: &Path) -> PathBuf {
 }
 
 fn read_raw_i32_values(path: &Path, acqus: &BTreeMap<String, String>) -> Result<Vec<f64>> {
+    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
+        format: "Bruker",
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    decode_raw_i32_values(&bytes, acqus)
+}
+
+fn decode_raw_i32_values(bytes: &[u8], acqus: &BTreeMap<String, String>) -> Result<Vec<f64>> {
     ensure_i32_data(acqus)?;
 
     let raw_count = required_usize(acqus, "TD")?;
@@ -96,10 +148,6 @@ fn read_raw_i32_values(path: &Path, acqus: &BTreeMap<String, String>) -> Result<
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "Bruker raw FID point count is too large".to_owned(),
         })?;
-    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
-        format: "Bruker",
-        message: format!("failed to read {}: {error}", path.display()),
-    })?;
     if bytes.len() < required_len {
         return Err(RSpinError::Parse {
             format: "Bruker",

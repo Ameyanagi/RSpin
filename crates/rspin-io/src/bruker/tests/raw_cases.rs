@@ -67,6 +67,55 @@ fn reads_raw_1d_fid_file_path() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_raw_1d_fid_bytes_without_dataset_path() -> anyhow::Result<()> {
+    let spectrum = read_bruker_fid_1d_bytes(
+        "\
+##$TD= 4
+##$BYTORDA= 1
+##$DTYPA= 0
+##$NC= -1
+##$SW_h= 1000
+##$NUC1= <13C>
+##$SFO1= 125.5
+##$SOLVENT= <CDCl3>
+##$TE= 300
+##$OWNER= <raw bytes fixture>
+##$PULPROG= <zg>
+",
+        &i32_bytes(&[1, -2, 3, -4], ByteOrder::Big),
+    )?;
+
+    assert_eq!(spectrum.len(), 2);
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.x.values, vec![0.0, 0.001]);
+    assert_eq!(spectrum.intensities, vec![2.0, 6.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-4.0, -8.0]));
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("zg"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(125.5));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCl3"));
+    assert_eq!(spectrum.metadata.temperature_k, Some(300.0));
+    assert_eq!(
+        spectrum.metadata.origin.as_deref(),
+        Some("raw bytes fixture")
+    );
+
+    let builder_spectrum = BrukerFid1DBytes::new(
+        "\
+##$TD= 2
+##$BYTORDA= 0
+##$DTYPA= 0
+",
+        &i32_bytes(&[5, -7], ByteOrder::Little),
+    )
+    .read()?;
+    assert_eq!(builder_spectrum.x.unit, Unit::Points);
+    assert_eq!(builder_spectrum.intensities, vec![5.0]);
+    assert_eq!(builder_spectrum.imaginary, Some(vec![-7.0]));
+    Ok(())
+}
+
+#[test]
 fn rejects_unsupported_raw_data_type() -> anyhow::Result<()> {
     let root = synthetic_dataset("raw-unsupported")?;
     write_text(
