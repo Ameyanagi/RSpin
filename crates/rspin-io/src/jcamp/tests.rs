@@ -76,6 +76,35 @@ fn accepts_integer_decimal_npoints_label() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_common_metadata_labels_and_comment_assignments() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=metadata sample
+##ORIGIN=benchtop source $$ free comment
+##.SOLVENT NAME=CDCl3
+##TEMPERATURE=25.0 $$ Celsius
+##.OBSERVE NUCLEUS=^13C
+##.OBSERVE FREQUENCY=100.5 $$ MHz
+$$solvent=CD2Cl2
+##XUNITS=PPM
+##FIRSTX=2
+##LASTX=1
+##NPOINTS=2
+##XYDATA=(X++(Y..Y))
+0 5 6
+##END=
+";
+    let spectrum = read_jcamp_dx_1d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("metadata sample"));
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("benchtop source"));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CD2Cl2"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(100.5));
+    assert_close(spectrum.metadata.temperature_k, Some(298.15));
+    Ok(())
+}
+
+#[test]
 fn reads_scaled_xypoints_spectrum() -> anyhow::Result<()> {
     let input = "\
 ##TITLE=scaled points
@@ -257,5 +286,12 @@ fn assert_axis_close(actual: &[f64], expected: &[f64]) {
     assert_eq!(actual.len(), expected.len());
     for (left, right) in actual.iter().zip(expected) {
         assert!((left - right).abs() < 1e-12, "{left} != {right}");
+    }
+}
+
+fn assert_close(actual: Option<f64>, expected: Option<f64>) {
+    match (actual, expected) {
+        (Some(left), Some(right)) => assert!((left - right).abs() < 1e-12, "{left} != {right}"),
+        (left, right) => assert_eq!(left, right),
     }
 }

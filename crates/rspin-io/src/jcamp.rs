@@ -1,17 +1,16 @@
 //! Minimal JCAMP-DX support for one-dimensional spectra.
 
-use std::str::FromStr;
-
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{Axis, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
 use crate::{SpectrumReader, SpectrumWriter};
 
 mod asdf;
+mod labels;
 mod writer;
 
 pub use writer::write_jcamp_dx_1d;
 
-/// Reader and writer for a narrow, numeric JCAMP-DX 1D subset.
+/// Reader and writer for a focused JCAMP-DX 1D subset.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct JcampDx;
 
@@ -41,6 +40,9 @@ struct RawJcamp {
     x_unit: Unit,
     nucleus: Option<Nucleus>,
     frequency_mhz: Option<f64>,
+    solvent: Option<String>,
+    temperature_k: Option<f64>,
+    origin: Option<String>,
     xy_values: Vec<f64>,
     imaginary_values: Vec<f64>,
     xy_points: Vec<(f64, f64)>,
@@ -81,12 +83,17 @@ pub fn read_jcamp_dx_1d(input: &str) -> Result<Spectrum1D> {
                 "DATATABLE" => data_table_block(value),
                 _ => None,
             };
-            apply_label(&mut raw, key, value)?;
+            labels::apply_label(&mut raw, key, value)?;
             continue;
         }
 
         if line.starts_with("##") {
             data_block = None;
+            continue;
+        }
+
+        if let Some((key, value)) = parse_comment_assignment(line) {
+            labels::apply_comment_assignment(&mut raw, key, value)?;
             continue;
         }
 
@@ -110,7 +117,7 @@ pub fn read_jcamp_dx_1d(input: &str) -> Result<Spectrum1D> {
         return spectrum_from_xypoints(raw);
     }
 
-    let metadata = metadata_from_raw(&raw);
+    let metadata = labels::metadata_from_raw(&raw);
     let y_factor = option_or(raw.y_factor, 1.0);
     let imaginary_y_factor = option_or(raw.imaginary_y_factor, y_factor);
     let intensity_limit = option_or(raw.points, raw.xy_values.len()).min(raw.xy_values.len());
@@ -150,7 +157,7 @@ pub fn read_jcamp_dx_1d(input: &str) -> Result<Spectrum1D> {
 }
 
 fn spectrum_from_xypoints(raw: RawJcamp) -> Result<Spectrum1D> {
-    let metadata = metadata_from_raw(&raw);
+    let metadata = labels::metadata_from_raw(&raw);
     let x_factor = option_or(raw.x_factor, 1.0);
     let y_factor = option_or(raw.y_factor, 1.0);
     let point_limit = option_or(raw.points, raw.xy_points.len()).min(raw.xy_points.len());
@@ -173,26 +180,6 @@ fn spectrum_from_xypoints(raw: RawJcamp) -> Result<Spectrum1D> {
     Spectrum1D::new(axis, intensities, metadata)
 }
 
-fn apply_label(raw: &mut RawJcamp, key: &str, value: &str) -> Result<()> {
-    match normalized_key(key).as_str() {
-        "TITLE" => raw.title = Some(value.trim().to_owned()),
-        "FIRSTX" => raw.first_x = Some(parse_float("FIRSTX", value)?),
-        "LASTX" => raw.last_x = Some(parse_float("LASTX", value)?),
-        "NPOINTS" => raw.points = Some(parse_usize("NPOINTS", value)?),
-        "XFACTOR" => raw.x_factor = Some(parse_float("XFACTOR", value)?),
-        "YFACTOR" => raw.y_factor = Some(parse_float("YFACTOR", value)?),
-        "XUNITS" => raw.x_unit = parse_unit(value),
-        "UNITS" => raw.x_unit = parse_unit(first_list_value(value)),
-        "FACTOR" => apply_factor_label(raw, value)?,
-        "FIRST" => apply_first_or_last_label(&mut raw.first_x, value)?,
-        "LAST" => apply_first_or_last_label(&mut raw.last_x, value)?,
-        "OBSERVENUCLEUS" => raw.nucleus = Some(Nucleus::from_str(value.trim())?),
-        "OBSERVEFREQUENCY" => raw.frequency_mhz = Some(parse_float("OBSERVE FREQUENCY", value)?),
-        _ => {}
-    }
-    Ok(())
-}
-
 fn data_table_block(value: &str) -> Option<DataBlock> {
     let upper = value.to_ascii_uppercase();
     if !upper.contains("XYDATA") {
@@ -207,52 +194,13 @@ fn data_table_block(value: &str) -> Option<DataBlock> {
     }
 }
 
-fn apply_factor_label(raw: &mut RawJcamp, value: &str) -> Result<()> {
-    let values = parse_numeric_list("FACTOR", value)?;
-    if let Some(value) = list_value(&values, 0) {
-        raw.x_factor = Some(value);
-    }
-    if let Some(value) = list_value(&values, 1) {
-        raw.y_factor = Some(value);
-    }
-    if let Some(value) = list_value(&values, 2) {
-        raw.imaginary_y_factor = Some(value);
-    }
-    Ok(())
-}
-
-fn apply_first_or_last_label(target: &mut Option<f64>, value: &str) -> Result<()> {
-    let values = parse_numeric_list("FIRST/LAST", value)?;
-    if let Some(value) = list_value(&values, 0) {
-        *target = Some(value);
-    }
-    Ok(())
-}
-
-fn parse_numeric_list(field: &'static str, value: &str) -> Result<Vec<f64>> {
-    value
-        .split(',')
-        .map(str::trim)
-        .filter(|token| !token.is_empty())
-        .map(|token| parse_float(field, token))
-        .collect()
-}
-
-fn list_value(values: &[f64], index: usize) -> Option<f64> {
-    values.iter().copied().nth(index)
-}
-
-fn first_list_value(value: &str) -> &str {
-    let mut values = value.split(',');
-    if let Some(first) = values.next() {
-        first.trim()
-    } else {
-        value
-    }
-}
-
 fn parse_labeled_line(line: &str) -> Option<(&str, &str)> {
     let without_prefix = line.strip_prefix("##")?;
+    without_prefix.split_once('=')
+}
+
+fn parse_comment_assignment(line: &str) -> Option<(&str, &str)> {
+    let without_prefix = line.strip_prefix("$$")?;
     without_prefix.split_once('=')
 }
 
@@ -344,34 +292,12 @@ fn scale_value(field: &'static str, value: f64, factor: f64) -> Result<f64> {
     Ok(scaled)
 }
 
-fn metadata_from_raw(raw: &RawJcamp) -> Metadata {
-    Metadata {
-        name: raw.title.clone(),
-        nucleus: raw.nucleus.clone(),
-        frequency_mhz: raw.frequency_mhz,
-        solvent: None,
-        temperature_k: None,
-        origin: None,
-        molecules: Vec::new(),
-    }
-}
-
 fn option_or<T>(value: Option<T>, default: T) -> T {
     let mut values = value.into_iter();
     if let Some(value) = values.next() {
         value
     } else {
         default
-    }
-}
-
-fn parse_unit(value: &str) -> Unit {
-    match normalized_key(value).as_str() {
-        "PPM" => Unit::Ppm,
-        "HZ" | "HERTZ" => Unit::Hertz,
-        "SECONDS" | "SECOND" | "SEC" | "S" => Unit::Seconds,
-        "POINTS" | "POINT" => Unit::Points,
-        _ => Unit::Arbitrary,
     }
 }
 

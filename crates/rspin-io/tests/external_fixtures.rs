@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rspin_core::Unit;
+use rspin_core::{Nucleus, Unit};
 use rspin_io::read_jcamp_dx_1d;
 
 #[test]
@@ -59,6 +59,10 @@ fn parses_external_jcamp_numeric_data_table_fixture_when_available() -> anyhow::
 
     assert_eq!(spectrum.len(), 2048);
     assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("Nanalysis Corp."));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("Chloroform-d"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.temperature_k, Some(306.150_009));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
     Ok(())
@@ -77,6 +81,9 @@ fn parses_external_jcamp_decimal_count_fixture_when_available() -> anyhow::Resul
 
     assert_eq!(spectrum.len(), 16_384);
     assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("agfavnmr"));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCL3"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
     Ok(())
 }
@@ -94,6 +101,8 @@ fn parses_external_jcamp_asdf_fixture_when_available() -> anyhow::Result<()> {
 
     assert_eq!(spectrum.len(), 16_384);
     assert_eq!(spectrum.x.unit, Unit::Hertz);
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert!(spectrum.intensities.iter().any(|value| *value > 1.0));
     Ok(())
 }
@@ -113,4 +122,11 @@ fn require_fixture(path: &Path) -> anyhow::Result<()> {
         "missing external fixture at {}; check RSPIN_EXTERNAL_TESTDATA",
         path.display()
     );
+}
+
+fn assert_close(actual: Option<f64>, expected: Option<f64>) {
+    match (actual, expected) {
+        (Some(left), Some(right)) => assert!((left - right).abs() < 1e-12, "{left} != {right}"),
+        (left, right) => assert_eq!(left, right),
+    }
 }
