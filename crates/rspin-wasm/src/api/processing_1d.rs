@@ -4,9 +4,9 @@ use serde::Deserialize;
 
 use rspin_core::{Axis, Result, Spectrum1D};
 use rspin_processing::{
-    BaselineMethod, FftDirection, ProcessingRecipe1D, abs_1d, apply_processing_recipe_1d, crop_1d,
-    exponential_apodization, fft_1d, magnitude_spectrum, offset_intensity, phase_correct,
-    resample_1d, shift_axis, subtract_baseline, zero_fill,
+    BaselineMethod, FftDirection, ProcessingRecipe1D, abs_1d, apply_processing_recipe_1d,
+    apply_processing_recipe_1d_until, crop_1d, exponential_apodization, fft_1d, magnitude_spectrum,
+    offset_intensity, phase_correct, resample_1d, shift_axis, subtract_baseline, zero_fill,
 };
 
 use super::{from_json, to_json};
@@ -164,6 +164,22 @@ pub fn apply_processing_recipe_1d_json(spectrum_json: &str, recipe_json: &str) -
     let spectrum: Spectrum1D = from_json(spectrum_json)?;
     let recipe: ProcessingRecipe1D = from_json(recipe_json)?;
     let processed = apply_processing_recipe_1d(&spectrum, &recipe)?;
+    to_json(&processed)
+}
+
+/// Applies the first operations in a serialized one-dimensional recipe.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn apply_processing_recipe_1d_until_json(
+    spectrum_json: &str,
+    recipe_json: &str,
+    operation_count: usize,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let recipe: ProcessingRecipe1D = from_json(recipe_json)?;
+    let processed = apply_processing_recipe_1d_until(&spectrum, &recipe, operation_count)?;
     to_json(&processed)
 }
 

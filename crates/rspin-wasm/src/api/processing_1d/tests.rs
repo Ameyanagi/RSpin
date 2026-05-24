@@ -183,6 +183,29 @@ fn applies_processing_recipe_1d_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn applies_processing_recipe_1d_prefix_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&real_spectrum()?)?;
+    let processed_json = apply_processing_recipe_1d_until_json(
+        &spectrum_json,
+        r#"{"operations":[{"operation":"scale","factor":2.0},{"operation":"offset","offset":-2.0},{"operation":"absolute_value"},{"operation":"normalize_max_abs"}]}"#,
+        2,
+    )?;
+    let processed: Spectrum1D = from_json(&processed_json)?;
+
+    assert_vec_close(&processed.intensities, &[0.0, -6.0, 6.0]);
+    assert_eq!(processed.processing.len(), 2);
+
+    let error = apply_processing_recipe_1d_until_json(
+        &spectrum_json,
+        r#"{"operations":[{"operation":"scale","factor":2.0}]}"#,
+        2,
+    )
+    .expect_err("too many operations should fail");
+    assert!(error.to_string().contains("requested"));
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_1d_processing_json_options() -> anyhow::Result<()> {
     let spectrum_json = to_json(&real_spectrum()?)?;
 

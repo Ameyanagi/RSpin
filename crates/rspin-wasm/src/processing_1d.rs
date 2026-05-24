@@ -3,11 +3,12 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    abs_spectrum_1d_json, apply_processing_recipe_1d_json, auto_phase_spectrum_1d_json,
-    crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
-    js_error, magnitude_spectrum_1d_json, normalize_spectrum_1d_json, offset_spectrum_1d_json,
-    phase_spectrum_1d_json, resample_spectrum_1d_json, scale_spectrum_1d_json,
-    shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
+    abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
+    auto_phase_spectrum_1d_json, crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json,
+    fft_spectrum_1d_json, js_error, magnitude_spectrum_1d_json, normalize_spectrum_1d_json,
+    offset_spectrum_1d_json, phase_spectrum_1d_json, resample_spectrum_1d_json,
+    scale_spectrum_1d_json, shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json,
+    zero_fill_spectrum_1d_json,
 };
 
 /// Scales a serialized one-dimensional spectrum.
@@ -210,4 +211,20 @@ pub fn apply_processing_recipe_1d(
     recipe_json: &str,
 ) -> std::result::Result<String, JsValue> {
     apply_processing_recipe_1d_json(spectrum_json, recipe_json).map_err(|error| js_error(&error))
+}
+
+/// Applies the first operations in a serialized processing recipe.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = applyProcessingRecipe1dUntil)]
+pub fn apply_processing_recipe_1d_until(
+    spectrum_json: &str,
+    recipe_json: &str,
+    operation_count: usize,
+) -> std::result::Result<String, JsValue> {
+    apply_processing_recipe_1d_until_json(spectrum_json, recipe_json, operation_count)
+        .map_err(|error| js_error(&error))
 }

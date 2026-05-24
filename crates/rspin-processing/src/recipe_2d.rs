@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use rspin_core::{Axis, Result, Spectrum2D};
+use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 
 use crate::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingStep, abs_2d,
@@ -162,6 +162,44 @@ impl ProcessingRecipe2D {
         apply_processing_recipe_2d(spectrum, self)
     }
 
+    /// Returns a recipe containing the first `operation_count` operations.
+    ///
+    /// This is useful for rollback/reapply workflows that rebuild a processed
+    /// spectrum from the original input.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `operation_count` is larger than the recipe length.
+    pub fn prefix(&self, operation_count: usize) -> Result<Self> {
+        validate_operation_count(
+            operation_count,
+            self.operations.len(),
+            "2D processing recipe",
+        )?;
+        Ok(Self {
+            operations: self.operations[..operation_count].to_vec(),
+        })
+    }
+
+    /// Returns a recipe with the final operation removed.
+    #[must_use]
+    pub fn without_last(&self) -> Self {
+        let operation_count = self.operations.len().saturating_sub(1);
+        Self {
+            operations: self.operations[..operation_count].to_vec(),
+        }
+    }
+
+    /// Applies the first `operation_count` operations to a spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `operation_count` is too large or when a selected
+    /// operation fails.
+    pub fn apply_until(&self, spectrum: &Spectrum2D, operation_count: usize) -> Result<Spectrum2D> {
+        apply_processing_recipe_2d_until(spectrum, self, operation_count)
+    }
+
     /// Appends a scale operation.
     #[must_use]
     pub fn scale(self, factor: f64) -> Self {
@@ -293,75 +331,46 @@ pub fn apply_processing_recipe_2d(
     spectrum: &Spectrum2D,
     recipe: &ProcessingRecipe2D,
 ) -> Result<Spectrum2D> {
+    apply_processing_recipe_2d_until(spectrum, recipe, recipe.operations.len())
+}
+
+/// Applies the first `operation_count` operations in a two-dimensional recipe.
+///
+/// # Errors
+///
+/// Returns an error when `operation_count` is larger than the recipe length or
+/// when a selected operation fails.
+pub fn apply_processing_recipe_2d_until(
+    spectrum: &Spectrum2D,
+    recipe: &ProcessingRecipe2D,
+    operation_count: usize,
+) -> Result<Spectrum2D> {
+    validate_operation_count(
+        operation_count,
+        recipe.operations.len(),
+        "2D processing recipe",
+    )?;
     let mut processed = spectrum.clone();
-    for operation in &recipe.operations {
+    for operation in recipe.operations.iter().take(operation_count) {
         processed = operation.apply(&processed)?;
     }
     Ok(processed)
 }
 
 #[cfg(test)]
-mod tests {
-    use rspin_core::{Axis, Metadata, RSpinError, Unit};
+mod tests;
 
-    use super::*;
-
-    #[test]
-    fn applies_chainable_recipe_operations() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let recipe = ProcessingRecipe2D::new()
-            .scale(2.0)
-            .absolute_value()
-            .zero_fill(3, 2)
-            .normalize_max_abs();
-
-        let processed = recipe.apply(&spectrum)?;
-
-        assert_eq!(recipe.len(), 4);
-        assert_eq!(processed.shape(), (3, 2));
-        assert_eq!(processed.z, vec![0.25, 0.5, 0.0, 0.75, 1.0, 0.0]);
-        assert_eq!(processed.processing.len(), 4);
-        assert_eq!(processed.processing[0].operation, "scale_2d");
-        assert_eq!(processed.processing[3].operation, "normalize_2d_max_abs");
-        Ok(())
+fn validate_operation_count(
+    operation_count: usize,
+    available: usize,
+    context: &'static str,
+) -> Result<()> {
+    if operation_count > available {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!(
+                "{context} has {available} operations but {operation_count} were requested"
+            ),
+        });
     }
-
-    #[test]
-    fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
-        let recipe = ProcessingRecipe2D::new().crop(0.0, 1.0, 1.0, 1.0).resample(
-            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 3)?,
-            Axis::ppm(vec![1.0])?,
-        );
-        let json = serde_json::to_string(&recipe)?;
-        let decoded: ProcessingRecipe2D = serde_json::from_str(&json)?;
-        let processed = ProcessingStep::apply(&decoded, &demo_spectrum()?)?;
-
-        assert_eq!(decoded.len(), 2);
-        assert_eq!(processed.shape(), (3, 1));
-        assert_eq!(processed.z, vec![3.0, -0.5, -4.0]);
-        assert_eq!(processed.processing[1].operation, "resample_2d");
-        Ok(())
-    }
-
-    #[test]
-    fn preserves_first_recipe_error() -> anyhow::Result<()> {
-        let recipe = ProcessingRecipe2D::new()
-            .scale(f64::NAN)
-            .normalize_max_abs();
-        let error = recipe
-            .apply(&demo_spectrum()?)
-            .expect_err("non-finite scale should fail");
-
-        assert!(matches!(error, RSpinError::NonFinite { .. }));
-        Ok(())
-    }
-
-    fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
-        Ok(Spectrum2D::new(
-            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
-            Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
-            vec![1.0, -2.0, 3.0, -4.0],
-            Metadata::default(),
-        )?)
-    }
+    Ok(())
 }

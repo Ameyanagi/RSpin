@@ -41,8 +41,14 @@ pub use one_d::{
 };
 pub use pipeline::{ProcessSpectrum1D, Spectrum1DPipeline};
 pub use pipeline_2d::{ProcessSpectrum2D, Spectrum2DPipeline};
-pub use recipe_1d::{ProcessingOperation1D, ProcessingRecipe1D, apply_processing_recipe_1d};
-pub use recipe_2d::{ProcessingOperation2D, ProcessingRecipe2D, apply_processing_recipe_2d};
+pub use recipe_1d::{
+    ProcessingOperation1D, ProcessingRecipe1D, apply_processing_recipe_1d,
+    apply_processing_recipe_1d_until,
+};
+pub use recipe_2d::{
+    ProcessingOperation2D, ProcessingRecipe2D, apply_processing_recipe_2d,
+    apply_processing_recipe_2d_until,
+};
 pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
