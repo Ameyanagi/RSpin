@@ -4,9 +4,10 @@ use super::*;
 
 #[test]
 fn round_trips_real_2d_spectrum_with_trait_api() -> anyhow::Result<()> {
-    let mut metadata = Metadata::named("map");
-    metadata.nucleus = Some(Nucleus::Carbon13);
-    metadata.frequency_mhz = Some(100.0);
+    let metadata = Metadata::named("map")
+        .with_nucleus(Nucleus::Carbon13)
+        .with_frequency_mhz(100.0)
+        .with_property("vendor.dimension", "f1");
     let spectrum = Spectrum2D::new(
         Axis::linear("direct", Unit::Ppm, 10.0, 8.0, 3)?,
         Axis::linear("indirect", Unit::Hertz, 20.0, 21.0, 2)?,
@@ -21,6 +22,8 @@ fn round_trips_real_2d_spectrum_with_trait_api() -> anyhow::Result<()> {
     assert_eq!(parsed.metadata.name.as_deref(), Some("map"));
     assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Carbon13));
     assert_eq!(parsed.metadata.frequency_mhz, Some(100.0));
+    assert_eq!(parsed.metadata.property("vendor.dimension"), Some("f1"));
+    assert!(text.contains("# property.vendor.dimension=f1"));
     assert_eq!(parsed.x.unit, Unit::Ppm);
     assert_eq!(parsed.y.unit, Unit::Hertz);
     assert_eq!(parsed.x.values, spectrum.x.values);

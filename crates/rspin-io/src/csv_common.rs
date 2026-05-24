@@ -1,6 +1,6 @@
 //! Shared helpers for `RSpin` CSV codecs.
 
-use rspin_core::{RSpinError, Result, Unit};
+use rspin_core::{Metadata, RSpinError, Result, Unit};
 
 pub(crate) fn normalized_key(key: &str) -> String {
     key.chars()
@@ -49,6 +49,33 @@ pub(crate) fn push_comment(output: &mut String, key: &str, value: &str) {
     output.push('=');
     output.push_str(value);
     output.push('\n');
+}
+
+pub(crate) fn push_metadata_property_comments(output: &mut String, metadata: &Metadata) {
+    for (key, value) in &metadata.properties {
+        push_comment(output, &format!("property.{key}"), value);
+    }
+}
+
+pub(crate) fn apply_metadata_property_comment(
+    metadata: &mut Metadata,
+    key: &str,
+    value: &str,
+) -> Result<bool> {
+    let key = key.trim();
+    let Some(property_key) = key.strip_prefix("property.") else {
+        return Ok(false);
+    };
+    if property_key.trim().is_empty() {
+        return Err(RSpinError::Parse {
+            format: "CSV",
+            message: "metadata property comment requires a non-empty key".to_owned(),
+        });
+    }
+    metadata
+        .properties
+        .insert(property_key.to_owned(), value.to_owned());
+    Ok(true)
 }
 
 pub(crate) fn format_float(value: f64) -> String {

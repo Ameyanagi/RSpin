@@ -6,7 +6,10 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum2D, Unit};
 
 use crate::{
     SpectrumReader, SpectrumWriter,
-    csv_common::{format_float, normalized_key, parse_float, parse_unit, push_comment, unit_label},
+    csv_common::{
+        apply_metadata_property_comment, format_float, normalized_key, parse_float, parse_unit,
+        push_comment, push_metadata_property_comments, unit_label,
+    },
 };
 
 /// Reader and writer for simple long-table two-dimensional CSV spectra.
@@ -99,6 +102,7 @@ pub fn write_spectrum2d_csv(spectrum: &Spectrum2D) -> Result<String> {
     if let Some(frequency_mhz) = spectrum.metadata.frequency_mhz {
         push_comment(&mut output, "frequency_mhz", &format_float(frequency_mhz));
     }
+    push_metadata_property_comments(&mut output, &spectrum.metadata);
     push_comment(&mut output, "x_unit", unit_label(spectrum.x.unit));
     push_comment(&mut output, "y_unit", unit_label(spectrum.y.unit));
 
@@ -132,6 +136,9 @@ fn apply_comment(state: &mut Csv2DState, comment: &str) -> Result<()> {
     let Some((key, value)) = comment.split_once('=') else {
         return Ok(());
     };
+    if apply_metadata_property_comment(&mut state.metadata, key, value.trim())? {
+        return Ok(());
+    }
     let value = value.trim();
     match normalized_key(key).as_str() {
         "name" => state.metadata.name = Some(value.to_owned()),
@@ -306,6 +313,7 @@ fn header_has_imaginary(line: &str) -> bool {
 }
 
 fn validate_spectrum(spectrum: &Spectrum2D) -> Result<()> {
+    spectrum.metadata.validate()?;
     let (width, height) = spectrum.shape();
     let expected_len = width
         .checked_mul(height)

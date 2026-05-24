@@ -6,7 +6,10 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
 use crate::{
     SpectrumReader, SpectrumWriter,
-    csv_common::{format_float, normalized_key, parse_float, parse_unit, push_comment, unit_label},
+    csv_common::{
+        apply_metadata_property_comment, format_float, normalized_key, parse_float, parse_unit,
+        push_comment, push_metadata_property_comments, unit_label,
+    },
 };
 
 /// Reader and writer for simple one-dimensional CSV spectra.
@@ -106,6 +109,7 @@ pub fn write_spectrum1d_csv(spectrum: &Spectrum1D) -> Result<String> {
     if let Some(frequency_mhz) = spectrum.metadata.frequency_mhz {
         push_comment(&mut output, "frequency_mhz", &format_float(frequency_mhz));
     }
+    push_metadata_property_comments(&mut output, &spectrum.metadata);
     push_comment(&mut output, "x_unit", unit_label(spectrum.x.unit));
 
     if spectrum.imaginary.is_some() {
@@ -132,6 +136,9 @@ fn apply_comment(state: &mut CsvState, comment: &str) -> Result<()> {
     let Some((key, value)) = comment.split_once('=') else {
         return Ok(());
     };
+    if apply_metadata_property_comment(&mut state.metadata, key, value.trim())? {
+        return Ok(());
+    }
     let value = value.trim();
     match normalized_key(key).as_str() {
         "name" => state.metadata.name = Some(value.to_owned()),
@@ -202,6 +209,7 @@ fn header_has_imaginary(line: &str) -> bool {
 }
 
 fn validate_spectrum(spectrum: &Spectrum1D) -> Result<()> {
+    spectrum.metadata.validate()?;
     if !spectrum.x.values.iter().all(|value| value.is_finite())
         || !spectrum.intensities.iter().all(|value| value.is_finite())
     {
@@ -223,9 +231,10 @@ mod tests {
 
     #[test]
     fn round_trips_real_spectrum_with_trait_api() -> anyhow::Result<()> {
-        let mut metadata = Metadata::named("demo");
-        metadata.nucleus = Some(Nucleus::Hydrogen1);
-        metadata.frequency_mhz = Some(400.0);
+        let metadata = Metadata::named("demo")
+            .with_nucleus(Nucleus::Hydrogen1)
+            .with_frequency_mhz(400.0)
+            .with_property("vendor.field", "value");
         let spectrum = Spectrum1D::new(
             Axis::linear("shift", Unit::Ppm, 10.0, 8.0, 3)?,
             vec![1.0, 2.5, 3.0],
@@ -239,6 +248,8 @@ mod tests {
         assert_eq!(parsed.metadata.name.as_deref(), Some("demo"));
         assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Hydrogen1));
         assert_eq!(parsed.metadata.frequency_mhz, Some(400.0));
+        assert_eq!(parsed.metadata.property("vendor.field"), Some("value"));
+        assert!(text.contains("# property.vendor.field=value"));
         assert_eq!(parsed.x.unit, Unit::Ppm);
         assert_eq!(parsed.x.values, spectrum.x.values);
         assert_eq!(parsed.intensities, spectrum.intensities);
