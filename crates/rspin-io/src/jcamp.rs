@@ -6,6 +6,10 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
 use crate::{SpectrumReader, SpectrumWriter};
 
+mod writer;
+
+pub use writer::write_jcamp_dx_1d;
+
 /// Reader and writer for a narrow, numeric JCAMP-DX 1D subset.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct JcampDx;
@@ -135,68 +139,6 @@ fn spectrum_from_xypoints(raw: RawJcamp) -> Result<Spectrum1D> {
     Spectrum1D::new(axis, intensities, metadata)
 }
 
-/// Writes a one-dimensional spectrum to a JCAMP-DX string.
-///
-/// # Errors
-///
-/// Returns an error when the spectrum axis or data contains non-finite values.
-pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
-    if !spectrum.x.values.iter().all(|value| value.is_finite())
-        || !spectrum.intensities.iter().all(|value| value.is_finite())
-    {
-        return Err(RSpinError::NonFinite { field: "spectrum" });
-    }
-
-    let title = option_ref_or(spectrum.metadata.name.as_deref(), "untitled");
-    let first_x =
-        spectrum
-            .x
-            .values
-            .first()
-            .copied()
-            .ok_or_else(|| RSpinError::InvalidSpectrum {
-                message: "missing x axis values".to_owned(),
-            })?;
-    let last_x = spectrum
-        .x
-        .values
-        .last()
-        .copied()
-        .ok_or_else(|| RSpinError::InvalidSpectrum {
-            message: "missing x axis values".to_owned(),
-        })?;
-
-    let mut output = String::new();
-    push_label(&mut output, "TITLE", title);
-    push_label(&mut output, "JCAMP-DX", "5.00");
-    push_label(&mut output, "DATA TYPE", "NMR SPECTRUM");
-    if let Some(nucleus) = &spectrum.metadata.nucleus {
-        push_label(&mut output, "OBSERVE NUCLEUS", nucleus.as_label());
-    }
-    if let Some(frequency_mhz) = spectrum.metadata.frequency_mhz {
-        push_label(
-            &mut output,
-            "OBSERVE FREQUENCY",
-            &format_float(frequency_mhz),
-        );
-    }
-    push_label(&mut output, "XUNITS", unit_label(spectrum.x.unit));
-    push_label(&mut output, "YUNITS", "ARBITRARY UNITS");
-    push_label(&mut output, "FIRSTX", &format_float(first_x));
-    push_label(&mut output, "LASTX", &format_float(last_x));
-    push_label(&mut output, "NPOINTS", &spectrum.len().to_string());
-    push_label(&mut output, "XYDATA", "(X++(Y..Y))");
-    for (x_value, intensity) in spectrum.points() {
-        output.push_str(&format_float(x_value));
-        output.push(' ');
-        output.push_str(&format_float(intensity));
-        output.push('\n');
-    }
-    output.push_str("##END=\n");
-
-    Ok(output)
-}
-
 fn apply_label(raw: &mut RawJcamp, key: &str, value: &str) -> Result<()> {
     match normalized_key(key).as_str() {
         "TITLE" => raw.title = Some(value.trim().to_owned()),
@@ -312,15 +254,6 @@ fn option_or<T>(value: Option<T>, default: T) -> T {
     }
 }
 
-fn option_ref_or<'a>(value: Option<&'a str>, default: &'a str) -> &'a str {
-    let mut values = value.into_iter();
-    if let Some(value) = values.next() {
-        value
-    } else {
-        default
-    }
-}
-
 fn parse_unit(value: &str) -> Unit {
     match normalized_key(value).as_str() {
         "PPM" => Unit::Ppm,
@@ -329,32 +262,6 @@ fn parse_unit(value: &str) -> Unit {
         "POINTS" | "POINT" => Unit::Points,
         _ => Unit::Arbitrary,
     }
-}
-
-fn unit_label(unit: Unit) -> &'static str {
-    match unit {
-        Unit::Ppm => "PPM",
-        Unit::Hertz => "HZ",
-        Unit::Seconds => "SECONDS",
-        Unit::Points => "POINTS",
-        _ => "ARBITRARY UNITS",
-    }
-}
-
-fn push_label(output: &mut String, label: &str, value: &str) {
-    output.push_str("##");
-    output.push_str(label);
-    output.push('=');
-    output.push_str(value);
-    output.push('\n');
-}
-
-fn format_float(value: f64) -> String {
-    let formatted = format!("{value:.12}");
-    formatted
-        .trim_end_matches('0')
-        .trim_end_matches('.')
-        .to_owned()
 }
 
 #[cfg(test)]

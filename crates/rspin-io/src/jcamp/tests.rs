@@ -103,11 +103,29 @@ fn writes_readable_xydata_spectrum() -> anyhow::Result<()> {
     let text = write_jcamp_dx_1d(&spectrum)?;
     assert!(text.contains("##TITLE=demo"));
     assert!(text.contains("##OBSERVE NUCLEUS=1H"));
+    assert!(text.contains("##XYDATA=(X++(Y..Y))"));
+    assert!(!text.contains("##XYPOINTS=(XY..XY)"));
 
     let parsed = read_jcamp_dx_1d(&text)?;
     assert_eq!(parsed.metadata.name.as_deref(), Some("demo"));
     assert_eq!(parsed.intensities, spectrum.intensities);
     assert_eq!(parsed.x.values, spectrum.x.values);
+    Ok(())
+}
+
+#[test]
+fn writes_xypoints_for_non_uniform_axis() -> anyhow::Result<()> {
+    let x = Axis::new("shift", Unit::Ppm, vec![0.0, 0.4, 1.5, 1.9])?;
+    let spectrum = Spectrum1D::new(x, vec![2.0, 4.0, 8.0, 16.0], Metadata::named("nonlinear"))?;
+
+    let text = write_jcamp_dx_1d(&spectrum)?;
+    assert!(text.contains("##XYPOINTS=(XY..XY)"));
+    assert!(!text.contains("##XYDATA=(X++(Y..Y))"));
+
+    let parsed = read_jcamp_dx_1d(&text)?;
+    assert_eq!(parsed.metadata.name.as_deref(), Some("nonlinear"));
+    assert_axis_close(&parsed.x.values, &spectrum.x.values);
+    assert_eq!(parsed.intensities, spectrum.intensities);
     Ok(())
 }
 
