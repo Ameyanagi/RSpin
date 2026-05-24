@@ -8,7 +8,7 @@ use crate::{
     SpectrumReader, SpectrumWriter,
     csv_common::{
         apply_metadata_property_comment, format_float, normalized_key, parse_float, parse_unit,
-        push_comment, push_metadata_property_comments, unit_label,
+        push_comment, push_metadata_comments, unit_label, validate_metadata_numbers,
     },
 };
 
@@ -100,16 +100,7 @@ pub fn write_spectrum1d_csv(spectrum: &Spectrum1D) -> Result<String> {
 
     let mut output = String::new();
     push_comment(&mut output, "format", "RSpin CSV 1D");
-    if let Some(name) = &spectrum.metadata.name {
-        push_comment(&mut output, "name", name);
-    }
-    if let Some(nucleus) = &spectrum.metadata.nucleus {
-        push_comment(&mut output, "nucleus", nucleus.as_label());
-    }
-    if let Some(frequency_mhz) = spectrum.metadata.frequency_mhz {
-        push_comment(&mut output, "frequency_mhz", &format_float(frequency_mhz));
-    }
-    push_metadata_property_comments(&mut output, &spectrum.metadata);
+    push_metadata_comments(&mut output, &spectrum.metadata);
     push_comment(&mut output, "x_unit", unit_label(spectrum.x.unit));
 
     if spectrum.imaginary.is_some() {
@@ -147,6 +138,9 @@ fn apply_comment(state: &mut CsvState, comment: &str) -> Result<()> {
             state.metadata.frequency_mhz = Some(parse_float("frequency_mhz", value)?);
         }
         "solvent" => state.metadata.solvent = Some(value.to_owned()),
+        "temperaturek" => {
+            state.metadata.temperature_k = Some(parse_float("temperature_k", value)?);
+        }
         "orig" | "origin" => state.metadata.origin = Some(value.to_owned()),
         "xunit" => state.x_unit = parse_unit(value),
         _ => {}
@@ -210,6 +204,7 @@ fn header_has_imaginary(line: &str) -> bool {
 
 fn validate_spectrum(spectrum: &Spectrum1D) -> Result<()> {
     spectrum.metadata.validate()?;
+    validate_metadata_numbers(&spectrum.metadata)?;
     if !spectrum.x.values.iter().all(|value| value.is_finite())
         || !spectrum.intensities.iter().all(|value| value.is_finite())
     {
@@ -234,6 +229,9 @@ mod tests {
         let metadata = Metadata::named("demo")
             .with_nucleus(Nucleus::Hydrogen1)
             .with_frequency_mhz(400.0)
+            .with_solvent("D2O")
+            .with_temperature_k(298.15)
+            .with_origin("synthetic.csv")
             .with_property("vendor.field", "value");
         let spectrum = Spectrum1D::new(
             Axis::linear("shift", Unit::Ppm, 10.0, 8.0, 3)?,
@@ -248,7 +246,13 @@ mod tests {
         assert_eq!(parsed.metadata.name.as_deref(), Some("demo"));
         assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Hydrogen1));
         assert_eq!(parsed.metadata.frequency_mhz, Some(400.0));
+        assert_eq!(parsed.metadata.solvent.as_deref(), Some("D2O"));
+        assert_eq!(parsed.metadata.temperature_k, Some(298.15));
+        assert_eq!(parsed.metadata.origin.as_deref(), Some("synthetic.csv"));
         assert_eq!(parsed.metadata.property("vendor.field"), Some("value"));
+        assert!(text.contains("# solvent=D2O"));
+        assert!(text.contains("# temperature_k=298.15"));
+        assert!(text.contains("# origin=synthetic.csv"));
         assert!(text.contains("# property.vendor.field=value"));
         assert_eq!(parsed.x.unit, Unit::Ppm);
         assert_eq!(parsed.x.values, spectrum.x.values);
@@ -261,6 +265,9 @@ mod tests {
     fn reads_imaginary_column() -> anyhow::Result<()> {
         let input = "\
 # name=complex
+# solvent=CDCl3
+# temperature_k=295
+# origin=memory
 # x_unit=HZ
 x,intensity,imaginary
 1,2,0.5
@@ -269,6 +276,9 @@ x,intensity,imaginary
         let spectrum = read_spectrum1d_csv(input)?;
 
         assert_eq!(spectrum.metadata.name.as_deref(), Some("complex"));
+        assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCl3"));
+        assert_eq!(spectrum.metadata.temperature_k, Some(295.0));
+        assert_eq!(spectrum.metadata.origin.as_deref(), Some("memory"));
         assert_eq!(spectrum.x.unit, Unit::Hertz);
         assert_eq!(spectrum.x.values, vec![1.0, 2.0]);
         assert_eq!(spectrum.intensities, vec![2.0, 3.0]);
@@ -290,5 +300,25 @@ x,intensity,imaginary
         let error = read_spectrum1d_csv("x,intensity\n1,2\n2,3,4\n")
             .expect_err("mixed columns should fail");
         assert!(matches!(error, RSpinError::Parse { .. }));
+    }
+
+    #[test]
+    fn rejects_non_finite_metadata_on_write() -> anyhow::Result<()> {
+        let mut spectrum = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 2)?,
+            vec![1.0, 2.0],
+            Metadata::new().with_temperature_k(f64::NAN),
+        )?;
+        let error =
+            write_spectrum1d_csv(&spectrum).expect_err("non-finite temperature should fail");
+        assert!(matches!(error, RSpinError::NonFinite { .. }));
+
+        spectrum.metadata.temperature_k = None;
+        spectrum.metadata.frequency_mhz = Some(f64::INFINITY);
+        let error = CsvSpectrum1D
+            .write_string(&spectrum)
+            .expect_err("non-finite frequency should fail");
+        assert!(matches!(error, RSpinError::NonFinite { .. }));
+        Ok(())
     }
 }

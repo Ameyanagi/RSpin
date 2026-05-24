@@ -8,7 +8,7 @@ use crate::{
     SpectrumReader, SpectrumWriter,
     csv_common::{
         apply_metadata_property_comment, format_float, normalized_key, parse_float, parse_unit,
-        push_comment, push_metadata_property_comments, unit_label,
+        push_comment, push_metadata_comments, unit_label, validate_metadata_numbers,
     },
 };
 
@@ -93,16 +93,7 @@ pub fn write_spectrum2d_csv(spectrum: &Spectrum2D) -> Result<String> {
 
     let mut output = String::new();
     push_comment(&mut output, "format", "RSpin CSV 2D");
-    if let Some(name) = &spectrum.metadata.name {
-        push_comment(&mut output, "name", name);
-    }
-    if let Some(nucleus) = &spectrum.metadata.nucleus {
-        push_comment(&mut output, "nucleus", nucleus.as_label());
-    }
-    if let Some(frequency_mhz) = spectrum.metadata.frequency_mhz {
-        push_comment(&mut output, "frequency_mhz", &format_float(frequency_mhz));
-    }
-    push_metadata_property_comments(&mut output, &spectrum.metadata);
+    push_metadata_comments(&mut output, &spectrum.metadata);
     push_comment(&mut output, "x_unit", unit_label(spectrum.x.unit));
     push_comment(&mut output, "y_unit", unit_label(spectrum.y.unit));
 
@@ -147,6 +138,9 @@ fn apply_comment(state: &mut Csv2DState, comment: &str) -> Result<()> {
             state.metadata.frequency_mhz = Some(parse_float("frequency_mhz", value)?);
         }
         "solvent" => state.metadata.solvent = Some(value.to_owned()),
+        "temperaturek" => {
+            state.metadata.temperature_k = Some(parse_float("temperature_k", value)?);
+        }
         "orig" | "origin" => state.metadata.origin = Some(value.to_owned()),
         "xunit" => state.x_unit = parse_unit(value),
         "yunit" => state.y_unit = parse_unit(value),
@@ -314,6 +308,7 @@ fn header_has_imaginary(line: &str) -> bool {
 
 fn validate_spectrum(spectrum: &Spectrum2D) -> Result<()> {
     spectrum.metadata.validate()?;
+    validate_metadata_numbers(&spectrum.metadata)?;
     let (width, height) = spectrum.shape();
     let expected_len = width
         .checked_mul(height)

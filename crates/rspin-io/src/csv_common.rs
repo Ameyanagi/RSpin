@@ -57,6 +57,42 @@ pub(crate) fn push_metadata_property_comments(output: &mut String, metadata: &Me
     }
 }
 
+pub(crate) fn push_metadata_comments(output: &mut String, metadata: &Metadata) {
+    if let Some(name) = &metadata.name {
+        push_comment(output, "name", name);
+    }
+    if let Some(nucleus) = &metadata.nucleus {
+        push_comment(output, "nucleus", nucleus.as_label());
+    }
+    if let Some(frequency_mhz) = metadata.frequency_mhz {
+        push_comment(output, "frequency_mhz", &format_float(frequency_mhz));
+    }
+    if let Some(solvent) = &metadata.solvent {
+        push_comment(output, "solvent", solvent);
+    }
+    if let Some(temperature_k) = metadata.temperature_k {
+        push_comment(output, "temperature_k", &format_float(temperature_k));
+    }
+    if let Some(origin) = &metadata.origin {
+        push_comment(output, "origin", origin);
+    }
+    push_metadata_property_comments(output, metadata);
+}
+
+pub(crate) fn validate_metadata_numbers(metadata: &Metadata) -> Result<()> {
+    if !metadata.frequency_mhz.is_none_or(f64::is_finite) {
+        return Err(RSpinError::NonFinite {
+            field: "frequency_mhz",
+        });
+    }
+    if !metadata.temperature_k.is_none_or(f64::is_finite) {
+        return Err(RSpinError::NonFinite {
+            field: "temperature_k",
+        });
+    }
+    Ok(())
+}
+
 pub(crate) fn apply_metadata_property_comment(
     metadata: &mut Metadata,
     key: &str,

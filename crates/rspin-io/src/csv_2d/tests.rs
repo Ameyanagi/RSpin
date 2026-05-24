@@ -7,6 +7,9 @@ fn round_trips_real_2d_spectrum_with_trait_api() -> anyhow::Result<()> {
     let metadata = Metadata::named("map")
         .with_nucleus(Nucleus::Carbon13)
         .with_frequency_mhz(100.0)
+        .with_solvent("CD3OD")
+        .with_temperature_k(300.0)
+        .with_origin("synthetic-2d.csv")
         .with_property("vendor.dimension", "f1");
     let spectrum = Spectrum2D::new(
         Axis::linear("direct", Unit::Ppm, 10.0, 8.0, 3)?,
@@ -22,7 +25,13 @@ fn round_trips_real_2d_spectrum_with_trait_api() -> anyhow::Result<()> {
     assert_eq!(parsed.metadata.name.as_deref(), Some("map"));
     assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Carbon13));
     assert_eq!(parsed.metadata.frequency_mhz, Some(100.0));
+    assert_eq!(parsed.metadata.solvent.as_deref(), Some("CD3OD"));
+    assert_eq!(parsed.metadata.temperature_k, Some(300.0));
+    assert_eq!(parsed.metadata.origin.as_deref(), Some("synthetic-2d.csv"));
     assert_eq!(parsed.metadata.property("vendor.dimension"), Some("f1"));
+    assert!(text.contains("# solvent=CD3OD"));
+    assert!(text.contains("# temperature_k=300"));
+    assert!(text.contains("# origin=synthetic-2d.csv"));
     assert!(text.contains("# property.vendor.dimension=f1"));
     assert_eq!(parsed.x.unit, Unit::Ppm);
     assert_eq!(parsed.y.unit, Unit::Hertz);
@@ -37,6 +46,9 @@ fn round_trips_real_2d_spectrum_with_trait_api() -> anyhow::Result<()> {
 fn reads_complex_long_table() -> anyhow::Result<()> {
     let input = "\
 # name=complex map
+# solvent=DMSO-d6
+# temperature_k=295.5
+# origin=memory 2d
 # x_unit=PPM
 # y_unit=HZ
 x,y,intensity,imaginary
@@ -48,6 +60,9 @@ x,y,intensity,imaginary
     let spectrum = read_spectrum2d_csv(input)?;
 
     assert_eq!(spectrum.metadata.name.as_deref(), Some("complex map"));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("DMSO-d6"));
+    assert_eq!(spectrum.metadata.temperature_k, Some(295.5));
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("memory 2d"));
     assert_eq!(spectrum.x.unit, Unit::Ppm);
     assert_eq!(spectrum.y.unit, Unit::Hertz);
     assert_eq!(spectrum.x.values, vec![1.0, 2.0]);
@@ -87,4 +102,24 @@ fn rejects_inconsistent_imaginary_columns() {
     let error = read_spectrum2d_csv("x,y,intensity\n1,10,2\n2,10,3,0.5\n")
         .expect_err("mixed imaginary columns should fail");
     assert!(matches!(error, RSpinError::Parse { .. }));
+}
+
+#[test]
+fn rejects_non_finite_metadata_on_write() -> anyhow::Result<()> {
+    let mut spectrum = Spectrum2D::new(
+        Axis::linear("direct", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("indirect", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::new().with_temperature_k(f64::NAN),
+    )?;
+    let error = write_spectrum2d_csv(&spectrum).expect_err("non-finite temperature should fail");
+    assert!(matches!(error, RSpinError::NonFinite { .. }));
+
+    spectrum.metadata.temperature_k = None;
+    spectrum.metadata.frequency_mhz = Some(f64::INFINITY);
+    let error = CsvSpectrum2D
+        .write_string(&spectrum)
+        .expect_err("non-finite frequency should fail");
+    assert!(matches!(error, RSpinError::NonFinite { .. }));
+    Ok(())
 }
