@@ -70,9 +70,9 @@ pub use io::{
     read_processing_recipe_2d_json, read_spectrum1d_csv, read_spectrum1d_json,
     read_spectrum1d_path, read_spectrum1d_text, read_spectrum2d_csv, read_spectrum2d_json,
     read_spectrum2d_path, read_spectrum2d_text, write_analysis1d_csv, write_analysis1d_json,
-    write_analysis2d_csv, write_analysis2d_json, write_jcamp_dx_1d,
-    write_processing_recipe_1d_json, write_processing_recipe_2d_json, write_spectrum1d_csv,
-    write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
+    write_analysis2d_csv, write_analysis2d_json, write_jcamp_dx_1d, write_nmrml_1d,
+    write_nmrml_1d_file, write_processing_recipe_1d_json, write_processing_recipe_2d_json,
+    write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 pub use prediction::{
     BondCorrelationRule, ElementShiftPredictor, ElementShiftRule, Experiment,
@@ -198,9 +198,9 @@ pub mod prelude {
         simulate_exact_spin_half_1d, simulate_exact_spin_half_2d, sine_bell_apodization,
         sine_bell_apodization_2d, slice_x_at_y, slice_y_at_x, subtract_baseline,
         summarize_signals_2d, write_analysis1d_csv, write_analysis1d_json, write_analysis2d_csv,
-        write_analysis2d_json, write_jcamp_dx_1d, write_processing_recipe_1d_json,
-        write_processing_recipe_2d_json, write_spectrum1d_csv, write_spectrum1d_json,
-        write_spectrum2d_csv, write_spectrum2d_json,
+        write_analysis2d_json, write_jcamp_dx_1d, write_nmrml_1d, write_nmrml_1d_file,
+        write_processing_recipe_1d_json, write_processing_recipe_2d_json, write_spectrum1d_csv,
+        write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
     };
 }
 

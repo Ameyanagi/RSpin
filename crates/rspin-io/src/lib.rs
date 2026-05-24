@@ -14,6 +14,7 @@ mod json;
 mod nmrml;
 mod nmrml_2d;
 mod nmrml_info;
+mod nmrml_writer;
 mod processing_json;
 mod traits;
 
@@ -51,6 +52,7 @@ pub use nmrml_info::{
     NmrMlVersion, parse_nmrml_version, read_nmrml_document_info_bytes,
     read_nmrml_document_info_file, read_nmrml_document_info_str,
 };
+pub use nmrml_writer::{write_nmrml_1d, write_nmrml_1d_file};
 pub use processing_json::{
     JsonProcessingRecipe1D, JsonProcessingRecipe2D, PROCESSING_RECIPE_1D_FORMAT,
     PROCESSING_RECIPE_2D_FORMAT, PROCESSING_RECIPE_JSON_VERSION, read_processing_recipe_1d_json,

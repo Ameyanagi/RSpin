@@ -100,6 +100,11 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
     let nmrml_version = parse_nmrml_version("v1.0.rc1")?;
     assert_eq!(nmrml_version.build.as_deref(), Some("rc1"));
     assert!(nmrml_version.is_supported_by_current_readers());
+    let nmrml_text = write_nmrml_1d(&spectrum)?;
+    assert_eq!(
+        read_nmrml_1d_str(&nmrml_text)?.intensities,
+        spectrum.intensities
+    );
 
     let aligned = align_spectra_by_peak_to_matrix(
         &[
