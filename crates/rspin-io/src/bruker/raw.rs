@@ -1,0 +1,157 @@
+//! Bruker raw one-dimensional FID import.
+
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
+use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+
+use super::{
+    optional_f64, optional_i32, parse_parameter_file, read_text, required_usize, text_parameter,
+};
+
+/// Reader for Bruker raw one-dimensional FID datasets.
+///
+/// The reader accepts either a dataset directory containing `fid` and `acqus`,
+/// or the `fid` file itself. The first implementation supports complex 32-bit
+/// integer FID data with Bruker acquisition metadata.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct BrukerFid1D;
+
+impl BrukerFid1D {
+    /// Reads a raw one-dimensional FID from a Bruker dataset path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when required `fid` or `acqus` files are missing,
+    /// malformed, real-only, odd-length, or use an unsupported binary data type.
+    pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_bruker_fid_1d_dir(path)
+    }
+}
+
+/// Reads a raw one-dimensional FID from a Bruker dataset path.
+///
+/// The path may point to the dataset directory or directly to `fid`.
+///
+/// # Errors
+///
+/// Returns an error when required files are missing, malformed, real-only,
+/// odd-length, or unsupported.
+pub fn read_bruker_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
+    let dataset_dir = locate_dataset_dir(path.as_ref());
+    let acqus = parse_parameter_file(&read_text(&dataset_dir.join("acqus"), "Bruker acqus")?);
+    let values = read_raw_i32_values(&dataset_dir.join("fid"), &acqus)?;
+    if values.len() % 2 != 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "Bruker raw FID must contain interleaved real/imaginary pairs".to_owned(),
+        });
+    }
+
+    let mut real = Vec::with_capacity(values.len() / 2);
+    let mut imaginary = Vec::with_capacity(values.len() / 2);
+    for pair in values.chunks_exact(2) {
+        real.push(pair[0]);
+        imaginary.push(pair[1]);
+    }
+
+    let axis = build_raw_axis(real.len(), &acqus)?;
+    let metadata = build_raw_metadata(&acqus)?;
+    Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
+}
+
+fn locate_dataset_dir(path: &Path) -> PathBuf {
+    if path.is_file() {
+        path.parent().map_or_else(PathBuf::new, Path::to_path_buf)
+    } else {
+        path.to_path_buf()
+    }
+}
+
+fn read_raw_i32_values(
+    path: &Path,
+    acqus: &std::collections::BTreeMap<String, String>,
+) -> Result<Vec<f64>> {
+    let data_type = optional_i32(acqus, "DTYPA")?;
+    if matches!(data_type, Some(value) if value != 0) {
+        return Err(RSpinError::Unsupported {
+            feature: "Bruker raw non-i32 data",
+        });
+    }
+
+    let raw_count = required_usize(acqus, "TD")?;
+    let required_len = raw_count
+        .checked_mul(4)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "Bruker raw FID point count is too large".to_owned(),
+        })?;
+    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
+        format: "Bruker",
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    if bytes.len() < required_len {
+        return Err(RSpinError::Parse {
+            format: "Bruker",
+            message: format!(
+                "raw fid has {} bytes but {required_len} are required",
+                bytes.len()
+            ),
+        });
+    }
+
+    let byte_order = optional_i32(acqus, "BYTORDA")?;
+    let scale = optional_i32(acqus, "NC")?.map_or(1.0, |value| 2_f64.powi(-value));
+    let mut values = Vec::with_capacity(raw_count);
+    for chunk in bytes[..required_len].chunks_exact(4) {
+        let raw = match byte_order {
+            Some(1) => i32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+            _ => i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+        };
+        values.push(f64::from(raw) * scale);
+    }
+    Ok(values)
+}
+
+fn build_raw_axis(
+    point_count: usize,
+    acqus: &std::collections::BTreeMap<String, String>,
+) -> Result<Axis> {
+    match optional_f64(acqus, "SWH")? {
+        Some(sweep_hz) if sweep_hz > 0.0 => {
+            let end = if point_count <= 1 {
+                0.0
+            } else {
+                let segments =
+                    u32::try_from(point_count - 1).map_err(|_| RSpinError::InvalidAxis {
+                        message: "Bruker raw FID point count is too large".to_owned(),
+                    })?;
+                f64::from(segments) / sweep_hz
+            };
+            Axis::linear("time", Unit::Seconds, 0.0, end, point_count)
+        }
+        _ => {
+            let end = u32::try_from(point_count.saturating_sub(1)).map_or(0.0, f64::from);
+            Axis::linear("point", Unit::Points, 0.0, end, point_count)
+        }
+    }
+}
+
+fn build_raw_metadata(acqus: &std::collections::BTreeMap<String, String>) -> Result<Metadata> {
+    let nucleus = text_parameter(acqus, "NUC1").and_then(|value| Nucleus::from_str(&value).ok());
+    let frequency_mhz = optional_f64(acqus, "SFO1")?;
+    let solvent = text_parameter(acqus, "SOLVENT");
+    let temperature_k = optional_f64(acqus, "TE")?;
+    let origin = text_parameter(acqus, "ORIGIN").or_else(|| text_parameter(acqus, "OWNER"));
+
+    Ok(Metadata {
+        name: text_parameter(acqus, "EXP").or_else(|| text_parameter(acqus, "PULPROG")),
+        nucleus,
+        frequency_mhz,
+        solvent,
+        temperature_k,
+        origin,
+        molecules: Vec::new(),
+    })
+}

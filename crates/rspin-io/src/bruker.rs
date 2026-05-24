@@ -1,4 +1,4 @@
-//! Bruker processed one-dimensional spectrum import.
+//! Bruker one-dimensional spectrum import.
 
 use std::{
     collections::BTreeMap,
@@ -8,6 +8,10 @@ use std::{
 };
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+
+mod raw;
+
+pub use raw::{BrukerFid1D, read_bruker_fid_1d_dir};
 
 /// Reader for Bruker processed one-dimensional datasets.
 ///

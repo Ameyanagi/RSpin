@@ -9,7 +9,9 @@ use std::{
 };
 
 use rspin_core::{Nucleus, Unit};
-use rspin_io::{read_agilent_fid_1d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file};
+use rspin_io::{
+    read_agilent_fid_1d_dir, read_bruker_fid_1d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
+};
 
 #[test]
 fn parses_external_jcamp_peak_table_fixture_when_available() -> anyhow::Result<()> {
@@ -125,6 +127,33 @@ fn parses_external_agilent_1d_fid_when_available() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("none"));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
+    Ok(())
+}
+
+#[test]
+fn parses_external_bruker_1d_fid_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_1d");
+    require_fixture(&fixture.join("fid"))?;
+    require_fixture(&fixture.join("acqus"))?;
+
+    let spectrum = read_bruker_fid_1d_dir(&fixture)?;
+
+    assert_eq!(spectrum.len(), 2048);
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(600.132_820_611));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("DMSO"));
+    assert_close(spectrum.metadata.temperature_k, Some(298.0));
+    assert!(spectrum.imaginary.is_some());
+    assert!(
+        spectrum
+            .intensities
+            .iter()
+            .any(|value| value.abs() > 1_000.0)
+    );
     Ok(())
 }
 

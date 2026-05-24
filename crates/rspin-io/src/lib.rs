@@ -19,7 +19,9 @@ pub use analysis_json::{
     JsonAnalysis1D, JsonAnalysis2D, read_analysis1d_json, read_analysis2d_json,
     write_analysis1d_json, write_analysis2d_json,
 };
-pub use bruker::{BrukerProcessed1D, read_bruker_processed_1d_dir};
+pub use bruker::{
+    BrukerFid1D, BrukerProcessed1D, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
+};
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};
 pub use jcamp::{JcampDx, read_jcamp_dx_1d, write_jcamp_dx_1d};
