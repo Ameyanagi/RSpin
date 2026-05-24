@@ -2,10 +2,11 @@
 
 use rspin_core::Result;
 use rspin_simulation::{
-    ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
-    decompose_exact_spin_half_1d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
-    simulate_multiplet_1d,
+    ExactSpectrumOptions, ExactSpinOptions, SpinHalfSystem, decompose_exact_spin_half_1d,
+    exact_spin_half_transitions, simulate_exact_spin_half_1d,
 };
+#[cfg(feature = "first-order")]
+use rspin_simulation::{FirstOrderMultiplet, SimulationOptions, simulate_multiplet_1d};
 
 use super::{from_json, to_json};
 
@@ -14,6 +15,7 @@ use super::{from_json, to_json};
 /// # Errors
 ///
 /// Returns an error when deserialization, simulation, or serialization fails.
+#[cfg(feature = "first-order")]
 pub fn simulate_first_order_multiplet_json(
     multiplet_json: &str,
     options_json: &str,

@@ -50,9 +50,11 @@ pub use processing_2d::{
     slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
     slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
 };
+#[cfg(feature = "first-order")]
+pub use simulation::simulate_first_order_multiplet_json;
 pub use simulation::{
     decompose_exact_spin_half_spectrum_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
+    simulate_exact_spin_half_transitions_json,
 };
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.

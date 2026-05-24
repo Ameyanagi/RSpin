@@ -11,6 +11,8 @@ use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
 
 pub use analysis::{detect_ranges_1d, detect_zones_2d};
+#[cfg(feature = "first-order")]
+pub use api::simulate_first_order_multiplet_json;
 pub use api::{
     abs_spectrum_1d_json, abs_spectrum_2d_json, annotate_spectrum_1d_with_assignments_json,
     annotate_spectrum_2d_with_assignments_json, apply_processing_recipe_1d_json,
@@ -28,13 +30,12 @@ pub use api::{
     project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
     resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
     scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
-    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
-    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
-    validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
-    zero_fill_spectrum_2d_json,
+    simulate_exact_spin_half_transitions_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
+    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
+    summarize_signals_2d_json, validate_assignment_set_json, validate_j_coupling_graph_json,
+    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
+    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -267,6 +268,7 @@ pub fn generate_spectrum_matrix_2d(
 ///
 /// Returns a JavaScript error string when deserialization, simulation, or
 /// serialization fails.
+#[cfg(feature = "first-order")]
 #[wasm_bindgen(js_name = simulateFirstOrderMultiplet)]
 pub fn simulate_first_order_multiplet(
     multiplet_json: &str,

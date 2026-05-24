@@ -9,6 +9,7 @@ version.workspace = true
 [features]
 default = []
 external-baselines = ["rspin-processing/external-baselines"]
+first-order = ["rspin-simulation/first-order"]
 
 [dependencies]
 rspin-analysis.workspace = true

@@ -1,10 +1,13 @@
 use rspin_core::Spectrum1D;
 
+#[cfg(feature = "first-order")]
+use super::super::simulate_first_order_multiplet_json;
 use super::super::{
     decompose_exact_spin_half_spectrum_json, from_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
+    simulate_exact_spin_half_transitions_json,
 };
 
+#[cfg(feature = "first-order")]
 #[test]
 fn simulates_first_order_json() -> anyhow::Result<()> {
     let spectrum_json = simulate_first_order_multiplet_json(
