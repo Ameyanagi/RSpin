@@ -21,6 +21,7 @@ mod nmrml_info;
 mod nmrml_writer;
 mod prediction_json;
 mod processing_json;
+mod simulation_json;
 mod traits;
 
 pub use agilent::{
@@ -97,5 +98,19 @@ pub use processing_json::{
     PROCESSING_RECIPE_2D_FORMAT, PROCESSING_RECIPE_JSON_VERSION, read_processing_recipe_1d_json,
     read_processing_recipe_2d_json, write_processing_recipe_1d_json,
     write_processing_recipe_2d_json,
+};
+pub use simulation_json::{
+    EXACT_DECOMPOSITION_1D_JSON_FORMAT, EXACT_DECOMPOSITION_2D_JSON_FORMAT,
+    EXACT_SPECTRUM_1D_OPTIONS_JSON_FORMAT, EXACT_SPECTRUM_2D_OPTIONS_JSON_FORMAT,
+    EXACT_SPIN_OPTIONS_JSON_FORMAT, EXACT_TRANSITIONS_JSON_FORMAT, JsonExactDecomposition1D,
+    JsonExactDecomposition2D, JsonExactSpectrum2DOptions, JsonExactSpectrumOptions,
+    JsonExactSpinOptions, JsonExactTransitions, JsonSpinHalfSystem, SIMULATION_JSON_VERSION,
+    SPIN_HALF_SYSTEM_JSON_FORMAT, read_exact_decomposition_1d_json,
+    read_exact_decomposition_2d_json, read_exact_spectrum_2d_options_json,
+    read_exact_spectrum_options_json, read_exact_spin_options_json, read_exact_transitions_json,
+    read_spin_half_system_json, write_exact_decomposition_1d_json,
+    write_exact_decomposition_2d_json, write_exact_spectrum_2d_options_json,
+    write_exact_spectrum_options_json, write_exact_spin_options_json, write_exact_transitions_json,
+    write_spin_half_system_json,
 };
 pub use traits::{SpectrumPathReader, SpectrumPathWriter, SpectrumReader, SpectrumWriter};

@@ -201,6 +201,32 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_exact_simulation_json() -> Result<()> {
+    let system = SpinHalfSystem::new().with_spin(1.0);
+    let system_json = write_spin_half_system_json(&system)?;
+    assert!(system_json.contains(SPIN_HALF_SYSTEM_JSON_FORMAT));
+    assert!(system_json.contains(&format!("\"version\":{SIMULATION_JSON_VERSION}")));
+    assert_eq!(read_spin_half_system_json(&system_json)?, system);
+
+    let options = ExactSpinOptions::new().with_spectrometer_mhz(400.0);
+    let options_json = write_exact_spin_options_json(&options)?;
+    assert!(options_json.contains(EXACT_SPIN_OPTIONS_JSON_FORMAT));
+    assert_eq!(read_exact_spin_options_json(&options_json)?, options);
+
+    let transitions = exact_spin_half_transitions(&system, &options)?;
+    let transitions_json =
+        <JsonExactTransitions as SpectrumWriter<[ExactTransition]>>::write_string(
+            &JsonExactTransitions,
+            &transitions,
+        )?;
+    assert!(transitions_json.contains(EXACT_TRANSITIONS_JSON_FORMAT));
+    let parsed: Vec<ExactTransition> =
+        SpectrumReader::read_str(&JsonExactTransitions, &transitions_json)?;
+    assert_eq!(parsed, transitions);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_nmredata_import() -> Result<()> {
     let record = nmredata_prelude_fixture()?;
 
