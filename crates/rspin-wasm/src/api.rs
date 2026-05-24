@@ -2,6 +2,7 @@
 
 mod assignments;
 mod buckets;
+mod clustering;
 mod contours;
 mod csv_io;
 mod pairwise;
@@ -34,6 +35,10 @@ pub use assignments::{
 pub use buckets::{
     bucket_spectra_1d_json, bucket_spectra_2d_json, bucket_spectrum_1d_json,
     bucket_spectrum_2d_json,
+};
+pub use clustering::{
+    cluster_bucket_matrix_1d_json, cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
+    cluster_spectrum_matrix_2d_json,
 };
 pub use contours::extract_contours_2d_json;
 pub use csv_io::{

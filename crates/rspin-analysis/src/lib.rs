@@ -3,6 +3,7 @@
 mod alignment;
 mod assignments;
 mod buckets;
+mod clustering;
 mod couplings;
 mod integration;
 mod integration_2d;
@@ -27,6 +28,11 @@ pub use assignments::{
 pub use buckets::{
     BucketMatrix1D, BucketMatrix2D, BucketOptions1D, BucketOptions2D, SpectralBucket1D,
     SpectralBucket2D, bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d,
+};
+pub use clustering::{
+    ClusterMerge, MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions, MatrixLinkage,
+    cluster_bucket_matrix_1d, cluster_bucket_matrix_2d, cluster_matrix, cluster_spectrum_matrix_1d,
+    cluster_spectrum_matrix_2d,
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};

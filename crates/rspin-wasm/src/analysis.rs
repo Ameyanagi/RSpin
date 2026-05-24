@@ -4,8 +4,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     align_spectra_by_peak_to_matrix_1d_json, bucket_spectra_1d_json, bucket_spectra_2d_json,
-    bucket_spectrum_1d_json, bucket_spectrum_2d_json, detect_ranges_json, detect_zones_json,
-    js_error, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
+    bucket_spectrum_1d_json, bucket_spectrum_2d_json, cluster_bucket_matrix_1d_json,
+    cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
+    cluster_spectrum_matrix_2d_json, detect_ranges_json, detect_zones_json, js_error,
+    pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
     pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, pca_bucket_matrix_1d_json,
     pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
 };
@@ -112,6 +114,62 @@ pub fn bucket_spectra_2d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     bucket_spectra_2d_json(spectra_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs hierarchical clustering on a one-dimensional spectrum matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, clustering, or
+/// serialization fails.
+#[wasm_bindgen(js_name = clusterSpectrumMatrix1d)]
+pub fn cluster_spectrum_matrix_1d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    cluster_spectrum_matrix_1d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs hierarchical clustering on a two-dimensional spectrum matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, clustering, or
+/// serialization fails.
+#[wasm_bindgen(js_name = clusterSpectrumMatrix2d)]
+pub fn cluster_spectrum_matrix_2d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    cluster_spectrum_matrix_2d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs hierarchical clustering on a one-dimensional bucket matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, clustering, or
+/// serialization fails.
+#[wasm_bindgen(js_name = clusterBucketMatrix1d)]
+pub fn cluster_bucket_matrix_1d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    cluster_bucket_matrix_1d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs hierarchical clustering on a two-dimensional bucket matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, clustering, or
+/// serialization fails.
+#[wasm_bindgen(js_name = clusterBucketMatrix2d)]
+pub fn cluster_bucket_matrix_2d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    cluster_bucket_matrix_2d_json(matrix_json, options_json).map_err(|error| js_error(&error))
 }
 
 /// Runs PCA on a one-dimensional spectrum matrix.
