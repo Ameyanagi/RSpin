@@ -16,6 +16,8 @@ mod recipe_1d;
 mod recipe_2d;
 mod resample_1d;
 mod resample_2d;
+#[cfg(test)]
+mod serde_tests;
 mod traits;
 mod transform;
 mod transform_2d;

@@ -1,11 +1,12 @@
 //! One-dimensional processing operations.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum1D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Multiplies all intensities by a scalar.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ScaleIntensity {
     /// Multiplicative factor.
     pub factor: f64,
@@ -18,7 +19,7 @@ impl ProcessingStep<Spectrum1D> for ScaleIntensity {
 }
 
 /// Adds a scalar offset to all intensities.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OffsetIntensity {
     /// Additive offset.
     pub offset: f64,
@@ -31,7 +32,7 @@ impl ProcessingStep<Spectrum1D> for OffsetIntensity {
 }
 
 /// Normalizes intensities by their maximum absolute value.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NormalizeMaxAbs;
 
 impl ProcessingStep<Spectrum1D> for NormalizeMaxAbs {
@@ -41,7 +42,7 @@ impl ProcessingStep<Spectrum1D> for NormalizeMaxAbs {
 }
 
 /// Normalizes intensities so their trapezoidal area matches a target value.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NormalizeArea {
     /// Desired integrated area after normalization.
     pub target_area: f64,
@@ -83,7 +84,7 @@ impl ProcessingStep<Spectrum1D> for NormalizeArea {
 }
 
 /// Shifts the x axis by a constant delta.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ShiftAxis {
     /// Shift amount in the x-axis unit.
     pub delta: f64,
@@ -96,7 +97,7 @@ impl ProcessingStep<Spectrum1D> for ShiftAxis {
 }
 
 /// Extends a one-dimensional spectrum with trailing zeroes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZeroFill {
     /// Desired total point count.
     pub target_len: usize,

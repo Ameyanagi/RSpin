@@ -1,11 +1,12 @@
 //! One-dimensional absolute-value processing.
 
 use rspin_core::{ProcessingRecord, Result, Spectrum1D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Applies component-wise absolute value to one-dimensional data.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Abs1D;
 
 impl ProcessingStep<Spectrum1D> for Abs1D {

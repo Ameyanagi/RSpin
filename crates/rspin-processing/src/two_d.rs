@@ -1,11 +1,13 @@
 //! Two-dimensional processing and extraction operations.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum1D, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Projection reduction mode.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ProjectionMode {
     /// Sum all values along the collapsed axis.
     Sum,
@@ -20,7 +22,7 @@ pub enum ProjectionMode {
 }
 
 /// Multiplies all 2D intensities by a scalar.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Scale2D {
     /// Multiplicative factor.
     pub factor: f64,
@@ -33,7 +35,7 @@ impl ProcessingStep<Spectrum2D> for Scale2D {
 }
 
 /// Normalizes 2D intensities by their maximum absolute value.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Normalize2DMaxAbs;
 
 impl ProcessingStep<Spectrum2D> for Normalize2DMaxAbs {
@@ -43,7 +45,7 @@ impl ProcessingStep<Spectrum2D> for Normalize2DMaxAbs {
 }
 
 /// Normalizes 2D intensities so their bilinear volume matches a target value.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Normalize2DVolume {
     /// Desired integrated volume after normalization.
     pub target_volume: f64,

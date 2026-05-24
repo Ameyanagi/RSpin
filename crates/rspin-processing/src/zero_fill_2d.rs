@@ -1,11 +1,12 @@
 //! Two-dimensional zero filling.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Extends a two-dimensional spectrum with trailing zeroes in each dimension.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ZeroFill2D {
     /// Desired x-axis point count.
     pub target_x_len: usize,

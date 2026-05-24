@@ -3,11 +3,12 @@
 use std::f64::consts::{LN_2, PI};
 
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Applies separable exponential apodization to a two-dimensional spectrum.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExponentialApodization2D {
     /// X-dimension line broadening in hertz.
     pub x_line_broadening_hz: f64,
@@ -32,7 +33,7 @@ impl ProcessingStep<Spectrum2D> for ExponentialApodization2D {
 }
 
 /// Applies separable Gaussian apodization to a two-dimensional spectrum.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GaussianApodization2D {
     /// X-dimension Gaussian broadening full width at half maximum in hertz.
     pub x_gaussian_broadening_hz: f64,
@@ -57,7 +58,7 @@ impl ProcessingStep<Spectrum2D> for GaussianApodization2D {
 }
 
 /// Applies separable sine-bell apodization to a two-dimensional spectrum.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SineBellApodization2D {
     /// X-dimension start angle in degrees.
     pub x_start_angle_deg: f64,

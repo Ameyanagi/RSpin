@@ -1,11 +1,12 @@
 //! One-dimensional resampling.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum1D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Linearly resamples a one-dimensional spectrum onto a target axis.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Resample1D {
     /// Target x axis.
     pub target_axis: Axis,

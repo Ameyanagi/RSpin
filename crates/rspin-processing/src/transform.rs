@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::ProcessingStep;
 
 /// Applies exponential apodization to real and imaginary channels.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ExponentialApodization {
     /// Line broadening in hertz.
     pub line_broadening_hz: f64,
@@ -24,7 +24,7 @@ impl ProcessingStep<Spectrum1D> for ExponentialApodization {
 }
 
 /// Applies Gaussian apodization to real and imaginary channels.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GaussianApodization {
     /// Gaussian broadening full width at half maximum in hertz.
     pub gaussian_broadening_hz: f64,
@@ -39,7 +39,7 @@ impl ProcessingStep<Spectrum1D> for GaussianApodization {
 }
 
 /// Applies sine-bell apodization to real and imaginary channels.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SineBellApodization {
     /// Start angle in degrees.
     pub start_angle_deg: f64,
@@ -61,7 +61,7 @@ impl ProcessingStep<Spectrum1D> for SineBellApodization {
 }
 
 /// Converts a complex spectrum to magnitude mode.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Magnitude;
 
 impl ProcessingStep<Spectrum1D> for Magnitude {
@@ -81,7 +81,7 @@ pub enum FftDirection {
 }
 
 /// FFT processing step.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fft1D {
     /// Transform direction.
     pub direction: FftDirection,
@@ -94,7 +94,7 @@ impl ProcessingStep<Spectrum1D> for Fft1D {
 }
 
 /// Manual zero- and first-order phase correction.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PhaseCorrection {
     /// Zero-order phase in degrees.
     pub zero_order_deg: f64,

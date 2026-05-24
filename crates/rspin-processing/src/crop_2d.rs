@@ -1,11 +1,12 @@
 //! Two-dimensional spectral windowing.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Keeps 2D points whose x and y coordinates fall inside inclusive windows.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Crop2D {
     /// First requested x coordinate.
     pub x_from: f64,

@@ -1,11 +1,12 @@
 //! Two-dimensional resampling.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Bilinearly resamples a two-dimensional spectrum onto target axes.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Resample2D {
     /// Target x axis.
     pub target_x: Axis,

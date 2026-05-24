@@ -1,11 +1,12 @@
 //! One-dimensional spectral windowing.
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum1D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Keeps points whose x coordinates fall inside an inclusive window.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Crop1D {
     /// First requested x coordinate.
     pub from: f64,

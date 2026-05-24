@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FftDirection, ProcessingStep};
 
 /// Two-dimensional FFT processing step.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Fft2D {
     /// Transform direction.
     pub direction: FftDirection,

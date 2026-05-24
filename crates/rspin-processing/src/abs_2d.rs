@@ -1,11 +1,12 @@
 //! Two-dimensional absolute-value processing.
 
 use rspin_core::{ProcessingRecord, Result, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Applies component-wise absolute value to two-dimensional data.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Abs2D;
 
 impl ProcessingStep<Spectrum2D> for Abs2D {
