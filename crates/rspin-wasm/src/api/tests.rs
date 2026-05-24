@@ -211,6 +211,30 @@ Spectrum_Location=file:./nmr/10
 }
 
 #[test]
+fn parses_nmredata_records_to_json() -> anyhow::Result<()> {
+    let json = parse_nmredata_records_json(
+        r"
+>  <NMREDATA_VERSION>
+1.0
+$$$$
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_FORMULA>
+C2H6O
+$$$$
+",
+    )?;
+    let value: serde_json::Value = from_json(&json)?;
+
+    assert_eq!(value.as_array().map(Vec::len), Some(2));
+    assert_eq!(value[0]["version"]["raw"], "1.0");
+    assert_eq!(value[1]["version"]["raw"], "1.1");
+    assert_eq!(value[1]["formula"], "C2H6O");
+    Ok(())
+}
+
+#[test]
 fn writes_nmredata_from_json() -> anyhow::Result<()> {
     let json = parse_nmredata_json(
         r"
@@ -235,21 +259,16 @@ H1, 4.200, H1
 
 #[test]
 fn writes_nmredata_records_from_json() -> anyhow::Result<()> {
-    let first = parse_nmredata_json(
+    let records_json = parse_nmredata_records_json(
         r"
 >  <NMREDATA_VERSION>
 1.0
-",
-    )?;
-    let second = parse_nmredata_json(
-        r"
+$$$$
 >  <NMREDATA_VERSION>
 1.1
+$$$$
 ",
     )?;
-    let first_value: serde_json::Value = from_json(&first)?;
-    let second_value: serde_json::Value = from_json(&second)?;
-    let records_json = serde_json::to_string(&vec![first_value, second_value])?;
 
     let text = write_nmredata_records_json(&records_json)?;
     assert_eq!(text.matches("$$$$").count(), 2);
