@@ -28,18 +28,19 @@ use rspin_analysis::{
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
     inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
-    parse_jcamp_dx_version, parse_spectrum_text_format, parse_spectrum1d_bytes_format,
-    parse_spectrum1d_write_format, parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
-    read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes,
-    read_agilent_processed_2d_bytes, read_assignment_set_json, read_bruker_fid_1d_bytes,
-    read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes,
-    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
-    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
-    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
-    read_spectrum1d_bytes_as, read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as,
-    read_spectrum2d_bytes_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
-    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d,
-    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
+    parse_jcamp_dx_version, parse_nmrml_version, parse_spectrum_text_format,
+    parse_spectrum1d_bytes_format, parse_spectrum1d_write_format, parse_spectrum2d_bytes_format,
+    parse_spectrum2d_write_format, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
+    read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
+    read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes,
+    read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes,
+    read_jeol_jdf_2d_bytes, read_nmredata_record_json, read_nmredata_records_json,
+    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum1d_bytes_as, read_spectrum1d_json,
+    read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as, read_spectrum2d_json,
+    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
+    write_j_coupling_graph_json, write_jcamp_dx_1d, write_nmredata_record,
+    write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum1d_json, write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
 };
@@ -308,6 +309,16 @@ pub fn write_jcamp_dx_1d_json(spectrum_json: &str) -> Result<String> {
 /// Returns an error when the version label is malformed.
 pub fn parse_jcamp_dx_version_json(input: &str) -> Result<String> {
     let version = parse_jcamp_dx_version(input)?;
+    to_json(&version)
+}
+
+/// Parses an nmrML version label into serialized metadata JSON.
+///
+/// # Errors
+///
+/// Returns an error when the version label is malformed.
+pub fn parse_nmrml_version_json(input: &str) -> Result<String> {
+    let version = parse_nmrml_version(input)?;
     to_json(&version)
 }
 

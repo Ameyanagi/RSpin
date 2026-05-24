@@ -241,6 +241,14 @@ fn inspects_vendor_and_open_format_metadata_json() -> anyhow::Result<()> {
     assert_eq!(jcamp["major"], 5);
     assert_eq!(jcamp["minor"], 0);
 
+    let nmrml_json = parse_nmrml_version_json("v1.0.rc1")?;
+    let nmrml: serde_json::Value = from_json(&nmrml_json)?;
+    assert_eq!(nmrml["raw"], "v1.0.rc1");
+    assert_eq!(nmrml["normalized"], "1.0.rc1");
+    assert_eq!(nmrml["major"], 1);
+    assert_eq!(nmrml["minor"], 0);
+    assert_eq!(nmrml["build"], "rc1");
+
     let bruker_json =
         inspect_bruker_parameter_file_json("##JCAMPDX= 5.00\n##DATATYPE= Parameters\n")?;
     let bruker: serde_json::Value = from_json(&bruker_json)?;

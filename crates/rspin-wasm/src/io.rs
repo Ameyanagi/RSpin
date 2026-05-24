@@ -13,12 +13,13 @@ use crate::{
     parse_bruker_processed_2d_bytes_json, parse_bruker_ser_2d_bytes_json,
     parse_jcamp_dx_version_json, parse_jeol_jdf_1d_bytes_json, parse_jeol_jdf_2d_bytes_json,
     parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
-    parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json,
-    parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json, parse_spectrum_2d_csv_json,
-    parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json, write_analysis_1d_csv_json,
-    write_analysis_2d_csv_json, write_nmredata_json, write_nmredata_records_json,
-    write_nmrml_1d_json, write_nmrml_2d_json, write_spectrum_1d_csv_json,
-    write_spectrum_1d_text_json, write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
+    parse_nmrml_version_json, parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json,
+    parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json,
+    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
+    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
+    write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -39,6 +40,16 @@ pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = parseJcampDxVersion)]
 pub fn parse_jcamp_dx_version(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_version_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses an nmrML version label into serialized metadata JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the version label is malformed.
+#[wasm_bindgen(js_name = parseNmrMlVersion)]
+pub fn parse_nmrml_version(input: &str) -> std::result::Result<String, JsValue> {
+    parse_nmrml_version_json(input).map_err(|error| js_error(&error))
 }
 
 /// Parses Agilent/Varian raw one-dimensional FID bytes into serialized spectrum JSON.
