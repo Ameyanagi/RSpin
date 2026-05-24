@@ -9,7 +9,7 @@ use std::{
 };
 
 use rspin_core::{Nucleus, Unit};
-use rspin_io::read_jcamp_dx_1d;
+use rspin_io::{read_agilent_fid_1d_dir, read_jcamp_dx_1d};
 
 #[test]
 fn parses_external_jcamp_peak_table_fixture_when_available() -> anyhow::Result<()> {
@@ -104,6 +104,27 @@ fn parses_external_jcamp_asdf_fixture_when_available() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert!(spectrum.intensities.iter().any(|value| *value > 1.0));
+    Ok(())
+}
+
+#[test]
+fn parses_external_agilent_1d_fid_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_1d");
+    require_fixture(&fixture.join("fid"))?;
+    require_fixture(&fixture.join("procpar"))?;
+
+    let spectrum = read_agilent_fid_1d_dir(&fixture)?;
+
+    assert_eq!(spectrum.len(), 1500);
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_close(spectrum.metadata.frequency_mhz, Some(125.681_110_7));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("none"));
+    assert!(spectrum.imaginary.is_some());
+    assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
     Ok(())
 }
 
