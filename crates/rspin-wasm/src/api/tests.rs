@@ -917,6 +917,31 @@ fn integrates_regions_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn integrates_detected_ranges_json() -> anyhow::Result<()> {
+    let spectrum_json = parse_jcamp_dx_1d_json(
+        "\
+##TITLE=demo
+##FIRSTX=0
+##LASTX=6
+##XYDATA=(X++(Y..Y))
+0 0 2 2 0 4 4 0
+##END=
+",
+    )?;
+    let ranges_json = detect_ranges_json(
+        &spectrum_json,
+        r#"{"threshold_abs":1.0,"min_active_points":1,"merge_gap_points":0}"#,
+    )?;
+    let integrals_json = integrate_ranges_json(&spectrum_json, &ranges_json)?;
+    let integrals: Vec<rspin_analysis::Integral> = from_json(&integrals_json)?;
+
+    assert_eq!(integrals.len(), 2);
+    assert!((integrals[0].area - 2.0).abs() < 1e-12);
+    assert!((integrals[1].area - 4.0).abs() < 1e-12);
+    Ok(())
+}
+
+#[test]
 fn integrates_2d_region_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&Spectrum2D::new(
         Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
@@ -951,5 +976,26 @@ fn integrates_2d_regions_json() -> anyhow::Result<()> {
     assert_eq!(integrals.len(), 2);
     assert!((integrals[0].volume - 1.0).abs() < 1e-12);
     assert!((integrals[1].volume - 3.0).abs() < 1e-12);
+    Ok(())
+}
+
+#[test]
+fn integrates_detected_zones_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 4.0, 5)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![1.0, 1.0, 0.0, 2.0, 2.0, 1.0, 1.0, 0.0, 2.0, 2.0],
+        Metadata::default(),
+    )?)?;
+    let zones_json = detect_zones_json(
+        &spectrum_json,
+        r#"{"threshold_abs":0.5,"min_active_points":1,"connectivity":"Four"}"#,
+    )?;
+    let integrals_json = integrate_zones_2d_json(&spectrum_json, &zones_json)?;
+    let integrals: Vec<rspin_analysis::Integral2D> = from_json(&integrals_json)?;
+
+    assert_eq!(integrals.len(), 2);
+    assert!((integrals[0].volume - 1.0).abs() < 1e-12);
+    assert!((integrals[1].volume - 2.0).abs() < 1e-12);
     Ok(())
 }

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{RSpinError, Result, Spectrum2D};
 
-use crate::Integrator2D;
+use crate::{Integrator2D, zones::DetectedZone};
 
 /// Inclusive rectangular integration region.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -138,6 +138,31 @@ pub fn integrate_regions_2d(
         .iter()
         .copied()
         .map(|region| integrate_region_2d(spectrum, region))
+        .collect()
+}
+
+/// Integrates a two-dimensional spectrum over detected zone bounds in input order.
+///
+/// # Errors
+///
+/// Returns the first integration error produced by any detected zone.
+pub fn integrate_zones_2d(
+    spectrum: &Spectrum2D,
+    zones: &[DetectedZone],
+) -> Result<Vec<Integral2D>> {
+    zones
+        .iter()
+        .map(|zone| {
+            integrate_region_2d(
+                spectrum,
+                IntegralRegion2D {
+                    x_from: zone.x_from,
+                    x_to: zone.x_to,
+                    y_from: zone.y_from,
+                    y_to: zone.y_to,
+                },
+            )
+        })
         .collect()
 }
 

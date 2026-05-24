@@ -107,6 +107,23 @@ fn integrates_multiple_2d_regions_in_order() -> anyhow::Result<()> {
 }
 
 #[test]
+fn integrates_detected_zones_in_order() -> anyhow::Result<()> {
+    let spectrum = plane_spectrum(0.0, 2.0, 0.0, 2.0)?;
+    let zones = [
+        detected_zone("zone-a", 0.0, 1.0, 0.0, 1.0),
+        detected_zone("zone-b", 1.0, 2.0, 1.0, 2.0),
+    ];
+    let integrals = integrate_zones_2d(&spectrum, &zones)?;
+
+    assert_eq!(integrals.len(), 2);
+    assert_close(integrals[0].volume, 1.0);
+    assert_close(integrals[1].volume, 3.0);
+    assert_close(integrals[0].region.x_from, zones[0].x_from);
+    assert_close(integrals[1].region.y_to, zones[1].y_to);
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_region_and_shape() -> anyhow::Result<()> {
     let spectrum = plane_spectrum(0.0, 2.0, 0.0, 2.0)?;
     let error = integrate_region_2d(
@@ -156,6 +173,26 @@ fn plane_spectrum(
         }
     }
     Ok(Spectrum2D::new(x, y, z, Metadata::default())?)
+}
+
+fn detected_zone(id: &str, x_from: f64, x_to: f64, y_from: f64, y_to: f64) -> DetectedZone {
+    DetectedZone {
+        id: id.to_owned(),
+        x_start_index: 0,
+        x_end_index: 1,
+        y_start_index: 0,
+        y_end_index: 1,
+        x_from,
+        x_to,
+        y_from,
+        y_to,
+        centroid_x: (x_from + x_to) * 0.5,
+        centroid_y: (y_from + y_to) * 0.5,
+        active_points: 1,
+        max_abs_intensity: 0.0,
+        sum_intensity: 0.0,
+        sum_abs_intensity: 0.0,
+    }
 }
 
 fn assert_close(actual: f64, expected: f64) {

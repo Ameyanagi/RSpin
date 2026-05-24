@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{RSpinError, Result, Spectrum1D};
 
-use crate::Integrator;
+use crate::{Integrator, ranges::DetectedRange};
 
 /// Inclusive integration region.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -120,6 +120,26 @@ pub fn integrate_regions(
         .collect()
 }
 
+/// Integrates a spectrum over detected range bounds in input order.
+///
+/// # Errors
+///
+/// Returns the first integration error produced by any detected range.
+pub fn integrate_ranges(spectrum: &Spectrum1D, ranges: &[DetectedRange]) -> Result<Vec<Integral>> {
+    ranges
+        .iter()
+        .map(|range| {
+            integrate_region(
+                spectrum,
+                IntegralRegion {
+                    from: range.from,
+                    to: range.to,
+                },
+            )
+        })
+        .collect()
+}
+
 fn interpolate(x0: f64, y0: f64, x1: f64, y1: f64, x: f64) -> f64 {
     let fraction = (x - x0) / (x1 - x0);
     y0 + fraction * (y1 - y0)
@@ -185,6 +205,35 @@ mod tests {
         assert_eq!(integrals[0].region, IntegralRegion { from: 0.0, to: 1.0 });
         assert_eq!(integrals[1].region, IntegralRegion { from: 1.0, to: 2.0 });
         Ok(())
+    }
+
+    #[test]
+    fn integrates_detected_ranges_in_order() -> anyhow::Result<()> {
+        let spectrum = spectrum(&[0.0, 2.0, 0.0, 4.0, 0.0], 0.0, 4.0)?;
+        let ranges = [
+            detected_range(0, 2, 0.0, 2.0),
+            detected_range(2, 4, 2.0, 4.0),
+        ];
+        let integrals = integrate_ranges(&spectrum, &ranges)?;
+
+        assert_eq!(integrals.len(), 2);
+        assert_close(integrals[0].area, 2.0);
+        assert_close(integrals[1].area, 4.0);
+        assert_eq!(integrals[0].region, IntegralRegion { from: 0.0, to: 2.0 });
+        assert_eq!(integrals[1].region, IntegralRegion { from: 2.0, to: 4.0 });
+        Ok(())
+    }
+
+    fn detected_range(start_index: usize, end_index: usize, from: f64, to: f64) -> DetectedRange {
+        DetectedRange {
+            start_index,
+            end_index,
+            from,
+            to,
+            active_points: end_index - start_index + 1,
+            max_abs_intensity: 0.0,
+            area: 0.0,
+        }
     }
 
     fn spectrum(intensities: &[f64], start: f64, end: f64) -> anyhow::Result<Spectrum1D> {

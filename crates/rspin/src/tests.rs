@@ -257,6 +257,36 @@ fn prelude_supports_batch_integration() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_detected_feature_integration() -> Result<()> {
+    let spectrum = read_spectrum1d_csv("x,intensity\n0,0\n1,2\n2,2\n3,0\n")?;
+    let ranges = detect_ranges(
+        &spectrum,
+        RangeDetectionOptions::new().with_threshold_abs(1.0),
+    )?;
+    let integrals = integrate_ranges(&spectrum, &ranges)?;
+
+    assert_eq!(integrals.len(), 1);
+    assert!((integrals[0].area - 2.0).abs() < 1.0e-12);
+
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 4.0, 5)?,
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        vec![1.0, 1.0, 0.0, 2.0, 2.0, 1.0, 1.0, 0.0, 2.0, 2.0],
+        Metadata::named("detected-zone-integration"),
+    )?;
+    let zones = detect_zones(
+        &spectrum_2d,
+        ZoneDetectionOptions::new().with_threshold_abs(0.5),
+    )?;
+    let integrals_2d = integrate_zones_2d(&spectrum_2d, &zones)?;
+
+    assert_eq!(integrals_2d.len(), 2);
+    assert!((integrals_2d[0].volume - 1.0).abs() < 1.0e-12);
+    assert!((integrals_2d[1].volume - 2.0).abs() < 1.0e-12);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_exact_simulation_json() -> Result<()> {
     let system = SpinHalfSystem::new().with_spin(1.0);
     system.validate()?;

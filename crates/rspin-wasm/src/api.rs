@@ -21,9 +21,9 @@ use rspin_analysis::{
     DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion, IntegralRegion2D,
     MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
     SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
-    detect_ranges, detect_zones, integrate_region, integrate_region_2d, integrate_regions,
-    integrate_regions_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
-    summarize_signals_2d,
+    detect_ranges, detect_zones, integrate_ranges, integrate_region, integrate_region_2d,
+    integrate_regions, integrate_regions_2d, integrate_zones_2d, optimize_peaks_quadratic,
+    pick_peaks, summarize_signals_1d, summarize_signals_2d,
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
@@ -519,6 +519,18 @@ pub fn integrate_regions_json(spectrum_json: &str, regions_json: &str) -> Result
     to_json(&integrals)
 }
 
+/// Integrates serialized `Spectrum1D` JSON over serialized detected ranges.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn integrate_ranges_json(spectrum_json: &str, ranges_json: &str) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let ranges: Vec<DetectedRange> = from_json(ranges_json)?;
+    let integrals = integrate_ranges(&spectrum, &ranges)?;
+    to_json(&integrals)
+}
+
 /// Integrates serialized `Spectrum2D` JSON over a serialized rectangular region.
 ///
 /// # Errors
@@ -540,6 +552,18 @@ pub fn integrate_regions_2d_json(spectrum_json: &str, regions_json: &str) -> Res
     let spectrum = spectrum2d_from_json(spectrum_json)?;
     let regions: Vec<IntegralRegion2D> = from_json(regions_json)?;
     let integrals = integrate_regions_2d(&spectrum, &regions)?;
+    to_json(&integrals)
+}
+
+/// Integrates serialized `Spectrum2D` JSON over serialized detected zones.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn integrate_zones_2d_json(spectrum_json: &str, zones_json: &str) -> Result<String> {
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
+    let zones: Vec<DetectedZone> = from_json(zones_json)?;
+    let integrals = integrate_zones_2d(&spectrum, &zones)?;
     to_json(&integrals)
 }
 

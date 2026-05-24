@@ -46,10 +46,12 @@ pub use consensus::{
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{
-    Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region, integrate_regions,
+    Integral, IntegralRegion, TrapezoidalIntegrator, integrate_ranges, integrate_region,
+    integrate_regions,
 };
 pub use integration_2d::{
     BilinearIntegrator2D, Integral2D, IntegralRegion2D, integrate_region_2d, integrate_regions_2d,
+    integrate_zones_2d,
 };
 pub use matrix::{
     MatrixGeneration2DOptions, MatrixGenerationOptions, SpectrumMatrix1D, SpectrumMatrix2D,

@@ -41,8 +41,9 @@ pub use api::{
     extract_contours_2d_json, fft_spectrum_1d_json, fft_spectrum_2d_json,
     gaussian_apodization_spectrum_1d_json, gaussian_apodization_spectrum_2d_json,
     generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
-    inspect_nmrml_document_json, integrate_region_2d_json, integrate_region_json,
-    integrate_regions_2d_json, integrate_regions_json, magnitude_spectrum_1d_json,
+    inspect_nmrml_document_json, integrate_ranges_json, integrate_region_2d_json,
+    integrate_region_json, integrate_regions_2d_json, integrate_regions_json,
+    integrate_zones_2d_json, magnitude_spectrum_1d_json,
     nmredata_1d_signals_to_assignment_set_json, nmredata_2d_signals_to_assignment_set_json,
     nmredata_assignments_to_assignment_set_json, nmredata_couplings_to_j_coupling_graph_json,
     nmredata_to_analysis_json, normalize_spectrum_1d_area_json, normalize_spectrum_1d_json,
@@ -298,6 +299,20 @@ pub fn integrate_regions_1d(
     integrate_regions_json(spectrum_json, regions_json).map_err(|error| js_error(&error))
 }
 
+/// Integrates a serialized one-dimensional spectrum over detected ranges.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, analysis, or
+/// serialization fails.
+#[wasm_bindgen(js_name = integrateRanges1d)]
+pub fn integrate_ranges_1d(
+    spectrum_json: &str,
+    ranges_json: &str,
+) -> std::result::Result<String, JsValue> {
+    integrate_ranges_json(spectrum_json, ranges_json).map_err(|error| js_error(&error))
+}
+
 /// Integrates a serialized two-dimensional spectrum over a rectangular region.
 ///
 /// # Errors
@@ -324,6 +339,20 @@ pub fn integrate_regions_2d(
     regions_json: &str,
 ) -> std::result::Result<String, JsValue> {
     integrate_regions_2d_json(spectrum_json, regions_json).map_err(|error| js_error(&error))
+}
+
+/// Integrates a serialized two-dimensional spectrum over detected zones.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, analysis, or
+/// serialization fails.
+#[wasm_bindgen(js_name = integrateZones2d)]
+pub fn integrate_zones_2d(
+    spectrum_json: &str,
+    zones_json: &str,
+) -> std::result::Result<String, JsValue> {
+    integrate_zones_2d_json(spectrum_json, zones_json).map_err(|error| js_error(&error))
 }
 
 /// Generates a row-major matrix from serialized one-dimensional spectra.
