@@ -7,8 +7,8 @@ use rspin_io::read_processing_recipe_1d_json;
 use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
     apply_processing_recipe_1d_until, crop_1d, exponential_apodization, fft_1d,
-    gaussian_apodization, magnitude_spectrum, offset_intensity, phase_correct, resample_1d,
-    shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
+    gaussian_apodization, magnitude_spectrum, normalize_area, offset_intensity, phase_correct,
+    resample_1d, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
 };
 
 use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
@@ -21,6 +21,21 @@ use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
 pub fn offset_spectrum_1d_json(spectrum_json: &str, offset: f64) -> Result<String> {
     let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = offset_intensity(&spectrum, offset)?;
+    spectrum1d_to_json(&processed)
+}
+
+/// Normalizes serialized `Spectrum1D` JSON by trapezoidal area.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn normalize_spectrum_1d_area_json(
+    spectrum_json: &str,
+    target_area: f64,
+    use_absolute_intensity: bool,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let processed = normalize_area(&spectrum, target_area, use_absolute_intensity)?;
     spectrum1d_to_json(&processed)
 }
 

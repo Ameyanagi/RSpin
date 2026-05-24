@@ -39,8 +39,9 @@ pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, e
 pub use crop_1d::{Crop1D, crop_1d};
 pub use crop_2d::{Crop2D, crop_2d};
 pub use one_d::{
-    NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill, normalize_max_abs,
-    offset_intensity, scale_intensity, shift_axis, zero_fill,
+    NormalizeArea, NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill,
+    normalize_area, normalize_max_abs, offset_intensity, scale_intensity, shift_axis,
+    spectrum_area, zero_fill,
 };
 pub use pipeline::{ProcessSpectrum1D, Spectrum1DPipeline};
 pub use pipeline_2d::{ProcessSpectrum2D, Spectrum2DPipeline};

@@ -40,6 +40,48 @@ impl ProcessingStep<Spectrum1D> for NormalizeMaxAbs {
     }
 }
 
+/// Normalizes intensities so their trapezoidal area matches a target value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NormalizeArea {
+    /// Desired integrated area after normalization.
+    pub target_area: f64,
+    /// Use absolute real intensities when measuring the area.
+    pub use_absolute_intensity: bool,
+}
+
+impl NormalizeArea {
+    /// Creates signed area normalization.
+    #[must_use]
+    pub fn new(target_area: f64) -> Self {
+        Self {
+            target_area,
+            use_absolute_intensity: false,
+        }
+    }
+
+    /// Creates absolute area normalization.
+    #[must_use]
+    pub fn absolute(target_area: f64) -> Self {
+        Self {
+            target_area,
+            use_absolute_intensity: true,
+        }
+    }
+
+    /// Sets whether absolute real intensities are used for the area.
+    #[must_use]
+    pub fn with_absolute_intensity(mut self, use_absolute_intensity: bool) -> Self {
+        self.use_absolute_intensity = use_absolute_intensity;
+        self
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for NormalizeArea {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        normalize_area(spectrum, self.target_area, self.use_absolute_intensity)
+    }
+}
+
 /// Shifts the x axis by a constant delta.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ShiftAxis {
@@ -131,6 +173,104 @@ pub fn normalize_max_abs(spectrum: &Spectrum1D) -> Result<Spectrum1D> {
     ))
 }
 
+/// Integrates real intensities over the x axis with the trapezoidal rule.
+///
+/// When `use_absolute_intensity` is true, each real intensity is converted to
+/// its absolute value before integration. Axis direction does not change the
+/// sign of the area.
+///
+/// # Errors
+///
+/// Returns an error when the spectrum has fewer than two points, has no
+/// non-zero-width intervals, or the computed area is not finite.
+pub fn spectrum_area(spectrum: &Spectrum1D, use_absolute_intensity: bool) -> Result<f64> {
+    if spectrum.len() < 2 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "area normalization requires at least two points".to_owned(),
+        });
+    }
+
+    let mut area = 0.0;
+    let mut interval_count = 0_usize;
+    for (x_pair, y_pair) in spectrum
+        .x
+        .values
+        .windows(2)
+        .zip(spectrum.intensities.windows(2))
+    {
+        let width = (x_pair[1] - x_pair[0]).abs();
+        if width <= f64::EPSILON {
+            continue;
+        }
+        let left = area_intensity(y_pair[0], use_absolute_intensity);
+        let right = area_intensity(y_pair[1], use_absolute_intensity);
+        area += 0.5 * (left + right) * width;
+        interval_count += 1;
+    }
+
+    if interval_count == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "area calculation requires at least one non-zero-width interval".to_owned(),
+        });
+    }
+    if !area.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "spectrum area",
+        });
+    }
+    Ok(area)
+}
+
+/// Normalizes real and imaginary intensities to a target trapezoidal area.
+///
+/// The scale factor is computed from real intensities and then applied to both
+/// real and imaginary channels.
+///
+/// # Errors
+///
+/// Returns an error when the target area is not finite, the target area is
+/// zero, the absolute target is negative, or the current area cannot be used as
+/// a normalization denominator.
+pub fn normalize_area(
+    spectrum: &Spectrum1D,
+    target_area: f64,
+    use_absolute_intensity: bool,
+) -> Result<Spectrum1D> {
+    ensure_finite("target area", target_area)?;
+    if target_area == 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "target area must be non-zero".to_owned(),
+        });
+    }
+    if use_absolute_intensity && target_area <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "absolute area normalization requires a positive target area".to_owned(),
+        });
+    }
+
+    let current_area = spectrum_area(spectrum, use_absolute_intensity)?;
+    if current_area == 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "cannot normalize a spectrum with zero integrated area".to_owned(),
+        });
+    }
+    let factor = target_area / current_area;
+    if !factor.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "area normalization factor",
+        });
+    }
+
+    let mut processed = spectrum.clone();
+    scale_values(&mut processed, factor);
+    Ok(recorded(
+        processed,
+        ProcessingRecord::new("normalize_area").with_details(format!(
+            "target_area={target_area},use_absolute_intensity={use_absolute_intensity}"
+        )),
+    ))
+}
+
 /// Shifts the x-axis values by `delta`.
 ///
 /// # Errors
@@ -212,6 +352,25 @@ fn ensure_finite(field: &'static str, value: f64) -> Result<()> {
     Ok(())
 }
 
+fn scale_values(spectrum: &mut Spectrum1D, factor: f64) {
+    for value in &mut spectrum.intensities {
+        *value *= factor;
+    }
+    if let Some(imaginary) = &mut spectrum.imaginary {
+        for value in imaginary {
+            *value *= factor;
+        }
+    }
+}
+
+fn area_intensity(value: f64, use_absolute_intensity: bool) -> f64 {
+    if use_absolute_intensity {
+        value.abs()
+    } else {
+        value
+    }
+}
+
 fn axis_step(axis: &Axis) -> f64 {
     let values = &axis.values;
     match values.as_slice() {
@@ -253,6 +412,69 @@ mod tests {
         let processed = NormalizeMaxAbs.apply(&spectrum)?;
         assert_eq!(processed.intensities, vec![0.25, -0.5, 1.0]);
         assert_eq!(processed.processing[0].operation, "normalize_max_abs");
+        Ok(())
+    }
+
+    #[test]
+    fn normalizes_by_signed_area() -> anyhow::Result<()> {
+        let spectrum = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, 1.0, 1.0],
+            Metadata::default(),
+        )?;
+        let processed = NormalizeArea::new(4.0).apply(&spectrum)?;
+
+        assert!((spectrum_area(&processed, false)? - 4.0).abs() < 1.0e-12);
+        assert_eq!(processed.intensities, vec![2.0, 2.0, 2.0]);
+        assert_eq!(processed.processing[0].operation, "normalize_area");
+        assert_eq!(
+            processed.processing[0].details.as_deref(),
+            Some("target_area=4,use_absolute_intensity=false")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn normalizes_by_absolute_area_and_scales_imaginary_channel() -> anyhow::Result<()> {
+        let spectrum = Spectrum1D::new_complex(
+            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![-1.0, 1.0, -1.0],
+            Some(vec![0.5, -0.5, 1.0]),
+            Metadata::default(),
+        )?;
+        let processed = NormalizeArea::absolute(4.0).apply(&spectrum)?;
+
+        assert!((spectrum_area(&processed, true)? - 4.0).abs() < 1.0e-12);
+        assert_eq!(processed.intensities, vec![-2.0, 2.0, -2.0]);
+        assert_eq!(processed.imaginary.as_deref(), Some(&[1.0, -1.0, 2.0][..]));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_unusable_area_normalization_inputs() -> anyhow::Result<()> {
+        let spectrum = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, 0.0, -1.0],
+            Metadata::default(),
+        )?;
+        let zero_area_error =
+            normalize_area(&spectrum, 1.0, false).expect_err("zero signed area should fail");
+        assert!(matches!(
+            zero_area_error,
+            RSpinError::InvalidSpectrum { .. }
+        ));
+
+        let target_error =
+            normalize_area(&spectrum, 0.0, true).expect_err("zero target area should fail");
+        assert!(matches!(target_error, RSpinError::InvalidSpectrum { .. }));
+
+        let short = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 0.0, 1)?,
+            vec![1.0],
+            Metadata::default(),
+        )?;
+        let short_error = spectrum_area(&short, false).expect_err("short spectrum should fail");
+        assert!(matches!(short_error, RSpinError::InvalidSpectrum { .. }));
         Ok(())
     }
 

@@ -12,16 +12,18 @@ fn applies_chainable_recipe_operations() -> anyhow::Result<()> {
         .crop(0.0, 1.0)
         .resample(Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 3)?)
         .zero_fill(5)
-        .normalize_max_abs();
+        .normalize_max_abs()
+        .normalize_abs_area(1.5);
 
     let processed = recipe.apply(&spectrum)?;
 
-    assert_eq!(recipe.len(), 7);
+    assert_eq!(recipe.len(), 8);
     assert_eq!(processed.len(), 5);
-    assert_eq!(processed.intensities, vec![0.0, 0.5, 1.0, 0.0, 0.0]);
-    assert_eq!(processed.processing.len(), 7);
+    assert_eq!(processed.intensities, vec![0.0, 1.0, 2.0, 0.0, 0.0]);
+    assert_eq!(processed.processing.len(), 8);
     assert_eq!(processed.processing[0].operation, "scale_intensity");
     assert_eq!(processed.processing[6].operation, "normalize_max_abs");
+    assert_eq!(processed.processing[7].operation, "normalize_area");
     Ok(())
 }
 
@@ -63,6 +65,7 @@ fn rejects_recipe_prefix_past_end() -> anyhow::Result<()> {
 fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let recipe = ProcessingRecipe1D::new()
         .scale(2.0)
+        .normalize_area(12.0)
         .gaussian_apodization(0.0, 0.1)
         .sine_bell_apodization(90.0, 90.0, 1.0)
         .subtract_baseline_with(BaselineMethod::Polynomial { degree: 1 });
@@ -70,10 +73,12 @@ fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let decoded: ProcessingRecipe1D = serde_json::from_str(&json)?;
     let processed = decoded.apply(&demo_spectrum()?)?;
 
-    assert_eq!(decoded.len(), 4);
-    assert_eq!(processed.processing[1].operation, "gaussian_apodization");
-    assert_eq!(processed.processing[2].operation, "sine_bell_apodization");
-    assert_eq!(processed.processing[3].operation, "baseline_polynomial");
+    assert_eq!(decoded.len(), 5);
+    assert_eq!(processed.processing[1].operation, "normalize_area");
+    assert_eq!(processed.processing[2].operation, "gaussian_apodization");
+    assert_eq!(processed.processing[3].operation, "sine_bell_apodization");
+    assert_eq!(processed.processing[4].operation, "baseline_polynomial");
+    assert!(json.contains("normalize_area"));
     assert!(json.contains("gaussian_apodization"));
     assert!(json.contains("sine_bell_apodization"));
     assert!(json.contains("polynomial"));

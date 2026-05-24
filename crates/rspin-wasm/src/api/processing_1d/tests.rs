@@ -21,6 +21,23 @@ fn offsets_shifts_and_zero_fills_1d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn normalizes_1d_spectrum_json_by_area() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&real_spectrum()?)?;
+    let normalized_json = normalize_spectrum_1d_area_json(&spectrum_json, 9.0, true)?;
+    let processed = spectrum1d_from_json(&normalized_json)?;
+
+    assert_vec_close(&processed.intensities, &[2.0, -4.0, 8.0]);
+    assert_eq!(
+        processed
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("normalize_area")
+    );
+    Ok(())
+}
+
+#[test]
 fn crops_1d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
     let cropped_json = crop_spectrum_1d_json(&spectrum_json, 1.0, 2.0)?;
@@ -212,12 +229,12 @@ fn applies_processing_recipe_1d_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&real_spectrum()?)?;
     let processed_json = apply_processing_recipe_1d_json(
         &spectrum_json,
-        r#"{"format":"rspin.processing_recipe_1d","version":1,"recipe":{"operations":[{"operation":"scale","factor":2.0},{"operation":"offset","offset":-2.0},{"operation":"absolute_value"},{"operation":"normalize_max_abs"}]}}"#,
+        r#"{"format":"rspin.processing_recipe_1d","version":1,"recipe":{"operations":[{"operation":"scale","factor":2.0},{"operation":"offset","offset":-2.0},{"operation":"absolute_value"},{"operation":"normalize_max_abs"},{"operation":"normalize_area","target_area":3.0,"use_absolute_intensity":true}]}}"#,
     )?;
     let processed = spectrum1d_from_json(&processed_json)?;
 
     assert_vec_close(&processed.x.values, &[0.0, 1.0, 2.0]);
-    assert_vec_close(&processed.intensities, &[0.0, 1.0, 1.0]);
+    assert_vec_close(&processed.intensities, &[0.0, 2.0, 2.0]);
     assert_eq!(
         processed
             .processing
@@ -228,7 +245,8 @@ fn applies_processing_recipe_1d_json() -> anyhow::Result<()> {
             "scale_intensity",
             "offset_intensity",
             "abs_1d",
-            "normalize_max_abs"
+            "normalize_max_abs",
+            "normalize_area"
         ]
     );
     Ok(())

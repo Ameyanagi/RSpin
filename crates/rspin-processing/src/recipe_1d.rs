@@ -7,8 +7,8 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
     crop_1d, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,
-    normalize_max_abs, offset_intensity, phase_correct, resample_1d, scale_intensity, shift_axis,
-    sine_bell_apodization, subtract_baseline, zero_fill,
+    normalize_area, normalize_max_abs, offset_intensity, phase_correct, resample_1d,
+    scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -27,6 +27,13 @@ pub enum ProcessingOperation1D {
     },
     /// Normalizes real intensities by their maximum absolute value.
     NormalizeMaxAbs,
+    /// Normalizes real and imaginary intensities by trapezoidal area.
+    NormalizeArea {
+        /// Desired integrated area after normalization.
+        target_area: f64,
+        /// Use absolute real intensities when measuring the area.
+        use_absolute_intensity: bool,
+    },
     /// Applies component-wise absolute value to real and imaginary channels.
     AbsoluteValue,
     /// Shifts the x-axis values by `delta`.
@@ -110,6 +117,10 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
             Self::Scale { factor } => scale_intensity(spectrum, *factor),
             Self::Offset { offset } => offset_intensity(spectrum, *offset),
             Self::NormalizeMaxAbs => normalize_max_abs(spectrum),
+            Self::NormalizeArea {
+                target_area,
+                use_absolute_intensity,
+            } => normalize_area(spectrum, *target_area, *use_absolute_intensity),
             Self::AbsoluteValue => abs_1d(spectrum),
             Self::ShiftAxis { delta } => shift_axis(spectrum, *delta),
             Self::ZeroFill { target_len } => zero_fill(spectrum, *target_len),
@@ -242,6 +253,27 @@ impl ProcessingRecipe1D {
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
         self.with_operation(ProcessingOperation1D::NormalizeMaxAbs)
+    }
+
+    /// Appends a signed-area normalization operation.
+    #[must_use]
+    pub fn normalize_area(self, target_area: f64) -> Self {
+        self.normalize_area_with(target_area, false)
+    }
+
+    /// Appends an absolute-area normalization operation.
+    #[must_use]
+    pub fn normalize_abs_area(self, target_area: f64) -> Self {
+        self.normalize_area_with(target_area, true)
+    }
+
+    /// Appends an area normalization operation with explicit area mode.
+    #[must_use]
+    pub fn normalize_area_with(self, target_area: f64, use_absolute_intensity: bool) -> Self {
+        self.with_operation(ProcessingOperation1D::NormalizeArea {
+            target_area,
+            use_absolute_intensity,
+        })
     }
 
     /// Appends a component-wise absolute-value operation.

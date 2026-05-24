@@ -18,16 +18,19 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
         .scale(2.0)
         .absolute_value()
         .normalize_max_abs()
+        .normalize_abs_area(1.0)
         .finish()?;
 
-    assert_eq!(processed.intensities, vec![0.5, 0.25, 1.0]);
-    assert_eq!(processed.processing.len(), 5);
+    assert_eq!(processed.intensities, vec![1.0, 0.5, 2.0]);
+    assert!((spectrum_area(&processed, true)? - 1.0).abs() < 1.0e-12);
+    assert_eq!(processed.processing.len(), 6);
 
     let recipe = ProcessingRecipe1D::new()
         .scale(2.0)
         .offset(-2.0)
         .absolute_value()
-        .normalize_max_abs();
+        .normalize_max_abs()
+        .normalize_abs_area(3.0);
     let recipe_json = write_processing_recipe_1d_json(&recipe)?;
     assert!(recipe_json.contains(PROCESSING_RECIPE_1D_FORMAT));
     assert!(recipe_json.contains(&format!("\"version\":{PROCESSING_RECIPE_JSON_VERSION}")));

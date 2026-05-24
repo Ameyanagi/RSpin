@@ -6,9 +6,9 @@ use crate::{
     abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
     auto_phase_spectrum_1d_json, crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json,
     fft_spectrum_1d_json, gaussian_apodization_spectrum_1d_json, js_error,
-    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, offset_spectrum_1d_json,
-    phase_spectrum_1d_json, resample_spectrum_1d_json, scale_spectrum_1d_json,
-    shift_spectrum_1d_axis_json, sine_bell_apodization_spectrum_1d_json,
+    magnitude_spectrum_1d_json, normalize_spectrum_1d_area_json, normalize_spectrum_1d_json,
+    offset_spectrum_1d_json, phase_spectrum_1d_json, resample_spectrum_1d_json,
+    scale_spectrum_1d_json, shift_spectrum_1d_axis_json, sine_bell_apodization_spectrum_1d_json,
     subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 
@@ -46,6 +46,22 @@ pub fn offset_spectrum_1d(
 #[wasm_bindgen(js_name = normalizeSpectrum1d)]
 pub fn normalize_spectrum_1d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
     normalize_spectrum_1d_json(spectrum_json).map_err(|error| js_error(&error))
+}
+
+/// Normalizes a serialized one-dimensional spectrum by trapezoidal area.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = normalizeSpectrum1dArea)]
+pub fn normalize_spectrum_1d_area(
+    spectrum_json: &str,
+    target_area: f64,
+    use_absolute_intensity: bool,
+) -> std::result::Result<String, JsValue> {
+    normalize_spectrum_1d_area_json(spectrum_json, target_area, use_absolute_intensity)
+        .map_err(|error| js_error(&error))
 }
 
 /// Shifts a serialized one-dimensional spectrum axis.
