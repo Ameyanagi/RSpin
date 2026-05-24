@@ -1,6 +1,9 @@
-//! Bruker raw one-dimensional FID import.
+//! Bruker raw FID and `ser` import.
+
+mod two_d;
 
 use std::{
+    collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
     str::FromStr,
@@ -11,6 +14,8 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 use super::{
     optional_f64, optional_i32, parse_parameter_file, read_text, required_usize, text_parameter,
 };
+
+pub use two_d::{BrukerSer2D, read_bruker_ser_2d_dir};
 
 /// Reader for Bruker raw one-dimensional FID datasets.
 ///
@@ -62,7 +67,7 @@ pub fn read_bruker_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
 }
 
-fn locate_dataset_dir(path: &Path) -> PathBuf {
+pub(super) fn locate_dataset_dir(path: &Path) -> PathBuf {
     if path.is_file() {
         path.parent().map_or_else(PathBuf::new, Path::to_path_buf)
     } else {
@@ -70,16 +75,8 @@ fn locate_dataset_dir(path: &Path) -> PathBuf {
     }
 }
 
-fn read_raw_i32_values(
-    path: &Path,
-    acqus: &std::collections::BTreeMap<String, String>,
-) -> Result<Vec<f64>> {
-    let data_type = optional_i32(acqus, "DTYPA")?;
-    if matches!(data_type, Some(value) if value != 0) {
-        return Err(RSpinError::Unsupported {
-            feature: "Bruker raw non-i32 data",
-        });
-    }
+fn read_raw_i32_values(path: &Path, acqus: &BTreeMap<String, String>) -> Result<Vec<f64>> {
+    ensure_i32_data(acqus)?;
 
     let raw_count = required_usize(acqus, "TD")?;
     let required_len = raw_count
@@ -101,23 +98,16 @@ fn read_raw_i32_values(
         });
     }
 
-    let byte_order = optional_i32(acqus, "BYTORDA")?;
-    let scale = optional_i32(acqus, "NC")?.map_or(1.0, |value| 2_f64.powi(-value));
+    let byte_order = byte_order(acqus)?;
+    let scale = scale_factor(acqus)?;
     let mut values = Vec::with_capacity(raw_count);
     for chunk in bytes[..required_len].chunks_exact(4) {
-        let raw = match byte_order {
-            Some(1) => i32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
-            _ => i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
-        };
-        values.push(f64::from(raw) * scale);
+        values.push(decode_i32_chunk(chunk, byte_order) * scale);
     }
     Ok(values)
 }
 
-fn build_raw_axis(
-    point_count: usize,
-    acqus: &std::collections::BTreeMap<String, String>,
-) -> Result<Axis> {
+pub(super) fn build_raw_axis(point_count: usize, acqus: &BTreeMap<String, String>) -> Result<Axis> {
     match optional_f64(acqus, "SWH")? {
         Some(sweep_hz) if sweep_hz > 0.0 => {
             let end = if point_count <= 1 {
@@ -138,7 +128,7 @@ fn build_raw_axis(
     }
 }
 
-fn build_raw_metadata(acqus: &std::collections::BTreeMap<String, String>) -> Result<Metadata> {
+pub(super) fn build_raw_metadata(acqus: &BTreeMap<String, String>) -> Result<Metadata> {
     let nucleus = text_parameter(acqus, "NUC1").and_then(|value| Nucleus::from_str(&value).ok());
     let frequency_mhz = optional_f64(acqus, "SFO1")?;
     let solvent = text_parameter(acqus, "SOLVENT");
@@ -154,4 +144,30 @@ fn build_raw_metadata(acqus: &std::collections::BTreeMap<String, String>) -> Res
         origin,
         molecules: Vec::new(),
     })
+}
+
+pub(super) fn ensure_i32_data(acqus: &BTreeMap<String, String>) -> Result<()> {
+    let data_type = optional_i32(acqus, "DTYPA")?;
+    if matches!(data_type, Some(value) if value != 0) {
+        return Err(RSpinError::Unsupported {
+            feature: "Bruker raw non-i32 data",
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn scale_factor(acqus: &BTreeMap<String, String>) -> Result<f64> {
+    Ok(optional_i32(acqus, "NC")?.map_or(1.0, |value| 2_f64.powi(-value)))
+}
+
+pub(super) fn byte_order(acqus: &BTreeMap<String, String>) -> Result<Option<i32>> {
+    optional_i32(acqus, "BYTORDA")
+}
+
+pub(super) fn decode_i32_chunk(chunk: &[u8], byte_order: Option<i32>) -> f64 {
+    let raw = match byte_order {
+        Some(1) => i32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+        _ => i32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]),
+    };
+    f64::from(raw)
 }

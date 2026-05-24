@@ -20,7 +20,8 @@ pub use analysis_json::{
     write_analysis1d_json, write_analysis2d_json,
 };
 pub use bruker::{
-    BrukerFid1D, BrukerProcessed1D, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
+    BrukerFid1D, BrukerProcessed1D, BrukerSer2D, read_bruker_fid_1d_dir,
+    read_bruker_processed_1d_dir, read_bruker_ser_2d_dir,
 };
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};

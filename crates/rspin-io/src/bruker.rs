@@ -11,7 +11,7 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
 mod raw;
 
-pub use raw::{BrukerFid1D, read_bruker_fid_1d_dir};
+pub use raw::{BrukerFid1D, BrukerSer2D, read_bruker_fid_1d_dir, read_bruker_ser_2d_dir};
 
 /// Reader for Bruker processed one-dimensional datasets.
 ///

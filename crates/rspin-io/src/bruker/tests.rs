@@ -184,6 +184,81 @@ fn rejects_unsupported_raw_data_type() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn reads_raw_2d_ser_dataset_root() -> anyhow::Result<()> {
+    let root = synthetic_dataset("raw-2d")?;
+    write_text(
+        &root.join("acqus"),
+        "\
+##$TD= 4
+##$BYTORDA= 1
+##$DTYPA= 0
+##$NC= -1
+##$SW_h= 1000
+##$NUC1= <1H>
+##$SFO1= 400.25
+##$SOLVENT= <D2O>
+##$TE= 299
+##$OWNER= <ser fixture>
+##$PULPROG= <hsqc>
+",
+    )?;
+    write_text(
+        &root.join("acqu2s"),
+        "\
+##$TD= 2
+##$SW_h= 200
+##$FnMODE= 0
+",
+    )?;
+    write_raw_ser(&root, &[vec![1, 2, 3, 4], vec![5, 6, 7, 8]], ByteOrder::Big)?;
+
+    let spectrum = BrukerSer2D.read_dir(&root)?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_eq!(spectrum.x.values, vec![0.0, 0.001]);
+    assert_eq!(spectrum.y.values, vec![0.0, 0.005]);
+    assert_eq!(spectrum.z, vec![2.0, 6.0, 10.0, 14.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![4.0, 8.0, 12.0, 16.0]));
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("hsqc"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.25));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("D2O"));
+    assert_eq!(spectrum.metadata.temperature_k, Some(299.0));
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("ser fixture"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn rejects_raw_2d_ser_with_incomplete_padded_row() -> anyhow::Result<()> {
+    let root = synthetic_dataset("raw-2d-short")?;
+    write_text(
+        &root.join("acqus"),
+        "\
+##$TD= 4
+##$DTYPA= 0
+",
+    )?;
+    write_text(
+        &root.join("acqu2s"),
+        "\
+##$TD= 1
+",
+    )?;
+    write_raw_fid(&root, &[1, 2, 3, 4], ByteOrder::Little)?;
+    fs::rename(root.join("fid"), root.join("ser"))?;
+
+    let error = read_bruker_ser_2d_dir(&root).expect_err("short Bruker ser row should be rejected");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 enum ByteOrder {
     Little,
@@ -229,6 +304,22 @@ fn write_raw_fid(root: &Path, values: &[i32], byte_order: ByteOrder) -> anyhow::
         })
         .collect::<Vec<_>>();
     fs::write(root.join("fid"), bytes)?;
+    Ok(())
+}
+
+fn write_raw_ser(root: &Path, rows: &[Vec<i32>], byte_order: ByteOrder) -> anyhow::Result<()> {
+    let mut bytes = Vec::new();
+    for row in rows {
+        for value in row {
+            bytes.extend_from_slice(&match byte_order {
+                ByteOrder::Little => value.to_le_bytes(),
+                ByteOrder::Big => value.to_be_bytes(),
+            });
+        }
+        let padded_words = 256usize.saturating_sub(row.len());
+        bytes.extend(std::iter::repeat_n(0, padded_words * 4));
+    }
+    fs::write(root.join("ser"), bytes)?;
     Ok(())
 }
 
