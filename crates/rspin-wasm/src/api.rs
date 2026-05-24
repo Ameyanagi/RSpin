@@ -4,6 +4,7 @@ mod assignments;
 mod buckets;
 mod contours;
 mod csv_io;
+mod pairwise;
 mod pca;
 mod prediction;
 mod processing_1d;
@@ -38,6 +39,10 @@ pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
     write_spectrum_2d_csv_json,
+};
+pub use pairwise::{
+    pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
+    pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json,
 };
 pub use pca::{
     pca_bucket_matrix_1d_json, pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json,
