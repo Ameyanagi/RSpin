@@ -300,6 +300,11 @@ Hcombo, 3.900, H2, H3
 
 >  <NMREDATA_J>
 H1, Hcombo, 7.0
+
+>  <NMREDATA_1D_1H>
+4.200, L=H1
+3.900-3.800, L=H2, H3
+2.000, orphan
 ",
     )?;
 
@@ -348,6 +353,26 @@ H1, Hcombo, 7.0
         analysis["j_coupling_graph"]["couplings"][0]["node_b"],
         "Hcombo"
     );
+
+    let signal_assignments_json = nmredata_1d_signals_to_assignment_set_json(&record_json, "1H")?;
+    let signal_assignments: serde_json::Value = from_json(&signal_assignments_json)?;
+    assert_eq!(
+        signal_assignments["assignments"].as_array().map(Vec::len),
+        Some(3)
+    );
+    assert_eq!(
+        signal_assignments["assignments"][0]["target"]["Peak1D"]["index"],
+        0
+    );
+    assert_eq!(
+        signal_assignments["assignments"][1]["target"]["Range1D"]["start_index"],
+        1
+    );
+    assert_eq!(signal_assignments["assignments"][1]["atoms"][1]["id"], "H3");
+    assert_eq!(
+        signal_assignments["assignments"][2]["atoms"][0]["id"],
+        "orphan"
+    );
     Ok(())
 }
 
@@ -373,6 +398,17 @@ H2, H1, 7.0
         analysis_error,
         RSpinError::InvalidAssignment { .. }
     ));
+
+    let duplicate_signal_record_json = parse_nmredata_json(
+        r"
+>  <NMREDATA_1D_1H>
+4.200, L=H1, H1
+",
+    )?;
+    let signal_error =
+        nmredata_1d_signals_to_assignment_set_json(&duplicate_signal_record_json, "1H")
+            .expect_err("duplicate signal labels should fail");
+    assert!(matches!(signal_error, RSpinError::InvalidAssignment { .. }));
 
     let nucleus_error = nmredata_assignments_to_assignment_set_json(&record_json, " ")
         .expect_err("empty nucleus labels should fail");

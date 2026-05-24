@@ -3,12 +3,13 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    inspect_nmrml_document_json, js_error, nmredata_assignments_to_assignment_set_json,
-    nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json, parse_nmredata_json,
-    parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
-    parse_spectrum_2d_text_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
-    write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    inspect_nmrml_document_json, js_error, nmredata_1d_signals_to_assignment_set_json,
+    nmredata_assignments_to_assignment_set_json, nmredata_couplings_to_j_coupling_graph_json,
+    nmredata_to_analysis_json, parse_nmredata_json, parse_nmredata_records_json,
+    parse_nmrml_1d_json, parse_nmrml_2d_json, parse_spectrum_1d_csv_json,
+    parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json, parse_spectrum_2d_text_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
+    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
     write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
 };
 
@@ -104,6 +105,21 @@ pub fn nmredata_assignments_to_assignment_set(
     nucleus_label: &str,
 ) -> std::result::Result<String, JsValue> {
     nmredata_assignments_to_assignment_set_json(record_json, nucleus_label)
+        .map_err(|error| js_error(&error))
+}
+
+/// Converts `NMReDATA` 1D signal labels into serialized assignment-set JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, nucleus parsing,
+/// conversion, or serialization fails.
+#[wasm_bindgen(js_name = nmreData1dSignalsToAssignmentSet)]
+pub fn nmredata_1d_signals_to_assignment_set(
+    record_json: &str,
+    nucleus_label: &str,
+) -> std::result::Result<String, JsValue> {
+    nmredata_1d_signals_to_assignment_set_json(record_json, nucleus_label)
         .map_err(|error| js_error(&error))
 }
 
