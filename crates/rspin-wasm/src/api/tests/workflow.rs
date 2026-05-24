@@ -1,4 +1,5 @@
 use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
+use rspin_io::{ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT};
 
 use super::*;
 
@@ -13,7 +14,8 @@ fn analyzes_spectrum_1d_json() -> anyhow::Result<()> {
         &to_json(&spectrum)?,
         r#"{"peak_options":{"min_abs_intensity":1.0,"min_prominence":0.0,"polarity":"Positive"},"peak_optimization_options":{"require_vertex_inside":true,"require_matching_curvature":true},"range_options":{"threshold_abs":1.0,"min_active_points":1,"merge_gap_points":0},"multiplet_options":{"max_peak_gap_ppm":1.1,"min_peak_count":1,"include_singlets":true,"spectrometer_mhz":400.0},"signal_options":{"include_empty_ranges":true,"include_orphan_multiplets":true}}"#,
     )?;
-    let analysis: rspin_analysis::SpectrumAnalysis1D = from_json(&analysis_json)?;
+    assert!(analysis_json.contains(ANALYSIS_1D_JSON_FORMAT));
+    let analysis = rspin_io::read_analysis1d_json(&analysis_json)?;
 
     assert_eq!(analysis.peaks.len(), 2);
     assert_eq!(analysis.optimized_peaks.len(), 2);
@@ -34,7 +36,8 @@ fn analyzes_spectrum_2d_json() -> anyhow::Result<()> {
         &to_json(&spectrum)?,
         r#"{"zone_options":{"threshold_abs":1.0,"min_active_points":1,"connectivity":"Four"},"signal_options":{"include_unassigned_zones":true}}"#,
     )?;
-    let analysis: rspin_analysis::SpectrumAnalysis2D = from_json(&analysis_json)?;
+    assert!(analysis_json.contains(ANALYSIS_2D_JSON_FORMAT));
+    let analysis = rspin_io::read_analysis2d_json(&analysis_json)?;
 
     assert_eq!(analysis.zones.len(), 2);
     assert_eq!(analysis.signals.len(), 2);

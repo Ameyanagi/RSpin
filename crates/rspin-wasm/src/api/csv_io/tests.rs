@@ -81,9 +81,12 @@ fn writes_analysis_csv_json() -> anyhow::Result<()> {
         multiplets: Vec::new(),
         signals: Vec::new(),
     };
-    let csv_1d = write_analysis_1d_csv_json(&to_json(&analysis_1d)?)?;
+    let versioned_1d_json = rspin_io::write_analysis1d_json(&analysis_1d)?;
+    let csv_1d = write_analysis_1d_csv_json(&versioned_1d_json)?;
     assert!(csv_1d.contains("# format=RSpin Analysis 1D CSV"));
     assert!(csv_1d.contains("index,x,intensity,prominence,polarity"));
+    let legacy_csv_1d = write_analysis_1d_csv_json(&to_json(&analysis_1d)?)?;
+    assert_eq!(legacy_csv_1d, csv_1d);
 
     let analysis_2d = rspin_analysis::SpectrumAnalysis2D {
         zones: vec![rspin_analysis::DetectedZone {
@@ -105,8 +108,11 @@ fn writes_analysis_csv_json() -> anyhow::Result<()> {
         }],
         signals: Vec::new(),
     };
-    let csv_2d = write_analysis_2d_csv_json(&to_json(&analysis_2d)?)?;
+    let versioned_2d_json = rspin_io::write_analysis2d_json(&analysis_2d)?;
+    let csv_2d = write_analysis_2d_csv_json(&versioned_2d_json)?;
     assert!(csv_2d.contains("# format=RSpin Analysis 2D CSV"));
     assert!(csv_2d.contains("zone:x0-0:y0-0"));
+    let legacy_csv_2d = write_analysis_2d_csv_json(&to_json(&analysis_2d)?)?;
+    assert_eq!(legacy_csv_2d, csv_2d);
     Ok(())
 }
