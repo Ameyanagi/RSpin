@@ -8,6 +8,7 @@ mod integration;
 mod integration_2d;
 mod matrix;
 mod multiplets;
+mod pca;
 mod peak_optimization;
 mod peaks;
 mod ranges;
@@ -36,6 +37,10 @@ pub use matrix::{
 pub use multiplets::{
     DetectedMultiplet, GapMultipletDetector, MultipletDetectionOptions, MultipletKind,
     detect_multiplets,
+};
+pub use pca::{
+    MatrixPcaOptions, MatrixPcaResult, MatrixScaling, pca_bucket_matrix_1d, pca_bucket_matrix_2d,
+    pca_matrix, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
 };
 pub use peak_optimization::{
     OptimizedPeak, PeakOptimizationOptions, QuadraticPeakOptimizer, optimize_peaks_quadratic,

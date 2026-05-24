@@ -5,6 +5,7 @@ use super::*;
 mod assignments;
 mod buckets;
 mod matrix;
+mod pca;
 mod prediction;
 mod simulation;
 

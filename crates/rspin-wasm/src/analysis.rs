@@ -5,7 +5,8 @@ use wasm_bindgen::prelude::*;
 use crate::{
     align_spectra_by_peak_to_matrix_1d_json, bucket_spectra_1d_json, bucket_spectra_2d_json,
     bucket_spectrum_1d_json, bucket_spectrum_2d_json, detect_ranges_json, detect_zones_json,
-    js_error,
+    js_error, pca_bucket_matrix_1d_json, pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json,
+    pca_spectrum_matrix_2d_json,
 };
 
 /// Detects ranges from a serialized one-dimensional spectrum.
@@ -110,4 +111,60 @@ pub fn bucket_spectra_2d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     bucket_spectra_2d_json(spectra_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs PCA on a one-dimensional spectrum matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, PCA, or
+/// serialization fails.
+#[wasm_bindgen(js_name = pcaSpectrumMatrix1d)]
+pub fn pca_spectrum_matrix_1d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    pca_spectrum_matrix_1d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs PCA on a two-dimensional spectrum matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, PCA, or
+/// serialization fails.
+#[wasm_bindgen(js_name = pcaSpectrumMatrix2d)]
+pub fn pca_spectrum_matrix_2d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    pca_spectrum_matrix_2d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs PCA on a one-dimensional bucket matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, PCA, or
+/// serialization fails.
+#[wasm_bindgen(js_name = pcaBucketMatrix1d)]
+pub fn pca_bucket_matrix_1d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    pca_bucket_matrix_1d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Runs PCA on a two-dimensional bucket matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, PCA, or
+/// serialization fails.
+#[wasm_bindgen(js_name = pcaBucketMatrix2d)]
+pub fn pca_bucket_matrix_2d(
+    matrix_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    pca_bucket_matrix_2d_json(matrix_json, options_json).map_err(|error| js_error(&error))
 }

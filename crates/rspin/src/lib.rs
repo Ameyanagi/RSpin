@@ -13,18 +13,20 @@ pub use analysis::{
     CouplingNode, DetectedMultiplet, DetectedRange, DetectedZone, GapMultipletDetector, Integral,
     Integral2D, IntegralRegion, IntegralRegion2D, Integrator, Integrator2D, JCoupling,
     JCouplingGraph, LocalExtremaPeakPicker, MatrixGeneration2DOptions, MatrixGenerationOptions,
-    MultipletDetectionOptions, MultipletDetector, MultipletKind, OptimizedPeak, Peak,
-    PeakAlignedMatrix1D, PeakAlignmentOptions, PeakAlignmentResult1D, PeakOptimizationOptions,
-    PeakOptimizer, PeakPickOptions, PeakPicker, PeakPolarity, QuadraticPeakOptimizer,
-    RangeDetectionOptions, RangeDetector, SignalSummary1D, SignalSummary2D, SignalSummary2DOptions,
-    SignalSummaryOptions, SpectralBucket1D, SpectralBucket2D, SpectrumAlignmentShift,
-    SpectrumMatrix1D, SpectrumMatrix2D, ThresholdRangeDetector, ThresholdZoneDetector,
-    TrapezoidalIntegrator, ZoneConnectivity, ZoneDetectionOptions, ZoneDetector,
-    align_spectra_by_peak, align_spectra_by_peak_to_matrix, bucket_spectra_1d, bucket_spectra_2d,
-    bucket_spectrum_1d, bucket_spectrum_2d, detect_multiplets, detect_ranges, detect_zones,
-    deterministic_assignment_id, deterministic_j_coupling_id, generate_spectrum_matrix_1d,
-    generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, optimize_peaks_quadratic,
-    pick_peaks, summarize_signals_1d, summarize_signals_2d,
+    MatrixPcaOptions, MatrixPcaResult, MatrixScaling, MultipletDetectionOptions, MultipletDetector,
+    MultipletKind, OptimizedPeak, Peak, PeakAlignedMatrix1D, PeakAlignmentOptions,
+    PeakAlignmentResult1D, PeakOptimizationOptions, PeakOptimizer, PeakPickOptions, PeakPicker,
+    PeakPolarity, QuadraticPeakOptimizer, RangeDetectionOptions, RangeDetector, SignalSummary1D,
+    SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D,
+    SpectralBucket2D, SpectrumAlignmentShift, SpectrumMatrix1D, SpectrumMatrix2D,
+    ThresholdRangeDetector, ThresholdZoneDetector, TrapezoidalIntegrator, ZoneConnectivity,
+    ZoneDetectionOptions, ZoneDetector, align_spectra_by_peak, align_spectra_by_peak_to_matrix,
+    bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d,
+    detect_multiplets, detect_ranges, detect_zones, deterministic_assignment_id,
+    deterministic_j_coupling_id, generate_spectrum_matrix_1d, generate_spectrum_matrix_2d,
+    integrate_region, integrate_region_2d, optimize_peaks_quadratic, pca_bucket_matrix_1d,
+    pca_bucket_matrix_2d, pca_matrix, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d, pick_peaks,
+    summarize_signals_1d, summarize_signals_2d,
 };
 pub use core::{
     AnnotationTarget, Atom, Axis, Bond, BondOrder, Metadata, Molecule, Nucleus, ProcessingRecord,
@@ -81,12 +83,13 @@ pub mod prelude {
         ElementShiftPredictor, ElementShiftRule, ExactSpectrumOptions, ExactSpinOptions,
         ExactTransition, Experiment, FftDirection, Integral, Integral2D, IntegralRegion,
         IntegralRegion2D, JCoupling, JCouplingGraph, LineShape, MatrixGeneration2DOptions,
-        MatrixGenerationOptions, Metadata, Molecule, MultipletDetectionOptions, MultipletKind,
-        Nucleus, Peak, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions, PeakPolarity,
-        PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
-        ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D,
-        ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions,
-        Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D, SignalSummary2D,
+        MatrixGenerationOptions, MatrixPcaOptions, MatrixPcaResult, MatrixScaling, Metadata,
+        Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignedMatrix1D,
+        PeakAlignmentOptions, PeakPickOptions, PeakPolarity, PredictionLineShape, PredictionSet,
+        PredictionSpectrum2DOptions, PredictionSpectrumOptions, ProcessSpectrum1D,
+        ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D, ProcessingRecipe1D,
+        ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions, Resample1D,
+        Resample2D, Result, ScalarCoupling, SignalSummary1D, SignalSummary2D,
         SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D, SpectralBucket2D,
         Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D, SpectrumMatrix2D,
         SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem, TrapezoidalIntegrator, Unit,
@@ -98,9 +101,10 @@ pub mod prelude {
         crop_2d, decompose_exact_spin_half_1d, detect_multiplets, detect_ranges, detect_zones,
         exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
         generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, normalize_max_abs,
-        pick_peaks, predict_molecule_with_rules, read_jcamp_dx_1d, read_spectrum1d_csv,
-        read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d,
-        render_prediction_2d, resample_1d, resample_2d, scale_intensity,
+        pca_bucket_matrix_1d, pca_bucket_matrix_2d, pca_matrix, pca_spectrum_matrix_1d,
+        pca_spectrum_matrix_2d, pick_peaks, predict_molecule_with_rules, read_jcamp_dx_1d,
+        read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json,
+        render_prediction_1d, render_prediction_2d, resample_1d, resample_2d, scale_intensity,
         simulate_exact_spin_half_1d, slice_x_at_y, slice_y_at_x, subtract_baseline,
         summarize_signals_2d, write_jcamp_dx_1d, write_spectrum1d_csv, write_spectrum1d_json,
         write_spectrum2d_csv, write_spectrum2d_json,
@@ -191,6 +195,17 @@ mod tests {
             BucketOptions2D::new(0.0, 2.0, 0.0, 2.0, 2, 2),
         )?;
         assert_eq!(buckets_2d.len(), 4);
+
+        let pca = pca_matrix(
+            &["a".to_owned(), "b".to_owned(), "c".to_owned()],
+            &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            3,
+            2,
+            MatrixPcaOptions::new()
+                .with_component_count(1)
+                .with_scaling(MatrixScaling::None),
+        )?;
+        assert_eq!(pca.score_shape(), (3, 1));
 
         let system = SpinHalfSystem::new().with_spin(1.0);
         let transitions = exact_spin_half_transitions(
