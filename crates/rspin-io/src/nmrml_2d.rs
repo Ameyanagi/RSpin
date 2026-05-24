@@ -1,4 +1,4 @@
-//! nmrML two-dimensional FID import.
+//! nmrML two-dimensional spectrum and FID import.
 
 use std::{
     fs,
@@ -17,16 +17,17 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum2D, Unit};
 
 const FORMAT: &str = "nmrML";
 
-/// Reader for raw two-dimensional nmrML FID payloads.
+/// Reader for raw or processed two-dimensional nmrML payloads.
 ///
-/// This focused reader supports schema version `1.0.*`, `acquisitionMultiD`,
-/// direct and first indirect dimension metadata, and little-endian
-/// `complex128`/`complex64` `fidData`.
+/// This focused reader supports schema version `1.0.*`, processed
+/// `spectrumMultiD` `spectrumDataArray` matrices, `acquisitionMultiD`, direct
+/// and first indirect dimension metadata, and little-endian
+/// `float64`/`float32`/`complex128`/`complex64` binary arrays.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NmrMl2D;
 
 impl NmrMl2D {
-    /// Reads a raw two-dimensional FID from an nmrML file.
+    /// Reads a two-dimensional spectrum or raw FID from an nmrML file.
     ///
     /// # Errors
     ///
@@ -37,7 +38,7 @@ impl NmrMl2D {
         read_nmrml_2d_file(path)
     }
 
-    /// Reads a raw two-dimensional FID from UTF-8 nmrML bytes.
+    /// Reads a two-dimensional spectrum or raw FID from UTF-8 nmrML bytes.
     ///
     /// # Errors
     ///
@@ -49,7 +50,7 @@ impl NmrMl2D {
     }
 }
 
-/// Reads a raw two-dimensional FID from an nmrML file.
+/// Reads a two-dimensional spectrum or raw FID from an nmrML file.
 ///
 /// # Errors
 ///
@@ -64,7 +65,7 @@ pub fn read_nmrml_2d_file(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     read_nmrml_2d_str(&input)
 }
 
-/// Reads a raw two-dimensional FID from UTF-8 nmrML bytes.
+/// Reads a two-dimensional spectrum or raw FID from UTF-8 nmrML bytes.
 ///
 /// # Errors
 ///
@@ -79,7 +80,7 @@ pub fn read_nmrml_2d_bytes(bytes: &[u8]) -> Result<Spectrum2D> {
     read_nmrml_2d_str(input)
 }
 
-/// Reads a raw two-dimensional FID from nmrML XML text.
+/// Reads a two-dimensional spectrum or raw FID from nmrML XML text.
 ///
 /// # Errors
 ///
@@ -95,6 +96,10 @@ struct RawNmrMl2D {
     version: Option<String>,
     name: Option<String>,
     id: Option<String>,
+    spectrum_data: Option<BinaryDataArray>,
+    spectrum_point_count: Option<usize>,
+    x_axis: Option<AxisSpec>,
+    y_axis: Option<AxisSpec>,
     fid_data: Option<BinaryDataArray>,
     direct: DimensionSpec,
     indirect: DimensionSpec,
@@ -118,6 +123,23 @@ struct DimensionSpec {
     sweep_width_hz: Option<f64>,
 }
 
+#[derive(Clone, Debug)]
+struct AxisSpec {
+    unit: Unit,
+    start: Option<f64>,
+    end: Option<f64>,
+}
+
+enum ActiveBinaryKind {
+    Spectrum,
+    Fid,
+}
+
+struct ActiveBinary {
+    kind: ActiveBinaryKind,
+    data: BinaryDataArray,
+}
+
 #[derive(Clone, Copy)]
 enum DimensionContext {
     Direct,
@@ -130,7 +152,7 @@ fn parse_nmrml_2d(input: &str) -> Result<RawNmrMl2D> {
 
     let mut raw = RawNmrMl2D::default();
     let mut buffer = Vec::new();
-    let mut active_binary: Option<BinaryDataArray> = None;
+    let mut active_binary: Option<ActiveBinary> = None;
     let mut active_text = String::new();
     let mut dimension_context = None;
 
@@ -139,43 +161,14 @@ fn parse_nmrml_2d(input: &str) -> Result<RawNmrMl2D> {
             .read_event_into(&mut buffer)
             .map_err(|error| xml_error(&error))?
         {
-            Event::Start(start) => {
-                let qualified_name = start.name();
-                let name = local_name(qualified_name.as_ref());
-                if name == b"nmrML" {
-                    apply_root(&mut raw, &start)?;
-                } else if name == b"spectrumMultiD" {
-                    apply_spectrum(&mut raw, &start)?;
-                } else if name == b"directDimensionParameterSet" {
-                    dimension_context = Some(DimensionContext::Direct);
-                    apply_dimension_start(&mut raw.direct, &start)?;
-                } else if name == b"indirectDimensionParameterSet" {
-                    dimension_context = Some(DimensionContext::Indirect);
-                    apply_dimension_start(&mut raw.indirect, &start)?;
-                } else if name == b"fidData" && active_binary.is_none() {
-                    active_binary = Some(binary_from_start(&start)?);
-                    active_text.clear();
-                } else if active_binary.is_none() {
-                    apply_metadata(&mut raw, &start, name, dimension_context)?;
-                }
-            }
-            Event::Empty(start) => {
-                let qualified_name = start.name();
-                let name = local_name(qualified_name.as_ref());
-                if name == b"nmrML" {
-                    apply_root(&mut raw, &start)?;
-                } else if name == b"spectrumMultiD" {
-                    apply_spectrum(&mut raw, &start)?;
-                } else if name == b"directDimensionParameterSet" {
-                    apply_dimension_start(&mut raw.direct, &start)?;
-                } else if name == b"indirectDimensionParameterSet" {
-                    apply_dimension_start(&mut raw.indirect, &start)?;
-                } else if name == b"fidData" && raw.fid_data.is_none() {
-                    raw.fid_data = Some(binary_from_start(&start)?);
-                } else {
-                    apply_metadata(&mut raw, &start, name, dimension_context)?;
-                }
-            }
+            Event::Start(start) => handle_start_event(
+                &mut raw,
+                &start,
+                &mut active_binary,
+                &mut active_text,
+                &mut dimension_context,
+            )?,
+            Event::Empty(start) => handle_empty_event(&mut raw, &start, dimension_context)?,
             Event::Text(text) if active_binary.is_some() => {
                 active_text.push_str(str::from_utf8(text.as_ref()).map_err(|error| {
                     RSpinError::Parse {
@@ -192,24 +185,13 @@ fn parse_nmrml_2d(input: &str) -> Result<RawNmrMl2D> {
                     }
                 })?);
             }
-            Event::End(end) => {
-                let qualified_name = end.name();
-                let name = local_name(qualified_name.as_ref());
-                if name == b"fidData" {
-                    if let Some(mut binary) = active_binary.take() {
-                        if raw.fid_data.is_none() {
-                            binary.text.clone_from(&active_text);
-                            raw.fid_data = Some(binary);
-                        }
-                    }
-                    active_text.clear();
-                } else if matches!(
-                    name,
-                    b"directDimensionParameterSet" | b"indirectDimensionParameterSet"
-                ) {
-                    dimension_context = None;
-                }
-            }
+            Event::End(end) => handle_end_event(
+                &mut raw,
+                local_name(end.name().as_ref()),
+                &mut active_binary,
+                &mut active_text,
+                &mut dimension_context,
+            ),
             Event::Eof => break,
             _ => {}
         }
@@ -219,8 +201,134 @@ fn parse_nmrml_2d(input: &str) -> Result<RawNmrMl2D> {
     Ok(raw)
 }
 
+fn handle_start_event(
+    raw: &mut RawNmrMl2D,
+    start: &BytesStart<'_>,
+    active_binary: &mut Option<ActiveBinary>,
+    active_text: &mut String,
+    dimension_context: &mut Option<DimensionContext>,
+) -> Result<()> {
+    let qualified_name = start.name();
+    let name = local_name(qualified_name.as_ref());
+    if name == b"nmrML" {
+        apply_root(raw, start)?;
+    } else if name == b"spectrumMultiD" {
+        apply_spectrum(raw, start)?;
+    } else if name == b"directDimensionParameterSet" {
+        *dimension_context = Some(DimensionContext::Direct);
+        apply_dimension_start(&mut raw.direct, start)?;
+    } else if name == b"indirectDimensionParameterSet" {
+        *dimension_context = Some(DimensionContext::Indirect);
+        apply_dimension_start(&mut raw.indirect, start)?;
+    } else if is_binary_start(name) && active_binary.is_none() {
+        *active_binary = Some(ActiveBinary {
+            kind: binary_kind(name),
+            data: binary_from_start(start, binary_field(name))?,
+        });
+        active_text.clear();
+    } else if active_binary.is_none() {
+        apply_metadata(raw, start, name, *dimension_context)?;
+    }
+    Ok(())
+}
+
+fn handle_empty_event(
+    raw: &mut RawNmrMl2D,
+    start: &BytesStart<'_>,
+    dimension_context: Option<DimensionContext>,
+) -> Result<()> {
+    let qualified_name = start.name();
+    let name = local_name(qualified_name.as_ref());
+    if name == b"nmrML" {
+        apply_root(raw, start)?;
+    } else if name == b"spectrumMultiD" {
+        apply_spectrum(raw, start)?;
+    } else if name == b"directDimensionParameterSet" {
+        apply_dimension_start(&mut raw.direct, start)?;
+    } else if name == b"indirectDimensionParameterSet" {
+        apply_dimension_start(&mut raw.indirect, start)?;
+    } else if name == b"spectrumDataArray" && raw.spectrum_data.is_none() {
+        raw.spectrum_data = Some(binary_from_start(start, "spectrumDataArray")?);
+    } else if name == b"fidData" && raw.fid_data.is_none() {
+        raw.fid_data = Some(binary_from_start(start, "fidData")?);
+    } else {
+        apply_metadata(raw, start, name, dimension_context)?;
+    }
+    Ok(())
+}
+
+fn handle_end_event(
+    raw: &mut RawNmrMl2D,
+    name: &[u8],
+    active_binary: &mut Option<ActiveBinary>,
+    active_text: &mut String,
+    dimension_context: &mut Option<DimensionContext>,
+) {
+    if is_binary_start(name) {
+        store_active_binary(raw, active_binary.take(), active_text);
+        active_text.clear();
+    } else if matches!(
+        name,
+        b"directDimensionParameterSet" | b"indirectDimensionParameterSet"
+    ) {
+        *dimension_context = None;
+    }
+}
+
+fn store_active_binary(raw: &mut RawNmrMl2D, active: Option<ActiveBinary>, active_text: &str) {
+    let Some(mut active) = active else {
+        return;
+    };
+    match active.kind {
+        ActiveBinaryKind::Spectrum if raw.spectrum_data.is_none() => {
+            active_text.clone_into(&mut active.data.text);
+            raw.spectrum_data = Some(active.data);
+        }
+        ActiveBinaryKind::Fid if raw.fid_data.is_none() => {
+            active_text.clone_into(&mut active.data.text);
+            raw.fid_data = Some(active.data);
+        }
+        _ => {}
+    }
+}
+
 fn spectrum_from_raw(raw: RawNmrMl2D) -> Result<Spectrum2D> {
     let version = validate_version(raw.version.as_deref())?;
+    let has_processed_spectrum = raw.spectrum_data.as_ref().is_some_and(binary_has_payload);
+    if has_processed_spectrum {
+        return spectrum_from_frequency_domain(raw, &version);
+    }
+    fid_from_raw(raw, &version)
+}
+
+fn spectrum_from_frequency_domain(raw: RawNmrMl2D, version: &str) -> Result<Spectrum2D> {
+    let binary = raw
+        .spectrum_data
+        .as_ref()
+        .ok_or_else(|| RSpinError::Parse {
+            format: FORMAT,
+            message: "missing spectrumDataArray".to_owned(),
+        })?;
+    let expected_points = expected_spectrum_points(&raw);
+    let (z, imaginary) = decode_spectrum_matrix(binary, expected_points)?;
+    validate_declared_spectrum_points(raw.spectrum_point_count, z.len())?;
+    let (x_count, y_count) = infer_matrix_dimensions(&raw, z.len())?;
+    let x = build_required_axis(raw.x_axis.as_ref(), "xAxis", x_count)?;
+    let y = build_optional_axis(raw.y_axis.as_ref(), "indirect point", y_count)?;
+    let metadata = Metadata {
+        name: raw.name.or(raw.id),
+        nucleus: raw.direct.nucleus,
+        frequency_mhz: raw.direct.frequency_mhz,
+        solvent: raw.solvent,
+        temperature_k: raw.temperature_k,
+        origin: Some(format!("nmrML {version}")),
+        molecules: Vec::new(),
+    };
+
+    Spectrum2D::new_complex(x, y, z, imaginary, metadata)
+}
+
+fn fid_from_raw(raw: RawNmrMl2D, version: &str) -> Result<Spectrum2D> {
     let x_count = raw.direct.point_count.ok_or_else(|| RSpinError::Parse {
         format: FORMAT,
         message: "missing direct dimension point count".to_owned(),
@@ -250,6 +358,26 @@ fn spectrum_from_raw(raw: RawNmrMl2D) -> Result<Spectrum2D> {
     Spectrum2D::new_complex(x, y, z, imaginary, metadata)
 }
 
+fn is_binary_start(name: &[u8]) -> bool {
+    matches!(name, b"spectrumDataArray" | b"fidData")
+}
+
+fn binary_kind(name: &[u8]) -> ActiveBinaryKind {
+    if name == b"fidData" {
+        ActiveBinaryKind::Fid
+    } else {
+        ActiveBinaryKind::Spectrum
+    }
+}
+
+fn binary_field(name: &[u8]) -> &'static str {
+    if name == b"fidData" {
+        "fidData"
+    } else {
+        "spectrumDataArray"
+    }
+}
+
 fn apply_root(raw: &mut RawNmrMl2D, start: &BytesStart<'_>) -> Result<()> {
     if raw.version.is_none() {
         raw.version = attr_value(start, b"version")?;
@@ -266,6 +394,10 @@ fn apply_spectrum(raw: &mut RawNmrMl2D, start: &BytesStart<'_>) -> Result<()> {
     }
     if raw.id.is_none() {
         raw.id = attr_value(start, b"id")?;
+    }
+    if raw.spectrum_point_count.is_none() {
+        raw.spectrum_point_count =
+            optional_usize_attr(start, b"numberOfDataPoints", "numberOfDataPoints")?;
     }
     Ok(())
 }
@@ -285,6 +417,12 @@ fn apply_metadata(
     dimension_context: Option<DimensionContext>,
 ) -> Result<()> {
     match name {
+        b"xAxis" if raw.x_axis.is_none() => {
+            raw.x_axis = Some(axis_from_start(start)?);
+        }
+        b"yAxis" | b"higherDimensionAxis" if raw.y_axis.is_none() => {
+            raw.y_axis = Some(axis_from_start(start)?);
+        }
         b"acquisitionNucleus" => {
             if let Some(dimension) = dimension_mut(raw, dimension_context) {
                 if dimension.nucleus.is_none() {
@@ -354,12 +492,17 @@ fn dimension_mut(
     }
 }
 
-fn binary_from_start(start: &BytesStart<'_>) -> Result<BinaryDataArray> {
-    let compressed = required_bool_attr(start, b"compressed", "fidData compressed")?;
+fn binary_from_start(start: &BytesStart<'_>, field: &'static str) -> Result<BinaryDataArray> {
+    let compressed_field = if field == "fidData" {
+        "fidData compressed"
+    } else {
+        "spectrumDataArray compressed"
+    };
+    let compressed = required_bool_attr(start, b"compressed", compressed_field)?;
     let encoded_length = optional_usize_attr(start, b"encodedLength", "encodedLength")?;
     let byte_format = attr_value(start, b"byteFormat")?.ok_or_else(|| RSpinError::Parse {
         format: FORMAT,
-        message: "missing fidData byteFormat".to_owned(),
+        message: format!("missing {field} byteFormat"),
     })?;
 
     Ok(BinaryDataArray {
@@ -370,12 +513,109 @@ fn binary_from_start(start: &BytesStart<'_>) -> Result<BinaryDataArray> {
     })
 }
 
+fn axis_from_start(start: &BytesStart<'_>) -> Result<AxisSpec> {
+    let unit = match attr_value(start, b"unitName")? {
+        Some(unit_name) => axis_unit(&unit_name),
+        None => Unit::Arbitrary,
+    };
+    let start_value = optional_f64_attr(start, b"startValue", "axis startValue")?;
+    let end_value = optional_f64_attr(start, b"endValue", "axis endValue")?;
+    Ok(AxisSpec {
+        unit,
+        start: start_value,
+        end: end_value,
+    })
+}
+
+fn binary_has_payload(binary: &BinaryDataArray) -> bool {
+    let has_encoded_text = !binary.text.trim().is_empty();
+    let has_encoded_length = matches!(binary.encoded_length, Some(length) if length > 0);
+    let has_byte_format = !binary.byte_format.trim().is_empty();
+    has_byte_format && (has_encoded_text || has_encoded_length)
+}
+
+fn expected_spectrum_points(raw: &RawNmrMl2D) -> Option<usize> {
+    match raw.spectrum_point_count {
+        Some(points) => Some(points),
+        None => raw
+            .direct
+            .point_count
+            .zip(raw.indirect.point_count)
+            .and_then(|(x_count, y_count)| x_count.checked_mul(y_count)),
+    }
+}
+
+fn validate_declared_spectrum_points(declared: Option<usize>, actual: usize) -> Result<()> {
+    let Some(declared) = declared else {
+        return Ok(());
+    };
+    if declared == actual {
+        return Ok(());
+    }
+    Err(RSpinError::InvalidSpectrum {
+        message: format!(
+            "nmrML spectrumMultiD declares {declared} points but spectrumDataArray contains {actual}"
+        ),
+    })
+}
+
+fn infer_matrix_dimensions(raw: &RawNmrMl2D, points: usize) -> Result<(usize, usize)> {
+    if let (Some(x_count), Some(y_count)) = (raw.direct.point_count, raw.indirect.point_count) {
+        if x_count.checked_mul(y_count) == Some(points) {
+            return Ok((x_count, y_count));
+        }
+    }
+    if let Some(x_count) = raw.direct.point_count {
+        if x_count > 0 && points % x_count == 0 {
+            return Ok((x_count, points / x_count));
+        }
+    }
+    if let Some(y_count) = raw.indirect.point_count {
+        if y_count > 0 && points % y_count == 0 {
+            return Ok((points / y_count, y_count));
+        }
+    }
+    Err(RSpinError::InvalidSpectrum {
+        message: format!("cannot infer nmrML 2D matrix dimensions for {points} processed points"),
+    })
+}
+
+fn decode_spectrum_matrix(
+    binary: &BinaryDataArray,
+    expected_points: Option<usize>,
+) -> Result<(Vec<f64>, Option<Vec<f64>>)> {
+    let payload = binary_payload(binary, "spectrumDataArray")?;
+
+    match normalize_token(&binary.byte_format).as_str() {
+        "complex128" if should_decode_matrix_complex64(&payload, expected_points) => {
+            decode_f32_pairs(&payload, "spectrumDataArray")
+        }
+        "complex128" => decode_f64_pairs(&payload, "spectrumDataArray"),
+        "complex64" => decode_f32_pairs(&payload, "spectrumDataArray"),
+        "float64" => decode_f64_values(&payload, "spectrumDataArray").map(|z| (z, None)),
+        "float32" => decode_f32_values(&payload, "spectrumDataArray").map(|z| (z, None)),
+        _ => Err(RSpinError::Unsupported {
+            feature: "nmrML multidimensional spectrumDataArray byteFormat",
+        }),
+    }
+}
+
+fn should_decode_matrix_complex64(payload: &[u8], expected_points: Option<usize>) -> bool {
+    let Some(points) = expected_points else {
+        return false;
+    };
+    match points.checked_mul(8) {
+        Some(expected_bytes) => payload.len() == expected_bytes && payload.len() % 8 == 0,
+        None => false,
+    }
+}
+
 fn decode_fid_matrix(
     binary: &BinaryDataArray,
     x_count: usize,
     y_count: usize,
 ) -> Result<(Vec<f64>, Option<Vec<f64>>)> {
-    let payload = binary_payload(binary)?;
+    let payload = binary_payload(binary, "fidData")?;
     let expected_points =
         x_count
             .checked_mul(y_count)
@@ -426,19 +666,19 @@ fn validate_matrix_length(
     Ok((z, imaginary))
 }
 
-fn binary_payload(binary: &BinaryDataArray) -> Result<Vec<u8>> {
+fn binary_payload(binary: &BinaryDataArray, field: &'static str) -> Result<Vec<u8>> {
     let encoded = binary
         .text
         .bytes()
         .filter(|byte| !byte.is_ascii_whitespace())
         .collect::<Vec<_>>();
-    validate_encoded_length(binary.encoded_length, encoded.len())?;
+    validate_encoded_length(binary.encoded_length, encoded.len(), field)?;
 
     let decoded_bytes = STANDARD
         .decode(&encoded)
         .map_err(|error| RSpinError::Parse {
             format: FORMAT,
-            message: format!("invalid base64 fidData: {error}"),
+            message: format!("invalid base64 {field}: {error}"),
         })?;
     if !binary.compressed {
         return Ok(decoded_bytes);
@@ -450,12 +690,16 @@ fn binary_payload(binary: &BinaryDataArray) -> Result<Vec<u8>> {
         .read_to_end(&mut inflated)
         .map_err(|error| RSpinError::Parse {
             format: FORMAT,
-            message: format!("failed to zlib-decompress fidData: {error}"),
+            message: format!("failed to zlib-decompress {field}: {error}"),
         })?;
     Ok(inflated)
 }
 
-fn validate_encoded_length(expected: Option<usize>, actual: usize) -> Result<()> {
+fn validate_encoded_length(
+    expected: Option<usize>,
+    actual: usize,
+    field: &'static str,
+) -> Result<()> {
     let Some(expected) = expected else {
         return Ok(());
     };
@@ -464,7 +708,7 @@ fn validate_encoded_length(expected: Option<usize>, actual: usize) -> Result<()>
     }
     Err(RSpinError::Parse {
         format: FORMAT,
-        message: format!("encodedLength is {expected} but fidData contains {actual} characters"),
+        message: format!("encodedLength is {expected} but {field} contains {actual} characters"),
     })
 }
 
@@ -531,6 +775,46 @@ fn split_pairs(values: &[f64], field: &'static str) -> Result<(Vec<f64>, Vec<f64
     Ok((z, imaginary))
 }
 
+fn build_required_axis(
+    spec: Option<&AxisSpec>,
+    field: &'static str,
+    points: usize,
+) -> Result<Axis> {
+    let spec = spec.ok_or_else(|| RSpinError::Parse {
+        format: FORMAT,
+        message: format!("missing {field} for processed spectrumMultiD"),
+    })?;
+    build_axis_from_spec(spec, points)
+}
+
+fn build_optional_axis(
+    spec: Option<&AxisSpec>,
+    fallback_label: &'static str,
+    points: usize,
+) -> Result<Axis> {
+    match spec {
+        Some(spec) => build_axis_from_spec(spec, points),
+        None => build_point_axis(fallback_label, points),
+    }
+}
+
+fn build_axis_from_spec(spec: &AxisSpec, points: usize) -> Result<Axis> {
+    let start = spec.start.ok_or_else(|| RSpinError::Parse {
+        format: FORMAT,
+        message: "missing axis startValue".to_owned(),
+    })?;
+    let end = spec.end.ok_or_else(|| RSpinError::Parse {
+        format: FORMAT,
+        message: "missing axis endValue".to_owned(),
+    })?;
+    Axis::linear(axis_label(spec.unit), spec.unit, start, end, points)
+}
+
+fn build_point_axis(label: &'static str, points: usize) -> Result<Axis> {
+    let end = u32::try_from(points.saturating_sub(1)).map_or(0.0, f64::from);
+    Axis::linear(label, Unit::Points, 0.0, end, points)
+}
+
 fn build_time_axis(
     label: &'static str,
     points: usize,
@@ -552,6 +836,26 @@ fn build_time_axis(
             let end = u32::try_from(points.saturating_sub(1)).map_or(0.0, f64::from);
             Axis::linear(label, Unit::Points, 0.0, end, points)
         }
+    }
+}
+
+fn axis_unit(value: &str) -> Unit {
+    match normalize_token(value).as_str() {
+        "partspermillion" | "ppm" => Unit::Ppm,
+        "hertz" | "hz" => Unit::Hertz,
+        "second" | "seconds" | "s" => Unit::Seconds,
+        "point" | "points" => Unit::Points,
+        _ => Unit::Arbitrary,
+    }
+}
+
+fn axis_label(unit: Unit) -> &'static str {
+    match unit {
+        Unit::Ppm => "chemical shift",
+        Unit::Hertz => "frequency",
+        Unit::Seconds => "time",
+        Unit::Points => "point",
+        _ => "axis",
     }
 }
 
@@ -726,74 +1030,4 @@ fn xml_error(error: &quick_xml::Error) -> RSpinError {
 }
 
 #[cfg(test)]
-mod tests {
-    use rspin_core::Unit;
-
-    use super::*;
-
-    #[test]
-    fn reads_compressed_complex64_2d_fid() -> Result<()> {
-        let input = r#"
-            <nmrML version="v1.0.rc1" id="two-d">
-              <acquisition>
-                <acquisitionMultiD>
-                  <acquisitionParameterSet numberOfScans="1" numberOfSteadyStateScans="0">
-                    <sampleAcquisitionTemperature value="25.0" unitName="degree celsius"/>
-                    <directDimensionParameterSet decoupled="false" numberOfDataPoints="2">
-                      <acquisitionNucleus cvRef="NMR" accession="NMR:1400151" name="1H"/>
-                      <irradiationFrequency value="600.0" unitName="megaHertz"/>
-                      <sweepWidth value="2.0" unitName="hertz"/>
-                    </directDimensionParameterSet>
-                    <indirectDimensionParameterSet decoupled="false" numberOfDataPoints="2">
-                      <acquisitionNucleus cvRef="NMR" accession="NMR:1400154" name="13C"/>
-                      <irradiationFrequency value="150.0" unitName="megaHertz"/>
-                      <sweepWidth value="4.0" unitName="hertz"/>
-                    </indirectDimensionParameterSet>
-                  </acquisitionParameterSet>
-                  <fidData compressed="true" encodedLength="44" byteFormat="complex64">
-                    eJxjYGiwZ2Bo2M/AwOAAxAeAFJB2ANINQLrhAABd6gZ/
-                  </fidData>
-                </acquisitionMultiD>
-              </acquisition>
-            </nmrML>
-        "#;
-
-        let spectrum = read_nmrml_2d_str(input)?;
-
-        assert_eq!(spectrum.shape(), (2, 2));
-        assert_eq!(spectrum.x.unit, Unit::Seconds);
-        assert_eq!(spectrum.y.unit, Unit::Seconds);
-        assert_eq!(spectrum.x.values, vec![0.0, 0.5]);
-        assert_eq!(spectrum.y.values, vec![0.0, 0.25]);
-        assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
-        assert_eq!(spectrum.imaginary, Some(vec![-1.0, -2.0, -3.0, -4.0]));
-        assert_eq!(spectrum.metadata.name.as_deref(), Some("two-d"));
-        assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
-        assert_eq!(spectrum.metadata.frequency_mhz, Some(600.0));
-        assert_eq!(spectrum.metadata.temperature_k, Some(298.15));
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_length_mismatch() {
-        let input = r#"
-            <nmrML version="v1.0.rc1">
-              <acquisition>
-                <acquisitionMultiD>
-                  <acquisitionParameterSet>
-                    <directDimensionParameterSet decoupled="false" numberOfDataPoints="3"/>
-                    <indirectDimensionParameterSet decoupled="false" numberOfDataPoints="2"/>
-                  </acquisitionParameterSet>
-                  <fidData compressed="true" encodedLength="44" byteFormat="complex64">
-                    eJxjYGiwZ2Bo2M/AwOAAxAeAFJB2ANINQLrhAABd6gZ/
-                  </fidData>
-                </acquisitionMultiD>
-              </acquisition>
-            </nmrML>
-        "#;
-
-        let error = read_nmrml_2d_str(input).expect_err("dimension mismatch should fail");
-
-        assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
-    }
-}
+mod tests;
