@@ -113,6 +113,26 @@ fn parses_nmrml_2d_to_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn inspects_nmrml_document_info_json() -> anyhow::Result<()> {
+    let json = inspect_nmrml_document_json(
+        r#"
+        <nmrML
+            version="v1.0.rc1"
+            xmlns="http://nmrml.org/schema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://nmrml.org/schema nmrML.xsd"/>
+        "#,
+    )?;
+    let value: serde_json::Value = from_json(&json)?;
+
+    assert_eq!(value["version"], "v1.0.rc1");
+    assert_eq!(value["normalized_version"], "1.0.rc1");
+    assert_eq!(value["namespace"], "http://nmrml.org/schema");
+    assert_eq!(value["schema_locations"][0]["location"], "nmrML.xsd");
+    Ok(())
+}
+
+#[test]
 fn parses_auto_detected_1d_text_to_json() -> anyhow::Result<()> {
     let json = parse_spectrum_1d_text_json(
         "\

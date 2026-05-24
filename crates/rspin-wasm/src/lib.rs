@@ -41,14 +41,15 @@ pub use api::{
     detect_consensus_zones_2d_json, detect_multiplets_json, detect_ranges_json, detect_zones_json,
     exponential_apodization_spectrum_1d_json, extract_contours_2d_json, fft_spectrum_1d_json,
     fft_spectrum_2d_json, generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
-    integrate_region_2d_json, integrate_region_json, magnitude_spectrum_1d_json,
-    normalize_spectrum_1d_json, normalize_spectrum_2d_json, offset_spectrum_1d_json,
-    optimize_peaks_json, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
-    pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, parse_jcamp_dx_1d_json,
-    parse_nmrml_1d_json, parse_nmrml_2d_json, parse_spectrum_1d_csv_json,
-    parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json, parse_spectrum_2d_text_json,
-    pca_bucket_matrix_1d_json, pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json,
-    pca_spectrum_matrix_2d_json, phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
+    inspect_nmrml_document_json, integrate_region_2d_json, integrate_region_json,
+    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
+    offset_spectrum_1d_json, optimize_peaks_json, pairwise_bucket_matrix_1d_json,
+    pairwise_bucket_matrix_2d_json, pairwise_spectrum_matrix_1d_json,
+    pairwise_spectrum_matrix_2d_json, parse_jcamp_dx_1d_json, parse_nmrml_1d_json,
+    parse_nmrml_2d_json, parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json,
+    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_json, pca_bucket_matrix_1d_json,
+    pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
+    phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
     predict_molecule_with_element_rules_json, project_spectrum_2d_x_json,
     project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
     resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
@@ -63,9 +64,9 @@ pub use api::{
 };
 pub use contours::extract_contours_2d;
 pub use io::{
-    parse_nmrml_1d, parse_nmrml_2d, parse_spectrum_1d_csv, parse_spectrum_1d_text,
-    parse_spectrum_2d_csv, parse_spectrum_2d_text, write_analysis_1d_csv, write_analysis_2d_csv,
-    write_spectrum_1d_csv, write_spectrum_2d_csv,
+    inspect_nmrml_document, parse_nmrml_1d, parse_nmrml_2d, parse_spectrum_1d_csv,
+    parse_spectrum_1d_text, parse_spectrum_2d_csv, parse_spectrum_2d_text, write_analysis_1d_csv,
+    write_analysis_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
 pub use prediction::{
     predict_molecule_with_element_rules, render_prediction_1d, render_prediction_2d,

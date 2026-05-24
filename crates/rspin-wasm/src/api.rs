@@ -27,8 +27,8 @@ use rspin_analysis::{
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_text,
-    read_spectrum2d_text,
+    read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
+    read_spectrum1d_text, read_spectrum2d_text,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -121,6 +121,16 @@ pub fn parse_nmrml_1d_json(input: &str) -> Result<String> {
 pub fn parse_nmrml_2d_json(input: &str) -> Result<String> {
     let spectrum = read_nmrml_2d_str(input)?;
     to_json(&spectrum)
+}
+
+/// Parses root-level nmrML document metadata into JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn inspect_nmrml_document_json(input: &str) -> Result<String> {
+    let info = read_nmrml_document_info_str(input)?;
+    to_json(&info)
 }
 
 /// Parses auto-detected one-dimensional spectrum text into serialized `Spectrum1D` JSON.
