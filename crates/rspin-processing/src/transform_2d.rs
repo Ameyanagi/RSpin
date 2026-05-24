@@ -2,6 +2,7 @@
 
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum2D};
 use rustfft::{FftPlanner, num_complex::Complex};
+use serde::{Deserialize, Serialize};
 
 use crate::{FftDirection, ProcessingStep};
 
@@ -19,7 +20,8 @@ impl ProcessingStep<Spectrum2D> for Fft2D {
 }
 
 /// Manual x/y phase correction for a two-dimensional spectrum.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PhaseCorrection2D {
     /// X-dimension zero-order phase in degrees.
     pub x_zero_order_deg: f64,

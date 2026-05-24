@@ -1,9 +1,11 @@
 use rspin_core::Spectrum2D;
+use serde::{Deserialize, Serialize};
 
 use crate::PhaseCorrection2D;
 
 /// Options for deterministic grid-search two-dimensional automatic phase correction.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AutoPhase2DOptions {
     /// Minimum x zero-order phase searched, in degrees.
     pub x_zero_order_min_deg: f64,

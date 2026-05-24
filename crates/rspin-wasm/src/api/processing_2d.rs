@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{Axis, Result, Spectrum2D};
 use rspin_processing::{
-    AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, abs_2d,
-    auto_phase_correct_2d, crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x,
-    project_y, resample_2d, scale_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
-    slice_y_at_x_index, zero_fill_2d,
+    AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingRecipe2D, ProjectionMode,
+    abs_2d, apply_processing_recipe_2d, auto_phase_correct_2d, crop_2d, fft_2d,
+    normalize_2d_max_abs, phase_correct_2d, project_x, project_y, resample_2d, scale_2d,
+    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, to_json};
@@ -135,6 +135,18 @@ pub fn auto_phase_spectrum_2d_json(spectrum_json: &str, options_json: &str) -> R
         correction: result.correction.into(),
         score: result.score,
     })
+}
+
+/// Applies a serialized two-dimensional processing recipe to serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn apply_processing_recipe_2d_json(spectrum_json: &str, recipe_json: &str) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let recipe: ProcessingRecipe2D = from_json(recipe_json)?;
+    let processed = apply_processing_recipe_2d(&spectrum, &recipe)?;
+    to_json(&processed)
 }
 
 /// Projects serialized `Spectrum2D` JSON onto the x axis.

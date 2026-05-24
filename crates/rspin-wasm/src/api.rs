@@ -41,11 +41,12 @@ pub use processing_1d::{
     shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 pub use processing_2d::{
-    abs_spectrum_2d_json, auto_phase_spectrum_2d_json, crop_spectrum_2d_json, fft_spectrum_2d_json,
-    normalize_spectrum_2d_json, phase_spectrum_2d_json, project_spectrum_2d_x_json,
-    project_spectrum_2d_y_json, resample_spectrum_2d_json, scale_spectrum_2d_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
-    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
+    abs_spectrum_2d_json, apply_processing_recipe_2d_json, auto_phase_spectrum_2d_json,
+    crop_spectrum_2d_json, fft_spectrum_2d_json, normalize_spectrum_2d_json,
+    phase_spectrum_2d_json, project_spectrum_2d_x_json, project_spectrum_2d_y_json,
+    resample_spectrum_2d_json, scale_spectrum_2d_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
+    slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
 };
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.

@@ -154,6 +154,32 @@ fn phases_and_auto_phases_2d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn applies_processing_recipe_2d_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+    let processed_json = apply_processing_recipe_2d_json(
+        &spectrum_json,
+        r#"{"operations":[{"operation":"scale","factor":2.0},{"operation":"absolute_value"},{"operation":"zero_fill","target_x_len":3,"target_y_len":2},{"operation":"normalize_max_abs"}]}"#,
+    )?;
+    let processed: Spectrum2D = from_json(&processed_json)?;
+
+    assert_eq!(processed.shape(), (3, 2));
+    assert_vec_close(&processed.z, &[0.25, 0.5, 0.0, 0.75, 1.0, 0.0]);
+    assert_option_vec_close(
+        processed.imaginary.as_deref(),
+        &[0.125, 0.25, 0.0, 0.375, 0.5, 0.0],
+    );
+    assert_eq!(
+        processed
+            .processing
+            .iter()
+            .map(|record| record.operation.as_str())
+            .collect::<Vec<_>>(),
+        vec!["scale_2d", "abs_2d", "zero_fill_2d", "normalize_2d_max_abs"]
+    );
+    Ok(())
+}
+
+#[test]
 fn projects_and_slices_2d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&grid_spectrum()?)?;
 
