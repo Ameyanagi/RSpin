@@ -210,6 +210,9 @@ fn prelude_supports_nmredata_import() -> Result<()> {
 >  <NMREDATA_ASSIGNMENT>
 H1, 4.200, H1
 
+>  <NMREDATA_J>
+H1, H2, 7.0
+
 >  <NMREDATA_1D_1H>
 Larmor=500.0
 4.200, L=H1
@@ -243,6 +246,10 @@ Larmor=500.0
     let trait_record = SpectrumReader::read_str(&NmreData, &nmredata_text)?;
     let trait_text = SpectrumWriter::write_string(&NmreData, &trait_record)?;
     assert!(trait_text.contains(">  <NMREDATA_VERSION>"));
+    let assignment_set = trait_record.to_assignment_set(Nucleus::Hydrogen1)?;
+    assert_eq!(assignment_set.len(), 1);
+    let coupling_graph = nmredata_couplings_to_j_coupling_graph(&trait_record, Nucleus::Hydrogen1)?;
+    assert_eq!(coupling_graph.couplings.len(), 1);
     let records = vec![trait_record];
     let records_text =
         <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;

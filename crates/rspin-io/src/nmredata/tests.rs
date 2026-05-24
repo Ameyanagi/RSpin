@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 
+use rspin_analysis::AssignmentTarget;
 use rspin_core::{Nucleus, RSpinError};
 
 use super::*;
@@ -182,6 +183,58 @@ $$$$
         Some("1.0")
     );
     assert_eq!(reparsed[1].formula.as_deref(), Some("C2H6O"));
+    Ok(())
+}
+
+#[test]
+fn converts_nmredata_to_analysis_models() -> anyhow::Result<()> {
+    let record = read_nmredata_str(
+        r"
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+Hcombo, 3.900, H2, H3
+
+>  <NMREDATA_J>
+H1, Hcombo, 7.0
+",
+    )?;
+
+    let assignments = record.to_assignment_set(Nucleus::Hydrogen1)?;
+    assert_eq!(assignments.len(), 2);
+    assert!(matches!(
+        assignments.assignments[0].target,
+        AssignmentTarget::Peak1D { index: 0, x } if (x - 4.2).abs() < 1.0e-12
+    ));
+    assert_eq!(assignments.assignments[0].atoms[0].id, "H1");
+    assert_eq!(assignments.assignments[1].atoms.len(), 2);
+    assert_eq!(assignments.assignments[1].atoms[1].id, "H3");
+
+    let graph = nmredata_couplings_to_j_coupling_graph(&record, Nucleus::Hydrogen1)?;
+    assert_eq!(graph.nodes.len(), 2);
+    assert_eq!(graph.nodes[0].id, "H1");
+    assert_eq!(graph.nodes[1].id, "Hcombo");
+    assert_eq!(graph.couplings.len(), 1);
+    assert_eq!(graph.couplings[0].node_a, "H1");
+    assert_eq!(graph.couplings[0].node_b, "Hcombo");
+    assert_close(graph.couplings[0].j_hz, 7.0);
+    assert_eq!(graph.couplings[0].source.as_deref(), Some("NMReDATA"));
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_nmredata_analysis_conversions() -> anyhow::Result<()> {
+    let duplicate_coupling = read_nmredata_str(
+        r"
+>  <NMREDATA_J>
+H1, H2, 7.0
+H2, H1, 7.0
+",
+    )?;
+
+    let error = duplicate_coupling
+        .to_j_coupling_graph(Nucleus::Hydrogen1)
+        .expect_err("duplicate coupling pairs should fail");
+    assert!(matches!(error, RSpinError::InvalidAssignment { .. }));
     Ok(())
 }
 

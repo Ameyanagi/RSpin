@@ -57,6 +57,7 @@ pub use json::{
 pub use nmredata::{
     NmreData, NmreDataAssignment, NmreDataCoupling, NmreDataRecord, NmreDataSignal1D,
     NmreDataSignal2D, NmreDataSpectrum, NmreDataSpectrumKind, NmreDataTag, NmreDataVersion,
+    nmredata_assignments_to_assignment_set, nmredata_couplings_to_j_coupling_graph,
     parse_nmredata_version, read_nmredata_bytes, read_nmredata_file, read_nmredata_records_str,
     read_nmredata_str, write_nmredata_file, write_nmredata_record, write_nmredata_records,
     write_nmredata_records_file,
