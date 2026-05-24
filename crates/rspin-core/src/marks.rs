@@ -46,6 +46,12 @@ pub enum AnnotationTarget {
         /// Y range end coordinate.
         y_to: f64,
     },
+    /// A two-dimensional detected zone by stable identifier.
+    #[serde(rename = "zone_2d_id")]
+    Zone2DId {
+        /// Zone identifier.
+        id: String,
+    },
     /// An atom stored on a metadata molecule.
     MoleculeAtom {
         /// Molecule identifier.
@@ -99,6 +105,12 @@ impl AnnotationTarget {
         }
     }
 
+    /// Creates a two-dimensional zone identifier target.
+    #[must_use]
+    pub fn zone_2d_id(id: impl Into<String>) -> Self {
+        Self::Zone2DId { id: id.into() }
+    }
+
     /// Creates a molecule atom target.
     #[must_use]
     pub fn molecule_atom(molecule_id: impl Into<String>, atom_id: impl Into<String>) -> Self {
@@ -150,6 +162,7 @@ impl AnnotationTarget {
                 ensure_finite("annotation y range start", *y_from)?;
                 ensure_finite("annotation y range end", *y_to)
             }
+            Self::Zone2DId { id } => ensure_non_empty("annotation zone id", id),
             Self::MoleculeAtom {
                 molecule_id,
                 atom_id,
@@ -264,9 +277,11 @@ mod tests {
             .with_label("peak");
         let atom =
             SpectrumAnnotation::new("atom-1", AnnotationTarget::molecule_atom("sample", "H1"));
+        let zone = SpectrumAnnotation::new("zone-1", AnnotationTarget::zone_2d_id("z1"));
 
         point.validate()?;
         atom.validate()?;
+        zone.validate()?;
         assert_eq!(point.label.as_deref(), Some("peak"));
         Ok(())
     }

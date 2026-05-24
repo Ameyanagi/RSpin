@@ -8,6 +8,8 @@ use rspin_core::{Nucleus, RSpinError, Result};
 
 use crate::{peaks::Peak, ranges::DetectedRange, zones::DetectedZone};
 
+pub use ids::deterministic_assignment_id;
+
 /// Atom or resonance label assigned to a detected feature.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AssignedAtom {
@@ -46,10 +48,6 @@ impl AssignedAtom {
             validate_non_empty("nucleus label", label)?;
         }
         Ok(())
-    }
-
-    fn stable_key(&self) -> String {
-        sanitize_id_token(&self.id)
     }
 }
 
@@ -129,20 +127,6 @@ impl AssignmentTarget {
                 ensure_finite("range end", *to)
             }
             Self::Zone2D { id } => validate_non_empty("zone id", id),
-        }
-    }
-
-    fn stable_key(&self) -> String {
-        match self {
-            Self::Peak1D { index, .. } => format!("peak1d:{index}"),
-            Self::Range1D {
-                start_index,
-                end_index,
-                ..
-            } => {
-                format!("range1d:{start_index}-{end_index}")
-            }
-            Self::Zone2D { id } => format!("zone2d:{}", sanitize_id_token(id)),
         }
     }
 }
@@ -320,25 +304,6 @@ impl AssignmentSet {
     }
 }
 
-/// Builds a deterministic assignment id from target and atom ids.
-///
-/// # Errors
-///
-/// Returns an error when target or atom data is invalid.
-pub fn deterministic_assignment_id(
-    target: &AssignmentTarget,
-    atoms: &[AssignedAtom],
-) -> Result<String> {
-    target.validate()?;
-    validate_atoms(atoms)?;
-    let atom_key = atoms
-        .iter()
-        .map(AssignedAtom::stable_key)
-        .collect::<Vec<_>>()
-        .join("+");
-    Ok(format!("assign:{}:{atom_key}", target.stable_key()))
-}
-
 fn validate_assignments(assignments: &[Assignment]) -> Result<()> {
     let mut ids = BTreeSet::new();
     for assignment in assignments {
@@ -396,19 +361,8 @@ fn validate_confidence(confidence: f64) -> Result<()> {
     Ok(())
 }
 
-fn sanitize_id_token(value: &str) -> String {
-    value
-        .trim()
-        .chars()
-        .map(|character| {
-            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
-                character
-            } else {
-                '_'
-            }
-        })
-        .collect()
-}
+mod annotations;
+mod ids;
 
 #[cfg(test)]
 mod tests;

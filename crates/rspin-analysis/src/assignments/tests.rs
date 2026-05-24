@@ -1,4 +1,6 @@
-use rspin_core::{Nucleus, RSpinError};
+use rspin_core::{
+    AnnotationTarget, Axis, Metadata, Nucleus, RSpinError, Spectrum1D, Spectrum2D, Unit,
+};
 
 use super::*;
 
@@ -102,6 +104,95 @@ fn validates_assignment_sets_and_target_lookup() -> anyhow::Result<()> {
     assert_eq!(set.len(), 2);
     assert_eq!(set.for_target(&target).len(), 1);
     assert!(!set.is_empty());
+    Ok(())
+}
+
+#[test]
+fn converts_assignments_to_1d_spectrum_annotations() -> anyhow::Result<()> {
+    let peak_target = AssignmentTarget::Peak1D { index: 1, x: 7.12 };
+    let range_target = AssignmentTarget::Range1D {
+        start_index: 2,
+        end_index: 4,
+        from: 3.4,
+        to: 3.1,
+    };
+    let set = AssignmentSet::default()
+        .with_deterministic_assignment(
+            peak_target,
+            vec![AssignedAtom::new("H1", Nucleus::Hydrogen1).with_label("H-1")],
+        )?
+        .with_deterministic_assignment(
+            range_target,
+            vec![
+                AssignedAtom::new("H2", Nucleus::Hydrogen1),
+                AssignedAtom::new("H3", Nucleus::Hydrogen1),
+            ],
+        )?;
+    let spectrum = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 8.0, 9)?,
+        vec![0.0; 9],
+        Metadata::default(),
+    )?;
+
+    let annotations = set.to_annotations()?;
+    let annotated = set.annotate_spectrum_1d(spectrum)?;
+
+    assert_eq!(annotations.len(), 2);
+    assert_eq!(annotations[0].label.as_deref(), Some("H-1"));
+    assert_eq!(annotations[1].label.as_deref(), Some("H2,H3"));
+    assert!(matches!(
+        annotations[0].target,
+        AnnotationTarget::Point1D { index: 1, x } if (x - 7.12).abs() < 1.0e-12
+    ));
+    assert_eq!(annotated.annotations, annotations);
+    annotated.validate_annotations()?;
+    Ok(())
+}
+
+#[test]
+fn converts_zone_assignments_to_2d_spectrum_annotations() -> anyhow::Result<()> {
+    let target = AssignmentTarget::Zone2D {
+        id: "zone:x1-2:y3-4".to_owned(),
+    };
+    let set = AssignmentSet::default()
+        .with_deterministic_assignment(target, vec![AssignedAtom::new("C2", Nucleus::Carbon13)])?;
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![0.0; 9],
+        Metadata::default(),
+    )?;
+
+    let annotated = set.annotate_spectrum_2d(spectrum)?;
+
+    assert_eq!(annotated.annotations.len(), 1);
+    assert!(matches!(
+        &annotated.annotations[0].target,
+        AnnotationTarget::Zone2DId { id } if id == "zone:x1-2:y3-4"
+    ));
+    annotated.validate_annotations()?;
+    Ok(())
+}
+
+#[test]
+fn rejects_assignment_annotations_for_wrong_spectrum_dimension() -> anyhow::Result<()> {
+    let set = AssignmentSet::default().with_deterministic_assignment(
+        AssignmentTarget::Zone2D {
+            id: "zone".to_owned(),
+        },
+        vec![AssignedAtom::new("C2", Nucleus::Carbon13)],
+    )?;
+    let spectrum = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![0.0; 3],
+        Metadata::default(),
+    )?;
+
+    let error = set
+        .annotate_spectrum_1d(spectrum)
+        .expect_err("2D target should fail on 1D");
+
+    assert!(matches!(error, RSpinError::InvalidMetadata { .. }));
     Ok(())
 }
 

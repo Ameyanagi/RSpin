@@ -96,7 +96,9 @@ impl Spectrum2D {
 fn validate_1d_annotation_target(target: &AnnotationTarget) -> Result<()> {
     if matches!(
         target,
-        AnnotationTarget::Point2D { .. } | AnnotationTarget::Zone2D { .. }
+        AnnotationTarget::Point2D { .. }
+            | AnnotationTarget::Zone2D { .. }
+            | AnnotationTarget::Zone2DId { .. }
     ) {
         return Err(RSpinError::InvalidMetadata {
             message: "1D spectra cannot use 2D annotation targets".to_owned(),
