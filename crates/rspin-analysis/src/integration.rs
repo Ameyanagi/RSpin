@@ -104,6 +104,22 @@ pub fn integrate_region(spectrum: &Spectrum1D, region: IntegralRegion) -> Result
     })
 }
 
+/// Integrates a spectrum over multiple regions in input order.
+///
+/// # Errors
+///
+/// Returns the first integration error produced by any region.
+pub fn integrate_regions(
+    spectrum: &Spectrum1D,
+    regions: &[IntegralRegion],
+) -> Result<Vec<Integral>> {
+    regions
+        .iter()
+        .copied()
+        .map(|region| integrate_region(spectrum, region))
+        .collect()
+}
+
 fn interpolate(x0: f64, y0: f64, x1: f64, y1: f64, x: f64) -> f64 {
     let fraction = (x - x0) / (x1 - x0);
     y0 + fraction * (y1 - y0)
@@ -149,6 +165,25 @@ mod tests {
         let integral = integrate_region(&spectrum, IntegralRegion { from: 3.0, to: 4.0 })?;
         assert_close(integral.area, 0.0);
         assert_eq!(integral.segments, 0);
+        Ok(())
+    }
+
+    #[test]
+    fn integrates_multiple_regions_in_order() -> anyhow::Result<()> {
+        let spectrum = spectrum(&[0.0, 1.0, 2.0], 0.0, 2.0)?;
+        let integrals = integrate_regions(
+            &spectrum,
+            &[
+                IntegralRegion { from: 0.0, to: 1.0 },
+                IntegralRegion { from: 1.0, to: 2.0 },
+            ],
+        )?;
+
+        assert_eq!(integrals.len(), 2);
+        assert_close(integrals[0].area, 0.5);
+        assert_close(integrals[1].area, 1.5);
+        assert_eq!(integrals[0].region, IntegralRegion { from: 0.0, to: 1.0 });
+        assert_eq!(integrals[1].region, IntegralRegion { from: 1.0, to: 2.0 });
         Ok(())
     }
 

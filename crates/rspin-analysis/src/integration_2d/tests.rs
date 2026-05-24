@@ -80,6 +80,33 @@ fn returns_zero_outside_spectrum_domain() -> anyhow::Result<()> {
 }
 
 #[test]
+fn integrates_multiple_2d_regions_in_order() -> anyhow::Result<()> {
+    let spectrum = plane_spectrum(0.0, 2.0, 0.0, 2.0)?;
+    let regions = [
+        IntegralRegion2D {
+            x_from: 0.0,
+            x_to: 1.0,
+            y_from: 0.0,
+            y_to: 1.0,
+        },
+        IntegralRegion2D {
+            x_from: 1.0,
+            x_to: 2.0,
+            y_from: 1.0,
+            y_to: 2.0,
+        },
+    ];
+    let integrals = integrate_regions_2d(&spectrum, &regions)?;
+
+    assert_eq!(integrals.len(), 2);
+    assert_close(integrals[0].volume, 1.0);
+    assert_close(integrals[1].volume, 3.0);
+    assert_eq!(integrals[0].region, regions[0]);
+    assert_eq!(integrals[1].region, regions[1]);
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_region_and_shape() -> anyhow::Result<()> {
     let spectrum = plane_spectrum(0.0, 2.0, 0.0, 2.0)?;
     let error = integrate_region_2d(

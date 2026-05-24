@@ -21,8 +21,9 @@ use rspin_analysis::{
     DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion, IntegralRegion2D,
     MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
     SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
-    detect_ranges, detect_zones, integrate_region, integrate_region_2d, optimize_peaks_quadratic,
-    pick_peaks, summarize_signals_1d, summarize_signals_2d,
+    detect_ranges, detect_zones, integrate_region, integrate_region_2d, integrate_regions,
+    integrate_regions_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
+    summarize_signals_2d,
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
@@ -506,6 +507,18 @@ pub fn integrate_region_json(spectrum_json: &str, region_json: &str) -> Result<S
     to_json(&integral)
 }
 
+/// Integrates serialized `Spectrum1D` JSON over serialized regions.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn integrate_regions_json(spectrum_json: &str, regions_json: &str) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let regions: Vec<IntegralRegion> = from_json(regions_json)?;
+    let integrals = integrate_regions(&spectrum, &regions)?;
+    to_json(&integrals)
+}
+
 /// Integrates serialized `Spectrum2D` JSON over a serialized rectangular region.
 ///
 /// # Errors
@@ -516,6 +529,18 @@ pub fn integrate_region_2d_json(spectrum_json: &str, region_json: &str) -> Resul
     let region: IntegralRegion2D = from_json(region_json)?;
     let integral = integrate_region_2d(&spectrum, region)?;
     to_json(&integral)
+}
+
+/// Integrates serialized `Spectrum2D` JSON over serialized rectangular regions.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn integrate_regions_2d_json(spectrum_json: &str, regions_json: &str) -> Result<String> {
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
+    let regions: Vec<IntegralRegion2D> = from_json(regions_json)?;
+    let integrals = integrate_regions_2d(&spectrum, &regions)?;
+    to_json(&integrals)
 }
 
 fn from_json<T: DeserializeOwned>(input: &str) -> Result<T> {

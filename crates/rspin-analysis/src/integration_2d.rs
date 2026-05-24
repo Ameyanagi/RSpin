@@ -125,6 +125,22 @@ pub fn integrate_region_2d(spectrum: &Spectrum2D, region: IntegralRegion2D) -> R
     })
 }
 
+/// Integrates a two-dimensional spectrum over multiple regions in input order.
+///
+/// # Errors
+///
+/// Returns the first integration error produced by any region.
+pub fn integrate_regions_2d(
+    spectrum: &Spectrum2D,
+    regions: &[IntegralRegion2D],
+) -> Result<Vec<Integral2D>> {
+    regions
+        .iter()
+        .copied()
+        .map(|region| integrate_region_2d(spectrum, region))
+        .collect()
+}
+
 #[derive(Clone, Copy)]
 struct Cell {
     x_index: usize,

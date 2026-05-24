@@ -216,6 +216,47 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_batch_integration() -> Result<()> {
+    let integrals = integrate_regions(
+        &read_spectrum1d_csv("x,intensity\n0,0\n1,1\n2,2\n")?,
+        &[
+            IntegralRegion { from: 0.0, to: 1.0 },
+            IntegralRegion { from: 1.0, to: 2.0 },
+        ],
+    )?;
+    assert_eq!(integrals.len(), 2);
+    assert!((integrals[0].area - 0.5).abs() < 1.0e-12);
+    assert!((integrals[1].area - 1.5).abs() < 1.0e-12);
+
+    let integrals_2d = integrate_regions_2d(
+        &Spectrum2D::new(
+            Axis::linear_ppm(0.0, 2.0, 3)?,
+            Axis::linear_ppm(0.0, 2.0, 3)?,
+            vec![0.0, 1.0, 2.0, 1.0, 2.0, 3.0, 2.0, 3.0, 4.0],
+            Metadata::named("integrated-2d"),
+        )?,
+        &[
+            IntegralRegion2D {
+                x_from: 0.0,
+                x_to: 1.0,
+                y_from: 0.0,
+                y_to: 1.0,
+            },
+            IntegralRegion2D {
+                x_from: 1.0,
+                x_to: 2.0,
+                y_from: 1.0,
+                y_to: 2.0,
+            },
+        ],
+    )?;
+    assert_eq!(integrals_2d.len(), 2);
+    assert!((integrals_2d[0].volume - 1.0).abs() < 1.0e-12);
+    assert!((integrals_2d[1].volume - 3.0).abs() < 1.0e-12);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_exact_simulation_json() -> Result<()> {
     let system = SpinHalfSystem::new().with_spin(1.0);
     system.validate()?;
