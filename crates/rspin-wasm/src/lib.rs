@@ -1,17 +1,20 @@
 //! WebAssembly bindings.
 
+mod analysis;
 mod api;
 
 use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
 
+pub use analysis::{detect_ranges_1d, detect_zones_2d};
 pub use api::{
     auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json,
-    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, fft_spectrum_2d_json,
-    integrate_region_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
-    optimize_peaks_json, parse_jcamp_dx_1d_json, phase_spectrum_2d_json, pick_peaks_json,
-    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
-    scale_spectrum_1d_json, scale_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
+    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
+    detect_zones_json, fft_spectrum_2d_json, integrate_region_json, normalize_spectrum_1d_json,
+    normalize_spectrum_2d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
+    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
+    project_spectrum_2d_y_json, render_prediction_1d_json, scale_spectrum_1d_json,
+    scale_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
     slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_y_at_x_index_json,
     summarize_signals_1d_json, validate_j_coupling_graph_json, validate_prediction_json,
@@ -381,6 +384,6 @@ pub fn render_prediction_1d(
     render_prediction_1d_json(prediction_json, options_json).map_err(|error| js_error(&error))
 }
 
-fn js_error(error: &RSpinError) -> JsValue {
+pub(crate) fn js_error(error: &RSpinError) -> JsValue {
     JsValue::from_str(&error.to_string())
 }

@@ -6,11 +6,11 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
     AssignmentSet, DetectedMultiplet, DetectedRange, IntegralRegion, JCouplingGraph,
-    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, SignalSummaryOptions,
-    detect_multiplets, integrate_region, optimize_peaks_quadratic, pick_peaks,
-    summarize_signals_1d,
+    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
+    SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones,
+    integrate_region, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
 };
-use rspin_core::{RSpinError, Result, Spectrum1D};
+use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::read_jcamp_dx_1d;
 use rspin_prediction::{PredictionSet, PredictionSpectrumOptions, render_prediction_1d};
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
@@ -120,6 +120,30 @@ pub fn detect_multiplets_json(
     let options: MultipletDetectionOptions = from_json(options_json)?;
     let multiplets = detect_multiplets(&spectrum, &peaks, options)?;
     to_json(&multiplets)
+}
+
+/// Detects ranges from serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn detect_ranges_json(spectrum_json: &str, options_json: &str) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let options: RangeDetectionOptions = from_json(options_json)?;
+    let ranges = detect_ranges(&spectrum, options)?;
+    to_json(&ranges)
+}
+
+/// Detects connected zones from serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn detect_zones_json(spectrum_json: &str, options_json: &str) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let options: ZoneDetectionOptions = from_json(options_json)?;
+    let zones = detect_zones(&spectrum, options)?;
+    to_json(&zones)
 }
 
 /// Validates serialized J-coupling graph JSON and returns normalized JSON.

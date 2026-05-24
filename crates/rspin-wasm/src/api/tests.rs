@@ -1,4 +1,4 @@
-use rspin_core::{Axis, Metadata, Spectrum1D, Unit};
+use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
 
 use super::*;
 
@@ -142,6 +142,54 @@ fn detects_multiplets_json() -> anyhow::Result<()> {
     assert_eq!(multiplets.len(), 2);
     assert_eq!(multiplets[0].kind, rspin_analysis::MultipletKind::Doublet);
     assert_eq!(multiplets[1].kind, rspin_analysis::MultipletKind::Singlet);
+    Ok(())
+}
+
+#[test]
+fn detects_ranges_json() -> anyhow::Result<()> {
+    let spectrum_json = parse_jcamp_dx_1d_json(
+        "\
+##TITLE=demo
+##FIRSTX=0
+##LASTX=6
+##XYDATA=(X++(Y..Y))
+0 0 2 3 0 -4 -5 0
+##END=
+",
+    )?;
+    let ranges_json = detect_ranges_json(
+        &spectrum_json,
+        r#"{"threshold_abs":1.0,"min_active_points":1,"merge_gap_points":0}"#,
+    )?;
+    let ranges: Vec<rspin_analysis::DetectedRange> = from_json(&ranges_json)?;
+
+    assert_eq!(ranges.len(), 2);
+    assert_eq!(ranges[0].start_index, 1);
+    assert_eq!(ranges[0].end_index, 2);
+    assert_eq!(ranges[1].start_index, 4);
+    assert_eq!(ranges[1].end_index, 5);
+    Ok(())
+}
+
+#[test]
+fn detects_zones_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![2.0, 0.0, 0.0, 3.0, 0.0, -4.0, 0.0, 0.0, -5.0],
+        Metadata::default(),
+    )?;
+    let zones_json = detect_zones_json(
+        &to_json(&spectrum)?,
+        r#"{"threshold_abs":1.0,"min_active_points":1,"connectivity":"Four"}"#,
+    )?;
+    let zones: Vec<rspin_analysis::DetectedZone> = from_json(&zones_json)?;
+
+    assert_eq!(zones.len(), 2);
+    assert_eq!(zones[0].id, "zone:x0-0:y0-1");
+    assert_eq!(zones[0].active_points, 2);
+    assert_eq!(zones[1].id, "zone:x2-2:y1-2");
+    assert!((zones[1].max_abs_intensity - 5.0).abs() < 1.0e-12);
     Ok(())
 }
 
