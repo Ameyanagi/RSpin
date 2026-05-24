@@ -75,6 +75,31 @@ fn reads_processed_directory_with_scaling_and_big_endian_data() -> anyhow::Resul
 }
 
 #[test]
+fn reads_processed_1d_directory_with_imaginary_plane() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-1d-complex")?;
+    write_processed_dir(
+        &root,
+        "\
+##$SI= 3
+##$BYTORDP= 0
+##$DTYPP= 0
+##$NC_proc= -1
+",
+        &[1, -2, 3],
+        ByteOrder::Little,
+    )?;
+    write_processed_1d_imaginary(&root, &[-1, 2, -3], ByteOrder::Little)?;
+
+    let spectrum = read_bruker_processed_1d_dir(root.join("pdata/1"))?;
+
+    assert_eq!(spectrum.intensities, vec![2.0, -4.0, 6.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-2.0, 4.0, -6.0]));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn rejects_unsupported_processed_data_type() -> anyhow::Result<()> {
     let root = synthetic_dataset("unsupported")?;
     write_processed_dir(
@@ -90,6 +115,28 @@ fn rejects_unsupported_processed_data_type() -> anyhow::Result<()> {
     let error = read_bruker_processed_1d_dir(&root)
         .expect_err("unsupported processed data type should fail");
     assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn rejects_truncated_processed_1d_imaginary_plane() -> anyhow::Result<()> {
+    let root = synthetic_dataset("truncated-1i")?;
+    write_processed_dir(
+        &root,
+        "\
+##$SI= 3
+##$DTYPP= 0
+",
+        &[1, 2, 3],
+        ByteOrder::Little,
+    )?;
+    write_processed_1d_imaginary(&root, &[1, 2], ByteOrder::Little)?;
+
+    let error = read_bruker_processed_1d_dir(&root).expect_err("truncated 1i should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    assert!(error.to_string().contains("1i"));
 
     remove_dir(root)?;
     Ok(())

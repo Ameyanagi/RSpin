@@ -18,8 +18,8 @@ pub use raw::{BrukerFid1D, BrukerSer2D, read_bruker_fid_1d_dir, read_bruker_ser_
 /// Reader for Bruker processed one-dimensional datasets.
 ///
 /// The reader accepts either the dataset root containing `pdata/1` or the
-/// processed directory itself. It currently supports real processed `1r` data
-/// stored as 32-bit integers with Bruker `procs` metadata.
+/// processed directory itself. It supports processed `1r` data and optional
+/// `1i` data stored as 32-bit integers with Bruker `procs` metadata.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BrukerProcessed1D;
 
@@ -29,7 +29,8 @@ impl BrukerProcessed1D {
     /// # Errors
     ///
     /// Returns an error when required `procs` or `1r` files are missing,
-    /// malformed, or use an unsupported binary data type.
+    /// optional `1i` data is malformed, or binary data uses an unsupported
+    /// type.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
         read_bruker_processed_1d_dir(path)
     }
@@ -54,10 +55,11 @@ pub fn read_bruker_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D
 
     let point_count = required_usize(&procs, "SI")?;
     let intensities = read_processed_i32_data(&data_path, point_count, &procs)?;
+    let imaginary = read_optional_processed_1d_imaginary(&processed_dir, point_count, &procs)?;
     let axis = build_axis(&procs, point_count)?;
     let metadata = build_metadata(&procs, acqus.as_ref(), title)?;
 
-    Spectrum1D::new(axis, intensities, metadata)
+    Spectrum1D::new_complex(axis, intensities, imaginary, metadata)
 }
 
 fn locate_processed_dir(path: &Path) -> PathBuf {
@@ -162,10 +164,14 @@ fn read_processed_i32_data(
             message: "Bruker point count is too large".to_owned(),
         })?;
     if bytes.len() < required_len {
+        let plane = path
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .map_or("processed data", |value| value);
         return Err(RSpinError::Parse {
             format: "Bruker",
             message: format!(
-                "processed 1r has {} bytes but {required_len} are required",
+                "processed {plane} has {} bytes but {required_len} are required",
                 bytes.len()
             ),
         });
@@ -182,6 +188,19 @@ fn read_processed_i32_data(
         intensities.push(f64::from(raw) * scale);
     }
     Ok(intensities)
+}
+
+fn read_optional_processed_1d_imaginary(
+    processed_dir: &Path,
+    point_count: usize,
+    procs: &BTreeMap<String, String>,
+) -> Result<Option<Vec<f64>>> {
+    let path = processed_dir.join("1i");
+    if path.is_file() {
+        read_processed_i32_data(&path, point_count, procs).map(Some)
+    } else {
+        Ok(None)
+    }
 }
 
 fn build_axis(procs: &BTreeMap<String, String>, point_count: usize) -> Result<Axis> {

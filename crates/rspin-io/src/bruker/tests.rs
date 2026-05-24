@@ -40,6 +40,15 @@ fn write_processed_dir(
     Ok(())
 }
 
+fn write_processed_1d_imaginary(
+    root: &Path,
+    values: &[i32],
+    byte_order: ByteOrder,
+) -> anyhow::Result<()> {
+    fs::write(root.join("pdata/1/1i"), i32_bytes(values, byte_order))?;
+    Ok(())
+}
+
 fn write_processed_2d_dir(
     root: &Path,
     direct_parameters: &str,
