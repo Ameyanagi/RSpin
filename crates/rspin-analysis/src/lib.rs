@@ -15,8 +15,8 @@ mod traits;
 mod zones;
 
 pub use alignment::{
-    AlignmentWindow, PeakAlignmentOptions, PeakAlignmentResult1D, SpectrumAlignmentShift,
-    align_spectra_by_peak,
+    AlignmentWindow, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakAlignmentResult1D,
+    SpectrumAlignmentShift, align_spectra_by_peak, align_spectra_by_peak_to_matrix,
 };
 pub use assignments::{
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,

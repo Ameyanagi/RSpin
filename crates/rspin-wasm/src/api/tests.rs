@@ -350,6 +350,33 @@ fn generates_spectrum_matrix_1d_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn aligns_spectra_by_peak_to_matrix_1d_json() -> anyhow::Result<()> {
+    let spectra_json = to_json(&vec![
+        Spectrum1D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![0.0, 5.0, 0.0],
+            Metadata::named("ref"),
+        )?,
+        Spectrum1D::new(
+            Axis::linear("x", Unit::Ppm, 0.5, 2.5, 3)?,
+            vec![0.0, 7.0, 0.0],
+            Metadata::named("shifted"),
+        )?,
+    ])?;
+    let result_json = align_spectra_by_peak_to_matrix_1d_json(
+        &spectra_json,
+        "{}",
+        r#"{"target_axis":null,"outside_value":0.0}"#,
+    )?;
+    let result: rspin_analysis::PeakAlignedMatrix1D = from_json(&result_json)?;
+
+    assert_eq!(result.matrix.shape(), (2, 3));
+    assert_eq!(result.matrix.values, vec![0.0, 5.0, 0.0, 0.0, 7.0, 0.0]);
+    assert!((result.shifts[1].delta + 0.5).abs() < 1.0e-12);
+    Ok(())
+}
+
+#[test]
 fn generates_spectrum_matrix_2d_json() -> anyhow::Result<()> {
     let spectra_json = to_json(&vec![
         Spectrum2D::new(

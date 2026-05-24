@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum1D};
 
-use crate::{Peak, PeakPickOptions, pick_peaks};
+use crate::{
+    MatrixGenerationOptions, Peak, PeakPickOptions, SpectrumMatrix1D, generate_spectrum_matrix_1d,
+    pick_peaks,
+};
 
 /// Optional coordinate window used for alignment peak selection.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -16,6 +19,12 @@ pub struct AlignmentWindow {
 }
 
 impl AlignmentWindow {
+    /// Creates an alignment search window.
+    #[must_use]
+    pub fn new(from: f64, to: f64) -> Self {
+        Self { from, to }
+    }
+
     fn bounds(self) -> Result<(f64, f64)> {
         if !self.from.is_finite() {
             return Err(RSpinError::NonFinite { field: "from" });
@@ -38,6 +47,7 @@ impl AlignmentWindow {
 
 /// Options for peak-based one-dimensional alignment.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PeakAlignmentOptions {
     /// Target coordinate. When omitted, the first spectrum's selected peak is used.
     pub target_x: Option<f64>,
@@ -48,6 +58,47 @@ pub struct PeakAlignmentOptions {
 }
 
 impl PeakAlignmentOptions {
+    /// Creates default peak alignment options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the target coordinate for selected alignment peaks.
+    #[must_use]
+    pub fn with_target_x(mut self, target_x: f64) -> Self {
+        self.target_x = Some(target_x);
+        self
+    }
+
+    /// Uses the first spectrum's selected peak as the target coordinate.
+    #[must_use]
+    pub fn without_target_x(mut self) -> Self {
+        self.target_x = None;
+        self
+    }
+
+    /// Sets a search window for selecting alignment peaks.
+    #[must_use]
+    pub fn with_search_window(mut self, window: AlignmentWindow) -> Self {
+        self.search_window = Some(window);
+        self
+    }
+
+    /// Clears the search window.
+    #[must_use]
+    pub fn without_search_window(mut self) -> Self {
+        self.search_window = None;
+        self
+    }
+
+    /// Sets peak-picking options used to choose alignment peaks.
+    #[must_use]
+    pub fn with_peak_options(mut self, peak_options: PeakPickOptions) -> Self {
+        self.peak_options = peak_options;
+        self
+    }
+
     fn validate(self) -> Result<()> {
         if let Some(target_x) = self.target_x {
             if !target_x.is_finite() {
@@ -81,6 +132,15 @@ pub struct SpectrumAlignmentShift {
 pub struct PeakAlignmentResult1D {
     /// Aligned spectra in input order.
     pub spectra: Vec<Spectrum1D>,
+    /// Per-spectrum shift metadata in input order.
+    pub shifts: Vec<SpectrumAlignmentShift>,
+}
+
+/// Peak-aligned matrix output for one-dimensional spectra.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PeakAlignedMatrix1D {
+    /// Matrix generated from peak-aligned spectra.
+    pub matrix: SpectrumMatrix1D,
     /// Per-spectrum shift metadata in input order.
     pub shifts: Vec<SpectrumAlignmentShift>,
 }
@@ -132,6 +192,29 @@ pub fn align_spectra_by_peak(
     Ok(PeakAlignmentResult1D {
         spectra: aligned,
         shifts,
+    })
+}
+
+/// Aligns spectra by peak and generates a common one-dimensional matrix.
+///
+/// This combines peak-based axis shifting with matrix generation for
+/// multi-spectrum workflows. Matrix generation runs on the aligned spectra, so
+/// its default target axis is the first aligned spectrum axis.
+///
+/// # Errors
+///
+/// Returns an error when alignment fails or matrix generation options are
+/// invalid.
+pub fn align_spectra_by_peak_to_matrix(
+    spectra: &[Spectrum1D],
+    alignment_options: PeakAlignmentOptions,
+    matrix_options: MatrixGenerationOptions,
+) -> Result<PeakAlignedMatrix1D> {
+    let alignment = align_spectra_by_peak(spectra, alignment_options)?;
+    let matrix = generate_spectrum_matrix_1d(&alignment.spectra, matrix_options)?;
+    Ok(PeakAlignedMatrix1D {
+        matrix,
+        shifts: alignment.shifts,
     })
 }
 

@@ -29,15 +29,15 @@ fn aligns_to_explicit_target_with_search_window() -> anyhow::Result<()> {
         &[0.0, 1.0, 2.0, 3.0, 4.0],
         &[0.0, 10.0, 0.0, 20.0, 0.0],
     )?;
-    let options = PeakAlignmentOptions {
-        target_x: Some(2.0),
-        search_window: Some(AlignmentWindow { from: 0.5, to: 1.5 }),
-        peak_options: PeakPickOptions {
-            min_abs_intensity: 1.0,
-            min_prominence: 1.0,
-            polarity: PeakPolarity::Positive,
-        },
-    };
+    let options = PeakAlignmentOptions::new()
+        .with_target_x(2.0)
+        .with_search_window(AlignmentWindow::new(0.5, 1.5))
+        .with_peak_options(
+            PeakPickOptions::new()
+                .with_min_abs_intensity(1.0)
+                .with_min_prominence(1.0)
+                .with_polarity(PeakPolarity::Positive),
+        );
 
     let result = align_spectra_by_peak(&[spectrum], options)?;
 
@@ -46,6 +46,36 @@ fn aligns_to_explicit_target_with_search_window() -> anyhow::Result<()> {
     assert_close(result.shifts[0].delta, 1.0);
     assert_eq!(result.spectra[0].x.values, vec![1.0, 2.0, 3.0, 4.0, 5.0]);
     Ok(())
+}
+
+#[test]
+fn aligns_spectra_and_generates_matrix() -> anyhow::Result<()> {
+    let first = spectrum("ref", &[0.0, 1.0, 2.0], &[0.0, 5.0, 0.0])?;
+    let second = spectrum("shifted", &[0.5, 1.5, 2.5], &[0.0, 7.0, 0.0])?;
+    let result = align_spectra_by_peak_to_matrix(
+        &[first, second],
+        PeakAlignmentOptions::new(),
+        MatrixGenerationOptions::new(),
+    )?;
+
+    assert_eq!(result.matrix.shape(), (2, 3));
+    assert_eq!(result.matrix.row_ids, vec!["0:ref", "1:shifted"]);
+    assert_eq!(result.matrix.axis.values, vec![0.0, 1.0, 2.0]);
+    assert_eq!(result.matrix.values, vec![0.0, 5.0, 0.0, 0.0, 7.0, 0.0]);
+    assert_close(result.shifts[1].delta, -0.5);
+    Ok(())
+}
+
+#[test]
+fn alignment_builders_can_clear_optional_values() {
+    let options = PeakAlignmentOptions::new()
+        .with_target_x(1.0)
+        .without_target_x()
+        .with_search_window(AlignmentWindow::new(0.0, 2.0))
+        .without_search_window();
+
+    assert_eq!(options.target_x, None);
+    assert_eq!(options.search_window, None);
 }
 
 #[test]

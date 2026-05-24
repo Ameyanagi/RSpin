@@ -13,11 +13,12 @@ use serde::{Serialize, de::DeserializeOwned};
 use rspin_analysis::{
     AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion,
     IntegralRegion2D, JCouplingGraph, MatrixGeneration2DOptions, MatrixGenerationOptions,
-    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
-    SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
-    detect_ranges, detect_zones, generate_spectrum_matrix_1d, generate_spectrum_matrix_2d,
-    integrate_region, integrate_region_2d, optimize_peaks_quadratic, pick_peaks,
-    summarize_signals_1d, summarize_signals_2d,
+    MultipletDetectionOptions, PeakAlignmentOptions, PeakOptimizationOptions, PeakPickOptions,
+    RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions,
+    align_spectra_by_peak_to_matrix, detect_multiplets, detect_ranges, detect_zones,
+    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
+    integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
+    summarize_signals_2d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::read_jcamp_dx_1d;
@@ -271,6 +272,24 @@ pub fn generate_spectrum_matrix_1d_json(spectra_json: &str, options_json: &str) 
     let options: MatrixGenerationOptions = from_json(options_json)?;
     let matrix = generate_spectrum_matrix_1d(&spectra, options)?;
     to_json(&matrix)
+}
+
+/// Aligns serialized `Spectrum1D` JSON values by peak and generates a matrix.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, alignment, matrix generation, or
+/// serialization fails.
+pub fn align_spectra_by_peak_to_matrix_1d_json(
+    spectra_json: &str,
+    alignment_options_json: &str,
+    matrix_options_json: &str,
+) -> Result<String> {
+    let spectra: Vec<Spectrum1D> = from_json(spectra_json)?;
+    let alignment_options: PeakAlignmentOptions = from_json(alignment_options_json)?;
+    let matrix_options: MatrixGenerationOptions = from_json(matrix_options_json)?;
+    let result = align_spectra_by_peak_to_matrix(&spectra, alignment_options, matrix_options)?;
+    to_json(&result)
 }
 
 /// Generates a layer-major matrix from serialized `Spectrum2D` JSON values.

@@ -13,16 +13,16 @@ pub use analysis::{
     GapMultipletDetector, Integral, Integral2D, IntegralRegion, IntegralRegion2D, Integrator,
     Integrator2D, JCoupling, JCouplingGraph, LocalExtremaPeakPicker, MatrixGeneration2DOptions,
     MatrixGenerationOptions, MultipletDetectionOptions, MultipletDetector, MultipletKind,
-    OptimizedPeak, Peak, PeakAlignmentOptions, PeakAlignmentResult1D, PeakOptimizationOptions,
-    PeakOptimizer, PeakPickOptions, PeakPicker, PeakPolarity, QuadraticPeakOptimizer,
-    RangeDetectionOptions, RangeDetector, SignalSummary1D, SignalSummary2D, SignalSummary2DOptions,
-    SignalSummaryOptions, SpectrumAlignmentShift, SpectrumMatrix1D, SpectrumMatrix2D,
-    ThresholdRangeDetector, ThresholdZoneDetector, TrapezoidalIntegrator, ZoneConnectivity,
-    ZoneDetectionOptions, ZoneDetector, align_spectra_by_peak, detect_multiplets, detect_ranges,
-    detect_zones, deterministic_assignment_id, deterministic_j_coupling_id,
-    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
-    integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
-    summarize_signals_2d,
+    OptimizedPeak, Peak, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakAlignmentResult1D,
+    PeakOptimizationOptions, PeakOptimizer, PeakPickOptions, PeakPicker, PeakPolarity,
+    QuadraticPeakOptimizer, RangeDetectionOptions, RangeDetector, SignalSummary1D, SignalSummary2D,
+    SignalSummary2DOptions, SignalSummaryOptions, SpectrumAlignmentShift, SpectrumMatrix1D,
+    SpectrumMatrix2D, ThresholdRangeDetector, ThresholdZoneDetector, TrapezoidalIntegrator,
+    ZoneConnectivity, ZoneDetectionOptions, ZoneDetector, align_spectra_by_peak,
+    align_spectra_by_peak_to_matrix, detect_multiplets, detect_ranges, detect_zones,
+    deterministic_assignment_id, deterministic_j_coupling_id, generate_spectrum_matrix_1d,
+    generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, optimize_peaks_quadratic,
+    pick_peaks, summarize_signals_1d, summarize_signals_2d,
 };
 pub use core::{
     AnnotationTarget, Atom, Axis, Bond, BondOrder, Metadata, Molecule, Nucleus, ProcessingRecord,
@@ -79,8 +79,8 @@ pub mod prelude {
         ExactSpinOptions, ExactTransition, Experiment, FftDirection, Integral, Integral2D,
         IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape,
         MatrixGeneration2DOptions, MatrixGenerationOptions, Metadata, Molecule,
-        MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignmentOptions,
-        PeakPickOptions, PeakPolarity, PredictionLineShape, PredictionSet,
+        MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignedMatrix1D,
+        PeakAlignmentOptions, PeakPickOptions, PeakPolarity, PredictionLineShape, PredictionSet,
         PredictionSpectrum2DOptions, PredictionSpectrumOptions, ProcessSpectrum1D,
         ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D, ProcessingRecipe1D,
         ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions, Resample1D,
@@ -88,8 +88,8 @@ pub mod prelude {
         SignalSummary2DOptions, SignalSummaryOptions, Spectrum1D, Spectrum2D, SpectrumAnnotation,
         SpectrumMatrix1D, SpectrumMatrix2D, SpectrumReader, SpectrumWriter, SpinHalf,
         SpinHalfSystem, TrapezoidalIntegrator, Unit, ZoneConnectivity, ZoneDetectionOptions,
-        abs_1d, abs_2d, align_spectra_by_peak, apply_processing_recipe_1d,
-        apply_processing_recipe_1d_until, apply_processing_recipe_2d,
+        abs_1d, abs_2d, align_spectra_by_peak, align_spectra_by_peak_to_matrix,
+        apply_processing_recipe_1d, apply_processing_recipe_1d_until, apply_processing_recipe_2d,
         apply_processing_recipe_2d_until, auto_phase_correct, auto_phase_correct_2d, crop_1d,
         crop_2d, decompose_exact_spin_half_1d, detect_multiplets, detect_ranges, detect_zones,
         exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
@@ -148,6 +148,24 @@ mod tests {
             )),
         )?;
         assert_eq!(prediction.signals_1d.len(), 1);
+
+        let aligned = align_spectra_by_peak_to_matrix(
+            &[
+                Spectrum1D::new(
+                    Axis::linear_ppm(0.0, 2.0, 3)?,
+                    vec![0.0, 5.0, 0.0],
+                    Metadata::named("ref"),
+                )?,
+                Spectrum1D::new(
+                    Axis::linear_ppm(0.5, 2.5, 3)?,
+                    vec![0.0, 7.0, 0.0],
+                    Metadata::named("shifted"),
+                )?,
+            ],
+            PeakAlignmentOptions::new(),
+            MatrixGenerationOptions::new(),
+        )?;
+        assert_eq!(aligned.matrix.shape(), (2, 3));
 
         let system = SpinHalfSystem::new().with_spin(1.0);
         let transitions = exact_spin_half_transitions(
