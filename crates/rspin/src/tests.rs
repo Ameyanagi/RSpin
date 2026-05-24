@@ -29,6 +29,8 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
         .absolute_value()
         .normalize_max_abs();
     let recipe_json = write_processing_recipe_1d_json(&recipe)?;
+    assert!(recipe_json.contains(PROCESSING_RECIPE_1D_FORMAT));
+    assert!(recipe_json.contains(&format!("\"version\":{PROCESSING_RECIPE_JSON_VERSION}")));
     assert_eq!(read_processing_recipe_1d_json(&recipe_json)?, recipe);
 
     let recipe_2d = ProcessingRecipe2D::new()
@@ -36,6 +38,7 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
         .zero_fill(4, 4)
         .normalize_max_abs();
     let recipe_2d_json = write_processing_recipe_2d_json(&recipe_2d)?;
+    assert!(recipe_2d_json.contains(PROCESSING_RECIPE_2D_FORMAT));
     assert_eq!(read_processing_recipe_2d_json(&recipe_2d_json)?, recipe_2d);
 
     let baseline_corrected = Spectrum1D::new(

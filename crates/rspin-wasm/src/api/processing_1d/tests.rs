@@ -199,7 +199,7 @@ fn applies_processing_recipe_1d_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&real_spectrum()?)?;
     let processed_json = apply_processing_recipe_1d_json(
         &spectrum_json,
-        r#"{"operations":[{"operation":"scale","factor":2.0},{"operation":"offset","offset":-2.0},{"operation":"absolute_value"},{"operation":"normalize_max_abs"}]}"#,
+        r#"{"format":"rspin.processing_recipe_1d","version":1,"recipe":{"operations":[{"operation":"scale","factor":2.0},{"operation":"offset","offset":-2.0},{"operation":"absolute_value"},{"operation":"normalize_max_abs"}]}}"#,
     )?;
     let processed: Spectrum1D = from_json(&processed_json)?;
 

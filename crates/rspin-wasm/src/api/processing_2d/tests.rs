@@ -184,7 +184,7 @@ fn applies_processing_recipe_2d_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
     let processed_json = apply_processing_recipe_2d_json(
         &spectrum_json,
-        r#"{"operations":[{"operation":"scale","factor":2.0},{"operation":"absolute_value"},{"operation":"zero_fill","target_x_len":3,"target_y_len":2},{"operation":"normalize_max_abs"}]}"#,
+        r#"{"format":"rspin.processing_recipe_2d","version":1,"recipe":{"operations":[{"operation":"scale","factor":2.0},{"operation":"absolute_value"},{"operation":"zero_fill","target_x_len":3,"target_y_len":2},{"operation":"normalize_max_abs"}]}}"#,
     )?;
     let processed: Spectrum2D = from_json(&processed_json)?;
 

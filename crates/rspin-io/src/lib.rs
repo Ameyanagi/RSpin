@@ -51,7 +51,8 @@ pub use nmrml_info::{
     read_nmrml_document_info_bytes, read_nmrml_document_info_file, read_nmrml_document_info_str,
 };
 pub use processing_json::{
-    JsonProcessingRecipe1D, JsonProcessingRecipe2D, read_processing_recipe_1d_json,
+    JsonProcessingRecipe1D, JsonProcessingRecipe2D, PROCESSING_RECIPE_1D_FORMAT,
+    PROCESSING_RECIPE_2D_FORMAT, PROCESSING_RECIPE_JSON_VERSION, read_processing_recipe_1d_json,
     read_processing_recipe_2d_json, write_processing_recipe_1d_json,
     write_processing_recipe_2d_json,
 };
