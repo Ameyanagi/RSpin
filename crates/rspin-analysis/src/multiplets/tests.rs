@@ -43,15 +43,39 @@ fn groups_nearby_peaks_into_multiplets() -> anyhow::Result<()> {
 fn can_omit_singlets() -> anyhow::Result<()> {
     let spectrum = spectrum(&[(0.0, 0.0), (1.0, 1.0), (2.0, 0.0)])?;
     let peaks = pick_peaks(&spectrum, PeakPickOptions::default())?;
-    let multiplets = GapMultipletDetector {
-        options: MultipletDetectionOptions {
-            include_singlets: false,
-            ..MultipletDetectionOptions::default()
-        },
-    }
-    .detect(&spectrum, &peaks)?;
+    let multiplets = GapMultipletDetector::new()
+        .with_options(MultipletDetectionOptions::new().with_singlets(false))
+        .detect(&spectrum, &peaks)?;
 
     assert!(multiplets.is_empty());
+    Ok(())
+}
+
+#[test]
+fn builder_options_group_multiplets() -> anyhow::Result<()> {
+    let mut spectrum = spectrum(&[
+        (0.00, 0.0),
+        (1.00, 0.0),
+        (1.01, 1.0),
+        (1.02, 0.0),
+        (1.03, 0.8),
+        (1.04, 0.0),
+    ])?;
+    spectrum.metadata.frequency_mhz = Some(400.0);
+    let peaks = pick_peaks(&spectrum, PeakPickOptions::default())?;
+    let multiplets = detect_multiplets(
+        &spectrum,
+        &peaks,
+        MultipletDetectionOptions::new()
+            .with_max_peak_gap_ppm(0.05)
+            .with_min_peak_count(2)
+            .with_singlets(true)
+            .without_spectrometer_mhz(),
+    )?;
+
+    assert_eq!(multiplets.len(), 1);
+    assert_eq!(multiplets[0].kind, MultipletKind::Doublet);
+    assert_close(multiplets[0].estimated_j_hz, Some(8.0));
     Ok(())
 }
 

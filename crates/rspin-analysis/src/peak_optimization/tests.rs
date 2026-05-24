@@ -87,7 +87,11 @@ fn rejects_peak_without_neighbors() -> anyhow::Result<()> {
 fn optimizer_trait_delegates_to_function() -> anyhow::Result<()> {
     let spectrum = spectrum(&[0.0, 1.0, 0.0], 1.0)?;
     let peaks = pick_peaks(&spectrum, PeakPickOptions::default())?;
-    let quadratic = QuadraticPeakOptimizer::default();
+    let quadratic = QuadraticPeakOptimizer::new().with_options(
+        PeakOptimizationOptions::new()
+            .with_vertex_inside_required(true)
+            .with_matching_curvature_required(true),
+    );
     let optimized = quadratic.optimize(&spectrum, &peaks)?;
 
     assert_eq!(optimized.len(), 1);

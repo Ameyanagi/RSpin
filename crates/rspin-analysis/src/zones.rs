@@ -40,6 +40,33 @@ impl Default for ZoneDetectionOptions {
 }
 
 impl ZoneDetectionOptions {
+    /// Creates default zone-detection options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the minimum absolute intensity for active points.
+    #[must_use]
+    pub fn with_threshold_abs(mut self, threshold_abs: f64) -> Self {
+        self.threshold_abs = threshold_abs;
+        self
+    }
+
+    /// Sets the minimum number of active points in a detected zone.
+    #[must_use]
+    pub fn with_min_active_points(mut self, min_active_points: usize) -> Self {
+        self.min_active_points = min_active_points;
+        self
+    }
+
+    /// Sets the neighborhood connectivity.
+    #[must_use]
+    pub fn with_connectivity(mut self, connectivity: ZoneConnectivity) -> Self {
+        self.connectivity = connectivity;
+        self
+    }
+
     fn validate(self) -> Result<()> {
         if !self.threshold_abs.is_finite() {
             return Err(RSpinError::NonFinite {
@@ -100,6 +127,21 @@ pub struct DetectedZone {
 pub struct ThresholdZoneDetector {
     /// Detection options.
     pub options: ZoneDetectionOptions,
+}
+
+impl ThresholdZoneDetector {
+    /// Creates a threshold zone detector with default options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets zone-detection options.
+    #[must_use]
+    pub fn with_options(mut self, options: ZoneDetectionOptions) -> Self {
+        self.options = options;
+        self
+    }
 }
 
 impl ZoneDetector for ThresholdZoneDetector {

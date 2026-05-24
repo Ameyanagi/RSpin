@@ -24,6 +24,28 @@ impl Default for PeakOptimizationOptions {
     }
 }
 
+impl PeakOptimizationOptions {
+    /// Creates default peak-optimization options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets whether fitted vertices must stay between adjacent samples.
+    #[must_use]
+    pub fn with_vertex_inside_required(mut self, require_vertex_inside: bool) -> Self {
+        self.require_vertex_inside = require_vertex_inside;
+        self
+    }
+
+    /// Sets whether fitted curvature must match the source peak polarity.
+    #[must_use]
+    pub fn with_matching_curvature_required(mut self, require_matching_curvature: bool) -> Self {
+        self.require_matching_curvature = require_matching_curvature;
+        self
+    }
+}
+
 /// A peak refined by local quadratic interpolation.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct OptimizedPeak {
@@ -46,6 +68,21 @@ pub struct OptimizedPeak {
 pub struct QuadraticPeakOptimizer {
     /// Optimization options.
     pub options: PeakOptimizationOptions,
+}
+
+impl QuadraticPeakOptimizer {
+    /// Creates a quadratic peak optimizer with default options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets peak-optimization options.
+    #[must_use]
+    pub fn with_options(mut self, options: PeakOptimizationOptions) -> Self {
+        self.options = options;
+        self
+    }
 }
 
 impl PeakOptimizer for QuadraticPeakOptimizer {

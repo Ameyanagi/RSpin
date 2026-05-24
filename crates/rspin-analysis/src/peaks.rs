@@ -45,6 +45,33 @@ impl Default for PeakPickOptions {
 }
 
 impl PeakPickOptions {
+    /// Creates default peak-picking options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the minimum absolute peak intensity.
+    #[must_use]
+    pub fn with_min_abs_intensity(mut self, min_abs_intensity: f64) -> Self {
+        self.min_abs_intensity = min_abs_intensity;
+        self
+    }
+
+    /// Sets the minimum local prominence.
+    #[must_use]
+    pub fn with_min_prominence(mut self, min_prominence: f64) -> Self {
+        self.min_prominence = min_prominence;
+        self
+    }
+
+    /// Sets the detected peak polarity.
+    #[must_use]
+    pub fn with_polarity(mut self, polarity: PeakPolarity) -> Self {
+        self.polarity = polarity;
+        self
+    }
+
     fn validate(self) -> Result<()> {
         if !self.min_abs_intensity.is_finite() {
             return Err(RSpinError::NonFinite {
@@ -90,6 +117,21 @@ pub struct Peak {
 pub struct LocalExtremaPeakPicker {
     /// Peak-picking options.
     pub options: PeakPickOptions,
+}
+
+impl LocalExtremaPeakPicker {
+    /// Creates a local-extrema peak picker with default options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets peak-picking options.
+    #[must_use]
+    pub fn with_options(mut self, options: PeakPickOptions) -> Self {
+        self.options = options;
+        self
+    }
 }
 
 impl PeakPicker for LocalExtremaPeakPicker {
@@ -189,13 +231,8 @@ mod tests {
     #[test]
     fn picks_negative_peaks() -> anyhow::Result<()> {
         let spectrum = spectrum(&[0.0, -3.0, -1.0, 2.0, -5.0, 0.0])?;
-        let picker = LocalExtremaPeakPicker {
-            options: PeakPickOptions {
-                polarity: PeakPolarity::Both,
-                min_abs_intensity: 0.0,
-                min_prominence: 0.0,
-            },
-        };
+        let picker = LocalExtremaPeakPicker::new()
+            .with_options(PeakPickOptions::new().with_polarity(PeakPolarity::Both));
         let peaks = picker.pick(&spectrum)?;
         assert_eq!(
             peaks.iter().map(|peak| peak.polarity).collect::<Vec<_>>(),
@@ -205,6 +242,22 @@ mod tests {
                 PeakPolarity::Negative
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn builder_options_filter_peaks() -> anyhow::Result<()> {
+        let spectrum = spectrum(&[0.0, 3.0, 2.8, 6.0, 2.0])?;
+        let peaks = pick_peaks(
+            &spectrum,
+            PeakPickOptions::new()
+                .with_min_abs_intensity(4.0)
+                .with_min_prominence(2.0)
+                .with_polarity(PeakPolarity::Positive),
+        )?;
+
+        assert_eq!(peaks.len(), 1);
+        assert_close(peaks[0].intensity, 6.0);
         Ok(())
     }
 

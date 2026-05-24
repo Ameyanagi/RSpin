@@ -28,6 +28,33 @@ impl Default for RangeDetectionOptions {
 }
 
 impl RangeDetectionOptions {
+    /// Creates default range-detection options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the minimum absolute intensity for active points.
+    #[must_use]
+    pub fn with_threshold_abs(mut self, threshold_abs: f64) -> Self {
+        self.threshold_abs = threshold_abs;
+        self
+    }
+
+    /// Sets the minimum number of active points in a detected range.
+    #[must_use]
+    pub fn with_min_active_points(mut self, min_active_points: usize) -> Self {
+        self.min_active_points = min_active_points;
+        self
+    }
+
+    /// Sets the number of inactive points allowed inside a range.
+    #[must_use]
+    pub fn with_merge_gap_points(mut self, merge_gap_points: usize) -> Self {
+        self.merge_gap_points = merge_gap_points;
+        self
+    }
+
     fn validate(self) -> Result<()> {
         if !self.threshold_abs.is_finite() {
             return Err(RSpinError::NonFinite {
@@ -72,6 +99,21 @@ pub struct DetectedRange {
 pub struct ThresholdRangeDetector {
     /// Detection options.
     pub options: RangeDetectionOptions,
+}
+
+impl ThresholdRangeDetector {
+    /// Creates a threshold range detector with default options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets range-detection options.
+    #[must_use]
+    pub fn with_options(mut self, options: RangeDetectionOptions) -> Self {
+        self.options = options;
+        self
+    }
 }
 
 impl RangeDetector for ThresholdRangeDetector {
@@ -196,13 +238,12 @@ mod tests {
     #[test]
     fn merges_small_gaps() -> anyhow::Result<()> {
         let spectrum = spectrum(&[0.0, 2.0, 0.1, 3.0, 0.0])?;
-        let detector = ThresholdRangeDetector {
-            options: RangeDetectionOptions {
-                threshold_abs: 1.0,
-                min_active_points: 2,
-                merge_gap_points: 1,
-            },
-        };
+        let detector = ThresholdRangeDetector::new().with_options(
+            RangeDetectionOptions::new()
+                .with_threshold_abs(1.0)
+                .with_min_active_points(2)
+                .with_merge_gap_points(1),
+        );
         let ranges = detector.detect(&spectrum)?;
         assert_eq!(ranges.len(), 1);
         assert_eq!(ranges[0].start_index, 1);

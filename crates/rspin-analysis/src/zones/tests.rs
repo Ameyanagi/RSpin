@@ -46,14 +46,14 @@ fn eight_connectivity_merges_diagonal_points() -> anyhow::Result<()> {
             0.0, 0.0, 5.0,
         ],
     )?;
-    let zones = ThresholdZoneDetector {
-        options: ZoneDetectionOptions {
-            threshold_abs: 1.0,
-            min_active_points: 1,
-            connectivity: ZoneConnectivity::Eight,
-        },
-    }
-    .detect(&spectrum)?;
+    let zones = ThresholdZoneDetector::new()
+        .with_options(
+            ZoneDetectionOptions::new()
+                .with_threshold_abs(1.0)
+                .with_min_active_points(1)
+                .with_connectivity(ZoneConnectivity::Eight),
+        )
+        .detect(&spectrum)?;
 
     assert_eq!(zones.len(), 1);
     assert_eq!(zones[0].active_points, 3);

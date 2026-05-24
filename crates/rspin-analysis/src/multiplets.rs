@@ -35,6 +35,47 @@ impl Default for MultipletDetectionOptions {
 }
 
 impl MultipletDetectionOptions {
+    /// Creates default multiplet-detection options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the maximum adjacent peak gap inside one multiplet, in ppm.
+    #[must_use]
+    pub fn with_max_peak_gap_ppm(mut self, max_peak_gap_ppm: f64) -> Self {
+        self.max_peak_gap_ppm = max_peak_gap_ppm;
+        self
+    }
+
+    /// Sets the minimum number of peaks required for a reported group.
+    #[must_use]
+    pub fn with_min_peak_count(mut self, min_peak_count: usize) -> Self {
+        self.min_peak_count = min_peak_count;
+        self
+    }
+
+    /// Sets whether isolated peaks are reported as singlets.
+    #[must_use]
+    pub fn with_singlets(mut self, include_singlets: bool) -> Self {
+        self.include_singlets = include_singlets;
+        self
+    }
+
+    /// Sets the spectrometer frequency in MHz used for J estimates.
+    #[must_use]
+    pub fn with_spectrometer_mhz(mut self, spectrometer_mhz: f64) -> Self {
+        self.spectrometer_mhz = Some(spectrometer_mhz);
+        self
+    }
+
+    /// Uses spectrum metadata for spectrometer frequency when available.
+    #[must_use]
+    pub fn without_spectrometer_mhz(mut self) -> Self {
+        self.spectrometer_mhz = None;
+        self
+    }
+
     fn validate(self) -> Result<()> {
         require_finite("max_peak_gap_ppm", self.max_peak_gap_ppm)?;
         if self.max_peak_gap_ppm < 0.0 {
@@ -109,6 +150,21 @@ pub struct DetectedMultiplet {
 pub struct GapMultipletDetector {
     /// Detection options.
     pub options: MultipletDetectionOptions,
+}
+
+impl GapMultipletDetector {
+    /// Creates a gap-based multiplet detector with default options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets multiplet-detection options.
+    #[must_use]
+    pub fn with_options(mut self, options: MultipletDetectionOptions) -> Self {
+        self.options = options;
+        self
+    }
 }
 
 impl MultipletDetector for GapMultipletDetector {
