@@ -18,21 +18,22 @@ mod workflow;
 use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
-    AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion,
-    IntegralRegion2D, JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions,
-    PeakPickOptions, RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions,
-    ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones, integrate_region,
-    integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
-    summarize_signals_2d,
+    DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion, IntegralRegion2D,
+    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
+    SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
+    detect_ranges, detect_zones, integrate_region, integrate_region_2d, optimize_peaks_quadratic,
+    pick_peaks, summarize_signals_1d, summarize_signals_2d,
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    read_jcamp_dx_1d, read_nmredata_record_json, read_nmredata_records_json,
-    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
-    read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json,
-    read_spectrum2d_text, write_nmredata_record, write_nmredata_record_json,
-    write_nmredata_records, write_nmredata_records_json as write_nmredata_records_json_io,
-    write_nmrml_1d, write_nmrml_2d, write_spectrum1d_json, write_spectrum2d_json,
+    read_assignment_set_json, read_j_coupling_graph_json, read_jcamp_dx_1d,
+    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
+    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
+    read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json, read_spectrum2d_text,
+    write_assignment_set_json, write_j_coupling_graph_json, write_nmredata_record,
+    write_nmredata_record_json, write_nmredata_records,
+    write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
+    write_spectrum1d_json, write_spectrum2d_json,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -179,7 +180,7 @@ pub fn nmredata_assignments_to_assignment_set_json(
 ) -> Result<String> {
     let record = read_nmredata_record_json(record_json)?;
     let assignments = record.to_assignment_set(parse_nucleus_label(nucleus_label)?)?;
-    to_json(&assignments)
+    write_assignment_set_json(&assignments)
 }
 
 /// Converts `NMReDATA` 1D signal labels into serialized [`AssignmentSet`] JSON.
@@ -194,7 +195,7 @@ pub fn nmredata_1d_signals_to_assignment_set_json(
 ) -> Result<String> {
     let record = read_nmredata_record_json(record_json)?;
     let assignments = record.to_signal_assignment_set(parse_nucleus_label(nucleus_label)?)?;
-    to_json(&assignments)
+    write_assignment_set_json(&assignments)
 }
 
 /// Converts `NMReDATA` 2D signal labels into serialized [`AssignmentSet`] JSON.
@@ -205,7 +206,7 @@ pub fn nmredata_1d_signals_to_assignment_set_json(
 pub fn nmredata_2d_signals_to_assignment_set_json(record_json: &str) -> Result<String> {
     let record = read_nmredata_record_json(record_json)?;
     let assignments = record.to_2d_signal_assignment_set()?;
-    to_json(&assignments)
+    write_assignment_set_json(&assignments)
 }
 
 /// Converts `NMReDATA` record JSON into serialized [`JCouplingGraph`] JSON.
@@ -220,7 +221,7 @@ pub fn nmredata_couplings_to_j_coupling_graph_json(
 ) -> Result<String> {
     let record = read_nmredata_record_json(record_json)?;
     let graph = record.to_j_coupling_graph(parse_nucleus_label(nucleus_label)?)?;
-    to_json(&graph)
+    write_j_coupling_graph_json(&graph)
 }
 
 /// Converts `NMReDATA` record JSON into serialized combined analysis JSON.
@@ -400,9 +401,9 @@ pub fn detect_zones_json(spectrum_json: &str, options_json: &str) -> Result<Stri
 ///
 /// Returns an error when deserialization, validation, or serialization fails.
 pub fn validate_j_coupling_graph_json(graph_json: &str) -> Result<String> {
-    let graph: JCouplingGraph = from_json(graph_json)?;
+    let graph = read_j_coupling_graph_json(graph_json)?;
     graph.validate()?;
-    to_json(&graph)
+    write_j_coupling_graph_json(&graph)
 }
 
 /// Assembles one-dimensional signal summary JSON from analysis payloads.
@@ -421,8 +422,8 @@ pub fn summarize_signals_1d_json(
     let spectrum = spectrum1d_from_json(spectrum_json)?;
     let ranges: Vec<DetectedRange> = from_json(ranges_json)?;
     let multiplets: Vec<DetectedMultiplet> = from_json(multiplets_json)?;
-    let assignments: AssignmentSet = from_json(assignments_json)?;
-    let coupling_graph: JCouplingGraph = from_json(coupling_graph_json)?;
+    let assignments = read_assignment_set_json(assignments_json)?;
+    let coupling_graph = read_j_coupling_graph_json(coupling_graph_json)?;
     let options: SignalSummaryOptions = from_json(options_json)?;
     let signals = summarize_signals_1d(
         &spectrum,
@@ -448,7 +449,7 @@ pub fn summarize_signals_2d_json(
 ) -> Result<String> {
     let spectrum = spectrum2d_from_json(spectrum_json)?;
     let zones: Vec<DetectedZone> = from_json(zones_json)?;
-    let assignments: AssignmentSet = from_json(assignments_json)?;
+    let assignments = read_assignment_set_json(assignments_json)?;
     let options: SignalSummary2DOptions = from_json(options_json)?;
     let signals = summarize_signals_2d(&spectrum, &zones, &assignments, options)?;
     to_json(&signals)

@@ -3,6 +3,7 @@
 mod agilent;
 mod analysis_csv;
 mod analysis_json;
+mod assignment_json;
 mod auto;
 mod bruker;
 mod csv;
@@ -31,6 +32,11 @@ pub use analysis_json::{
     ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION, JsonAnalysis1D,
     JsonAnalysis2D, read_analysis1d_json, read_analysis2d_json, write_analysis1d_json,
     write_analysis2d_json,
+};
+pub use assignment_json::{
+    ASSIGNMENT_JSON_VERSION, ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT,
+    JsonAssignmentSet, JsonJCouplingGraph, read_assignment_set_json, read_j_coupling_graph_json,
+    write_assignment_set_json, write_j_coupling_graph_json,
 };
 pub use auto::{
     AutoSpectrum1DPath, AutoSpectrum1DPathWriter, AutoSpectrum1DText, AutoSpectrum2DPath,

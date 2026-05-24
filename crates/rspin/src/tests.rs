@@ -202,25 +202,7 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
 
 #[test]
 fn prelude_supports_nmredata_import() -> Result<()> {
-    let record = read_nmredata_str(
-        r"
->  <NMREDATA_VERSION>
-1.1
-
->  <NMREDATA_ASSIGNMENT>
-H1, 4.200, H1
-
->  <NMREDATA_J>
-H1, H2, 7.0
-
->  <NMREDATA_1D_1H>
-Larmor=500.0
-4.200, L=H1
-
->  <NMREDATA_2D_13C_1J_1H>
-H1/C1, I=1.0
-",
-    )?;
+    let record = nmredata_prelude_fixture()?;
 
     assert_eq!(
         record.version.as_ref().map(|version| version.major),
@@ -255,8 +237,10 @@ H1/C1, I=1.0
     assert_eq!(read_nmredata_record_json(&record_payload)?, trait_record);
     let assignment_set = trait_record.to_assignment_set(Nucleus::Hydrogen1)?;
     assert_eq!(assignment_set.len(), 1);
+    assert_assignment_json_round_trip(&assignment_set)?;
     let coupling_graph = nmredata_couplings_to_j_coupling_graph(&trait_record, Nucleus::Hydrogen1)?;
     assert_eq!(coupling_graph.couplings.len(), 1);
+    assert_j_coupling_json_round_trip(&coupling_graph)?;
     let analysis: NmreDataAnalysis = nmredata_to_analysis(&trait_record, Nucleus::Hydrogen1)?;
     assert_eq!(analysis.assignment_set.len(), 1);
     assert_eq!(analysis.j_coupling_graph.couplings.len(), 1);
@@ -307,6 +291,46 @@ H1/C1, I=1.0
     );
     assert_eq!(format!("{NmreData:?}"), "NmreData");
     assert_eq!(format!("{NmreDataRecords:?}"), "NmreDataRecords");
+    Ok(())
+}
+
+fn nmredata_prelude_fixture() -> Result<NmreDataRecord> {
+    read_nmredata_str(
+        r"
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+
+>  <NMREDATA_J>
+H1, H2, 7.0
+
+>  <NMREDATA_1D_1H>
+Larmor=500.0
+4.200, L=H1
+
+>  <NMREDATA_2D_13C_1J_1H>
+H1/C1, I=1.0
+",
+    )
+}
+
+fn assert_assignment_json_round_trip(assignment_set: &AssignmentSet) -> Result<()> {
+    let assignment_set_json = write_assignment_set_json(assignment_set)?;
+    assert!(assignment_set_json.contains(ASSIGNMENT_SET_JSON_FORMAT));
+    assert!(assignment_set_json.contains(&format!("\"version\":{ASSIGNMENT_JSON_VERSION}")));
+    assert_eq!(
+        read_assignment_set_json(&assignment_set_json)?,
+        *assignment_set
+    );
+    Ok(())
+}
+
+fn assert_j_coupling_json_round_trip(coupling_graph: &JCouplingGraph) -> Result<()> {
+    let graph_json = write_j_coupling_graph_json(coupling_graph)?;
+    assert!(graph_json.contains(J_COUPLING_GRAPH_JSON_FORMAT));
+    assert_eq!(read_j_coupling_graph_json(&graph_json)?, *coupling_graph);
     Ok(())
 }
 

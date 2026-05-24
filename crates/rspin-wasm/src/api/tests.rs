@@ -1,5 +1,8 @@
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
-use rspin_io::{NMREDATA_RECORD_JSON_FORMAT, NMREDATA_RECORDS_JSON_FORMAT};
+use rspin_io::{
+    ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, NMREDATA_RECORD_JSON_FORMAT,
+    NMREDATA_RECORDS_JSON_FORMAT,
+};
 
 use super::*;
 
@@ -356,27 +359,29 @@ Hcombo/C2, I=2.4
 fn converts_nmredata_analysis_to_json() -> anyhow::Result<()> {
     let record_json = nmredata_analysis_fixture_json()?;
     let assignments_json = nmredata_assignments_to_assignment_set_json(&record_json, "1H")?;
-    let assignments: serde_json::Value = from_json(&assignments_json)?;
-    assert_eq!(assignments["assignments"].as_array().map(Vec::len), Some(2));
-    assert_eq!(assignments["assignments"][0]["atoms"][0]["id"], "H1");
+    assert!(assignments_json.contains(ASSIGNMENT_SET_JSON_FORMAT));
+    let assignments = rspin_io::read_assignment_set_json(&assignments_json)?;
+    assert_eq!(assignments.assignments.len(), 2);
+    assert_eq!(assignments.assignments[0].atoms[0].id, "H1");
     assert_eq!(
-        assignments["assignments"][1]["atoms"][1]["nucleus"],
-        "Hydrogen1"
+        assignments.assignments[1].atoms[1].nucleus,
+        rspin_core::Nucleus::Hydrogen1
     );
-    assert_eq!(
-        assignments["assignments"][0]["target"]["Peak1D"]["index"],
-        0
-    );
-    assert_eq!(assignments["assignments"][0]["target"]["Peak1D"]["x"], 4.2);
+    assert!(matches!(
+        assignments.assignments[0].target,
+        rspin_analysis::AssignmentTarget::Peak1D { index: 0, x }
+            if (x - 4.2).abs() < 1.0e-12
+    ));
 
     let graph_json = nmredata_couplings_to_j_coupling_graph_json(&record_json, "1H")?;
-    let graph: serde_json::Value = from_json(&graph_json)?;
-    assert_eq!(graph["nodes"].as_array().map(Vec::len), Some(2));
-    assert_eq!(graph["nodes"][0]["id"], "H1");
-    assert_eq!(graph["couplings"].as_array().map(Vec::len), Some(1));
-    assert_eq!(graph["couplings"][0]["node_a"], "H1");
-    assert_eq!(graph["couplings"][0]["node_b"], "Hcombo");
-    assert_eq!(graph["couplings"][0]["j_hz"], 7.0);
+    assert!(graph_json.contains(J_COUPLING_GRAPH_JSON_FORMAT));
+    let graph = rspin_io::read_j_coupling_graph_json(&graph_json)?;
+    assert_eq!(graph.nodes.len(), 2);
+    assert_eq!(graph.nodes[0].id, "H1");
+    assert_eq!(graph.couplings.len(), 1);
+    assert_eq!(graph.couplings[0].node_a, "H1");
+    assert_eq!(graph.couplings[0].node_b, "Hcombo");
+    assert!((graph.couplings[0].j_hz - 7.0).abs() < 1.0e-12);
 
     let analysis_json = nmredata_to_analysis_json(&record_json, "1H")?;
     let analysis: serde_json::Value = from_json(&analysis_json)?;
@@ -414,44 +419,35 @@ fn converts_nmredata_analysis_to_json() -> anyhow::Result<()> {
     );
 
     let signal_assignments_json = nmredata_1d_signals_to_assignment_set_json(&record_json, "1H")?;
-    let signal_assignments: serde_json::Value = from_json(&signal_assignments_json)?;
-    assert_eq!(
-        signal_assignments["assignments"].as_array().map(Vec::len),
-        Some(3)
-    );
-    assert_eq!(
-        signal_assignments["assignments"][0]["target"]["Peak1D"]["index"],
-        0
-    );
-    assert_eq!(
-        signal_assignments["assignments"][1]["target"]["Range1D"]["start_index"],
-        1
-    );
-    assert_eq!(signal_assignments["assignments"][1]["atoms"][1]["id"], "H3");
-    assert_eq!(
-        signal_assignments["assignments"][2]["atoms"][0]["id"],
-        "orphan"
-    );
+    let signal_assignments = rspin_io::read_assignment_set_json(&signal_assignments_json)?;
+    assert_eq!(signal_assignments.assignments.len(), 3);
+    assert!(matches!(
+        signal_assignments.assignments[0].target,
+        rspin_analysis::AssignmentTarget::Peak1D { index: 0, .. }
+    ));
+    assert!(matches!(
+        signal_assignments.assignments[1].target,
+        rspin_analysis::AssignmentTarget::Range1D { start_index: 1, .. }
+    ));
+    assert_eq!(signal_assignments.assignments[1].atoms[1].id, "H3");
+    assert_eq!(signal_assignments.assignments[2].atoms[0].id, "orphan");
 
     let signal_assignments_2d_json = nmredata_2d_signals_to_assignment_set_json(&record_json)?;
-    let signal_assignments_2d: serde_json::Value = from_json(&signal_assignments_2d_json)?;
+    let signal_assignments_2d = rspin_io::read_assignment_set_json(&signal_assignments_2d_json)?;
+    assert_eq!(signal_assignments_2d.assignments.len(), 2);
     assert_eq!(
-        signal_assignments_2d["assignments"]
-            .as_array()
-            .map(Vec::len),
-        Some(2)
+        signal_assignments_2d.assignments[0].target,
+        rspin_analysis::AssignmentTarget::Zone2D {
+            id: "nmredata:2d-signal:0:H1:C1".to_owned(),
+        }
     );
     assert_eq!(
-        signal_assignments_2d["assignments"][0]["target"]["Zone2D"]["id"],
-        "nmredata:2d-signal:0:H1:C1"
+        signal_assignments_2d.assignments[0].atoms[0].nucleus,
+        rspin_core::Nucleus::Hydrogen1
     );
     assert_eq!(
-        signal_assignments_2d["assignments"][0]["atoms"][0]["nucleus"],
-        "Hydrogen1"
-    );
-    assert_eq!(
-        signal_assignments_2d["assignments"][0]["atoms"][1]["nucleus"],
-        "Carbon13"
+        signal_assignments_2d.assignments[0].atoms[1].nucleus,
+        rspin_core::Nucleus::Carbon13
     );
     Ok(())
 }
@@ -738,7 +734,8 @@ fn validates_j_coupling_graph_json() -> anyhow::Result<()> {
     let graph_json = validate_j_coupling_graph_json(
         r#"{"nodes":[{"id":"H1","label":"H-1","nucleus":"Hydrogen1"},{"id":"H2","label":null,"nucleus":"Hydrogen1"}],"couplings":[{"id":"j:H1-H2","node_a":"H1","node_b":"H2","j_hz":7.2,"confidence":0.9,"source":"measured"}]}"#,
     )?;
-    let graph: rspin_analysis::JCouplingGraph = from_json(&graph_json)?;
+    assert!(graph_json.contains(J_COUPLING_GRAPH_JSON_FORMAT));
+    let graph = rspin_io::read_j_coupling_graph_json(&graph_json)?;
 
     assert_eq!(graph.nodes.len(), 2);
     assert_eq!(graph.couplings.len(), 1);
@@ -750,7 +747,8 @@ fn validates_assignment_set_json() -> anyhow::Result<()> {
     let assignments_json = validate_assignment_set_json(
         r#"{"assignments":[{"id":"assign:peak1d:2:H2","target":{"Peak1D":{"index":2,"x":7.12}},"atoms":[{"id":"H2","label":null,"nucleus":"Hydrogen1"}],"confidence":0.9,"note":null}]}"#,
     )?;
-    let assignments: rspin_analysis::AssignmentSet = from_json(&assignments_json)?;
+    assert!(assignments_json.contains(ASSIGNMENT_SET_JSON_FORMAT));
+    let assignments = rspin_io::read_assignment_set_json(&assignments_json)?;
 
     assert_eq!(assignments.len(), 1);
     assert_eq!(assignments.assignments[0].id, "assign:peak1d:2:H2");
