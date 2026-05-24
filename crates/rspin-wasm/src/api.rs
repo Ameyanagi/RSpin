@@ -28,15 +28,16 @@ use rspin_analysis::{
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
     inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
-    parse_jcamp_dx_version, parse_spectrum_text_format, parse_spectrum1d_write_format,
-    parse_spectrum2d_write_format, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
-    read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
-    read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes,
-    read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes,
-    read_jeol_jdf_2d_bytes, read_nmredata_record_json, read_nmredata_records_json,
-    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
-    read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text,
-    read_spectrum1d_text_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
+    parse_jcamp_dx_version, parse_spectrum_text_format, parse_spectrum1d_bytes_format,
+    parse_spectrum1d_write_format, parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
+    read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes,
+    read_agilent_processed_2d_bytes, read_assignment_set_json, read_bruker_fid_1d_bytes,
+    read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes,
+    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
+    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
+    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
+    read_spectrum1d_bytes_as, read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as,
+    read_spectrum2d_bytes_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
     write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d,
     write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
@@ -219,6 +220,54 @@ pub fn parse_bruker_ser_2d_bytes_json(
     ser_bytes: &[u8],
 ) -> Result<String> {
     let spectrum = read_bruker_ser_2d_bytes(direct_parameters, indirect_parameters, ser_bytes)?;
+    spectrum2d_to_json(&spectrum)
+}
+
+/// Parses one-dimensional bytes in an explicit format into serialized
+/// `Spectrum1D` JSON.
+///
+/// Parameter text is required for Bruker and Agilent/Varian byte formats.
+///
+/// # Errors
+///
+/// Returns an error when the format name is unsupported, required parameter
+/// text is missing, parsing fails, or serialization fails.
+pub fn parse_spectrum_1d_bytes_as_json(
+    data_bytes: &[u8],
+    format: &str,
+    parameters: Option<&str>,
+) -> Result<String> {
+    let spectrum = read_spectrum1d_bytes_as(
+        data_bytes,
+        parse_spectrum1d_bytes_format(format)?,
+        parameters,
+    )?;
+    spectrum1d_to_json(&spectrum)
+}
+
+/// Parses two-dimensional bytes in an explicit format into serialized
+/// `Spectrum2D` JSON.
+///
+/// Primary parameter text is required for Bruker and Agilent/Varian byte
+/// formats. Bruker two-dimensional byte formats also require indirect
+/// parameter text.
+///
+/// # Errors
+///
+/// Returns an error when the format name is unsupported, required parameter
+/// text is missing, parsing fails, or serialization fails.
+pub fn parse_spectrum_2d_bytes_as_json(
+    data_bytes: &[u8],
+    format: &str,
+    parameters: Option<&str>,
+    indirect_parameters: Option<&str>,
+) -> Result<String> {
+    let spectrum = read_spectrum2d_bytes_as(
+        data_bytes,
+        parse_spectrum2d_bytes_format(format)?,
+        parameters,
+        indirect_parameters,
+    )?;
     spectrum2d_to_json(&spectrum)
 }
 

@@ -10,6 +10,7 @@ mod agilent;
 mod assignments;
 mod bruker;
 mod buckets;
+mod bytes;
 mod clustering;
 mod consensus;
 mod matrix;

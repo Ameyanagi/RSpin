@@ -13,12 +13,12 @@ use crate::{
     parse_bruker_processed_2d_bytes_json, parse_bruker_ser_2d_bytes_json,
     parse_jcamp_dx_version_json, parse_jeol_jdf_1d_bytes_json, parse_jeol_jdf_2d_bytes_json,
     parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json,
-    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
-    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
-    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
-    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
-    write_spectrum_2d_text_json,
+    parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json,
+    parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json, parse_spectrum_2d_csv_json,
+    parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json, write_analysis_1d_csv_json,
+    write_analysis_2d_csv_json, write_nmredata_json, write_nmredata_records_json,
+    write_nmrml_1d_json, write_nmrml_2d_json, write_spectrum_1d_csv_json,
+    write_spectrum_1d_text_json, write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -151,6 +151,56 @@ pub fn parse_bruker_ser_2d_bytes(
 ) -> std::result::Result<String, JsValue> {
     parse_bruker_ser_2d_bytes_json(direct_parameters, indirect_parameters, ser_bytes)
         .map_err(|error| js_error(&error))
+}
+
+/// Parses one-dimensional bytes in an explicit format into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the format is unsupported, required
+/// parameter text is missing, or parsing/serialization fails.
+#[wasm_bindgen(js_name = parseSpectrum1dBytesAs)]
+pub fn parse_spectrum_1d_bytes_as(
+    data_bytes: &[u8],
+    format: &str,
+    parameters: Option<String>,
+) -> std::result::Result<String, JsValue> {
+    match parameters {
+        Some(parameters) => parse_spectrum_1d_bytes_as_json(data_bytes, format, Some(&parameters)),
+        None => parse_spectrum_1d_bytes_as_json(data_bytes, format, None),
+    }
+    .map_err(|error| js_error(&error))
+}
+
+/// Parses two-dimensional bytes in an explicit format into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the format is unsupported, required
+/// parameter text is missing, or parsing/serialization fails.
+#[wasm_bindgen(js_name = parseSpectrum2dBytesAs)]
+pub fn parse_spectrum_2d_bytes_as(
+    data_bytes: &[u8],
+    format: &str,
+    parameters: Option<String>,
+    indirect_parameters: Option<String>,
+) -> std::result::Result<String, JsValue> {
+    match (parameters, indirect_parameters) {
+        (Some(parameters), Some(indirect_parameters)) => parse_spectrum_2d_bytes_as_json(
+            data_bytes,
+            format,
+            Some(&parameters),
+            Some(&indirect_parameters),
+        ),
+        (Some(parameters), None) => {
+            parse_spectrum_2d_bytes_as_json(data_bytes, format, Some(&parameters), None)
+        }
+        (None, Some(indirect_parameters)) => {
+            parse_spectrum_2d_bytes_as_json(data_bytes, format, None, Some(&indirect_parameters))
+        }
+        (None, None) => parse_spectrum_2d_bytes_as_json(data_bytes, format, None, None),
+    }
+    .map_err(|error| js_error(&error))
 }
 
 /// Parses JEOL Delta `.jdf` bytes into serialized one-dimensional spectrum JSON.
