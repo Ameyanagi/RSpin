@@ -47,7 +47,7 @@ where
 }
 
 /// Writes a spectrum-like value to a string payload.
-pub trait SpectrumWriter<S> {
+pub trait SpectrumWriter<S: ?Sized> {
     /// Writes a value to a string.
     ///
     /// # Errors
@@ -57,7 +57,7 @@ pub trait SpectrumWriter<S> {
 }
 
 /// Writes a spectrum-like value to a filesystem path.
-pub trait SpectrumPathWriter<S>: SpectrumWriter<S> {
+pub trait SpectrumPathWriter<S: ?Sized>: SpectrumWriter<S> {
     /// Writes a value to a path.
     ///
     /// # Errors
@@ -73,4 +73,4 @@ pub trait SpectrumPathWriter<S>: SpectrumWriter<S> {
     }
 }
 
-impl<T, S> SpectrumPathWriter<S> for T where T: SpectrumWriter<S> {}
+impl<T, S: ?Sized> SpectrumPathWriter<S> for T where T: SpectrumWriter<S> {}

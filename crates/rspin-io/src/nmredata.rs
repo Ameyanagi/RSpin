@@ -5,6 +5,8 @@ use std::{collections::BTreeMap, fs, path::Path, str::FromStr};
 use rspin_core::{Nucleus, RSpinError, Result};
 use serde::{Deserialize, Serialize};
 
+use crate::{SpectrumReader, SpectrumWriter};
+
 mod writer;
 
 pub use writer::{
@@ -97,6 +99,26 @@ impl NmreData {
         path: impl AsRef<Path>,
     ) -> Result<()> {
         write_nmredata_records_file(records, path)
+    }
+}
+
+impl SpectrumReader for NmreData {
+    type Output = NmreDataRecord;
+
+    fn read_str(&self, input: &str) -> Result<Self::Output> {
+        read_nmredata_str(input)
+    }
+}
+
+impl SpectrumWriter<NmreDataRecord> for NmreData {
+    fn write_string(&self, record: &NmreDataRecord) -> Result<String> {
+        write_nmredata_record(record)
+    }
+}
+
+impl SpectrumWriter<[NmreDataRecord]> for NmreData {
+    fn write_string(&self, records: &[NmreDataRecord]) -> Result<String> {
+        write_nmredata_records(records)
     }
 }
 

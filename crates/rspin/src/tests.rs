@@ -240,6 +240,13 @@ Larmor=500.0
     let nmredata_text = write_nmredata_record(&record)?;
     let reparsed = read_nmredata_str(&nmredata_text)?;
     assert!((reparsed.assignments[0].shift_ppm - 4.2).abs() < 1.0e-12);
+    let trait_record = SpectrumReader::read_str(&NmreData, &nmredata_text)?;
+    let trait_text = SpectrumWriter::write_string(&NmreData, &trait_record)?;
+    assert!(trait_text.contains(">  <NMREDATA_VERSION>"));
+    let records = vec![trait_record];
+    let records_text =
+        <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;
+    assert_eq!(records_text.matches("$$$$").count(), 1);
     assert_eq!(format!("{NmreData:?}"), "NmreData");
     Ok(())
 }

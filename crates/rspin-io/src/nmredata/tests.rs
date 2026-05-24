@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use rspin_core::{Nucleus, RSpinError};
 
 use super::*;
+use crate::{SpectrumPathWriter, SpectrumReader, SpectrumWriter};
 
 #[test]
 fn parses_header_assignments_couplings_and_spectra() -> anyhow::Result<()> {
@@ -181,6 +182,45 @@ $$$$
         Some("1.0")
     );
     assert_eq!(reparsed[1].formula.as_deref(), Some("C2H6O"));
+    Ok(())
+}
+
+#[test]
+fn supports_shared_io_traits() -> anyhow::Result<()> {
+    let input = r"
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+";
+    let record = SpectrumReader::read_str(&NmreData, input)?;
+    let text = SpectrumWriter::write_string(&NmreData, &record)?;
+    let reparsed = read_nmredata_str(&text)?;
+    assert_eq!(
+        reparsed
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.1")
+    );
+
+    let records = vec![record.clone(), record];
+    let records_text =
+        <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;
+    assert_eq!(records_text.matches("$$$$").count(), 2);
+
+    let path = std::env::temp_dir().join(format!(
+        "rspin-nmredata-trait-{}-{}.sdf",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos()
+    ));
+    <NmreData as SpectrumPathWriter<[NmreDataRecord]>>::write_path(&NmreData, &records, &path)?;
+    let from_file = read_nmredata_records_str(&std::fs::read_to_string(&path)?)?;
+    assert_eq!(from_file.len(), 2);
+    std::fs::remove_file(path)?;
     Ok(())
 }
 
