@@ -256,6 +256,45 @@ fn writes_readable_xydata_spectrum() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_sample_metadata_labels() -> anyhow::Result<()> {
+    let x = Axis::linear("shift", Unit::Ppm, 1.0, 2.0, 2)?;
+    let metadata = Metadata::named("with metadata")
+        .with_origin("local export")
+        .with_solvent("DMSO-D6")
+        .with_temperature_k(298.15)
+        .with_nucleus(Nucleus::Carbon13)
+        .with_frequency_mhz(100.5);
+    let spectrum = Spectrum1D::new(x, vec![2.0, 4.0], metadata)?;
+
+    let text = write_jcamp_dx_1d(&spectrum)?;
+
+    assert!(text.contains("##ORIGIN=local export"));
+    assert!(text.contains("##.SOLVENT NAME=DMSO-D6"));
+    assert!(text.contains("##TEMPERATURE=298.15 K"));
+    let parsed = read_jcamp_dx_1d(&text)?;
+    assert_eq!(parsed.metadata.origin.as_deref(), Some("local export"));
+    assert_eq!(parsed.metadata.solvent.as_deref(), Some("DMSO-D6"));
+    assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(parsed.metadata.frequency_mhz, Some(100.5));
+    assert_close(parsed.metadata.temperature_k, Some(298.15));
+    Ok(())
+}
+
+#[test]
+fn rejects_non_finite_writer_metadata() -> anyhow::Result<()> {
+    let x = Axis::linear("shift", Unit::Ppm, 1.0, 2.0, 2)?;
+    let spectrum = Spectrum1D::new(
+        x,
+        vec![2.0, 4.0],
+        Metadata::named("bad").with_temperature_k(f64::NAN),
+    )?;
+
+    let error = write_jcamp_dx_1d(&spectrum).expect_err("non-finite metadata should fail");
+    assert!(matches!(error, RSpinError::NonFinite { .. }));
+    Ok(())
+}
+
+#[test]
 fn writes_xypoints_for_non_uniform_axis() -> anyhow::Result<()> {
     let x = Axis::new("shift", Unit::Ppm, vec![0.0, 0.4, 1.5, 1.9])?;
     let spectrum = Spectrum1D::new(x, vec![2.0, 4.0, 8.0, 16.0], Metadata::named("nonlinear"))?;

@@ -11,11 +11,7 @@ use rspin_core::{RSpinError, Result, Spectrum1D, Unit};
 ///
 /// Returns an error when the spectrum axis or data contains non-finite values.
 pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
-    if !spectrum.x.values.iter().all(|value| value.is_finite())
-        || !spectrum.intensities.iter().all(|value| value.is_finite())
-    {
-        return Err(RSpinError::NonFinite { field: "spectrum" });
-    }
+    validate_finite_spectrum(spectrum)?;
 
     let title = option_ref_or(spectrum.metadata.name.as_deref(), "untitled");
     let first_x =
@@ -40,6 +36,19 @@ pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
     push_label(&mut output, "TITLE", title);
     push_label(&mut output, "JCAMP-DX", "5.00");
     push_label(&mut output, "DATA TYPE", "NMR SPECTRUM");
+    if let Some(origin) = spectrum.metadata.origin.as_deref() {
+        push_label(&mut output, "ORIGIN", origin);
+    }
+    if let Some(solvent) = spectrum.metadata.solvent.as_deref() {
+        push_label(&mut output, ".SOLVENT NAME", solvent);
+    }
+    if let Some(temperature_k) = spectrum.metadata.temperature_k {
+        push_label(
+            &mut output,
+            "TEMPERATURE",
+            &format!("{} K", format_float(temperature_k)),
+        );
+    }
     if let Some(nucleus) = &spectrum.metadata.nucleus {
         push_label(&mut output, "OBSERVE NUCLEUS", nucleus.as_label());
     }
@@ -63,6 +72,25 @@ pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
     output.push_str("##END=\n");
 
     Ok(output)
+}
+
+fn validate_finite_spectrum(spectrum: &Spectrum1D) -> Result<()> {
+    if !spectrum.x.values.iter().all(|value| value.is_finite())
+        || !spectrum.intensities.iter().all(|value| value.is_finite())
+    {
+        return Err(RSpinError::NonFinite { field: "spectrum" });
+    }
+    if !spectrum.metadata.frequency_mhz.is_none_or(f64::is_finite) {
+        return Err(RSpinError::NonFinite {
+            field: "frequency_mhz",
+        });
+    }
+    if !spectrum.metadata.temperature_k.is_none_or(f64::is_finite) {
+        return Err(RSpinError::NonFinite {
+            field: "temperature_k",
+        });
+    }
+    Ok(())
 }
 
 fn write_xydata_block(output: &mut String, spectrum: &Spectrum1D) {
