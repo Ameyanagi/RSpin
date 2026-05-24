@@ -34,6 +34,15 @@ fn round_trips_one_dimensional_analysis_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_one_dimensional_analysis_json_without_optimized_peaks() -> anyhow::Result<()> {
+    let analysis =
+        read_analysis1d_json(r#"{"peaks":[],"ranges":[],"multiplets":[],"signals":[]}"#)?;
+
+    assert!(analysis.optimized_peaks.is_empty());
+    Ok(())
+}
+
+#[test]
 fn round_trips_two_dimensional_analysis_json() -> anyhow::Result<()> {
     let spectrum = Spectrum2D::new(
         Axis::linear("1H", Unit::Ppm, 0.0, 2.0, 3)?,

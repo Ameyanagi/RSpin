@@ -3,11 +3,11 @@
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    AssignmentSet, JCouplingGraph, MultipletDetectionOptions, PeakPickOptions,
-    RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions, SpectrumAnalysis1D,
-    SpectrumAnalysis1DOptions, SpectrumAnalysis2D, SpectrumAnalysis2DOptions, ZoneDetectionOptions,
-    analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d, analyze_spectrum_1d,
-    analyze_spectrum_2d,
+    AssignmentSet, JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions,
+    PeakPickOptions, RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions,
+    SpectrumAnalysis1D, SpectrumAnalysis1DOptions, SpectrumAnalysis2D, SpectrumAnalysis2DOptions,
+    ZoneDetectionOptions, analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d,
+    analyze_spectrum_1d, analyze_spectrum_2d,
 };
 
 /// Extension trait for chainable one-dimensional spectrum analysis.
@@ -94,6 +94,23 @@ impl<'a> SpectrumAnalysis1DWorkflow<'a> {
     #[must_use]
     pub fn with_peak_options(mut self, peak_options: PeakPickOptions) -> Self {
         self.options.peak_options = peak_options;
+        self
+    }
+
+    /// Enables quadratic peak optimization.
+    #[must_use]
+    pub fn with_peak_optimization_options(
+        mut self,
+        peak_optimization_options: PeakOptimizationOptions,
+    ) -> Self {
+        self.options.peak_optimization_options = Some(peak_optimization_options);
+        self
+    }
+
+    /// Disables peak optimization.
+    #[must_use]
+    pub fn without_peak_optimization(mut self) -> Self {
+        self.options.peak_optimization_options = None;
         self
     }
 
@@ -194,6 +211,23 @@ impl<'a, 'c> SpectrumAnalysis1DResultWorkflow<'a, 'c> {
     #[must_use]
     pub fn with_peak_options(mut self, peak_options: PeakPickOptions) -> Self {
         self.options.peak_options = peak_options;
+        self
+    }
+
+    /// Enables quadratic peak optimization.
+    #[must_use]
+    pub fn with_peak_optimization_options(
+        mut self,
+        peak_optimization_options: PeakOptimizationOptions,
+    ) -> Self {
+        self.options.peak_optimization_options = Some(peak_optimization_options);
+        self
+    }
+
+    /// Disables peak optimization.
+    #[must_use]
+    pub fn without_peak_optimization(mut self) -> Self {
+        self.options.peak_optimization_options = None;
         self
     }
 

@@ -3,9 +3,9 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Spectrum1D, Spectrum2D, Un
 use crate::{
     AnalyzeSpectrum1D, AnalyzeSpectrum1DResult, AnalyzeSpectrum2D, AnalyzeSpectrum2DResult,
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, CouplingNode, JCoupling,
-    JCouplingGraph, MultipletDetectionOptions, PeakPickOptions, PeakPolarity,
-    RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions, SpectrumAnalysis1DOptions,
-    SpectrumAnalysis2DOptions, ZoneConnectivity, ZoneDetectionOptions,
+    JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions,
+    PeakPolarity, RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions,
+    SpectrumAnalysis1DOptions, SpectrumAnalysis2DOptions, ZoneConnectivity, ZoneDetectionOptions,
     analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d, analyze_spectrum_1d,
     analyze_spectrum_2d,
 };
@@ -30,10 +30,37 @@ fn analyzes_one_dimensional_spectrum_with_defaults() -> anyhow::Result<()> {
     let analysis = analyze_spectrum_1d(&spectrum, options)?;
 
     assert_eq!(analysis.peaks.len(), 2);
+    assert!(analysis.optimized_peaks.is_empty());
     assert_eq!(analysis.ranges.len(), 2);
     assert_eq!(analysis.multiplets.len(), 1);
     assert_eq!(analysis.signals.len(), 2);
     assert_eq!(analysis.multiplets[0].estimated_j_hz, Some(800.0));
+    Ok(())
+}
+
+#[test]
+fn analyzes_one_dimensional_spectrum_with_peak_optimization() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new(
+        Axis::new("shift", Unit::Ppm, vec![0.0, 0.4, 1.0])?,
+        vec![0.75, 1.0, 0.75],
+        Metadata::named("optimized"),
+    )?;
+    let options = SpectrumAnalysis1DOptions::new()
+        .with_peak_options(
+            PeakPickOptions::new()
+                .with_min_abs_intensity(0.5)
+                .with_min_prominence(0.1)
+                .with_polarity(PeakPolarity::Positive),
+        )
+        .with_peak_optimization_options(PeakOptimizationOptions::new());
+
+    let analysis = analyze_spectrum_1d(&spectrum, options)?;
+
+    assert_eq!(analysis.peaks.len(), 1);
+    assert_eq!(analysis.optimized_peaks.len(), 1);
+    assert!(analysis.optimized_peaks[0].optimized);
+    assert!((analysis.optimized_peaks[0].x - 0.5).abs() < 1.0e-12);
+    assert!((analysis.optimized_peaks[0].delta_x - 0.1).abs() < 1.0e-12);
     Ok(())
 }
 
@@ -111,12 +138,14 @@ fn runs_chainable_one_dimensional_workflow() -> anyhow::Result<()> {
         .analyze()
         .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(1.0))
         .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0))
+        .with_peak_optimization_options(PeakOptimizationOptions::new())
         .with_multiplet_options(MultipletDetectionOptions::new().with_max_peak_gap_ppm(2.1))
         .with_assignments(&assignments)
         .with_coupling_graph(&graph)
         .run()?;
 
     assert_eq!(analysis.peaks.len(), 2);
+    assert_eq!(analysis.optimized_peaks.len(), 2);
     assert_eq!(analysis.signals[0].atoms[0].id, "H2");
     assert_eq!(analysis.signals[0].couplings.len(), 1);
 
@@ -124,11 +153,14 @@ fn runs_chainable_one_dimensional_workflow() -> anyhow::Result<()> {
         .analyze()
         .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(1.0))
         .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0))
+        .with_peak_optimization_options(PeakOptimizationOptions::new())
         .with_assignments(&assignments)
         .with_coupling_graph(&graph)
+        .without_peak_optimization()
         .without_coupling_graph()
         .run()?;
     assert!(analysis_without_couplings.signals[0].couplings.is_empty());
+    assert!(analysis_without_couplings.optimized_peaks.is_empty());
 
     let analysis_without_assignments = spectrum
         .analyze()

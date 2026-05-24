@@ -76,6 +76,7 @@ fn writes_analysis_csv_json() -> anyhow::Result<()> {
             prominence: 1.5,
             polarity: rspin_analysis::PeakPolarity::Positive,
         }],
+        optimized_peaks: Vec::new(),
         ranges: Vec::new(),
         multiplets: Vec::new(),
         signals: Vec::new(),

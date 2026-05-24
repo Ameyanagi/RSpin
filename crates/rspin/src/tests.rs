@@ -288,10 +288,12 @@ fn prelude_supports_simple_analysis_workflows() -> Result<()> {
         )?,
         SpectrumAnalysis1DOptions::new()
             .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(1.0))
+            .with_peak_optimization_options(PeakOptimizationOptions::new())
             .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0)),
     )?;
 
     assert_eq!(analysis.peaks.len(), 2);
+    assert_eq!(analysis.optimized_peaks.len(), 2);
     assert_eq!(analysis.ranges.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
     let analysis_csv = write_analysis1d_csv(&analysis)?;

@@ -1,7 +1,7 @@
 use rspin_analysis::{
     AnalyzeSpectrum1D, AnalyzeSpectrum2D, AssignedAtom, Assignment, AssignmentSet,
-    AssignmentTarget, CouplingNode, JCoupling, JCouplingGraph, PeakPickOptions,
-    RangeDetectionOptions, ZoneDetectionOptions,
+    AssignmentTarget, CouplingNode, JCoupling, JCouplingGraph, PeakOptimizationOptions,
+    PeakPickOptions, RangeDetectionOptions, ZoneDetectionOptions,
 };
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Spectrum1D, Spectrum2D, Unit};
 
@@ -35,6 +35,7 @@ fn writes_one_dimensional_analysis_csv() -> anyhow::Result<()> {
     let analysis = spectrum
         .analyze()
         .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(1.0))
+        .with_peak_optimization_options(PeakOptimizationOptions::new())
         .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0))
         .with_assignments(&assignments)
         .with_coupling_graph(&graph)
@@ -45,6 +46,8 @@ fn writes_one_dimensional_analysis_csv() -> anyhow::Result<()> {
     assert!(csv.starts_with("# format=RSpin Analysis 1D CSV\n"));
     assert!(csv.contains("# section=peaks\n"));
     assert!(csv.contains("index,x,intensity,prominence,polarity\n"));
+    assert!(csv.contains("# section=optimized_peaks\n"));
+    assert!(csv.contains("optimized_x,optimized_intensity,delta_x,curvature,optimized"));
     assert!(csv.contains("# section=ranges\n"));
     assert!(csv.contains("# section=multiplets\n"));
     assert!(csv.contains("# section=signals\n"));
@@ -100,6 +103,7 @@ fn rejects_non_finite_analysis_values() {
             prominence: 1.0,
             polarity: rspin_analysis::PeakPolarity::Positive,
         }],
+        optimized_peaks: Vec::new(),
         ranges: Vec::new(),
         multiplets: Vec::new(),
         signals: Vec::new(),

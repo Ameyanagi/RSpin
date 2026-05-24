@@ -6,10 +6,10 @@ use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, JCouplingGraph,
-    MultipletDetectionOptions, Peak, PeakPickOptions, RangeDetectionOptions, SignalSummary1D,
-    SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions,
-    detect_multiplets, detect_ranges, detect_zones, pick_peaks, summarize_signals_1d,
-    summarize_signals_2d,
+    MultipletDetectionOptions, OptimizedPeak, Peak, PeakOptimizationOptions, PeakPickOptions,
+    RangeDetectionOptions, SignalSummary1D, SignalSummary2D, SignalSummary2DOptions,
+    SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones,
+    optimize_peaks_quadratic, pick_peaks, summarize_signals_1d, summarize_signals_2d,
 };
 
 mod builder;
@@ -25,6 +25,9 @@ pub use builder::{
 pub struct SpectrumAnalysis1DOptions {
     /// Peak picking options.
     pub peak_options: PeakPickOptions,
+    /// Optional peak optimization options.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peak_optimization_options: Option<PeakOptimizationOptions>,
     /// Range detection options.
     pub range_options: RangeDetectionOptions,
     /// Multiplet grouping options.
@@ -44,6 +47,23 @@ impl SpectrumAnalysis1DOptions {
     #[must_use]
     pub fn with_peak_options(mut self, peak_options: PeakPickOptions) -> Self {
         self.peak_options = peak_options;
+        self
+    }
+
+    /// Enables quadratic peak optimization.
+    #[must_use]
+    pub fn with_peak_optimization_options(
+        mut self,
+        peak_optimization_options: PeakOptimizationOptions,
+    ) -> Self {
+        self.peak_optimization_options = Some(peak_optimization_options);
+        self
+    }
+
+    /// Disables peak optimization.
+    #[must_use]
+    pub fn without_peak_optimization(mut self) -> Self {
+        self.peak_optimization_options = None;
         self
     }
 
@@ -74,6 +94,9 @@ impl SpectrumAnalysis1DOptions {
 pub struct SpectrumAnalysis1D {
     /// Picked peaks.
     pub peaks: Vec<Peak>,
+    /// Optimized peak positions, emitted when peak optimization is enabled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub optimized_peaks: Vec<OptimizedPeak>,
     /// Detected threshold ranges.
     pub ranges: Vec<DetectedRange>,
     /// Multiplets grouped from picked peaks.
@@ -153,6 +176,12 @@ pub fn analyze_assigned_spectrum_1d(
     options: SpectrumAnalysis1DOptions,
 ) -> Result<SpectrumAnalysis1D> {
     let peaks = pick_peaks(spectrum, options.peak_options)?;
+    let optimized_peaks = match options.peak_optimization_options {
+        Some(peak_optimization_options) => {
+            optimize_peaks_quadratic(spectrum, &peaks, peak_optimization_options)?
+        }
+        None => Vec::new(),
+    };
     let ranges = detect_ranges(spectrum, options.range_options)?;
     let multiplets = detect_multiplets(spectrum, &peaks, options.multiplet_options)?;
     let signals = summarize_signals_1d(
@@ -166,6 +195,7 @@ pub fn analyze_assigned_spectrum_1d(
 
     Ok(SpectrumAnalysis1D {
         peaks,
+        optimized_peaks,
         ranges,
         multiplets,
         signals,

@@ -11,11 +11,12 @@ fn analyzes_spectrum_1d_json() -> anyhow::Result<()> {
     )?;
     let analysis_json = analyze_spectrum_1d_json(
         &to_json(&spectrum)?,
-        r#"{"peak_options":{"min_abs_intensity":1.0,"min_prominence":0.0,"polarity":"Positive"},"range_options":{"threshold_abs":1.0,"min_active_points":1,"merge_gap_points":0},"multiplet_options":{"max_peak_gap_ppm":1.1,"min_peak_count":1,"include_singlets":true,"spectrometer_mhz":400.0},"signal_options":{"include_empty_ranges":true,"include_orphan_multiplets":true}}"#,
+        r#"{"peak_options":{"min_abs_intensity":1.0,"min_prominence":0.0,"polarity":"Positive"},"peak_optimization_options":{"require_vertex_inside":true,"require_matching_curvature":true},"range_options":{"threshold_abs":1.0,"min_active_points":1,"merge_gap_points":0},"multiplet_options":{"max_peak_gap_ppm":1.1,"min_peak_count":1,"include_singlets":true,"spectrometer_mhz":400.0},"signal_options":{"include_empty_ranges":true,"include_orphan_multiplets":true}}"#,
     )?;
     let analysis: rspin_analysis::SpectrumAnalysis1D = from_json(&analysis_json)?;
 
     assert_eq!(analysis.peaks.len(), 2);
+    assert_eq!(analysis.optimized_peaks.len(), 2);
     assert_eq!(analysis.ranges.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
     Ok(())

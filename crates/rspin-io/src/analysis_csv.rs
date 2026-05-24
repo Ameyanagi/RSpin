@@ -1,8 +1,8 @@
 //! CSV export for analysis workflow results.
 
 use rspin_analysis::{
-    DetectedMultiplet, DetectedRange, DetectedZone, Peak, SignalSummary1D, SignalSummary2D,
-    SpectrumAnalysis1D, SpectrumAnalysis2D,
+    DetectedMultiplet, DetectedRange, DetectedZone, OptimizedPeak, Peak, SignalSummary1D,
+    SignalSummary2D, SpectrumAnalysis1D, SpectrumAnalysis2D,
 };
 use rspin_core::{RSpinError, Result};
 
@@ -30,9 +30,9 @@ impl SpectrumWriter<SpectrumAnalysis2D> for CsvAnalysis2D {
 
 /// Writes a one-dimensional analysis workflow result as multi-section CSV.
 ///
-/// The output contains separate `peaks`, `ranges`, `multiplets`, and `signals`
-/// sections, each with its own header row. Comment rows beginning with `#`
-/// identify the file format and section boundaries.
+/// The output contains separate `peaks`, `optimized_peaks`, `ranges`,
+/// `multiplets`, and `signals` sections, each with its own header row. Comment
+/// rows beginning with `#` identify the file format and section boundaries.
 ///
 /// # Errors
 ///
@@ -41,6 +41,7 @@ pub fn write_analysis1d_csv(analysis: &SpectrumAnalysis1D) -> Result<String> {
     let mut output = String::new();
     output.push_str("# format=RSpin Analysis 1D CSV\n");
     write_peaks(&mut output, &analysis.peaks)?;
+    write_optimized_peaks(&mut output, &analysis.optimized_peaks)?;
     write_ranges(&mut output, &analysis.ranges)?;
     write_multiplets(&mut output, &analysis.multiplets)?;
     write_signals_1d(&mut output, &analysis.signals)?;
@@ -79,6 +80,39 @@ fn write_peaks(output: &mut String, peaks: &[Peak]) -> Result<()> {
                 finite("peak intensity", peak.intensity)?,
                 finite("peak prominence", peak.prominence)?,
                 format!("{:?}", peak.polarity),
+            ],
+        );
+    }
+    Ok(())
+}
+
+fn write_optimized_peaks(output: &mut String, optimized_peaks: &[OptimizedPeak]) -> Result<()> {
+    section(output, "optimized_peaks");
+    row(
+        output,
+        [
+            "index",
+            "original_x",
+            "original_intensity",
+            "optimized_x",
+            "optimized_intensity",
+            "delta_x",
+            "curvature",
+            "optimized",
+        ],
+    );
+    for peak in optimized_peaks {
+        row(
+            output,
+            &[
+                peak.peak.index.to_string(),
+                finite("optimized peak original x", peak.peak.x)?,
+                finite("optimized peak original intensity", peak.peak.intensity)?,
+                finite("optimized peak x", peak.x)?,
+                finite("optimized peak intensity", peak.intensity)?,
+                finite("optimized peak delta_x", peak.delta_x)?,
+                optional_finite("optimized peak curvature", peak.curvature)?,
+                peak.optimized.to_string(),
             ],
         );
     }
