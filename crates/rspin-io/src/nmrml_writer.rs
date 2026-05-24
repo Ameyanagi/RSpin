@@ -43,14 +43,16 @@ impl SpectrumWriter<Spectrum1D> for NmrMl1D {
 ///
 /// Uniform real spectra are emitted as little-endian `float64` y-value arrays.
 /// Non-uniform real spectra are emitted as little-endian `complex128` x/y
-/// pairs so coordinates round-trip without resampling.
+/// pairs so coordinates round-trip without resampling. Complex spectra are
+/// emitted as one-dimensional `fidData` when their axis is representable as
+/// seconds or standard point indices.
 ///
 /// # Errors
 ///
 /// Returns an error when the spectrum contains non-finite values or cannot yet
 /// be represented by `RSpin`'s focused nmrML writer.
 pub fn write_nmrml_1d(spectrum: &Spectrum1D) -> Result<String> {
-    validate_exportable(spectrum)?;
+    let fid_sweep_width_hz = validate_exportable(spectrum)?;
 
     let mut output = String::new();
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -58,8 +60,12 @@ pub fn write_nmrml_1d(spectrum: &Spectrum1D) -> Result<String> {
         output,
         "<nmrML version=\"{VERSION}\" xmlns=\"{NAMESPACE}\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"{NAMESPACE} nmrML.xsd\">"
     );
-    write_acquisition(&mut output, spectrum);
-    write_spectrum(&mut output, spectrum)?;
+    write_acquisition(&mut output, spectrum, fid_sweep_width_hz)?;
+    if spectrum.imaginary.is_some() {
+        write_fid_spectrum_stub(&mut output, spectrum);
+    } else {
+        write_spectrum(&mut output, spectrum)?;
+    }
     output.push_str("</nmrML>\n");
     Ok(output)
 }
@@ -79,16 +85,25 @@ pub fn write_nmrml_1d_file(spectrum: &Spectrum1D, path: impl AsRef<Path>) -> Res
     })
 }
 
-fn validate_exportable(spectrum: &Spectrum1D) -> Result<()> {
-    if spectrum.imaginary.is_some() {
-        return Err(RSpinError::Unsupported {
-            feature: "complex nmrML 1D spectrum export",
-        });
-    }
+fn validate_exportable(spectrum: &Spectrum1D) -> Result<Option<f64>> {
     if !spectrum.x.values.iter().all(|value| value.is_finite())
         || !spectrum.intensities.iter().all(|value| value.is_finite())
     {
         return Err(RSpinError::NonFinite { field: "spectrum" });
+    }
+    if let Some(imaginary) = spectrum.imaginary.as_deref() {
+        if imaginary.len() != spectrum.len() {
+            return Err(RSpinError::InvalidSpectrum {
+                message: format!(
+                    "imaginary data has {} points but spectrum has {} points",
+                    imaginary.len(),
+                    spectrum.len()
+                ),
+            });
+        }
+        if !imaginary.iter().all(|value| value.is_finite()) {
+            return Err(RSpinError::NonFinite { field: "imaginary" });
+        }
     }
     if !spectrum.metadata.frequency_mhz.is_none_or(f64::is_finite) {
         return Err(RSpinError::NonFinite {
@@ -100,10 +115,14 @@ fn validate_exportable(spectrum: &Spectrum1D) -> Result<()> {
             field: "temperature_k",
         });
     }
-    Ok(())
+    fid_sweep_width_hz(spectrum)
 }
 
-fn write_acquisition(output: &mut String, spectrum: &Spectrum1D) {
+fn write_acquisition(
+    output: &mut String,
+    spectrum: &Spectrum1D,
+    fid_sweep_width_hz: Option<f64>,
+) -> Result<()> {
     output.push_str("  <acquisition>\n");
     output.push_str("    <acquisition1D>\n");
     output.push_str("      <acquisitionParameterSet>\n");
@@ -133,6 +152,13 @@ fn write_acquisition(output: &mut String, spectrum: &Spectrum1D) {
             format_float(frequency_mhz)
         );
     }
+    if let Some(sweep_width_hz) = fid_sweep_width_hz {
+        let _ = writeln!(
+            output,
+            "          <sweepWidth value=\"{}\" unitName=\"hertz\"/>",
+            format_float(sweep_width_hz)
+        );
+    }
     output.push_str("        </DirectDimensionParameterSet>\n");
     if let Some(solvent) = spectrum.metadata.solvent.as_deref() {
         let _ = writeln!(
@@ -142,8 +168,10 @@ fn write_acquisition(output: &mut String, spectrum: &Spectrum1D) {
         );
     }
     output.push_str("      </acquisitionParameterSet>\n");
+    write_fid_data(output, spectrum)?;
     output.push_str("    </acquisition1D>\n");
     output.push_str("  </acquisition>\n");
+    Ok(())
 }
 
 fn write_spectrum(output: &mut String, spectrum: &Spectrum1D) -> Result<()> {
@@ -168,6 +196,34 @@ fn write_spectrum(output: &mut String, spectrum: &Spectrum1D) -> Result<()> {
     write_axis(output, spectrum)?;
     output.push_str("    </spectrum1D>\n");
     output.push_str("  </spectrumList>\n");
+    Ok(())
+}
+
+fn write_fid_spectrum_stub(output: &mut String, spectrum: &Spectrum1D) {
+    output.push_str("  <spectrumList count=\"1\">\n");
+    output.push_str("    <spectrum1D id=\"fid1\"");
+    if let Some(name) = spectrum.metadata.name.as_deref() {
+        let _ = write!(output, " name=\"{}\"", escape_xml_attr(name));
+    }
+    let _ = writeln!(output, " numberOfDataPoints=\"{}\"/>", spectrum.len());
+    output.push_str("  </spectrumList>\n");
+}
+
+fn write_fid_data(output: &mut String, spectrum: &Spectrum1D) -> Result<()> {
+    if spectrum.imaginary.is_none() {
+        return Ok(());
+    }
+
+    let binary = fid_binary(spectrum)?;
+    let encoded = STANDARD.encode(&binary.bytes);
+    let _ = write!(
+        output,
+        "      <fidData compressed=\"false\" encodedLength=\"{}\" byteFormat=\"{}\">",
+        encoded.len(),
+        binary.byte_format
+    );
+    output.push_str(&encoded);
+    output.push_str("</fidData>\n");
     Ok(())
 }
 
@@ -197,6 +253,24 @@ fn spectrum_binary(spectrum: &Spectrum1D) -> SpectrumBinary {
             bytes,
         }
     }
+}
+
+fn fid_binary(spectrum: &Spectrum1D) -> Result<SpectrumBinary> {
+    let imaginary = spectrum
+        .imaginary
+        .as_deref()
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "missing imaginary data for nmrML fidData export".to_owned(),
+        })?;
+    let mut bytes = Vec::with_capacity(spectrum.len() * 16);
+    for (real, imaginary_value) in spectrum.intensities.iter().zip(imaginary) {
+        bytes.extend_from_slice(&real.to_le_bytes());
+        bytes.extend_from_slice(&imaginary_value.to_le_bytes());
+    }
+    Ok(SpectrumBinary {
+        byte_format: "complex128",
+        bytes,
+    })
 }
 
 fn write_axis(output: &mut String, spectrum: &Spectrum1D) -> Result<()> {
@@ -232,6 +306,75 @@ fn write_axis(output: &mut String, spectrum: &Spectrum1D) -> Result<()> {
     }
     output.push_str("/>\n");
     Ok(())
+}
+
+fn fid_sweep_width_hz(spectrum: &Spectrum1D) -> Result<Option<f64>> {
+    if spectrum.imaginary.is_none() {
+        return Ok(None);
+    }
+
+    match spectrum.x.unit {
+        Unit::Seconds => infer_time_axis_sweep_width_hz(&spectrum.x.values).map(Some),
+        Unit::Points => {
+            if is_standard_point_axis(&spectrum.x.values) {
+                Ok(None)
+            } else {
+                Err(RSpinError::Unsupported {
+                    feature: "complex nmrML 1D FID export with non-standard point axis",
+                })
+            }
+        }
+        _ => Err(RSpinError::Unsupported {
+            feature: "complex nmrML frequency-domain 1D spectrum export",
+        }),
+    }
+}
+
+fn infer_time_axis_sweep_width_hz(values: &[f64]) -> Result<f64> {
+    let Some(start) = values.first().copied() else {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "nmrML FID export requires at least one point".to_owned(),
+        });
+    };
+    if start.abs() > 1.0e-12 {
+        return Err(RSpinError::Unsupported {
+            feature: "complex nmrML 1D FID export with non-zero time origin",
+        });
+    }
+    if !has_uniform_spacing(values) {
+        return Err(RSpinError::Unsupported {
+            feature: "complex nmrML 1D FID export with non-uniform time axis",
+        });
+    }
+    if values.len() == 1 {
+        return Ok(1.0);
+    }
+
+    let end = values
+        .last()
+        .copied()
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "nmrML FID export requires at least one point".to_owned(),
+        })?;
+    if end <= start {
+        return Err(RSpinError::Unsupported {
+            feature: "complex nmrML 1D FID export with non-positive dwell time",
+        });
+    }
+    let segments = u32::try_from(values.len() - 1).map_err(|_| RSpinError::InvalidSpectrum {
+        message: "nmrML FID point count is too large".to_owned(),
+    })?;
+    let dwell_time_s = (end - start) / f64::from(segments);
+    Ok(1.0 / dwell_time_s)
+}
+
+fn is_standard_point_axis(values: &[f64]) -> bool {
+    values.iter().enumerate().all(|(index, value)| {
+        let Ok(index) = u32::try_from(index) else {
+            return false;
+        };
+        (*value - f64::from(index)).abs() <= 1.0e-10
+    })
 }
 
 fn has_uniform_spacing(values: &[f64]) -> bool {
@@ -282,7 +425,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use rspin_core::{Axis, Metadata, Nucleus};
+    use rspin_core::{Axis, Metadata, Nucleus, Unit};
 
     use crate::{SpectrumReader, SpectrumWriter, read_nmrml_1d_str, read_nmrml_document_info_str};
 
@@ -334,6 +477,52 @@ mod tests {
     }
 
     #[test]
+    fn writes_complex_time_domain_fid_round_trip() -> anyhow::Result<()> {
+        let spectrum = Spectrum1D::new_complex(
+            Axis::linear("time", Unit::Seconds, 0.0, 0.003, 4)?,
+            vec![1.0, -2.0, 3.5, 4.25],
+            Some(vec![0.5, -0.25, 1.25, -1.5]),
+            Metadata::named("complex fid")
+                .with_nucleus(Nucleus::Hydrogen1)
+                .with_frequency_mhz(600.0),
+        )?;
+
+        let text = write_nmrml_1d(&spectrum)?;
+        let parsed = read_nmrml_1d_str(&text)?;
+
+        assert!(text.contains("<fidData"));
+        assert!(text.contains("byteFormat=\"complex128\""));
+        assert!(text.contains("<sweepWidth value=\"1000.0\" unitName=\"hertz\"/>"));
+        assert!(!text.contains("<spectrumDataArray"));
+        assert_eq!(parsed.x, spectrum.x);
+        assert_eq!(parsed.intensities, spectrum.intensities);
+        assert_eq!(parsed.imaginary, spectrum.imaginary);
+        assert_eq!(parsed.metadata.name, spectrum.metadata.name);
+        assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Hydrogen1));
+        Ok(())
+    }
+
+    #[test]
+    fn writes_complex_point_domain_fid_round_trip() -> anyhow::Result<()> {
+        let spectrum = Spectrum1D::new_complex(
+            Axis::linear("point", Unit::Points, 0.0, 2.0, 3)?,
+            vec![1.0, 2.0, 3.0],
+            Some(vec![0.1, 0.2, 0.3]),
+            Metadata::named("point fid"),
+        )?;
+
+        let text = SpectrumWriter::write_string(&NmrMl1D, &spectrum)?;
+        let parsed = SpectrumReader::read_str(&NmrMl1D, &text)?;
+
+        assert!(text.contains("<fidData"));
+        assert!(!text.contains("<sweepWidth"));
+        assert_eq!(parsed.x, spectrum.x);
+        assert_eq!(parsed.intensities, spectrum.intensities);
+        assert_eq!(parsed.imaginary, spectrum.imaginary);
+        Ok(())
+    }
+
+    #[test]
     fn writes_file_with_inherent_api() -> anyhow::Result<()> {
         let mut path = std::env::temp_dir();
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
@@ -356,14 +545,25 @@ mod tests {
     }
 
     #[test]
-    fn rejects_complex_and_non_finite_metadata() -> anyhow::Result<()> {
+    fn rejects_complex_frequency_domain_and_non_finite_metadata() -> anyhow::Result<()> {
         let complex = Spectrum1D::new_complex(
             Axis::linear_ppm(0.0, 1.0, 2)?,
             vec![1.0, 2.0],
             Some(vec![0.1, 0.2]),
             Metadata::new(),
         )?;
-        let error = write_nmrml_1d(&complex).expect_err("complex export should be explicit");
+        let error = write_nmrml_1d(&complex)
+            .expect_err("complex frequency-domain export should be explicit");
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+        let non_standard_point_axis = Spectrum1D::new_complex(
+            Axis::new("point", Unit::Points, vec![1.0, 2.0])?,
+            vec![1.0, 2.0],
+            Some(vec![0.1, 0.2]),
+            Metadata::new(),
+        )?;
+        let error = write_nmrml_1d(&non_standard_point_axis)
+            .expect_err("non-standard point FID export should fail");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
 
         let mut invalid = Spectrum1D::new(

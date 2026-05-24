@@ -199,6 +199,26 @@ fn writes_nmrml_1d_from_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_complex_nmrml_1d_fid_from_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new_complex(
+        Axis::linear("time", Unit::Seconds, 0.0, 0.002, 3)?,
+        vec![1.0, -2.0, 3.5],
+        Some(vec![0.25, -0.5, 0.75]),
+        Metadata::named("wasm fid"),
+    )?;
+    let text = write_nmrml_1d_json(&to_json(&spectrum)?)?;
+    let parsed_json = parse_nmrml_1d_json(&text)?;
+    let parsed = spectrum1d_from_json(&parsed_json)?;
+
+    assert!(text.contains("<fidData"));
+    assert!(text.contains("byteFormat=\"complex128\""));
+    assert_eq!(parsed.x, spectrum.x);
+    assert_eq!(parsed.intensities, spectrum.intensities);
+    assert_eq!(parsed.imaginary, spectrum.imaginary);
+    Ok(())
+}
+
+#[test]
 fn writes_nmrml_2d_from_json() -> anyhow::Result<()> {
     let spectrum = Spectrum2D::new_complex(
         Axis::linear_ppm(10.0, 8.0, 3)?,
