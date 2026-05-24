@@ -4,6 +4,7 @@ mod alignment;
 mod assignments;
 mod couplings;
 mod integration;
+mod integration_2d;
 mod matrix;
 mod multiplets;
 mod peak_optimization;
@@ -22,6 +23,7 @@ pub use assignments::{
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
+pub use integration_2d::{BilinearIntegrator2D, Integral2D, IntegralRegion2D, integrate_region_2d};
 pub use matrix::{MatrixGenerationOptions, SpectrumMatrix1D, generate_spectrum_matrix_1d};
 pub use multiplets::{
     DetectedMultiplet, GapMultipletDetector, MultipletDetectionOptions, MultipletKind,
@@ -34,7 +36,8 @@ pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pic
 pub use ranges::{DetectedRange, RangeDetectionOptions, ThresholdRangeDetector, detect_ranges};
 pub use signals::{SignalSummary1D, SignalSummaryOptions, summarize_signals_1d};
 pub use traits::{
-    Integrator, MultipletDetector, PeakOptimizer, PeakPicker, RangeDetector, ZoneDetector,
+    Integrator, Integrator2D, MultipletDetector, PeakOptimizer, PeakPicker, RangeDetector,
+    ZoneDetector,
 };
 pub use zones::{
     DetectedZone, ThresholdZoneDetector, ZoneConnectivity, ZoneDetectionOptions, detect_zones,

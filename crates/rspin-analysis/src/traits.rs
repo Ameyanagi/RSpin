@@ -3,7 +3,8 @@
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    DetectedMultiplet, DetectedRange, DetectedZone, Integral, IntegralRegion, OptimizedPeak, Peak,
+    DetectedMultiplet, DetectedRange, DetectedZone, Integral, Integral2D, IntegralRegion,
+    IntegralRegion2D, OptimizedPeak, Peak,
 };
 
 /// Picks peaks from a one-dimensional spectrum.
@@ -44,6 +45,16 @@ pub trait Integrator {
     ///
     /// Returns an error when the region is invalid for the spectrum.
     fn integrate(&self, spectrum: &Spectrum1D, region: IntegralRegion) -> Result<Integral>;
+}
+
+/// Integrates a two-dimensional spectrum over a rectangular region.
+pub trait Integrator2D {
+    /// Returns the integral over `region`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the region is invalid for the spectrum.
+    fn integrate(&self, spectrum: &Spectrum2D, region: IntegralRegion2D) -> Result<Integral2D>;
 }
 
 /// Detects ranges from a one-dimensional spectrum.

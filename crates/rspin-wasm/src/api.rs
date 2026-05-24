@@ -8,10 +8,11 @@ mod processing_2d;
 use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
-    AssignmentSet, DetectedMultiplet, DetectedRange, IntegralRegion, JCouplingGraph,
-    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
-    SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones,
-    integrate_region, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
+    AssignmentSet, DetectedMultiplet, DetectedRange, IntegralRegion, IntegralRegion2D,
+    JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions,
+    RangeDetectionOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
+    detect_ranges, detect_zones, integrate_region, integrate_region_2d, optimize_peaks_quadratic,
+    pick_peaks, summarize_signals_1d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::read_jcamp_dx_1d;
@@ -214,6 +215,18 @@ pub fn integrate_region_json(spectrum_json: &str, region_json: &str) -> Result<S
     let spectrum: Spectrum1D = from_json(spectrum_json)?;
     let region: IntegralRegion = from_json(region_json)?;
     let integral = integrate_region(&spectrum, region)?;
+    to_json(&integral)
+}
+
+/// Integrates serialized `Spectrum2D` JSON over a serialized rectangular region.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn integrate_region_2d_json(spectrum_json: &str, region_json: &str) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let region: IntegralRegion2D = from_json(region_json)?;
+    let integral = integrate_region_2d(&spectrum, region)?;
     to_json(&integral)
 }
 

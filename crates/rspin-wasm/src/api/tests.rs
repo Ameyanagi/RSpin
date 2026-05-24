@@ -261,6 +261,24 @@ fn integrates_region_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn integrates_2d_region_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![0.0, 1.0, 2.0, 1.0, 2.0, 3.0, 2.0, 3.0, 4.0],
+        Metadata::default(),
+    )?)?;
+    let integral_json = integrate_region_2d_json(
+        &spectrum_json,
+        r#"{"x_from":0.5,"x_to":1.5,"y_from":0.5,"y_to":1.5}"#,
+    )?;
+    let integral: rspin_analysis::Integral2D = from_json(&integral_json)?;
+    assert!((integral.volume - 2.0).abs() < 1e-12);
+    assert_eq!(integral.cells, 4);
+    Ok(())
+}
+
+#[test]
 fn simulates_first_order_json() -> anyhow::Result<()> {
     let spectrum_json = simulate_first_order_multiplet_json(
         r#"{"center_ppm":7.0,"area":1.0,"couplings":[{"j_hz":8.0,"equivalent_spins":1}]}"#,
