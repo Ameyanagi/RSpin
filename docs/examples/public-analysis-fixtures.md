@@ -83,3 +83,18 @@ fn analyze_public_2d_fixture(spectrum: &Spectrum2D) -> Result<SpectrumAnalysis2D
     )
 }
 ```
+
+Rust callers can also use the chainable workflow builders from the prelude:
+
+```rust
+use rspin::prelude::*;
+
+fn analyze_with_chain_methods(spectrum: &Spectrum1D) -> Result<SpectrumAnalysis1D> {
+    spectrum
+        .analyze()
+        .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(0.05))
+        .with_range_options(RangeDetectionOptions::new().with_threshold_abs(0.03))
+        .with_multiplet_options(MultipletDetectionOptions::new().with_max_peak_gap_ppm(0.04))
+        .run()
+}
+```

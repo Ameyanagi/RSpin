@@ -233,16 +233,16 @@ fn prelude_supports_simple_analysis_workflows() -> Result<()> {
     assert_eq!(analysis.ranges.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
 
-    let analysis_2d = analyze_spectrum_2d(
-        &Spectrum2D::new(
-            Axis::linear_ppm(0.0, 2.0, 3)?,
-            Axis::linear_ppm(0.0, 2.0, 3)?,
-            vec![2.0, 0.0, 0.0, 1.5, 0.0, -3.0, 0.0, 0.0, -4.0],
-            Metadata::named("analysis-2d"),
-        )?,
-        SpectrumAnalysis2DOptions::new()
-            .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0)),
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 2.0, 3)?,
+        Axis::linear_ppm(0.0, 2.0, 3)?,
+        vec![2.0, 0.0, 0.0, 1.5, 0.0, -3.0, 0.0, 0.0, -4.0],
+        Metadata::named("analysis-2d"),
     )?;
+    let analysis_2d = spectrum_2d
+        .analyze()
+        .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0))
+        .run()?;
 
     assert_eq!(analysis_2d.zones.len(), 2);
     assert_eq!(analysis_2d.signals.len(), 2);

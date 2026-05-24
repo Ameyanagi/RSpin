@@ -12,6 +12,12 @@ use crate::{
     summarize_signals_2d,
 };
 
+mod builder;
+
+pub use builder::{
+    AnalyzeSpectrum1D, AnalyzeSpectrum2D, SpectrumAnalysis1DWorkflow, SpectrumAnalysis2DWorkflow,
+};
+
 /// Options for the default one-dimensional analysis workflow.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SpectrumAnalysis1DOptions {

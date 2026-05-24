@@ -78,9 +78,10 @@ pub use traits::{
     ZoneDetector,
 };
 pub use workflow::{
-    SpectrumAnalysis1D, SpectrumAnalysis1DOptions, SpectrumAnalysis2D, SpectrumAnalysis2DOptions,
-    analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d, analyze_spectrum_1d,
-    analyze_spectrum_2d,
+    AnalyzeSpectrum1D, AnalyzeSpectrum2D, SpectrumAnalysis1D, SpectrumAnalysis1DOptions,
+    SpectrumAnalysis1DWorkflow, SpectrumAnalysis2D, SpectrumAnalysis2DOptions,
+    SpectrumAnalysis2DWorkflow, analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d,
+    analyze_spectrum_1d, analyze_spectrum_2d,
 };
 pub use zones::{
     DetectedZone, ThresholdZoneDetector, ZoneConnectivity, ZoneDetectionOptions, detect_zones,
