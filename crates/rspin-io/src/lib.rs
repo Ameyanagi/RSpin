@@ -55,4 +55,4 @@ pub use processing_json::{
     read_processing_recipe_2d_json, write_processing_recipe_1d_json,
     write_processing_recipe_2d_json,
 };
-pub use traits::{SpectrumPathReader, SpectrumReader, SpectrumWriter};
+pub use traits::{SpectrumPathReader, SpectrumPathWriter, SpectrumReader, SpectrumWriter};

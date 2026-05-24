@@ -1,8 +1,9 @@
 //! Shared IO traits.
 
+use std::fs;
 use std::path::Path;
 
-use rspin_core::Result;
+use rspin_core::{RSpinError, Result};
 
 /// Reads a spectrum-like value from a string payload.
 pub trait SpectrumReader {
@@ -39,3 +40,22 @@ pub trait SpectrumWriter<S> {
     /// Returns an error when the value cannot be represented by the writer.
     fn write_string(&self, spectrum: &S) -> Result<String>;
 }
+
+/// Writes a spectrum-like value to a filesystem path.
+pub trait SpectrumPathWriter<S>: SpectrumWriter<S> {
+    /// Writes a value to a path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value cannot be serialized or the path cannot
+    /// be written.
+    fn write_path(&self, spectrum: &S, path: &Path) -> Result<()> {
+        let payload = self.write_string(spectrum)?;
+        fs::write(path, payload).map_err(|error| RSpinError::Parse {
+            format: "spectrum path",
+            message: format!("failed to write {}: {error}", path.display()),
+        })
+    }
+}
+
+impl<T, S> SpectrumPathWriter<S> for T where T: SpectrumWriter<S> {}

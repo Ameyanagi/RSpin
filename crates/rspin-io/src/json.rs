@@ -85,9 +85,17 @@ fn json_error(error: &serde_json::Error) -> RSpinError {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use rspin_core::{
         AnnotationTarget, Atom, Axis, Bond, Metadata, Molecule, SpectrumAnnotation, Unit,
     };
+
+    use crate::SpectrumPathWriter;
 
     use super::*;
 
@@ -147,6 +155,25 @@ mod tests {
     }
 
     #[test]
+    fn writes_spectrum_path_with_trait_api() -> anyhow::Result<()> {
+        let root = temp_dir("json-path-writer")?;
+        let path = root.join("spectrum.json");
+        let spectrum = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, 2.0, 3.0],
+            Metadata::named("path one"),
+        )?;
+
+        JsonSpectrum1D.write_path(&spectrum, &path)?;
+        let text = fs::read_to_string(&path)?;
+        let parsed = read_spectrum1d_json(&text)?;
+
+        assert_eq!(parsed, spectrum);
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
     fn round_trips_complex_2d_spectrum() -> anyhow::Result<()> {
         let spectrum = Spectrum2D::new_complex(
             Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
@@ -165,5 +192,18 @@ mod tests {
     fn rejects_invalid_json() {
         let error = read_spectrum1d_json("{").expect_err("invalid JSON should fail");
         assert!(matches!(error, RSpinError::Parse { .. }));
+    }
+
+    fn temp_dir(name: &str) -> anyhow::Result<PathBuf> {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let mut path = std::env::temp_dir();
+        path.push(format!("rspin-json-{name}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&path)?;
+        Ok(path)
+    }
+
+    fn remove_dir(path: PathBuf) -> anyhow::Result<()> {
+        fs::remove_dir_all(path)?;
+        Ok(())
     }
 }
