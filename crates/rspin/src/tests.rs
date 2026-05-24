@@ -211,6 +211,20 @@ fn prelude_supports_prediction_bond_correlations() -> Result<()> {
 
     assert_eq!(prediction.signals_1d.len(), 2);
     assert_eq!(prediction.correlations_2d.len(), 1);
+
+    let formula_atoms = atoms_from_formula("C2H6O")?;
+    assert_eq!(formula_atoms.len(), 9);
+    let formula_prediction = predict_formula_with_rules(
+        "ethanol",
+        "C2H6O",
+        &ElementShiftPredictor::new().with_rule(ElementShiftRule::new(
+            "H",
+            Experiment::Proton1D,
+            Nucleus::Hydrogen1,
+            1.1,
+        )),
+    )?;
+    assert_eq!(formula_prediction.signals_1d.len(), 6);
     Ok(())
 }
 

@@ -12,7 +12,8 @@ pub use model::{
     StaticPrediction,
 };
 pub use rules::{
-    BondCorrelationRule, ElementShiftPredictor, ElementShiftRule, predict_molecule_with_rules,
+    BondCorrelationRule, ElementShiftPredictor, ElementShiftRule, predict_formula_with_rules,
+    predict_molecule_with_rules,
 };
 pub use spectrum::{PredictionLineShape, PredictionSpectrumOptions, render_prediction_1d};
 pub use spectrum_2d::{PredictionSpectrum2DOptions, render_prediction_2d};

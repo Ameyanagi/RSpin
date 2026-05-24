@@ -1,10 +1,12 @@
 //! Molecule and sample chemistry data structures.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::{RSpinError, Result};
+
+const MAX_FORMULA_ATOMS: usize = 10_000;
 
 /// Atom data stored with sample metadata.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -220,6 +222,24 @@ impl Molecule {
         }
     }
 
+    /// Creates a molecule with atoms expanded from a simple molecular formula.
+    ///
+    /// Formula terms must use an element symbol followed by an optional positive
+    /// integer count, such as `C6H6`, `C2H5OH`, or `NaCl`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the formula is empty, malformed, contains a zero
+    /// count, or expands to too many atoms.
+    pub fn from_formula(id: impl Into<String>, formula: impl Into<String>) -> Result<Self> {
+        let formula = formula.into();
+        let molecule = Self::new(id)
+            .with_formula(formula.clone())
+            .with_atoms(atoms_from_formula(&formula)?);
+        molecule.validate()?;
+        Ok(molecule)
+    }
+
     /// Sets a human-readable molecule name.
     #[must_use]
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
@@ -331,6 +351,117 @@ impl Molecule {
     }
 }
 
+/// Expands a simple molecular formula into stable atoms.
+///
+/// Atom identifiers are generated as `{element}{n}` while preserving the formula
+/// term order, so `C2H5OH` yields `C1`, `C2`, `H1` ... `H6`, `O1`.
+///
+/// # Errors
+///
+/// Returns an error when the formula is empty, malformed, contains a zero count,
+/// or expands to too many atoms.
+pub fn atoms_from_formula(formula: &str) -> Result<Vec<Atom>> {
+    let terms = parse_formula_terms(formula)?;
+    let mut atoms = Vec::new();
+    let mut element_counts = BTreeMap::<String, usize>::new();
+
+    for term in terms {
+        for _ in 0..term.count {
+            if atoms.len() >= MAX_FORMULA_ATOMS {
+                return invalid_metadata(format!(
+                    "formula expands beyond {MAX_FORMULA_ATOMS} atoms"
+                ));
+            }
+            let next_index = element_counts.entry(term.element.clone()).or_insert(0);
+            *next_index += 1;
+            atoms.push(Atom::new(
+                format!("{}{}", term.element, *next_index),
+                term.element.clone(),
+            ));
+        }
+    }
+
+    Ok(atoms)
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct FormulaTerm {
+    element: String,
+    count: usize,
+}
+
+fn parse_formula_terms(formula: &str) -> Result<Vec<FormulaTerm>> {
+    let trimmed = formula.trim();
+    ensure_non_empty("formula", trimmed)?;
+
+    let chars = trimmed.chars().collect::<Vec<_>>();
+    let mut index = 0usize;
+    let mut terms = Vec::new();
+
+    while index < chars.len() {
+        if chars[index].is_whitespace() {
+            index += 1;
+            continue;
+        }
+        let (element, next_index) = parse_element_symbol(&chars, index)?;
+        let (count, next_index) = parse_count(&chars, next_index)?;
+        terms.push(FormulaTerm { element, count });
+        index = next_index;
+    }
+
+    if terms.is_empty() {
+        return invalid_metadata("formula must contain at least one element");
+    }
+    Ok(terms)
+}
+
+fn parse_element_symbol(chars: &[char], start: usize) -> Result<(String, usize)> {
+    let first = chars[start];
+    if !first.is_ascii_uppercase() {
+        return invalid_metadata(format!(
+            "formula expected element symbol at character {}",
+            start + 1
+        ));
+    }
+
+    let mut end = start + 1;
+    while end < chars.len() && chars[end].is_ascii_lowercase() {
+        end += 1;
+    }
+    Ok((chars[start..end].iter().collect(), end))
+}
+
+fn parse_count(chars: &[char], start: usize) -> Result<(usize, usize)> {
+    let mut end = start;
+    let mut count = 0usize;
+    let mut saw_digit = false;
+
+    while end < chars.len() && chars[end].is_ascii_digit() {
+        saw_digit = true;
+        let digit = match chars[end].to_digit(10) {
+            Some(digit) => digit as usize,
+            None => {
+                return invalid_metadata(format!("formula invalid count at character {}", end + 1));
+            }
+        };
+        count = count
+            .checked_mul(10)
+            .and_then(|value| value.checked_add(digit))
+            .ok_or_else(|| RSpinError::InvalidMetadata {
+                message: "formula atom count is too large".to_owned(),
+            })?;
+        end += 1;
+    }
+
+    if !saw_digit {
+        return Ok((1, start));
+    }
+    if count == 0 {
+        return invalid_metadata("formula atom count must be positive");
+    }
+    Ok((count, end))
+}
+
 fn validate_optional_coordinate(field: &'static str, value: Option<f64>) -> Result<()> {
     if value.is_none_or(f64::is_finite) {
         return Ok(());
@@ -345,7 +476,7 @@ fn ensure_non_empty(field: &'static str, value: &str) -> Result<()> {
     Ok(())
 }
 
-fn invalid_metadata(message: impl Into<String>) -> Result<()> {
+fn invalid_metadata<T>(message: impl Into<String>) -> Result<T> {
     Err(RSpinError::InvalidMetadata {
         message: message.into(),
     })

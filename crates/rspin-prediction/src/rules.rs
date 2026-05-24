@@ -247,6 +247,21 @@ impl ElementShiftPredictor {
         Ok(prediction)
     }
 
+    /// Predicts signals for a formula-expanded molecule.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the formula, rule table, or generated prediction
+    /// payload is invalid.
+    pub fn predict_formula(
+        &self,
+        molecule_id: impl Into<String>,
+        formula: impl Into<String>,
+    ) -> Result<PredictionSet> {
+        let molecule = Molecule::from_formula(molecule_id, formula)?;
+        self.predict_molecule(&molecule)
+    }
+
     /// Validates the rule table.
     ///
     /// # Errors
@@ -312,6 +327,20 @@ pub fn predict_molecule_with_rules(
     predictor: &ElementShiftPredictor,
 ) -> Result<PredictionSet> {
     predictor.predict_molecule(molecule)
+}
+
+/// Predicts formula-expanded molecule signals with an element shift rule table.
+///
+/// # Errors
+///
+/// Returns an error when the formula, rule table, or generated prediction
+/// payload is invalid.
+pub fn predict_formula_with_rules(
+    molecule_id: impl Into<String>,
+    formula: impl Into<String>,
+    predictor: &ElementShiftPredictor,
+) -> Result<PredictionSet> {
+    predictor.predict_formula(molecule_id, formula)
 }
 
 trait OptionalConfidence {

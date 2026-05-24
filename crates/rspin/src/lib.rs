@@ -48,7 +48,7 @@ pub use analysis::{
 };
 pub use core::{
     AnnotationTarget, Atom, Axis, Bond, BondOrder, Metadata, Molecule, Nucleus, ProcessingRecord,
-    RSpinError, Result, Spectrum1D, Spectrum2D, SpectrumAnnotation, Unit,
+    RSpinError, Result, Spectrum1D, Spectrum2D, SpectrumAnnotation, Unit, atoms_from_formula,
 };
 pub use io::{
     AgilentFid1D, AgilentFid2D, AutoSpectrum1DPath, AutoSpectrum1DText, AutoSpectrum2DPath,
@@ -78,8 +78,8 @@ pub use prediction::{
     PredictionSet, PredictionSpectrum1DResultWorkflow, PredictionSpectrum1DWorkflow,
     PredictionSpectrum2DOptions, PredictionSpectrum2DResultWorkflow, PredictionSpectrum2DWorkflow,
     PredictionSpectrumOptions, Predictor, RenderPrediction1D, RenderPrediction1DResult,
-    RenderPrediction2D, RenderPrediction2DResult, StaticPrediction, predict_molecule_with_rules,
-    render_prediction_1d, render_prediction_2d,
+    RenderPrediction2D, RenderPrediction2DResult, StaticPrediction, predict_formula_with_rules,
+    predict_molecule_with_rules, render_prediction_1d, render_prediction_2d,
 };
 pub use processing::{
     Abs1D, Abs2D, AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection,
@@ -164,10 +164,10 @@ pub mod prelude {
         align_spectra_by_peak_to_matrix, align_spectra_by_zone, align_spectra_by_zone_to_matrix,
         analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d, analyze_spectrum_1d,
         analyze_spectrum_2d, apply_processing_recipe_1d, apply_processing_recipe_1d_until,
-        apply_processing_recipe_2d, apply_processing_recipe_2d_until, auto_phase_correct,
-        auto_phase_correct_2d, bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d,
-        bucket_spectrum_2d, cluster_bucket_matrix_1d, cluster_bucket_matrix_2d, cluster_matrix,
-        cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d, crop_1d, crop_2d,
+        apply_processing_recipe_2d, apply_processing_recipe_2d_until, atoms_from_formula,
+        auto_phase_correct, auto_phase_correct_2d, bucket_spectra_1d, bucket_spectra_2d,
+        bucket_spectrum_1d, bucket_spectrum_2d, cluster_bucket_matrix_1d, cluster_bucket_matrix_2d,
+        cluster_matrix, cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d, crop_1d, crop_2d,
         decompose_exact_spin_half_1d, decompose_exact_spin_half_2d, detect_consensus_peaks_1d,
         detect_consensus_ranges_1d, detect_consensus_zones_2d, detect_multiplets, detect_ranges,
         detect_spectrum_text_format, detect_spectrum1d_path_format, detect_spectrum2d_path_format,
@@ -176,10 +176,11 @@ pub mod prelude {
         pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d, pairwise_matrix,
         pairwise_spectrum_matrix_1d, pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d,
         pca_bucket_matrix_2d, pca_matrix, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
-        pick_peaks, predict_molecule_with_rules, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
-        read_analysis1d_json, read_analysis2d_json, read_bruker_fid_1d_dir,
-        read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
-        read_jcamp_dx_1d, read_jeol_jdf_1d_bytes, read_jeol_jdf_1d_file, read_jeol_jdf_2d_bytes,
+        pick_peaks, predict_formula_with_rules, predict_molecule_with_rules,
+        read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_analysis1d_json,
+        read_analysis2d_json, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
+        read_bruker_processed_2d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d,
+        read_jeol_jdf_1d_bytes, read_jeol_jdf_1d_file, read_jeol_jdf_2d_bytes,
         read_jeol_jdf_2d_file, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str,
         read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str, read_nmrml_document_info_bytes,
         read_nmrml_document_info_file, read_nmrml_document_info_str,

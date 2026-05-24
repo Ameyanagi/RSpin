@@ -3,7 +3,8 @@
 use rspin_core::{Molecule, Result, Spectrum1D, Spectrum2D};
 use rspin_prediction::{
     ElementShiftPredictor, PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
-    predict_molecule_with_rules, render_prediction_1d, render_prediction_2d,
+    predict_formula_with_rules, predict_molecule_with_rules, render_prediction_1d,
+    render_prediction_2d,
 };
 
 use super::{from_json, to_json};
@@ -21,6 +22,22 @@ pub fn predict_molecule_with_element_rules_json(
     let molecule: Molecule = from_json(molecule_json)?;
     let predictor: ElementShiftPredictor = from_json(predictor_json)?;
     let prediction = predict_molecule_with_rules(&molecule, &predictor)?;
+    to_json(&prediction)
+}
+
+/// Predicts formula-expanded molecule signals with serialized element shift rules.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, formula expansion, prediction,
+/// validation, or serialization fails.
+pub fn predict_formula_with_element_rules_json(
+    molecule_id: &str,
+    formula: &str,
+    predictor_json: &str,
+) -> Result<String> {
+    let predictor: ElementShiftPredictor = from_json(predictor_json)?;
+    let prediction = predict_formula_with_rules(molecule_id, formula, &predictor)?;
     to_json(&prediction)
 }
 

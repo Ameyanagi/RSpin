@@ -18,6 +18,29 @@ fn builds_and_validates_molecule() -> Result<()> {
 }
 
 #[test]
+fn expands_simple_molecular_formulas() -> Result<()> {
+    let molecule = Molecule::from_formula("ethanol", "C2H5OH")?.with_name("ethanol");
+
+    assert_eq!(molecule.formula.as_deref(), Some("C2H5OH"));
+    assert_eq!(molecule.atoms.len(), 9);
+    assert_eq!(molecule.atoms[0], Atom::new("C1", "C"));
+    assert_eq!(molecule.atoms[1], Atom::new("C2", "C"));
+    assert_eq!(molecule.atoms[7], Atom::new("O1", "O"));
+    assert_eq!(molecule.atoms[8], Atom::new("H6", "H"));
+    molecule.validate()
+}
+
+#[test]
+fn rejects_invalid_molecular_formulas() {
+    for formula in ["", "2H", "H0", "C(OH)2"] {
+        assert!(matches!(
+            atoms_from_formula(formula),
+            Err(RSpinError::InvalidMetadata { .. })
+        ));
+    }
+}
+
+#[test]
 fn rejects_invalid_molecule_data() {
     let duplicate_atoms = Molecule::new("m")
         .with_atom(Atom::new("C1", "C"))

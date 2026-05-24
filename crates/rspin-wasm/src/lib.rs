@@ -50,17 +50,18 @@ pub use api::{
     parse_spectrum_2d_csv_json, parse_spectrum_2d_text_json, pca_bucket_matrix_1d_json,
     pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
     phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
-    predict_molecule_with_element_rules_json, project_spectrum_2d_x_json,
-    project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
-    resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
-    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_2d_json,
-    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
-    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
-    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
-    validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_spectrum_1d_csv_json,
-    write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
+    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
+    render_prediction_2d_json, resample_spectrum_1d_json, resample_spectrum_2d_json,
+    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
+    simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
+    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
+    summarize_signals_2d_json, validate_assignment_set_json, validate_j_coupling_graph_json,
+    validate_prediction_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
+    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
+    zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -69,8 +70,8 @@ pub use io::{
     write_analysis_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
 pub use prediction::{
-    predict_molecule_with_element_rules, render_prediction_1d, render_prediction_2d,
-    validate_prediction,
+    predict_formula_with_element_rules, predict_molecule_with_element_rules, render_prediction_1d,
+    render_prediction_2d, validate_prediction,
 };
 pub use processing_1d::{
     abs_spectrum_1d, apply_processing_recipe_1d, apply_processing_recipe_1d_until,

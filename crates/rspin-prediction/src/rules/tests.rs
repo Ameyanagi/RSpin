@@ -171,6 +171,32 @@ fn free_function_delegates_to_rule_predictor() -> anyhow::Result<()> {
 }
 
 #[test]
+fn predicts_formula_signals_from_element_rules() -> anyhow::Result<()> {
+    let predictor = ElementShiftPredictor::new()
+        .with_rule(ElementShiftRule::new(
+            "H",
+            Experiment::Proton1D,
+            Nucleus::Hydrogen1,
+            1.1,
+        ))
+        .with_rule(ElementShiftRule::new(
+            "C",
+            Experiment::Carbon13_1D,
+            Nucleus::Carbon13,
+            30.0,
+        ));
+
+    let prediction = predict_formula_with_rules("ethanol", "C2H6O", &predictor)?;
+
+    assert_eq!(prediction.name, Some("ethanol".to_owned()));
+    assert_eq!(prediction.signals_1d.len(), 8);
+    assert_eq!(prediction.signals_1d[0].assignments, vec!["C1".to_owned()]);
+    assert_eq!(prediction.signals_1d[1].assignments, vec!["C2".to_owned()]);
+    assert_eq!(prediction.signals_1d[7].assignments, vec!["H6".to_owned()]);
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_rules_and_molecules() {
     let empty_element = ElementShiftRule::new("", Experiment::Proton1D, Nucleus::Hydrogen1, 1.0);
     let non_finite_shift =

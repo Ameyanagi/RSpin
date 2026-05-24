@@ -66,8 +66,8 @@ pub use pca::{
     pca_spectrum_matrix_2d_json,
 };
 pub use prediction::{
-    predict_molecule_with_element_rules_json, render_prediction_1d_json, render_prediction_2d_json,
-    validate_prediction_json,
+    predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
+    render_prediction_1d_json, render_prediction_2d_json, validate_prediction_json,
 };
 pub use processing_1d::{
     abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,

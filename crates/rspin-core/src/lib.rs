@@ -8,7 +8,7 @@ mod nucleus;
 mod spectrum;
 mod units;
 
-pub use chemistry::{Atom, Bond, BondOrder, Molecule};
+pub use chemistry::{Atom, Bond, BondOrder, Molecule, atoms_from_formula};
 pub use error::{RSpinError, Result};
 pub use marks::{AnnotationTarget, SpectrumAnnotation};
 pub use metadata::Metadata;

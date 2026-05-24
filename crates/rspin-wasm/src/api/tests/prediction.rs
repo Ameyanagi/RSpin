@@ -2,8 +2,8 @@ use rspin_core::{Spectrum1D, Spectrum2D};
 use rspin_prediction::PredictionSet;
 
 use super::super::{
-    from_json, predict_molecule_with_element_rules_json, render_prediction_1d_json,
-    render_prediction_2d_json, validate_prediction_json,
+    from_json, predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
+    render_prediction_1d_json, render_prediction_2d_json, validate_prediction_json,
 };
 
 #[test]
@@ -40,6 +40,22 @@ fn predicts_molecule_with_element_rules_json() -> anyhow::Result<()> {
             .map(|item| item.source.as_str()),
         Some("rspin-element-shift-rules")
     );
+    Ok(())
+}
+
+#[test]
+fn predicts_formula_with_element_rules_json() -> anyhow::Result<()> {
+    let json = predict_formula_with_element_rules_json(
+        "ethanol",
+        "C2H6O",
+        r#"{"rules":[{"element":"H","experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.1,"intensity":1.0},{"element":"C","experiment":"Carbon13_1D","nucleus":"Carbon13","delta_ppm":30.0,"intensity":1.0}]}"#,
+    )?;
+    let prediction: PredictionSet = from_json(&json)?;
+
+    assert_eq!(prediction.name, Some("ethanol".to_owned()));
+    assert_eq!(prediction.signals_1d.len(), 8);
+    assert_eq!(prediction.signals_1d[0].assignments, vec!["C1".to_owned()]);
+    assert_eq!(prediction.signals_1d[7].assignments, vec!["H6".to_owned()]);
     Ok(())
 }
 
