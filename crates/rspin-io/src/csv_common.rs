@@ -1,0 +1,60 @@
+//! Shared helpers for `RSpin` CSV codecs.
+
+use rspin_core::{RSpinError, Result, Unit};
+
+pub(crate) fn normalized_key(key: &str) -> String {
+    key.chars()
+        .filter(char::is_ascii_alphanumeric)
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+pub(crate) fn parse_float(field: &'static str, value: &str) -> Result<f64> {
+    let parsed = value
+        .trim()
+        .parse::<f64>()
+        .map_err(|error| RSpinError::Parse {
+            format: "CSV",
+            message: format!("{field}: {error}"),
+        })?;
+    if !parsed.is_finite() {
+        return Err(RSpinError::NonFinite { field });
+    }
+    Ok(parsed)
+}
+
+pub(crate) fn parse_unit(value: &str) -> Unit {
+    match normalized_key(value).as_str() {
+        "ppm" => Unit::Ppm,
+        "hz" | "hertz" => Unit::Hertz,
+        "seconds" | "second" | "sec" | "s" => Unit::Seconds,
+        "points" | "point" => Unit::Points,
+        _ => Unit::Arbitrary,
+    }
+}
+
+pub(crate) fn unit_label(unit: Unit) -> &'static str {
+    match unit {
+        Unit::Ppm => "PPM",
+        Unit::Hertz => "HZ",
+        Unit::Seconds => "SECONDS",
+        Unit::Points => "POINTS",
+        _ => "ARBITRARY",
+    }
+}
+
+pub(crate) fn push_comment(output: &mut String, key: &str, value: &str) {
+    output.push_str("# ");
+    output.push_str(key);
+    output.push('=');
+    output.push_str(value);
+    output.push('\n');
+}
+
+pub(crate) fn format_float(value: f64) -> String {
+    let formatted = format!("{value:.12}");
+    formatted
+        .trim_end_matches('0')
+        .trim_end_matches('.')
+        .to_owned()
+}
