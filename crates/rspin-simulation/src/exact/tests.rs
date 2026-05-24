@@ -1,4 +1,5 @@
 use super::*;
+use crate::Simulator;
 
 #[test]
 fn single_spin_transition_matches_shift() -> anyhow::Result<()> {
@@ -157,6 +158,44 @@ fn simulator_trait_runs_exact_transition_simulation() -> anyhow::Result<()> {
     assert_eq!(transitions.len(), 1);
     assert_close(transitions[0].center_ppm, 1.5, 1.0e-12);
     Ok(())
+}
+
+#[test]
+fn builders_create_chainable_exact_system_and_options() -> anyhow::Result<()> {
+    let system = SpinHalfSystem::new()
+        .with_spin(1.2)
+        .with_spin(1.25)
+        .with_coupling(0, 1, 7.0);
+
+    assert_eq!(system.spins, vec![SpinHalf::new(1.2), SpinHalf::new(1.25)]);
+    assert_eq!(system.couplings, vec![ScalarCoupling::new(0, 1, 7.0)]);
+
+    let options = ExactSpinOptions::new()
+        .with_spectrometer_mhz(500.0)
+        .with_intensity_threshold(1.0e-14)
+        .with_frequency_tolerance_hz(1.0e-8)
+        .with_max_spins(4)
+        .with_detected_spins([0, 1]);
+    let transitions = options.simulate(&system)?;
+
+    assert_eq!(transitions.len(), 4);
+    assert!(
+        transitions
+            .iter()
+            .all(|transition| transition.frequency_hz > 0.0)
+    );
+    Ok(())
+}
+
+#[test]
+fn from_shifts_builds_uncoupled_spin_system() {
+    let system = SpinHalfSystem::from_shifts([1.0, 2.0, 3.0]);
+
+    assert_eq!(
+        system.spins,
+        vec![SpinHalf::new(1.0), SpinHalf::new(2.0), SpinHalf::new(3.0)]
+    );
+    assert!(system.couplings.is_empty());
 }
 
 #[test]

@@ -40,6 +40,57 @@ impl Default for ExactSpectrumOptions {
     }
 }
 
+impl ExactSpectrumOptions {
+    /// Creates default exact spectrum rendering options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the output ppm range.
+    #[must_use]
+    pub fn with_ppm_range(mut self, from_ppm: f64, to_ppm: f64) -> Self {
+        self.from_ppm = from_ppm;
+        self.to_ppm = to_ppm;
+        self
+    }
+
+    /// Sets the number of output points.
+    #[must_use]
+    pub fn with_points(mut self, points: usize) -> Self {
+        self.points = points;
+        self
+    }
+
+    /// Sets the integrated spectrum area.
+    #[must_use]
+    pub fn with_area(mut self, area: f64) -> Self {
+        self.area = area;
+        self
+    }
+
+    /// Sets the full width at half maximum in Hz.
+    #[must_use]
+    pub fn with_line_width_hz(mut self, line_width_hz: f64) -> Self {
+        self.line_width_hz = line_width_hz;
+        self
+    }
+
+    /// Sets the rendered line shape.
+    #[must_use]
+    pub fn with_line_shape(mut self, line_shape: LineShape) -> Self {
+        self.line_shape = line_shape;
+        self
+    }
+
+    /// Sets the exact transition generation options.
+    #[must_use]
+    pub fn with_transition_options(mut self, transition_options: ExactSpinOptions) -> Self {
+        self.transition_options = transition_options;
+        self
+    }
+}
+
 impl Simulator<SpinHalfSystem> for ExactSpectrumOptions {
     type Output = Spectrum1D;
 

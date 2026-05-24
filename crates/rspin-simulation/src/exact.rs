@@ -3,15 +3,14 @@
 use std::collections::BTreeSet;
 
 use rspin_core::{RSpinError, Result};
-use serde::{Deserialize, Serialize};
-
-use crate::Simulator;
 
 mod hamiltonian;
+mod model;
 mod spectrum;
 
 use hamiltonian::{basis_dimension, hamiltonian_matrix, observation_matrix, total_z_expectations};
 
+pub use model::{ExactSpinOptions, ExactTransition, ScalarCoupling, SpinHalf, SpinHalfSystem};
 pub use spectrum::{
     ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactTransitionContribution1D,
     decompose_exact_spin_half_1d, simulate_exact_spin_half_1d,
@@ -19,86 +18,6 @@ pub use spectrum::{
 
 /// Maximum number of spin-1/2 particles supported by the dense exact solver.
 pub const MAX_EXACT_SPINS: usize = 12;
-
-/// A spin-1/2 nucleus in an exact spin system.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SpinHalf {
-    /// Chemical shift in ppm relative to the transmitter reference.
-    pub shift_ppm: f64,
-}
-
-/// An isotropic scalar coupling between two spin-1/2 nuclei.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ScalarCoupling {
-    /// Zero-based index of the first spin.
-    pub spin_a: usize,
-    /// Zero-based index of the second spin.
-    pub spin_b: usize,
-    /// Scalar coupling constant in Hz.
-    pub j_hz: f64,
-}
-
-/// A spin-1/2 system for exact transition simulation.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct SpinHalfSystem {
-    /// Spin definitions.
-    pub spins: Vec<SpinHalf>,
-    /// Scalar couplings between spins.
-    pub couplings: Vec<ScalarCoupling>,
-}
-
-/// Options for exact spin-1/2 transition simulation.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ExactSpinOptions {
-    /// Spectrometer frequency in MHz.
-    pub spectrometer_mhz: f64,
-    /// Discard transitions with intensity at or below this threshold.
-    pub intensity_threshold: f64,
-    /// Merge transitions this close in Hz.
-    pub frequency_tolerance_hz: f64,
-    /// Per-call spin-count limit, capped by [`MAX_EXACT_SPINS`].
-    pub max_spins: usize,
-    /// Spin indices included in the transverse detection operator.
-    ///
-    /// An empty list detects all spins in the system.
-    #[serde(default)]
-    pub detected_spins: Vec<usize>,
-}
-
-impl Default for ExactSpinOptions {
-    fn default() -> Self {
-        Self {
-            spectrometer_mhz: 400.0,
-            intensity_threshold: 1.0e-12,
-            frequency_tolerance_hz: 1.0e-9,
-            max_spins: 10,
-            detected_spins: Vec::new(),
-        }
-    }
-}
-
-impl Simulator<SpinHalfSystem> for ExactSpinOptions {
-    type Output = Vec<ExactTransition>;
-
-    fn simulate(&self, model: &SpinHalfSystem) -> Result<Self::Output> {
-        exact_spin_half_transitions(model, self)
-    }
-}
-
-/// An observable exact transition line.
-#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
-pub struct ExactTransition {
-    /// Absolute transition frequency in Hz.
-    pub frequency_hz: f64,
-    /// Signed transition offset in Hz relative to the transmitter reference.
-    pub offset_hz: f64,
-    /// Signed transition position in ppm.
-    pub center_ppm: f64,
-    /// Relative transition intensity.
-    pub intensity: f64,
-    /// Number of eigenstate transitions merged into this line.
-    pub contribution_count: u32,
-}
 
 /// Simulates exact spin-1/2 transition lines by dense Hamiltonian diagonalization.
 ///

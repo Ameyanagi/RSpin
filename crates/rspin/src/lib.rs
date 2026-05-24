@@ -105,10 +105,7 @@ mod tests {
         let spectrum = read_spectrum1d_csv("x,intensity\n1,2\n2,4\n")?;
         assert_eq!(spectrum.len(), 2);
 
-        let system = SpinHalfSystem {
-            spins: vec![SpinHalf { shift_ppm: 1.0 }],
-            couplings: Vec::<ScalarCoupling>::new(),
-        };
+        let system = SpinHalfSystem::new().with_spin(1.0);
         let transitions = exact_spin_half_transitions(
             &system,
             &ExactSpinOptions {

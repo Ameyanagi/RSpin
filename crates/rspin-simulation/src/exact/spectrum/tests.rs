@@ -1,5 +1,5 @@
 use super::*;
-use crate::{ScalarCoupling, SpinHalf};
+use crate::{ScalarCoupling, Simulator, SpinHalf};
 
 #[test]
 fn renders_single_spin_with_requested_area() -> anyhow::Result<()> {
@@ -77,6 +77,24 @@ fn renders_coupled_ab_system() -> anyhow::Result<()> {
     assert_eq!(spectrum.len(), 128);
     assert!(spectrum.intensities.iter().all(|value| *value >= 0.0));
     assert!(spectrum.intensities.iter().any(|value| *value > 0.0));
+    Ok(())
+}
+
+#[test]
+fn builder_options_render_exact_spectrum() -> anyhow::Result<()> {
+    let system = SpinHalfSystem::new().with_spin(2.0);
+    let options = ExactSpectrumOptions::new()
+        .with_ppm_range(1.99, 2.01)
+        .with_points(11)
+        .with_area(3.0)
+        .with_line_width_hz(2.0)
+        .with_line_shape(LineShape::Gaussian)
+        .with_transition_options(ExactSpinOptions::new().with_spectrometer_mhz(400.0));
+    let spectrum = options.simulate(&system)?;
+
+    assert_eq!(spectrum.len(), 11);
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
+    assert!(spectrum.intensities[5] > spectrum.intensities[0]);
     Ok(())
 }
 
