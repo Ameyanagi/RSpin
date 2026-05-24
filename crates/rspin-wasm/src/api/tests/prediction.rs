@@ -1,9 +1,12 @@
-use rspin_io::{PREDICTION_JSON_FORMAT, read_prediction_json, write_prediction_json};
+use rspin_io::{
+    PREDICTION_JSON_FORMAT, read_prediction_csv, read_prediction_json, write_prediction_json,
+};
 
 use super::super::{
-    predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
-    render_prediction_1d_json, render_prediction_2d_json, spectrum1d_from_json,
-    spectrum2d_from_json, validate_prediction_json,
+    parse_prediction_csv_json, predict_formula_with_element_rules_json,
+    predict_molecule_with_element_rules_json, render_prediction_1d_json, render_prediction_2d_json,
+    spectrum1d_from_json, spectrum2d_from_json, validate_prediction_json,
+    write_prediction_csv_json,
 };
 
 #[test]
@@ -14,6 +17,23 @@ fn validates_prediction_json() -> anyhow::Result<()> {
     assert!(json.contains(PREDICTION_JSON_FORMAT));
     let prediction = read_prediction_json(&json)?;
     assert_eq!(prediction.signals_1d.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn round_trips_prediction_csv_json() -> anyhow::Result<()> {
+    let prediction_json = validate_prediction_json(
+        r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":2.0,"confidence":0.9,"assignments":["H1, alpha"]}],"correlations_2d":[{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","x_ppm":1.0,"y_ppm":20.0,"intensity":0.5,"confidence":null,"assignments":["H1-C1"]}],"provenance":{"source":"fixture","version":"1"}}"#,
+    )?;
+    let csv = write_prediction_csv_json(&prediction_json)?;
+    let reparsed_json = parse_prediction_csv_json(&csv)?;
+    let reparsed = read_prediction_json(&reparsed_json)?;
+    let csv_prediction = read_prediction_csv(&csv)?;
+
+    assert!(csv.starts_with("# format=RSpin Prediction CSV\n"));
+    assert_eq!(reparsed.signals_1d.len(), 1);
+    assert_eq!(reparsed.correlations_2d.len(), 1);
+    assert_eq!(reparsed, csv_prediction);
     Ok(())
 }
 

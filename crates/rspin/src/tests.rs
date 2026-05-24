@@ -570,6 +570,12 @@ fn prelude_supports_prediction_bond_correlations() -> Result<()> {
     assert!(prediction_json.contains(PREDICTION_JSON_FORMAT));
     assert!(prediction_json.contains(&format!("\"version\":{PREDICTION_JSON_VERSION}")));
     assert_eq!(read_prediction_json(&prediction_json)?, prediction);
+    let prediction_csv = write_prediction_csv(&prediction)?;
+    assert!(prediction_csv.starts_with("# format=RSpin Prediction CSV"));
+    assert_eq!(read_prediction_csv(&prediction_csv)?, prediction);
+    let trait_prediction: PredictionSet =
+        SpectrumReader::read_str(&CsvPrediction, &prediction_csv)?;
+    assert_eq!(trait_prediction, prediction);
 
     let formula_atoms = atoms_from_formula("C2H6O")?;
     assert_eq!(formula_atoms.len(), 9);

@@ -1,7 +1,9 @@
 //! Prediction JSON helpers.
 
 use rspin_core::{Molecule, Result, Spectrum1D, Spectrum2D};
-use rspin_io::{read_prediction_json, write_prediction_json};
+use rspin_io::{
+    read_prediction_csv, read_prediction_json, write_prediction_csv, write_prediction_json,
+};
 use rspin_prediction::{
     ElementShiftPredictor, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
     predict_formula_with_rules, predict_molecule_with_rules, render_prediction_1d,
@@ -51,6 +53,26 @@ pub fn validate_prediction_json(prediction_json: &str) -> Result<String> {
     let prediction = read_prediction_json(prediction_json)?;
     prediction.validate()?;
     write_prediction_json(&prediction)
+}
+
+/// Parses prediction CSV and returns normalized prediction JSON.
+///
+/// # Errors
+///
+/// Returns an error when CSV parsing, validation, or JSON serialization fails.
+pub fn parse_prediction_csv_json(input: &str) -> Result<String> {
+    let prediction = read_prediction_csv(input)?;
+    write_prediction_json(&prediction)
+}
+
+/// Converts serialized prediction JSON to prediction CSV.
+///
+/// # Errors
+///
+/// Returns an error when JSON deserialization, validation, or CSV serialization fails.
+pub fn write_prediction_csv_json(prediction_json: &str) -> Result<String> {
+    let prediction = read_prediction_json(prediction_json)?;
+    write_prediction_csv(&prediction)
 }
 
 /// Renders serialized one-dimensional prediction JSON into `Spectrum1D` JSON.

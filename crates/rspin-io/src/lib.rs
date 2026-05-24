@@ -19,6 +19,7 @@ mod nmrml_2d;
 mod nmrml_2d_writer;
 mod nmrml_info;
 mod nmrml_writer;
+mod prediction_csv;
 mod prediction_json;
 mod processing_json;
 mod simulation_csv;
@@ -93,6 +94,7 @@ pub use nmrml_info::{
     read_nmrml_document_info_file, read_nmrml_document_info_str,
 };
 pub use nmrml_writer::{write_nmrml_1d, write_nmrml_1d_file};
+pub use prediction_csv::{CsvPrediction, read_prediction_csv, write_prediction_csv};
 pub use prediction_json::{
     JsonPrediction, PREDICTION_JSON_FORMAT, PREDICTION_JSON_VERSION, read_prediction_json,
     write_prediction_json,

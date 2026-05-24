@@ -3,8 +3,9 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    js_error, predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
-    render_prediction_1d_json, render_prediction_2d_json, validate_prediction_json,
+    js_error, parse_prediction_csv_json, predict_formula_with_element_rules_json,
+    predict_molecule_with_element_rules_json, render_prediction_1d_json, render_prediction_2d_json,
+    validate_prediction_json, write_prediction_csv_json,
 };
 
 /// Validates a serialized prediction payload and returns its normalized JSON.
@@ -16,6 +17,28 @@ use crate::{
 #[wasm_bindgen(js_name = validatePrediction)]
 pub fn validate_prediction(prediction_json: &str) -> std::result::Result<String, JsValue> {
     validate_prediction_json(prediction_json).map_err(|error| js_error(&error))
+}
+
+/// Parses prediction CSV and returns normalized prediction JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when CSV parsing, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = parsePredictionCsv)]
+pub fn parse_prediction_csv(input: &str) -> std::result::Result<String, JsValue> {
+    parse_prediction_csv_json(input).map_err(|error| js_error(&error))
+}
+
+/// Converts serialized prediction JSON to prediction CSV.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or CSV
+/// serialization fails.
+#[wasm_bindgen(js_name = writePredictionCsv)]
+pub fn write_prediction_csv(prediction_json: &str) -> std::result::Result<String, JsValue> {
+    write_prediction_csv_json(prediction_json).map_err(|error| js_error(&error))
 }
 
 /// Predicts molecule signals with serialized element shift rules.
