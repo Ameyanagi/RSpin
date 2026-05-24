@@ -1,4 +1,4 @@
-use rspin_core::{Axis, Metadata, Spectrum2D, Unit};
+use rspin_core::{Axis, Metadata, RSpinError, Spectrum2D, Unit};
 
 use super::*;
 
@@ -45,6 +45,75 @@ fn fft_2d_processing_step_delegates_to_function() -> anyhow::Result<()> {
     assert_eq!(transformed.shape(), spectrum.shape());
     assert!(transformed.imaginary.is_some());
     assert_eq!(transformed.processing[0].operation, "fft_2d");
+    Ok(())
+}
+
+#[test]
+fn phase_correct_2d_applies_zero_order_x_phase() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Points, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Points, 0.0, 1.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::default(),
+    )?;
+
+    let phased = phase_correct_2d(&spectrum, PhaseCorrection2D::new().x_phase(90.0, 0.0, 0.5))?;
+
+    assert_vec_close(&phased.z, &[0.0, 0.0, 0.0, 0.0]);
+    assert_vec_close(require_imaginary(&phased)?, &[1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(phased.processing[0].operation, "phase_correct_2d");
+    Ok(())
+}
+
+#[test]
+fn phase_correct_2d_applies_first_order_x_and_y_phase() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Points, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Points, 0.0, 1.0, 2)?,
+        vec![1.0, 1.0, 1.0, 1.0],
+        Metadata::default(),
+    )?;
+
+    let phased = phase_correct_2d(
+        &spectrum,
+        PhaseCorrection2D::new()
+            .x_phase(0.0, 180.0, 0.0)
+            .y_phase(0.0, 180.0, 0.0),
+    )?;
+
+    assert_vec_close(&phased.z, &[1.0, -1.0, -1.0, 1.0]);
+    assert_vec_close(require_imaginary(&phased)?, &[0.0, 0.0, 0.0, 0.0]);
+    Ok(())
+}
+
+#[test]
+fn phase_correct_2d_roundtrip_recovers_complex_data() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let correction = PhaseCorrection2D::new()
+        .x_phase(20.0, 45.0, 0.5)
+        .y_phase(-10.0, -30.0, 0.0);
+    let inverse = PhaseCorrection2D::new()
+        .x_phase(-20.0, -45.0, 0.5)
+        .y_phase(10.0, 30.0, 0.0);
+
+    let phased = phase_correct_2d(&spectrum, correction)?;
+    let recovered = phase_correct_2d(&phased, inverse)?;
+
+    assert_vec_close(&recovered.z, &spectrum.z);
+    assert_vec_close(
+        require_imaginary(&recovered)?,
+        require_imaginary_2d(&spectrum)?,
+    );
+    Ok(())
+}
+
+#[test]
+fn phase_correct_2d_rejects_invalid_options() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let error = phase_correct_2d(&spectrum, PhaseCorrection2D::new().x_phase(0.0, 0.0, 1.5))
+        .expect_err("phase pivot outside range should fail");
+
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
     Ok(())
 }
 

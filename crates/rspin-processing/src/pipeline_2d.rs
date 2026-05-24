@@ -3,8 +3,8 @@
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    ExponentialApodization2D, Fft2D, FftDirection, Normalize2DMaxAbs, ProcessingStep,
-    ProjectionMode, Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y_index,
+    ExponentialApodization2D, Fft2D, FftDirection, Normalize2DMaxAbs, PhaseCorrection2D,
+    ProcessingStep, ProjectionMode, Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y_index,
     slice_y_at_x_index,
 };
 
@@ -103,6 +103,24 @@ impl Spectrum2DPipeline {
     #[must_use]
     pub fn fft(self, direction: FftDirection) -> Self {
         self.then(Fft2D { direction })
+    }
+
+    /// Applies a full two-dimensional phase correction.
+    #[must_use]
+    pub fn phase(self, correction: PhaseCorrection2D) -> Self {
+        self.then(correction)
+    }
+
+    /// Applies x-dimension phase correction.
+    #[must_use]
+    pub fn phase_x(self, zero_order_deg: f64, first_order_deg: f64, pivot_fraction: f64) -> Self {
+        self.then(PhaseCorrection2D::new().x_phase(zero_order_deg, first_order_deg, pivot_fraction))
+    }
+
+    /// Applies y-dimension phase correction.
+    #[must_use]
+    pub fn phase_y(self, zero_order_deg: f64, first_order_deg: f64, pivot_fraction: f64) -> Self {
+        self.then(PhaseCorrection2D::new().y_phase(zero_order_deg, first_order_deg, pivot_fraction))
     }
 
     /// Returns the processed 2D spectrum.
@@ -263,6 +281,24 @@ mod tests {
         assert_eq!(processed.processing.len(), 2);
         assert_eq!(processed.processing[0].operation, "fft_2d");
         assert_eq!(processed.processing[1].operation, "fft_2d");
+        Ok(())
+    }
+
+    #[test]
+    fn chains_2d_phase_steps() -> anyhow::Result<()> {
+        let spectrum = demo_spectrum()?;
+        let processed = spectrum
+            .process()
+            .phase_x(90.0, 0.0, 0.5)
+            .phase_y(-90.0, 0.0, 0.5)
+            .phase(PhaseCorrection2D::new().x_phase(180.0, 0.0, 0.5))
+            .finish()?;
+
+        assert_vec_close(&processed.z, &[-1.0, 2.0, -3.0, -4.0, 5.0, -6.0]);
+        assert!(processed.imaginary.is_some());
+        assert_eq!(processed.processing.len(), 3);
+        assert_eq!(processed.processing[0].operation, "phase_correct_2d");
+        assert_eq!(processed.processing[2].operation, "phase_correct_2d");
         Ok(())
     }
 
