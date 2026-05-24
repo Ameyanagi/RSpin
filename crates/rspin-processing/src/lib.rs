@@ -5,6 +5,7 @@ mod auto_phase;
 mod baseline;
 mod contours;
 mod one_d;
+mod pipeline;
 mod traits;
 mod transform;
 mod two_d;
@@ -20,6 +21,7 @@ pub use one_d::{
     NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill, normalize_max_abs,
     offset_intensity, scale_intensity, shift_axis, zero_fill,
 };
+pub use pipeline::{ProcessSpectrum1D, Spectrum1DPipeline};
 pub use traits::ProcessingStep;
 pub use transform::{
     ExponentialApodization, Fft1D, FftDirection, Magnitude, PhaseCorrection,

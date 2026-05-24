@@ -1,0 +1,252 @@
+//! Chainable one-dimensional processing pipelines.
+
+use rspin_core::{Result, Spectrum1D};
+
+use crate::{
+    AutoPhaseOptions, BaselineMethod, ExponentialApodization, Fft1D, FftDirection, Magnitude,
+    NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, ProcessingStep, ScaleIntensity, ShiftAxis,
+    SubtractBaseline, ZeroFill,
+};
+
+/// Chainable processor for one-dimensional spectra.
+///
+/// The pipeline stores the first error it encounters and skips later steps.
+/// Call [`finish`](Self::finish) to retrieve the processed spectrum or error.
+#[derive(Debug)]
+pub struct Spectrum1DPipeline {
+    result: Result<Spectrum1D>,
+}
+
+impl Spectrum1DPipeline {
+    /// Starts a pipeline from an owned spectrum.
+    #[must_use]
+    pub fn new(spectrum: Spectrum1D) -> Self {
+        Self {
+            result: Ok(spectrum),
+        }
+    }
+
+    /// Starts a pipeline from a borrowed spectrum.
+    #[must_use]
+    pub fn from_spectrum(spectrum: &Spectrum1D) -> Self {
+        Self::new(spectrum.clone())
+    }
+
+    /// Starts a pipeline from an existing result.
+    #[must_use]
+    pub fn from_result(result: Result<Spectrum1D>) -> Self {
+        Self { result }
+    }
+
+    /// Applies a reusable processing step.
+    #[must_use]
+    pub fn then<T>(self, step: T) -> Self
+    where
+        T: ProcessingStep<Spectrum1D>,
+    {
+        self.try_then(move |spectrum| step.apply(spectrum))
+    }
+
+    /// Applies a custom fallible processing function.
+    #[must_use]
+    pub fn try_then<F>(self, process: F) -> Self
+    where
+        F: FnOnce(&Spectrum1D) -> Result<Spectrum1D>,
+    {
+        let result = match self.result {
+            Ok(spectrum) => process(&spectrum),
+            Err(error) => Err(error),
+        };
+        Self { result }
+    }
+
+    /// Multiplies all real and imaginary intensities by `factor`.
+    #[must_use]
+    pub fn scale(self, factor: f64) -> Self {
+        self.then(ScaleIntensity { factor })
+    }
+
+    /// Adds `offset` to all real intensities.
+    #[must_use]
+    pub fn offset(self, offset: f64) -> Self {
+        self.then(OffsetIntensity { offset })
+    }
+
+    /// Normalizes real intensities by their maximum absolute value.
+    #[must_use]
+    pub fn normalize_max_abs(self) -> Self {
+        self.then(NormalizeMaxAbs)
+    }
+
+    /// Shifts the x-axis values by `delta`.
+    #[must_use]
+    pub fn shift_axis(self, delta: f64) -> Self {
+        self.then(ShiftAxis { delta })
+    }
+
+    /// Appends zeroes until the spectrum reaches `target_len` points.
+    #[must_use]
+    pub fn zero_fill(self, target_len: usize) -> Self {
+        self.then(ZeroFill { target_len })
+    }
+
+    /// Applies exponential apodization to real and imaginary channels.
+    #[must_use]
+    pub fn exponential_apodization(self, line_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        self.then(ExponentialApodization {
+            line_broadening_hz,
+            dwell_time_s,
+        })
+    }
+
+    /// Applies a forward or inverse FFT.
+    #[must_use]
+    pub fn fft(self, direction: FftDirection) -> Self {
+        self.then(Fft1D { direction })
+    }
+
+    /// Converts the spectrum to magnitude mode.
+    #[must_use]
+    pub fn magnitude(self) -> Self {
+        self.then(Magnitude)
+    }
+
+    /// Applies manual zero- and first-order phase correction.
+    #[must_use]
+    pub fn phase(self, zero_order_deg: f64, first_order_deg: f64, pivot_fraction: f64) -> Self {
+        self.then(PhaseCorrection {
+            zero_order_deg,
+            first_order_deg,
+            pivot_fraction,
+        })
+    }
+
+    /// Applies automatic phase correction with default options.
+    #[must_use]
+    pub fn auto_phase(self) -> Self {
+        self.auto_phase_with(AutoPhaseOptions::default())
+    }
+
+    /// Applies automatic phase correction with explicit options.
+    #[must_use]
+    pub fn auto_phase_with(self, options: AutoPhaseOptions) -> Self {
+        self.then(crate::AutoPhaseCorrection::with_options(options))
+    }
+
+    /// Subtracts a fitted baseline using the default method.
+    #[must_use]
+    pub fn subtract_baseline(self) -> Self {
+        self.subtract_baseline_with(BaselineMethod::default())
+    }
+
+    /// Subtracts a fitted baseline using an explicit method.
+    #[must_use]
+    pub fn subtract_baseline_with(self, method: BaselineMethod) -> Self {
+        self.then(SubtractBaseline { method })
+    }
+
+    /// Returns the processed spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first error encountered by any step in the pipeline.
+    pub fn finish(self) -> Result<Spectrum1D> {
+        self.result
+    }
+}
+
+/// Convenience extension trait for starting one-dimensional pipelines.
+pub trait ProcessSpectrum1D {
+    /// Starts a chainable processing pipeline.
+    fn process(self) -> Spectrum1DPipeline;
+}
+
+impl ProcessSpectrum1D for Spectrum1D {
+    fn process(self) -> Spectrum1DPipeline {
+        Spectrum1DPipeline::new(self)
+    }
+}
+
+impl ProcessSpectrum1D for &Spectrum1D {
+    fn process(self) -> Spectrum1DPipeline {
+        Spectrum1DPipeline::from_spectrum(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rspin_core::{Axis, Metadata, RSpinError, Unit};
+
+    use super::*;
+
+    #[test]
+    fn chains_common_processing_steps() -> anyhow::Result<()> {
+        let spectrum = demo_spectrum()?;
+        let processed = spectrum
+            .process()
+            .scale(2.0)
+            .offset(-2.0)
+            .zero_fill(5)
+            .normalize_max_abs()
+            .finish()?;
+
+        assert_eq!(processed.len(), 5);
+        assert_eq!(processed.intensities, vec![0.0, -1.0, 1.0, 0.0, 0.0]);
+        assert_eq!(processed.processing.len(), 4);
+        assert_eq!(processed.processing[0].operation, "scale_intensity");
+        assert_eq!(processed.processing[3].operation, "normalize_max_abs");
+        Ok(())
+    }
+
+    #[test]
+    fn borrowed_pipeline_leaves_original_spectrum_unchanged() -> anyhow::Result<()> {
+        let spectrum = demo_spectrum()?;
+        let processed = (&spectrum).process().shift_axis(1.0).finish()?;
+
+        assert_eq!(spectrum.x.values, vec![0.0, 1.0, 2.0]);
+        assert_eq!(processed.x.values, vec![1.0, 2.0, 3.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn accepts_custom_steps_and_preserves_first_error() -> anyhow::Result<()> {
+        let spectrum = demo_spectrum()?;
+        let error = spectrum
+            .process()
+            .then(ScaleIntensity { factor: f64::NAN })
+            .offset(10.0)
+            .finish()
+            .expect_err("non-finite scale should fail");
+
+        assert!(matches!(error, RSpinError::NonFinite { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn chains_phase_and_magnitude_steps() -> anyhow::Result<()> {
+        let spectrum = Spectrum1D::new_complex(
+            Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 2)?,
+            vec![1.0, 0.0],
+            Some(vec![0.0, 1.0]),
+            Metadata::default(),
+        )?;
+        let processed = spectrum
+            .process()
+            .phase(90.0, 0.0, 0.5)
+            .magnitude()
+            .finish()?;
+
+        assert_eq!(processed.imaginary, None);
+        assert!((processed.intensities[0] - 1.0).abs() < 1.0e-12);
+        assert!((processed.intensities[1] - 1.0).abs() < 1.0e-12);
+        Ok(())
+    }
+
+    fn demo_spectrum() -> anyhow::Result<Spectrum1D> {
+        Ok(Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, -1.0, 3.0],
+            Metadata::default(),
+        )?)
+    }
+}
