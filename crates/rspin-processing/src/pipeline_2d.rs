@@ -3,9 +3,9 @@
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    ExponentialApodization2D, Fft2D, FftDirection, Normalize2DMaxAbs, PhaseCorrection2D,
-    ProcessingStep, ProjectionMode, Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y_index,
-    slice_y_at_x_index,
+    AutoPhase2DOptions, AutoPhaseCorrection2D, ExponentialApodization2D, Fft2D, FftDirection,
+    Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Scale2D, ZeroFill2D,
+    project_x, project_y, slice_x_at_y_index, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -121,6 +121,18 @@ impl Spectrum2DPipeline {
     #[must_use]
     pub fn phase_y(self, zero_order_deg: f64, first_order_deg: f64, pivot_fraction: f64) -> Self {
         self.then(PhaseCorrection2D::new().y_phase(zero_order_deg, first_order_deg, pivot_fraction))
+    }
+
+    /// Applies automatic two-dimensional phase correction with default options.
+    #[must_use]
+    pub fn auto_phase(self) -> Self {
+        self.auto_phase_with(AutoPhase2DOptions::default())
+    }
+
+    /// Applies automatic two-dimensional phase correction with explicit options.
+    #[must_use]
+    pub fn auto_phase_with(self, options: AutoPhase2DOptions) -> Self {
+        self.then(AutoPhaseCorrection2D::with_options(options))
     }
 
     /// Returns the processed 2D spectrum.
@@ -303,6 +315,32 @@ mod tests {
     }
 
     #[test]
+    fn chains_2d_auto_phase_step() -> anyhow::Result<()> {
+        let spectrum = positive_spectrum()?;
+        let phased = spectrum.process().phase_x(45.0, 0.0, 0.5).finish()?;
+        let processed = phased
+            .process()
+            .auto_phase_with(
+                AutoPhase2DOptions::default()
+                    .x_zero_order_range(-90.0, 90.0, 5.0)
+                    .x_first_order_range(0.0, 0.0, 1.0)
+                    .y_zero_order_range(0.0, 0.0, 1.0)
+                    .y_first_order_range(0.0, 0.0, 1.0),
+            )
+            .finish()?;
+
+        assert_vec_close(&processed.z, &[1.0, 2.0, 3.0, 4.0]);
+        assert_eq!(
+            processed
+                .processing
+                .last()
+                .map(|record| record.operation.as_str()),
+            Some("auto_phase_correct_2d")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn preserves_first_2d_pipeline_error() -> anyhow::Result<()> {
         let spectrum = demo_spectrum()?;
         let error = spectrum
@@ -322,6 +360,15 @@ mod tests {
             Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
             vec![1.0, -2.0, 3.0, 4.0, -5.0, 6.0],
             Metadata::named("2d"),
+        )?)
+    }
+
+    fn positive_spectrum() -> anyhow::Result<Spectrum2D> {
+        Ok(Spectrum2D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+            Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+            vec![1.0, 2.0, 3.0, 4.0],
+            Metadata::named("positive 2d"),
         )?)
     }
 
