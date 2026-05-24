@@ -20,6 +20,8 @@ pub(super) struct Header {
     pub(super) param_start: usize,
     pub(super) param_length: usize,
     pub(super) data_start: usize,
+    major_version: u8,
+    minor_version: u16,
     data_dimension_number: u8,
     data_format: u8,
     data_points: [u32; 8],
@@ -38,8 +40,8 @@ impl Header {
             1 => Endian::Little,
             value => return Err(parse_error(format!("unknown endian marker {value}"))),
         };
-        let _major_version = reader.u8("major version")?;
-        let _minor_version = reader.u16("minor version")?;
+        let major_version = reader.u8("major version")?;
+        let minor_version = reader.u16("minor version")?;
         let data_dimension_number = reader.u8("dimension count")?;
         let _dimension_exist = reader.u8("dimension presence")?;
         let data_type_and_format = reader.u8("data type and format")?;
@@ -87,6 +89,8 @@ impl Header {
             param_start,
             param_length,
             data_start,
+            major_version,
+            minor_version,
             data_dimension_number,
             data_format,
             data_points,
@@ -94,6 +98,12 @@ impl Header {
     }
 
     pub(super) fn validate_1d(&self) -> Result<()> {
+        if self.major_version != 1 {
+            return Err(parse_error(format!(
+                "unsupported JEOL JDF major version {}; minor version is {}",
+                self.major_version, self.minor_version
+            )));
+        }
         if self.data_dimension_number != 1 || self.data_format != DATA_FORMAT_ONE_D {
             return Err(RSpinError::Unsupported {
                 feature: "JEOL multidimensional JDF data",

@@ -40,6 +40,18 @@ fn rejects_multidimensional_jdf_for_1d_reader() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn rejects_unsupported_jdf_major_version() -> Result<()> {
+    let mut bytes = synthetic_complex_jdf()?;
+    bytes[9] = 2;
+
+    let error =
+        read_jeol_jdf_1d_bytes(&bytes).expect_err("unsupported JDF major version should fail");
+
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
 fn synthetic_complex_jdf() -> Result<Vec<u8>> {
     let real: [f64; 4] = [1.0, 2.0, 3.0, 4.0];
     let imaginary: [f64; 4] = [0.1, 0.2, 0.3, 0.4];
