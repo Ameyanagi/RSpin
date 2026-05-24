@@ -27,6 +27,25 @@ fn corrects_zero_order_phase() -> anyhow::Result<()> {
 }
 
 #[test]
+fn serializes_auto_phase_result_and_step() -> anyhow::Result<()> {
+    let phased = phase_correct(&real_spectrum()?, 45.0, 0.0, 0.5)?;
+    let step = AutoPhaseCorrection::new()
+        .zero_order_range(-90.0, 90.0, 5.0)
+        .first_order_range(0.0, 0.0, 1.0);
+    let result = auto_phase_correct(&phased, step.options)?;
+    let result_json = serde_json::to_string(&result)?;
+    let parsed_result: AutoPhaseResult = serde_json::from_str(&result_json)?;
+    let step_json = serde_json::to_string(&step)?;
+    let parsed_step: AutoPhaseCorrection = serde_json::from_str(&step_json)?;
+
+    assert_eq!(parsed_result, result);
+    assert_eq!(parsed_step, step);
+    assert!(result_json.contains("\"zero_order_deg\""));
+    assert!(step_json.contains("\"zero_order_min_deg\""));
+    Ok(())
+}
+
+#[test]
 fn corrects_first_order_phase() -> anyhow::Result<()> {
     let spectrum = Spectrum1D::new_complex(
         Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,

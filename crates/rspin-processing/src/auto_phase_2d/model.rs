@@ -125,7 +125,7 @@ impl AutoPhase2DOptions {
 }
 
 /// Automatic two-dimensional phase correction processing step.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AutoPhaseCorrection2D {
     /// Search options.
     pub options: AutoPhase2DOptions,
@@ -197,7 +197,7 @@ impl AutoPhaseCorrection2D {
 }
 
 /// Result of automatic two-dimensional phase correction.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AutoPhase2DResult {
     /// Phased spectrum.
     pub spectrum: Spectrum2D,

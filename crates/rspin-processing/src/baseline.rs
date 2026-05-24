@@ -146,7 +146,7 @@ impl Default for BaselineMethod {
 }
 
 /// Baseline fit convergence metadata.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BaselineReport {
     /// Number of iterations performed by the fit.
     pub iterations: usize,
@@ -167,7 +167,7 @@ impl BaselineReport {
 }
 
 /// Baseline fit output.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct BaselineFit {
     /// Estimated baseline.
     pub baseline: Vec<f64>,
@@ -178,7 +178,7 @@ pub struct BaselineFit {
 }
 
 /// Processing step that subtracts an estimated baseline.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct SubtractBaseline {
     /// Baseline-correction algorithm.
     pub method: BaselineMethod,

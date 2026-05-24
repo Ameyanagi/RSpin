@@ -25,6 +25,24 @@ fn fits_moving_minimum_baseline() -> anyhow::Result<()> {
 }
 
 #[test]
+fn serializes_baseline_fit_and_step() -> anyhow::Result<()> {
+    let spectrum = spectrum(&[3.0, 2.0, 5.0, 1.0, 4.0])?;
+    let method = BaselineMethod::MovingMinimum { half_window: 1 };
+    let fit = fit_baseline(&spectrum, method)?;
+    let fit_json = serde_json::to_string(&fit)?;
+    let parsed_fit: BaselineFit = serde_json::from_str(&fit_json)?;
+    let step = SubtractBaseline { method };
+    let step_json = serde_json::to_string(&step)?;
+    let parsed_step: SubtractBaseline = serde_json::from_str(&step_json)?;
+
+    assert_eq!(parsed_fit, fit);
+    assert_eq!(parsed_step, step);
+    assert!(fit_json.contains("\"baseline\""));
+    assert!(step_json.contains("moving_minimum"));
+    Ok(())
+}
+
+#[test]
 fn fits_polynomial_baseline_on_sloped_data() -> anyhow::Result<()> {
     let spectrum = spectrum_with_axis(&[0.0, 1.0, 2.0, 3.0], &[1.0, 3.0, 5.0, 7.0])?;
     let fit = fit_baseline(&spectrum, BaselineMethod::Polynomial { degree: 1 })?;

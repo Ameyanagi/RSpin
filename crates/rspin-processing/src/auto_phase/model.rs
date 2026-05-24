@@ -77,7 +77,7 @@ impl AutoPhaseOptions {
 }
 
 /// Automatic phase correction processing step.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct AutoPhaseCorrection {
     /// Search options.
     pub options: AutoPhaseOptions,
@@ -128,7 +128,7 @@ impl AutoPhaseCorrection {
 }
 
 /// Result of automatic phase correction.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AutoPhaseResult {
     /// Phased spectrum.
     pub spectrum: Spectrum1D,
