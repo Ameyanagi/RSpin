@@ -27,11 +27,12 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    parse_spectrum1d_write_format, parse_spectrum2d_write_format, read_assignment_set_json,
-    read_j_coupling_graph_json, read_jcamp_dx_1d, read_nmredata_record_json,
-    read_nmredata_records_json, read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str,
-    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text,
-    read_spectrum2d_json, read_spectrum2d_text, write_assignment_set_json,
+    parse_spectrum_text_format, parse_spectrum1d_write_format, parse_spectrum2d_write_format,
+    read_assignment_set_json, read_j_coupling_graph_json, read_jcamp_dx_1d,
+    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
+    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
+    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_json,
+    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
     write_j_coupling_graph_json, write_jcamp_dx_1d, write_nmredata_record,
     write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
@@ -318,6 +319,16 @@ pub fn parse_spectrum_1d_text_json(input: &str) -> Result<String> {
     spectrum1d_to_json(&spectrum)
 }
 
+/// Parses one-dimensional spectrum text in an explicit format into serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when format parsing, spectrum parsing, or serialization fails.
+pub fn parse_spectrum_1d_text_as_json(input: &str, format: &str) -> Result<String> {
+    let spectrum = read_spectrum1d_text_as(input, parse_spectrum_text_format(format)?)?;
+    spectrum1d_to_json(&spectrum)
+}
+
 /// Parses auto-detected two-dimensional spectrum text into serialized `Spectrum2D` JSON.
 ///
 /// # Errors
@@ -325,6 +336,16 @@ pub fn parse_spectrum_1d_text_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_spectrum_2d_text_json(input: &str) -> Result<String> {
     let spectrum = read_spectrum2d_text(input)?;
+    spectrum2d_to_json(&spectrum)
+}
+
+/// Parses two-dimensional spectrum text in an explicit format into serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when format parsing, spectrum parsing, or serialization fails.
+pub fn parse_spectrum_2d_text_as_json(input: &str, format: &str) -> Result<String> {
+    let spectrum = read_spectrum2d_text_as(input, parse_spectrum_text_format(format)?)?;
     spectrum2d_to_json(&spectrum)
 }
 

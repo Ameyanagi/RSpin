@@ -7,9 +7,10 @@ use crate::{
     nmredata_2d_signals_to_assignment_set_json, nmredata_assignments_to_assignment_set_json,
     nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json, parse_nmredata_json,
     parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
-    parse_spectrum_2d_text_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
-    write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json,
+    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
+    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
     write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
     write_spectrum_2d_text_json,
 };
@@ -32,6 +33,20 @@ pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = parseSpectrum1dText)]
 pub fn parse_spectrum_1d_text(input: &str) -> std::result::Result<String, JsValue> {
     parse_spectrum_1d_text_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses one-dimensional spectrum text in an explicit format into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when format parsing, spectrum parsing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = parseSpectrum1dTextAs)]
+pub fn parse_spectrum_1d_text_as(
+    input: &str,
+    format: &str,
+) -> std::result::Result<String, JsValue> {
+    parse_spectrum_1d_text_as_json(input, format).map_err(|error| js_error(&error))
 }
 
 /// Parses nmrML text into serialized spectrum JSON.
@@ -238,6 +253,20 @@ pub fn parse_spectrum_2d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = parseSpectrum2dText)]
 pub fn parse_spectrum_2d_text(input: &str) -> std::result::Result<String, JsValue> {
     parse_spectrum_2d_text_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses two-dimensional spectrum text in an explicit format into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when format parsing, spectrum parsing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = parseSpectrum2dTextAs)]
+pub fn parse_spectrum_2d_text_as(
+    input: &str,
+    format: &str,
+) -> std::result::Result<String, JsValue> {
+    parse_spectrum_2d_text_as_json(input, format).map_err(|error| js_error(&error))
 }
 
 /// Serializes two-dimensional spectrum JSON into CSV text.

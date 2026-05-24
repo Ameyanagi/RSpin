@@ -609,6 +609,41 @@ fn parses_auto_detected_2d_text_to_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn parses_explicit_text_formats_to_json() -> anyhow::Result<()> {
+    let json = parse_spectrum_1d_text_as_json(
+        "\
+# name=explicit one
+# x_unit=PPM
+x,intensity
+0.0,1.0
+1.0,2.0
+",
+        "csv",
+    )?;
+    let spectrum = spectrum1d_from_json(&json)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("explicit one"));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.x.values, vec![0.0, 1.0]);
+    assert_eq!(spectrum.intensities, vec![1.0, 2.0]);
+
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 10.0, 1)?,
+        vec![1.0, 2.0],
+        Metadata::named("explicit two"),
+    )?;
+    let json_2d = to_json(&spectrum_2d)?;
+    let parsed_2d = spectrum2d_from_json(&parse_spectrum_2d_text_as_json(&json_2d, "json")?)?;
+    assert_eq!(parsed_2d, spectrum_2d);
+
+    let error = parse_spectrum_2d_text_as_json("##TITLE=demo\n", "jdx")
+        .expect_err("2D JCAMP-DX explicit parse should fail");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
 fn scales_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\
