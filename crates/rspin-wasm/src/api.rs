@@ -3,8 +3,10 @@
 use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
-    IntegralRegion, JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions,
-    PeakPickOptions, detect_multiplets, integrate_region, optimize_peaks_quadratic, pick_peaks,
+    AssignmentSet, DetectedMultiplet, DetectedRange, IntegralRegion, JCouplingGraph,
+    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, SignalSummaryOptions,
+    detect_multiplets, integrate_region, optimize_peaks_quadratic, pick_peaks,
+    summarize_signals_1d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D};
 use rspin_io::read_jcamp_dx_1d;
@@ -103,6 +105,36 @@ pub fn validate_j_coupling_graph_json(graph_json: &str) -> Result<String> {
     let graph: JCouplingGraph = from_json(graph_json)?;
     graph.validate()?;
     to_json(&graph)
+}
+
+/// Assembles one-dimensional signal summary JSON from analysis payloads.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, analysis, or serialization fails.
+pub fn summarize_signals_1d_json(
+    spectrum_json: &str,
+    ranges_json: &str,
+    multiplets_json: &str,
+    assignments_json: &str,
+    coupling_graph_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let ranges: Vec<DetectedRange> = from_json(ranges_json)?;
+    let multiplets: Vec<DetectedMultiplet> = from_json(multiplets_json)?;
+    let assignments: AssignmentSet = from_json(assignments_json)?;
+    let coupling_graph: JCouplingGraph = from_json(coupling_graph_json)?;
+    let options: SignalSummaryOptions = from_json(options_json)?;
+    let signals = summarize_signals_1d(
+        &spectrum,
+        &ranges,
+        &multiplets,
+        &assignments,
+        &coupling_graph,
+        options,
+    )?;
+    to_json(&signals)
 }
 
 /// Integrates serialized `Spectrum1D` JSON over a serialized region.

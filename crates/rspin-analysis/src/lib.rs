@@ -9,6 +9,7 @@ mod multiplets;
 mod peak_optimization;
 mod peaks;
 mod ranges;
+mod signals;
 mod traits;
 mod zones;
 
@@ -31,6 +32,7 @@ pub use peak_optimization::{
 };
 pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pick_peaks};
 pub use ranges::{DetectedRange, RangeDetectionOptions, ThresholdRangeDetector, detect_ranges};
+pub use signals::{SignalSummary1D, SignalSummaryOptions, summarize_signals_1d};
 pub use traits::{
     Integrator, MultipletDetector, PeakOptimizer, PeakPicker, RangeDetector, ZoneDetector,
 };

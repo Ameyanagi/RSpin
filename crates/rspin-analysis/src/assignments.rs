@@ -213,6 +213,15 @@ impl AssignmentSet {
         Ok(Self { assignments })
     }
 
+    /// Validates all assignments in the set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any assignment is invalid or ids are duplicated.
+    pub fn validate(&self) -> Result<()> {
+        validate_assignments(&self.assignments)
+    }
+
     /// Adds one assignment after validation.
     ///
     /// # Errors

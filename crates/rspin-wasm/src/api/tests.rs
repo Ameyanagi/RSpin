@@ -130,6 +130,43 @@ fn validates_j_coupling_graph_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn summarizes_signals_json() -> anyhow::Result<()> {
+    let spectrum_json = parse_jcamp_dx_1d_json(
+        "\
+##TITLE=demo
+##FIRSTX=0
+##LASTX=2
+##XYDATA=(X++(Y..Y))
+0 0 2 0
+##END=
+",
+    )?;
+    let peaks_json = pick_peaks_json(
+        &spectrum_json,
+        r#"{"min_abs_intensity":1.0,"min_prominence":1.0,"polarity":"Positive"}"#,
+    )?;
+    let multiplets_json = detect_multiplets_json(
+        &spectrum_json,
+        &peaks_json,
+        r#"{"max_peak_gap_ppm":0.1,"min_peak_count":1,"include_singlets":true,"spectrometer_mhz":400.0}"#,
+    )?;
+    let signals_json = summarize_signals_1d_json(
+        &spectrum_json,
+        r#"[{"start_index":0,"end_index":2,"from":0.0,"to":2.0,"active_points":1,"max_abs_intensity":2.0,"area":2.0}]"#,
+        &multiplets_json,
+        r#"{"assignments":[{"id":"assign:range1d:0-2:H1","target":{"Range1D":{"start_index":0,"end_index":2,"from":0.0,"to":2.0}},"atoms":[{"id":"H1","label":null,"nucleus":"Hydrogen1"}],"confidence":null,"note":null}]}"#,
+        r#"{"nodes":[{"id":"H1","label":null,"nucleus":"Hydrogen1"},{"id":"H2","label":null,"nucleus":"Hydrogen1"}],"couplings":[{"id":"j:H1-H2","node_a":"H1","node_b":"H2","j_hz":7.2,"confidence":null,"source":null}]}"#,
+        r#"{"include_empty_ranges":true,"include_orphan_multiplets":true}"#,
+    )?;
+    let signals: Vec<rspin_analysis::SignalSummary1D> = from_json(&signals_json)?;
+
+    assert_eq!(signals.len(), 1);
+    assert_eq!(signals[0].assignments.len(), 1);
+    assert_eq!(signals[0].couplings.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn integrates_region_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\
