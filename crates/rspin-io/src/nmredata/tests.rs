@@ -201,6 +201,10 @@ H1, Hcombo, 7.0
 4.200, L=H1
 3.900-3.800, L=H2, H3
 2.000, orphan
+
+>  <NMREDATA_2D_13C_1J_1H>
+H1/C1, I=1.2
+Hcombo/C2, I=2.4
 ",
     )?;
 
@@ -251,6 +255,28 @@ H1, Hcombo, 7.0
     let free_signal_assignments =
         nmredata_1d_signals_to_assignment_set(&record, Nucleus::Hydrogen1)?;
     assert_eq!(free_signal_assignments, signal_assignments);
+
+    let signal_assignments_2d = record.to_2d_signal_assignment_set()?;
+    assert_eq!(signal_assignments_2d.len(), 2);
+    let first_2d_signal = &record.spectra[1].signals_2d[0];
+    assert_eq!(
+        signal_assignments_2d.assignments[0].target,
+        AssignmentTarget::Zone2D {
+            id: nmredata_2d_signal_zone_id(0, first_2d_signal),
+        }
+    );
+    assert_eq!(signal_assignments_2d.assignments[0].atoms[0].id, "H1");
+    assert_eq!(
+        signal_assignments_2d.assignments[0].atoms[0].nucleus,
+        Nucleus::Hydrogen1
+    );
+    assert_eq!(signal_assignments_2d.assignments[0].atoms[1].id, "C1");
+    assert_eq!(
+        signal_assignments_2d.assignments[0].atoms[1].nucleus,
+        Nucleus::Carbon13
+    );
+    let free_2d_signal_assignments = nmredata_2d_signals_to_assignment_set(&record)?;
+    assert_eq!(free_2d_signal_assignments, signal_assignments_2d);
     Ok(())
 }
 
@@ -279,6 +305,15 @@ H2, H1, 7.0
         .to_signal_assignment_set(Nucleus::Hydrogen1)
         .expect_err("duplicate signal labels should fail");
     assert!(matches!(error, RSpinError::InvalidAssignment { .. }));
+
+    let error = read_nmredata_str(
+        r"
+>  <NMREDATA_2D_13C_1J_1H>
+/, I=1.0
+",
+    )
+    .expect_err("empty 2D signal labels should fail during parsing");
+    assert!(matches!(error, RSpinError::Parse { .. }));
     Ok(())
 }
 

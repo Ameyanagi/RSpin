@@ -58,6 +58,7 @@ pub use nmredata::{
     NmreData, NmreDataAnalysis, NmreDataAssignment, NmreDataCoupling, NmreDataRecord,
     NmreDataRecords, NmreDataSignal1D, NmreDataSignal2D, NmreDataSpectrum, NmreDataSpectrumKind,
     NmreDataTag, NmreDataVersion, nmredata_1d_signals_to_assignment_set,
+    nmredata_2d_signal_zone_id, nmredata_2d_signals_to_assignment_set,
     nmredata_assignments_to_assignment_set, nmredata_couplings_to_j_coupling_graph,
     nmredata_to_analysis, parse_nmredata_version, read_nmredata_bytes, read_nmredata_file,
     read_nmredata_records_bytes, read_nmredata_records_file, read_nmredata_records_str,

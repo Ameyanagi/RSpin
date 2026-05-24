@@ -216,6 +216,9 @@ H1, H2, 7.0
 >  <NMREDATA_1D_1H>
 Larmor=500.0
 4.200, L=H1
+
+>  <NMREDATA_2D_13C_1J_1H>
+H1/C1, I=1.0
 ",
     )?;
 
@@ -260,6 +263,22 @@ Larmor=500.0
         signal_assignments.assignments[0].target,
         AssignmentTarget::Peak1D { index: 0, x } if (x - 4.2).abs() < 1.0e-12
     ));
+    let signal_assignments_2d = nmredata_2d_signals_to_assignment_set(&trait_record)?;
+    assert_eq!(signal_assignments_2d.len(), 1);
+    assert_eq!(
+        signal_assignments_2d.assignments[0].target,
+        AssignmentTarget::Zone2D {
+            id: nmredata_2d_signal_zone_id(0, &trait_record.spectra[1].signals_2d[0]),
+        }
+    );
+    assert_eq!(
+        signal_assignments_2d.assignments[0].atoms[0].nucleus,
+        Nucleus::Hydrogen1
+    );
+    assert_eq!(
+        signal_assignments_2d.assignments[0].atoms[1].nucleus,
+        Nucleus::Carbon13
+    );
     let records = vec![trait_record];
     let records_text =
         <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;

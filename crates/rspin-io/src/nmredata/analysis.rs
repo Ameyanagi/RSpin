@@ -58,6 +58,20 @@ impl NmreDataRecord {
         nmredata_1d_signals_to_assignment_set(self, nucleus)
     }
 
+    /// Converts parsed two-dimensional signal labels to an [`AssignmentSet`].
+    ///
+    /// Each 2D signal becomes a synthetic [`AssignmentTarget::Zone2D`] target
+    /// whose id is derived from the source signal order and labels. For standard
+    /// 2D tags, the left side of the signal pair is assigned the direct-dimension
+    /// nucleus and the right side is assigned the indirect-dimension nucleus.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the generated assignment payload is invalid.
+    pub fn to_2d_signal_assignment_set(&self) -> Result<AssignmentSet> {
+        nmredata_2d_signals_to_assignment_set(self)
+    }
+
     /// Converts parsed `NMReDATA` scalar couplings to a [`JCouplingGraph`].
     ///
     /// Assignment labels become graph nodes. Coupling endpoints that are not
@@ -154,6 +168,51 @@ pub fn nmredata_1d_signals_to_assignment_set(
     AssignmentSet::new(assignments)
 }
 
+/// Converts parsed two-dimensional signal labels to an [`AssignmentSet`].
+///
+/// # Errors
+///
+/// Returns an error when the generated assignment payload is invalid.
+pub fn nmredata_2d_signals_to_assignment_set(record: &NmreDataRecord) -> Result<AssignmentSet> {
+    let mut assignments = Vec::new();
+    let mut signal_index = 0;
+
+    for spectrum in &record.spectra {
+        let super::NmreDataSpectrumKind::TwoD {
+            indirect_label,
+            indirect_nucleus,
+            direct_label,
+            direct_nucleus,
+            ..
+        } = &spectrum.kind
+        else {
+            continue;
+        };
+        let left_nucleus = resolved_nucleus(direct_nucleus.as_ref(), direct_label);
+        let right_nucleus = resolved_nucleus(indirect_nucleus.as_ref(), indirect_label);
+        for signal in &spectrum.signals_2d {
+            let atoms = assigned_atoms_for_signal_2d(signal, &left_nucleus, &right_nucleus);
+            let target = AssignmentTarget::Zone2D {
+                id: nmredata_2d_signal_zone_id(signal_index, signal),
+            };
+            assignments.push(Assignment::deterministic(target, atoms)?);
+            signal_index += 1;
+        }
+    }
+
+    AssignmentSet::new(assignments)
+}
+
+/// Returns the stable synthetic zone id used for a parsed `NMReDATA` 2D signal.
+#[must_use]
+pub fn nmredata_2d_signal_zone_id(signal_index: usize, signal: &super::NmreDataSignal2D) -> String {
+    format!(
+        "nmredata:2d-signal:{signal_index}:{}:{}",
+        zone_id_token(&signal.left),
+        zone_id_token(&signal.right)
+    )
+}
+
 /// Converts parsed `NMReDATA` scalar couplings to a [`JCouplingGraph`].
 ///
 /// # Errors
@@ -237,6 +296,50 @@ fn assigned_atoms_for_signal(
         .iter()
         .filter(|label| !label.trim().is_empty())
         .map(|label| AssignedAtom::new(label.clone(), nucleus.clone()).with_label(label))
+        .collect()
+}
+
+fn assigned_atoms_for_signal_2d(
+    signal: &super::NmreDataSignal2D,
+    left_nucleus: &Nucleus,
+    right_nucleus: &Nucleus,
+) -> Vec<AssignedAtom> {
+    let mut seen = BTreeSet::new();
+    let mut atoms = Vec::with_capacity(2);
+    push_signal_atom(&mut atoms, &mut seen, &signal.left, left_nucleus);
+    push_signal_atom(&mut atoms, &mut seen, &signal.right, right_nucleus);
+    atoms
+}
+
+fn push_signal_atom(
+    atoms: &mut Vec<AssignedAtom>,
+    seen: &mut BTreeSet<String>,
+    label: &str,
+    nucleus: &Nucleus,
+) {
+    if seen.insert(label.to_owned()) {
+        atoms.push(AssignedAtom::new(label.to_owned(), nucleus.clone()).with_label(label));
+    }
+}
+
+fn resolved_nucleus(parsed: Option<&Nucleus>, fallback_label: &str) -> Nucleus {
+    match parsed {
+        Some(nucleus) => nucleus.clone(),
+        None => Nucleus::Other(fallback_label.to_owned()),
+    }
+}
+
+fn zone_id_token(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
