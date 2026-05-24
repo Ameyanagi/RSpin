@@ -113,6 +113,42 @@ fn parses_nmrml_2d_to_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn parses_auto_detected_1d_text_to_json() -> anyhow::Result<()> {
+    let json = parse_spectrum_1d_text_json(
+        "\
+# name=auto one
+# x_unit=PPM
+x,intensity
+0.0,1.0
+1.0,2.0
+",
+    )?;
+    let spectrum: Spectrum1D = from_json(&json)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("auto one"));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.x.values, vec![0.0, 1.0]);
+    assert_eq!(spectrum.intensities, vec![1.0, 2.0]);
+    Ok(())
+}
+
+#[test]
+fn parses_auto_detected_2d_text_to_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 10.0, 1)?,
+        vec![1.0, 2.0],
+        Metadata::named("auto two"),
+    )?;
+    let input = to_json(&spectrum)?;
+    let json = parse_spectrum_2d_text_json(&input)?;
+    let parsed: Spectrum2D = from_json(&json)?;
+
+    assert_eq!(parsed, spectrum);
+    Ok(())
+}
+
+#[test]
 fn scales_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\

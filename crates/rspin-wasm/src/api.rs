@@ -26,7 +26,10 @@ use rspin_analysis::{
     summarize_signals_2d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
-use rspin_io::{read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str};
+use rspin_io::{
+    read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_text,
+    read_spectrum2d_text,
+};
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
 pub use assignments::{
@@ -117,6 +120,26 @@ pub fn parse_nmrml_1d_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_nmrml_2d_json(input: &str) -> Result<String> {
     let spectrum = read_nmrml_2d_str(input)?;
+    to_json(&spectrum)
+}
+
+/// Parses auto-detected one-dimensional spectrum text into serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_spectrum_1d_text_json(input: &str) -> Result<String> {
+    let spectrum = read_spectrum1d_text(input)?;
+    to_json(&spectrum)
+}
+
+/// Parses auto-detected two-dimensional spectrum text into serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_spectrum_2d_text_json(input: &str) -> Result<String> {
+    let spectrum = read_spectrum2d_text(input)?;
     to_json(&spectrum)
 }
 
