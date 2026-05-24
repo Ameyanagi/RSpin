@@ -11,6 +11,7 @@ mod jcamp;
 mod jeol;
 mod json;
 mod nmrml;
+mod nmrml_2d;
 mod processing_json;
 mod traits;
 
@@ -36,6 +37,7 @@ pub use json::{
     write_spectrum1d_json, write_spectrum2d_json,
 };
 pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str};
+pub use nmrml_2d::{NmrMl2D, read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str};
 pub use processing_json::{
     JsonProcessingRecipe1D, JsonProcessingRecipe2D, read_processing_recipe_1d_json,
     read_processing_recipe_2d_json, write_processing_recipe_1d_json,

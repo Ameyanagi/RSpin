@@ -12,7 +12,7 @@ use rspin_core::{Nucleus, Unit};
 use rspin_io::{
     read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
     read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
-    read_nmrml_1d_file,
+    read_nmrml_1d_file, read_nmrml_2d_file,
 };
 
 #[test]
@@ -321,6 +321,42 @@ fn parses_external_nmrml_fid_fixture_when_available() -> anyhow::Result<()> {
             .intensities
             .iter()
             .any(|value| value.abs() > 100_000.0)
+    );
+    Ok(())
+}
+
+#[test]
+fn parses_external_nmrml_2d_fid_fixture_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("nmrml/examples/bmse000400-exp06.nmrML");
+    require_fixture(&fixture)?;
+
+    let spectrum = read_nmrml_2d_file(&fixture)?;
+
+    assert_eq!(spectrum.shape(), (4096, 256));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_close(spectrum.x.values.first().copied(), Some(0.0));
+    assert_close(
+        spectrum.x.values.last().copied(),
+        Some(0.584_765_999_999_999_9),
+    );
+    assert_close(spectrum.y.values.first().copied(), Some(0.0));
+    assert_close(
+        spectrum.y.values.last().copied(),
+        Some(0.033_813_000_000_000_02),
+    );
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("2D [1H,13C]-HSQC"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(499.842_349_248));
+    assert!(spectrum.imaginary.is_some());
+    assert!(
+        spectrum
+            .imaginary
+            .as_deref()
+            .is_some_and(|values| values.iter().any(|value| value.abs() > 1.0))
     );
     Ok(())
 }
