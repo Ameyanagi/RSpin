@@ -88,7 +88,7 @@ fn builder_options_render_exact_spectrum() -> anyhow::Result<()> {
         .with_points(11)
         .with_area(3.0)
         .with_line_width_hz(2.0)
-        .with_line_shape(LineShape::Gaussian)
+        .with_line_shape(LineShape::PseudoVoigt)
         .with_transition_options(ExactSpinOptions::new().with_spectrometer_mhz(400.0));
     let spectrum = options.simulate(&system)?;
 

@@ -16,6 +16,8 @@ pub enum PredictionLineShape {
     Lorentzian,
     /// Gaussian peak shape.
     Gaussian,
+    /// Equal-mixture pseudo-Voigt peak shape.
+    PseudoVoigt,
 }
 
 /// Options for rendering predicted one-dimensional signals into a spectrum.
@@ -179,8 +181,11 @@ fn line_shape_value(
     match line_shape {
         PredictionLineShape::Lorentzian => lorentzian(x_ppm, center_ppm, fwhm_ppm, area),
         PredictionLineShape::Gaussian => gaussian(x_ppm, center_ppm, fwhm_ppm, area),
+        PredictionLineShape::PseudoVoigt => pseudo_voigt(x_ppm, center_ppm, fwhm_ppm, area),
     }
 }
+
+const PSEUDO_VOIGT_LORENTZIAN_FRACTION: f64 = 0.5;
 
 fn lorentzian(x_ppm: f64, center_ppm: f64, fwhm_ppm: f64, area: f64) -> f64 {
     let half_width = fwhm_ppm / 2.0;
@@ -191,6 +196,13 @@ fn gaussian(x_ppm: f64, center_ppm: f64, fwhm_ppm: f64, area: f64) -> f64 {
     let sigma = fwhm_ppm / (2.0 * (2.0 * LN_2).sqrt());
     let normalizer = sigma * (2.0 * PI).sqrt();
     area * (-(x_ppm - center_ppm).powi(2) / (2.0 * sigma.powi(2))).exp() / normalizer
+}
+
+fn pseudo_voigt(x_ppm: f64, center_ppm: f64, fwhm_ppm: f64, area: f64) -> f64 {
+    let lorentzian_value = lorentzian(x_ppm, center_ppm, fwhm_ppm, area);
+    let gaussian_value = gaussian(x_ppm, center_ppm, fwhm_ppm, area);
+    PSEUDO_VOIGT_LORENTZIAN_FRACTION * lorentzian_value
+        + (1.0 - PSEUDO_VOIGT_LORENTZIAN_FRACTION) * gaussian_value
 }
 
 fn spectrum_name(prediction: &PredictionSet) -> Option<String> {

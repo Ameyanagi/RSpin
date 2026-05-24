@@ -301,7 +301,7 @@ fn simulates_exact_detected_spin_json() -> anyhow::Result<()> {
 fn simulates_exact_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = simulate_exact_spin_half_spectrum_json(
         r#"{"spins":[{"shift_ppm":2.0}],"couplings":[]}"#,
-        r#"{"from_ppm":1.99,"to_ppm":2.01,"points":11,"area":2.0,"line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
+        r#"{"from_ppm":1.99,"to_ppm":2.01,"points":11,"area":2.0,"line_width_hz":1.0,"line_shape":"PseudoVoigt","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
     )?;
     let spectrum: Spectrum1D = from_json(&spectrum_json)?;
 
@@ -342,7 +342,7 @@ fn validates_prediction_json() -> anyhow::Result<()> {
 fn renders_prediction_json() -> anyhow::Result<()> {
     let spectrum_json = render_prediction_1d_json(
         r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":1.0,"confidence":0.9,"assignments":["H1"]}],"correlations_2d":[],"provenance":{"source":"fixture","version":null}}"#,
-        r#"{"experiment":"Proton1D","nucleus":"Hydrogen1","from_ppm":0.99,"to_ppm":1.01,"points":3,"spectrometer_mhz":400.0,"line_width_hz":1.0,"line_shape":"Lorentzian","area_scale":1.0}"#,
+        r#"{"experiment":"Proton1D","nucleus":"Hydrogen1","from_ppm":0.99,"to_ppm":1.01,"points":3,"spectrometer_mhz":400.0,"line_width_hz":1.0,"line_shape":"PseudoVoigt","area_scale":1.0}"#,
     )?;
     let spectrum: Spectrum1D = from_json(&spectrum_json)?;
 

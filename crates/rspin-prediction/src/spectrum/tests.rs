@@ -74,6 +74,51 @@ fn supports_gaussian_line_shape() -> anyhow::Result<()> {
 }
 
 #[test]
+fn supports_pseudo_voigt_line_shape() -> anyhow::Result<()> {
+    let prediction = prediction_set();
+    let options = PredictionSpectrumOptions {
+        experiment: Some(Experiment::Proton1D),
+        nucleus: Some(Nucleus::Hydrogen1),
+        from_ppm: 0.99,
+        to_ppm: 1.01,
+        points: 3,
+        line_width_hz: 2.0,
+        ..PredictionSpectrumOptions::default()
+    };
+    let lorentzian = render_prediction_1d(
+        &prediction,
+        &PredictionSpectrumOptions {
+            line_shape: PredictionLineShape::Lorentzian,
+            ..options.clone()
+        },
+    )?;
+    let gaussian = render_prediction_1d(
+        &prediction,
+        &PredictionSpectrumOptions {
+            line_shape: PredictionLineShape::Gaussian,
+            ..options.clone()
+        },
+    )?;
+    let pseudo_voigt = render_prediction_1d(
+        &prediction,
+        &PredictionSpectrumOptions {
+            line_shape: PredictionLineShape::PseudoVoigt,
+            ..options
+        },
+    )?;
+
+    assert_close(
+        pseudo_voigt.intensities[0],
+        0.5 * (lorentzian.intensities[0] + gaussian.intensities[0]),
+    );
+    assert_close(
+        pseudo_voigt.intensities[1],
+        0.5 * (lorentzian.intensities[1] + gaussian.intensities[1]),
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_options() {
     let error = render_prediction_1d(
         &prediction_set(),
@@ -132,4 +177,8 @@ fn prediction_set() -> PredictionSet {
             version: Some("1".to_owned()),
         }),
     }
+}
+
+fn assert_close(actual: f64, expected: f64) {
+    assert!((actual - expected).abs() < 1e-12, "{actual} != {expected}");
 }

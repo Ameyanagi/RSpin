@@ -12,6 +12,8 @@ pub enum LineShape {
     Lorentzian,
     /// Gaussian peak shape.
     Gaussian,
+    /// Equal-mixture pseudo-Voigt peak shape.
+    PseudoVoigt,
 }
 
 impl LineShape {
@@ -31,9 +33,12 @@ impl LineShape {
         match self {
             Self::Lorentzian => lorentzian(x_ppm, center_ppm, fwhm_ppm, area),
             Self::Gaussian => gaussian(x_ppm, center_ppm, fwhm_ppm, area),
+            Self::PseudoVoigt => pseudo_voigt(x_ppm, center_ppm, fwhm_ppm, area),
         }
     }
 }
+
+const PSEUDO_VOIGT_LORENTZIAN_FRACTION: f64 = 0.5;
 
 fn lorentzian(x_ppm: f64, center_ppm: f64, fwhm_ppm: f64, area: f64) -> f64 {
     let half_width = fwhm_ppm / 2.0;
@@ -44,6 +49,13 @@ fn gaussian(x_ppm: f64, center_ppm: f64, fwhm_ppm: f64, area: f64) -> f64 {
     let sigma = fwhm_ppm / (2.0 * (2.0 * LN_2).sqrt());
     let normalizer = sigma * (2.0 * PI).sqrt();
     area * (-(x_ppm - center_ppm).powi(2) / (2.0 * sigma.powi(2))).exp() / normalizer
+}
+
+fn pseudo_voigt(x_ppm: f64, center_ppm: f64, fwhm_ppm: f64, area: f64) -> f64 {
+    let lorentzian_value = lorentzian(x_ppm, center_ppm, fwhm_ppm, area);
+    let gaussian_value = gaussian(x_ppm, center_ppm, fwhm_ppm, area);
+    PSEUDO_VOIGT_LORENTZIAN_FRACTION * lorentzian_value
+        + (1.0 - PSEUDO_VOIGT_LORENTZIAN_FRACTION) * gaussian_value
 }
 
 #[cfg(test)]
@@ -61,6 +73,15 @@ mod tests {
     fn gaussian_peak_height_tracks_area_and_width() {
         let height = LineShape::Gaussian.value(1.0, 1.0, 2.0, 100.0, 3.0);
         assert!(height > 0.0);
+    }
+
+    #[test]
+    fn pseudo_voigt_blends_lorentzian_and_gaussian() {
+        let lorentzian = LineShape::Lorentzian.value(1.01, 1.0, 2.0, 100.0, 3.0);
+        let gaussian = LineShape::Gaussian.value(1.01, 1.0, 2.0, 100.0, 3.0);
+        let pseudo_voigt = LineShape::PseudoVoigt.value(1.01, 1.0, 2.0, 100.0, 3.0);
+
+        assert_close(pseudo_voigt, 0.5 * (lorentzian + gaussian));
     }
 
     fn assert_close(actual: f64, expected: f64) {
