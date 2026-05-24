@@ -68,7 +68,8 @@ pub use jcamp::{
     JcampDx, JcampDxVersion, parse_jcamp_dx_version, read_jcamp_dx_1d, write_jcamp_dx_1d,
 };
 pub use jeol::{
-    JeolJdf1D, JeolJdf2D, read_jeol_jdf_1d_bytes, read_jeol_jdf_1d_file, read_jeol_jdf_2d_bytes,
+    JeolJdf1D, JeolJdf2D, JeolJdfInfo, JeolJdfVersion, inspect_jeol_jdf_bytes,
+    inspect_jeol_jdf_file, read_jeol_jdf_1d_bytes, read_jeol_jdf_1d_file, read_jeol_jdf_2d_bytes,
     read_jeol_jdf_2d_file,
 };
 pub use json::{

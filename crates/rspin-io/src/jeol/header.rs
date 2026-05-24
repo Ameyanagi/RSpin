@@ -183,4 +183,32 @@ impl Header {
             _ => 8,
         }
     }
+
+    pub(super) fn major_version(&self) -> u8 {
+        self.major_version
+    }
+
+    pub(super) fn minor_version(&self) -> u16 {
+        self.minor_version
+    }
+
+    pub(super) fn dimension_count(&self) -> usize {
+        usize::from(self.data_dimension_number)
+    }
+
+    pub(super) fn data_format_code(&self) -> u8 {
+        self.data_format
+    }
+
+    pub(super) fn data_type_code(&self) -> u8 {
+        self.data_type
+    }
+
+    pub(super) fn point_counts(&self) -> Result<Vec<usize>> {
+        self.data_points
+            .iter()
+            .take(self.dimension_count().min(self.data_points.len()))
+            .map(|value| usize_from_u32(*value, "JEOL JDF point count"))
+            .collect()
+    }
 }

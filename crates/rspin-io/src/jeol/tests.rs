@@ -8,7 +8,10 @@ use rspin_core::{Nucleus, RSpinError, Result, Unit};
 
 use crate::SpectrumPathReader;
 
-use super::{JeolJdf1D, JeolJdf2D, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes};
+use super::{
+    JeolJdf1D, JeolJdf2D, JeolJdfVersion, inspect_jeol_jdf_bytes, inspect_jeol_jdf_file,
+    read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
+};
 
 #[test]
 fn reads_synthetic_complex_1d_jdf() -> Result<()> {
@@ -50,6 +53,30 @@ fn reads_synthetic_complex_2d_jdf() -> Result<()> {
     assert_eq!(spectrum.metadata.name.as_deref(), Some("sample"));
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+    Ok(())
+}
+
+#[test]
+fn inspects_synthetic_jdf_header_metadata() -> anyhow::Result<()> {
+    let root = temp_dir("inspect")?;
+    let path = root.join("sample.jdf");
+    fs::write(&path, synthetic_complex_2d_jdf()?)?;
+
+    let info = inspect_jeol_jdf_file(&path)?;
+    let bytes_info = inspect_jeol_jdf_bytes(&fs::read(&path)?)?;
+
+    assert_eq!(info, bytes_info);
+    assert_eq!(info.version, JeolJdfVersion::new(1, 2));
+    assert_eq!(info.endian, "little");
+    assert_eq!(info.dimension_count, 2);
+    assert_eq!(info.data_format_name(), "two_d");
+    assert_eq!(info.data_type_name(), "float64");
+    assert_eq!(info.point_counts, vec![3, 2]);
+    assert_eq!(info.title.as_deref(), Some("synthetic 2d"));
+    assert!(info.is_supported_by_current_readers());
+    info.validate_supported_by_current_readers()?;
+
+    remove_dir(root)?;
     Ok(())
 }
 
@@ -108,6 +135,56 @@ fn rejects_unsupported_jdf_major_version() -> Result<()> {
         read_jeol_jdf_1d_bytes(&bytes).expect_err("unsupported JDF major version should fail");
 
     assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+#[test]
+fn inspects_unsupported_jdf_major_version() -> Result<()> {
+    let mut bytes = synthetic_complex_jdf()?;
+    bytes[9] = 2;
+
+    let info = inspect_jeol_jdf_bytes(&bytes)?;
+
+    assert_eq!(info.version.major, 2);
+    assert!(!info.is_supported_by_current_readers());
+    let error = info
+        .validate_supported_by_current_readers()
+        .expect_err("unsupported JDF major version should fail validation");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
+fn inspects_unsupported_jdf_dimension() -> Result<()> {
+    let mut bytes = synthetic_complex_jdf()?;
+    bytes[12] = 3;
+
+    let info = inspect_jeol_jdf_bytes(&bytes)?;
+
+    assert_eq!(info.dimension_count, 3);
+    assert_eq!(info.point_counts, vec![4, 0, 0]);
+    assert!(!info.is_supported_by_current_readers());
+    let error = info
+        .validate_supported_by_current_readers()
+        .expect_err("unsupported JDF dimensionality should fail validation");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
+fn inspects_unsupported_jdf_numeric_type() -> Result<()> {
+    let mut bytes = synthetic_complex_jdf()?;
+    bytes[14] = 0b1100_0001;
+
+    let info = inspect_jeol_jdf_bytes(&bytes)?;
+
+    assert_eq!(info.data_format_name(), "one_d");
+    assert_eq!(info.data_type_name(), "unknown");
+    assert!(!info.is_supported_by_current_readers());
+    let error = info
+        .validate_supported_by_current_readers()
+        .expect_err("unsupported JDF numeric type should fail validation");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
     Ok(())
 }
 

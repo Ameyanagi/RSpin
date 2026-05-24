@@ -231,6 +231,12 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     let bruker_info = inspect_bruker_parameter_file("##JCAMPDX= 5.00\n##DATATYPE= Parameters\n")?;
     assert_eq!(bruker_info.data_type.as_deref(), Some("Parameters"));
     assert!(bruker_info.is_supported_by_current_readers());
+    let jeol_version = JeolJdfVersion::new(1, 2);
+    assert_eq!(jeol_version.raw, "1.2");
+    assert!(jeol_version.is_supported_by_current_reader());
+    let error = inspect_jeol_jdf_bytes(b"not jdf")
+        .expect_err("invalid JEOL JDF bytes should fail inspection");
+    assert!(matches!(error, RSpinError::Parse { .. }));
     Ok(())
 }
 
