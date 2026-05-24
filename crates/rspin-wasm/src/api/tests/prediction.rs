@@ -1,7 +1,7 @@
-use rspin_prediction::PredictionSet;
+use rspin_io::{PREDICTION_JSON_FORMAT, read_prediction_json, write_prediction_json};
 
 use super::super::{
-    from_json, predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
+    predict_formula_with_element_rules_json, predict_molecule_with_element_rules_json,
     render_prediction_1d_json, render_prediction_2d_json, spectrum1d_from_json,
     spectrum2d_from_json, validate_prediction_json,
 };
@@ -11,7 +11,8 @@ fn validates_prediction_json() -> anyhow::Result<()> {
     let json = validate_prediction_json(
         r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":1.0,"confidence":0.9,"assignments":[]}],"correlations_2d":[],"provenance":null}"#,
     )?;
-    let prediction: PredictionSet = from_json(&json)?;
+    assert!(json.contains(PREDICTION_JSON_FORMAT));
+    let prediction = read_prediction_json(&json)?;
     assert_eq!(prediction.signals_1d.len(), 1);
     Ok(())
 }
@@ -22,7 +23,8 @@ fn predicts_molecule_with_element_rules_json() -> anyhow::Result<()> {
         r#"{"id":"ethanol","name":"ethanol","atoms":[{"id":"H1","element":"H","label":"H-a"},{"id":"C1","element":"C"},{"id":"O1","element":"O"}],"bonds":[{"from_atom_id":"C1","to_atom_id":"H1","order":"single"}]}"#,
         r#"{"rules":[{"element":"H","experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.25,"intensity":1.0,"confidence":0.8},{"element":"C","experiment":"Carbon13_1D","nucleus":"Carbon13","delta_ppm":63.0,"intensity":1.0}],"correlation_rules":[{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","intensity":0.5,"confidence":0.7}]}"#,
     )?;
-    let prediction: PredictionSet = from_json(&json)?;
+    assert!(json.contains(PREDICTION_JSON_FORMAT));
+    let prediction = read_prediction_json(&json)?;
 
     assert_eq!(prediction.name, Some("ethanol".to_owned()));
     assert_eq!(prediction.signals_1d.len(), 2);
@@ -50,7 +52,7 @@ fn predicts_formula_with_element_rules_json() -> anyhow::Result<()> {
         "C2H6O",
         r#"{"rules":[{"element":"H","experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.1,"intensity":1.0},{"element":"C","experiment":"Carbon13_1D","nucleus":"Carbon13","delta_ppm":30.0,"intensity":1.0}]}"#,
     )?;
-    let prediction: PredictionSet = from_json(&json)?;
+    let prediction = read_prediction_json(&json)?;
 
     assert_eq!(prediction.name, Some("ethanol".to_owned()));
     assert_eq!(prediction.signals_1d.len(), 8);
@@ -61,8 +63,11 @@ fn predicts_formula_with_element_rules_json() -> anyhow::Result<()> {
 
 #[test]
 fn renders_prediction_json() -> anyhow::Result<()> {
-    let spectrum_json = render_prediction_1d_json(
+    let prediction_json = write_prediction_json(&read_prediction_json(
         r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":1.0,"confidence":0.9,"assignments":["H1"]}],"correlations_2d":[],"provenance":{"source":"fixture","version":null}}"#,
+    )?)?;
+    let spectrum_json = render_prediction_1d_json(
+        &prediction_json,
         r#"{"experiment":"Proton1D","nucleus":"Hydrogen1","from_ppm":0.99,"to_ppm":1.01,"points":3,"spectrometer_mhz":400.0,"line_width_hz":1.0,"line_shape":"PseudoVoigt","area_scale":1.0}"#,
     )?;
     let spectrum = spectrum1d_from_json(&spectrum_json)?;

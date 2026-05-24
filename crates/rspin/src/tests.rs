@@ -347,6 +347,10 @@ fn prelude_supports_prediction_bond_correlations() -> Result<()> {
 
     assert_eq!(prediction.signals_1d.len(), 2);
     assert_eq!(prediction.correlations_2d.len(), 1);
+    let prediction_json = write_prediction_json(&prediction)?;
+    assert!(prediction_json.contains(PREDICTION_JSON_FORMAT));
+    assert!(prediction_json.contains(&format!("\"version\":{PREDICTION_JSON_VERSION}")));
+    assert_eq!(read_prediction_json(&prediction_json)?, prediction);
 
     let formula_atoms = atoms_from_formula("C2H6O")?;
     assert_eq!(formula_atoms.len(), 9);

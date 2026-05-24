@@ -12,6 +12,7 @@ flate2.workspace = true
 quick-xml.workspace = true
 rspin-analysis.workspace = true
 rspin-core.workspace = true
+rspin-prediction.workspace = true
 rspin-processing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
