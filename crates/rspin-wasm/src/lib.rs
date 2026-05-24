@@ -21,14 +21,14 @@ pub use api::{
     optimize_peaks_json, parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json,
     parse_spectrum_2d_csv_json, phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
     project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
-    resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
-    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
-    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
-    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, validate_j_coupling_graph_json,
-    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
-    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    render_prediction_2d_json, resample_spectrum_1d_json, resample_spectrum_2d_json,
+    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    simulate_first_order_multiplet_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
+    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
+    validate_j_coupling_graph_json, validate_prediction_json, write_spectrum_1d_csv_json,
+    write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -237,6 +237,20 @@ pub fn render_prediction_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     render_prediction_1d_json(prediction_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Renders a serialized two-dimensional prediction as a spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation,
+/// rendering, or serialization fails.
+#[wasm_bindgen(js_name = renderPrediction2d)]
+pub fn render_prediction_2d(
+    prediction_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    render_prediction_2d_json(prediction_json, options_json).map_err(|error| js_error(&error))
 }
 
 pub(crate) fn js_error(error: &RSpinError) -> JsValue {

@@ -246,7 +246,7 @@ fn render_signals(
         .collect()
 }
 
-fn line_shape_value(
+pub(crate) fn line_shape_value(
     line_shape: PredictionLineShape,
     x_ppm: f64,
     center_ppm: f64,
@@ -306,14 +306,14 @@ fn infer_nucleus(
     }
 }
 
-fn require_finite(field: &'static str, value: f64) -> Result<()> {
+pub(crate) fn require_finite(field: &'static str, value: f64) -> Result<()> {
     if !value.is_finite() {
         return Err(RSpinError::NonFinite { field });
     }
     Ok(())
 }
 
-fn require_positive(field: &'static str, value: f64) -> Result<()> {
+pub(crate) fn require_positive(field: &'static str, value: f64) -> Result<()> {
     require_finite(field, value)?;
     if value <= 0.0 {
         return Err(RSpinError::InvalidSpectrum {

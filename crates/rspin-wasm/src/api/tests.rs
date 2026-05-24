@@ -351,3 +351,23 @@ fn renders_prediction_json() -> anyhow::Result<()> {
     assert!(spectrum.intensities[1] > spectrum.intensities[0]);
     Ok(())
 }
+
+#[test]
+fn renders_prediction_2d_json() -> anyhow::Result<()> {
+    let spectrum_json = render_prediction_2d_json(
+        r#"{"name":"demo","signals_1d":[],"correlations_2d":[{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","x_ppm":1.0,"y_ppm":20.0,"intensity":1.0,"confidence":0.9,"assignments":["H1-C1"]}],"provenance":{"source":"fixture","version":null}}"#,
+        r#"{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","x_from_ppm":0.99,"x_to_ppm":1.01,"x_points":3,"y_from_ppm":19.9,"y_to_ppm":20.1,"y_points":3,"x_spectrometer_mhz":400.0,"y_spectrometer_mhz":100.0,"x_line_width_hz":1.0,"y_line_width_hz":4.0,"line_shape":"PseudoVoigt","volume_scale":1.0}"#,
+    )?;
+    let spectrum: Spectrum2D = from_json(&spectrum_json)?;
+
+    assert_eq!(spectrum.shape(), (3, 3));
+    assert_eq!(spectrum.metadata.origin, Some("fixture".to_owned()));
+    let Some(center) = spectrum.value_at(1, 1) else {
+        panic!("center point should exist");
+    };
+    let Some(edge) = spectrum.value_at(0, 0) else {
+        panic!("edge point should exist");
+    };
+    assert!(center > edge);
+    Ok(())
+}
