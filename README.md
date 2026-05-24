@@ -33,7 +33,7 @@ cargo test --workspace --all-features
 
 ## Optional Features
 
-- `external-baselines`: enables the optional Git-pinned `baselines` crate for
+- `external-baselines`: enables the optional crates.io `baselines` crate for
   additional baseline correction methods. It is off by default so the core
   library dependency graph stays small and reviewable.
 - `visualization-ruviz`: enables the standalone processed-data PNG example in
