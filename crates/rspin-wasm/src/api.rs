@@ -31,7 +31,8 @@ pub use csv_io::{
 pub use processing_1d::{
     crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
     magnitude_spectrum_1d_json, offset_spectrum_1d_json, phase_spectrum_1d_json,
-    shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
+    resample_spectrum_1d_json, shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json,
+    zero_fill_spectrum_1d_json,
 };
 pub use processing_2d::{
     auto_phase_spectrum_2d_json, crop_spectrum_2d_json, fft_spectrum_2d_json,

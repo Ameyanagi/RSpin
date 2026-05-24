@@ -2,10 +2,10 @@
 
 use serde::Deserialize;
 
-use rspin_core::{Result, Spectrum1D};
+use rspin_core::{Axis, Result, Spectrum1D};
 use rspin_processing::{
     BaselineMethod, FftDirection, crop_1d, exponential_apodization, fft_1d, magnitude_spectrum,
-    offset_intensity, phase_correct, shift_axis, subtract_baseline, zero_fill,
+    offset_intensity, phase_correct, resample_1d, shift_axis, subtract_baseline, zero_fill,
 };
 
 use super::{from_json, to_json};
@@ -51,6 +51,22 @@ pub fn zero_fill_spectrum_1d_json(spectrum_json: &str, target_len: usize) -> Res
 pub fn crop_spectrum_1d_json(spectrum_json: &str, from: f64, to: f64) -> Result<String> {
     let spectrum: Spectrum1D = from_json(spectrum_json)?;
     let processed = crop_1d(&spectrum, from, to)?;
+    to_json(&processed)
+}
+
+/// Resamples serialized `Spectrum1D` JSON onto a serialized target axis.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn resample_spectrum_1d_json(
+    spectrum_json: &str,
+    target_axis_json: &str,
+    outside_value: f64,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let target_axis: Axis = from_json(target_axis_json)?;
+    let processed = resample_1d(&spectrum, target_axis, outside_value)?;
     to_json(&processed)
 }
 

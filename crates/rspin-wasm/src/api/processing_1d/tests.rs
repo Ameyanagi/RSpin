@@ -40,6 +40,32 @@ fn crops_1d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn resamples_1d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+    let target_axis_json = to_json(&Axis::linear("x", Unit::Ppm, 0.0, 3.0, 7)?)?;
+    let resampled_json = resample_spectrum_1d_json(&spectrum_json, &target_axis_json, -1.0)?;
+    let resampled: Spectrum1D = from_json(&resampled_json)?;
+
+    assert_vec_close(&resampled.x.values, &[0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0]);
+    assert_vec_close(
+        &resampled.intensities,
+        &[1.0, -0.5, -2.0, 0.5, 3.0, 3.5, 4.0],
+    );
+    assert_option_vec_close(
+        resampled.imaginary.as_deref(),
+        &[0.5, -0.25, -1.0, 0.25, 1.5, 1.75, 2.0],
+    );
+    assert_eq!(
+        resampled
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("resample_1d")
+    );
+    Ok(())
+}
+
+#[test]
 fn roundtrips_1d_fft_json() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let spectrum_json = to_json(&spectrum)?;

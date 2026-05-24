@@ -1,11 +1,11 @@
 //! Chainable one-dimensional processing pipelines.
 
-use rspin_core::{Result, Spectrum1D};
+use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, Crop1D, ExponentialApodization, Fft1D, FftDirection,
-    Magnitude, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, ProcessingStep, ScaleIntensity,
-    ShiftAxis, SubtractBaseline, ZeroFill,
+    Magnitude, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D,
+    ScaleIntensity, ShiftAxis, SubtractBaseline, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -94,6 +94,18 @@ impl Spectrum1DPipeline {
     #[must_use]
     pub fn crop(self, from: f64, to: f64) -> Self {
         self.then(Crop1D { from, to })
+    }
+
+    /// Linearly resamples real and imaginary channels onto `target_axis`.
+    #[must_use]
+    pub fn resample(self, target_axis: Axis) -> Self {
+        self.then(Resample1D::new(target_axis))
+    }
+
+    /// Linearly resamples onto `target_axis` with an explicit outside value.
+    #[must_use]
+    pub fn resample_with_outside(self, target_axis: Axis, outside_value: f64) -> Self {
+        self.then(Resample1D::new(target_axis).with_outside_value(outside_value))
     }
 
     /// Applies exponential apodization to real and imaginary channels.
@@ -193,16 +205,18 @@ mod tests {
             .scale(2.0)
             .offset(-2.0)
             .crop(0.0, 1.0)
+            .resample(Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 3)?)
             .zero_fill(5)
             .normalize_max_abs()
             .finish()?;
 
         assert_eq!(processed.len(), 5);
-        assert_eq!(processed.intensities, vec![0.0, -1.0, 0.0, 0.0, 0.0]);
-        assert_eq!(processed.processing.len(), 5);
+        assert_eq!(processed.intensities, vec![0.0, -0.5, -1.0, 0.0, 0.0]);
+        assert_eq!(processed.processing.len(), 6);
         assert_eq!(processed.processing[0].operation, "scale_intensity");
         assert_eq!(processed.processing[2].operation, "crop_1d");
-        assert_eq!(processed.processing[4].operation, "normalize_max_abs");
+        assert_eq!(processed.processing[3].operation, "resample_1d");
+        assert_eq!(processed.processing[5].operation, "normalize_max_abs");
         Ok(())
     }
 
