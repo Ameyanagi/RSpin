@@ -1,3 +1,5 @@
+use std::f64::consts::{LN_2, PI};
+
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 
 use super::*;
@@ -11,6 +13,24 @@ fn apodization_decays_real_and_imaginary_channels() -> anyhow::Result<()> {
     let imaginary = require_imaginary(&processed)?;
     assert_close(imaginary[0], 0.5);
     assert!(imaginary[1] < 1.0);
+    Ok(())
+}
+
+#[test]
+fn gaussian_apodization_damps_real_and_imaginary_channels() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = gaussian_apodization(&spectrum, 1.0, 0.1)?;
+    let weight_one = (-(PI * 0.1_f64).powi(2) / (4.0 * LN_2)).exp();
+    let weight_two = (-(PI * 0.2_f64).powi(2) / (4.0 * LN_2)).exp();
+
+    assert_close(processed.intensities[0], 1.0);
+    assert_close(processed.intensities[1], 2.0 * weight_one);
+    assert_close(processed.intensities[2], 4.0 * weight_two);
+    let imaginary = require_imaginary(&processed)?;
+    assert_close(imaginary[0], 0.5);
+    assert_close(imaginary[1], weight_one);
+    assert_close(imaginary[2], 0.0);
+    assert_eq!(processed.processing[0].operation, "gaussian_apodization");
     Ok(())
 }
 
@@ -93,6 +113,19 @@ fn rejects_negative_line_broadening() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let error = exponential_apodization(&spectrum, -1.0, 0.1)
         .expect_err("negative line broadening should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_negative_gaussian_broadening() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let error = GaussianApodization {
+        gaussian_broadening_hz: -1.0,
+        dwell_time_s: 0.1,
+    }
+    .apply(&spectrum)
+    .expect_err("negative Gaussian broadening should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
     Ok(())
 }

@@ -6,9 +6,9 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
-    crop_1d, exponential_apodization, fft_1d, magnitude_spectrum, normalize_max_abs,
-    offset_intensity, phase_correct, resample_1d, scale_intensity, shift_axis, subtract_baseline,
-    zero_fill,
+    crop_1d, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,
+    normalize_max_abs, offset_intensity, phase_correct, resample_1d, scale_intensity, shift_axis,
+    subtract_baseline, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -60,6 +60,13 @@ pub enum ProcessingOperation1D {
         /// Dwell time in seconds.
         dwell_time_s: f64,
     },
+    /// Applies Gaussian apodization to real and imaginary channels.
+    GaussianApodization {
+        /// Gaussian broadening full width at half maximum in hertz.
+        gaussian_broadening_hz: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
     /// Applies a forward or inverse FFT.
     Fft {
         /// Transform direction.
@@ -106,6 +113,10 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 line_broadening_hz,
                 dwell_time_s,
             } => exponential_apodization(spectrum, *line_broadening_hz, *dwell_time_s),
+            Self::GaussianApodization {
+                gaussian_broadening_hz,
+                dwell_time_s,
+            } => gaussian_apodization(spectrum, *gaussian_broadening_hz, *dwell_time_s),
             Self::Fft { direction } => fft_1d(spectrum, *direction),
             Self::Magnitude => magnitude_spectrum(spectrum),
             Self::Phase {
@@ -263,6 +274,15 @@ impl ProcessingRecipe1D {
     pub fn exponential_apodization(self, line_broadening_hz: f64, dwell_time_s: f64) -> Self {
         self.with_operation(ProcessingOperation1D::ExponentialApodization {
             line_broadening_hz,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a Gaussian apodization operation.
+    #[must_use]
+    pub fn gaussian_apodization(self, gaussian_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::GaussianApodization {
+            gaussian_broadening_hz,
             dwell_time_s,
         })
     }

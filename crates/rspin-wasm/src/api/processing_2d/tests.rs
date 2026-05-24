@@ -130,6 +130,32 @@ fn roundtrips_2d_fft_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn gaussian_apodizes_2d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+    let apodized_json = gaussian_apodization_spectrum_2d_json(
+        &spectrum_json,
+        r#"{"x_gaussian_broadening_hz":1.0,"y_gaussian_broadening_hz":1.0,"x_dwell_time_s":0.1,"y_dwell_time_s":0.1}"#,
+    )?;
+    let apodized: Spectrum2D = from_json(&apodized_json)?;
+
+    assert!(apodized.z[1].abs() < 2.0);
+    assert!(apodized.z[2].abs() < 3.0);
+    let Some(imaginary) = apodized.imaginary.as_deref() else {
+        panic!("expected an imaginary channel");
+    };
+    assert!(imaginary[1].abs() < 1.0);
+    assert!(imaginary[2].abs() < 1.5);
+    assert_eq!(
+        apodized
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("gaussian_apodization_2d")
+    );
+    Ok(())
+}
+
+#[test]
 fn phases_and_auto_phases_2d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&positive_spectrum()?)?;
     let phased_json = phase_spectrum_2d_json(&spectrum_json, r#"{"x_zero_order_deg":45.0}"#)?;

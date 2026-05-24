@@ -15,6 +15,7 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
             Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
         )
         .zero_fill(4, 3)
+        .gaussian_apodization(0.0, 0.0, 0.1, 0.1)
         .normalize_max_abs()
         .finish()?;
 
@@ -36,12 +37,13 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
             0.0,
         ],
     );
-    assert_eq!(processed.processing.len(), 6);
+    assert_eq!(processed.processing.len(), 7);
     assert_eq!(processed.processing[0].operation, "scale_2d");
     assert_eq!(processed.processing[1].operation, "abs_2d");
     assert_eq!(processed.processing[2].operation, "crop_2d");
     assert_eq!(processed.processing[3].operation, "resample_2d");
-    assert_eq!(processed.processing[5].operation, "normalize_2d_max_abs");
+    assert_eq!(processed.processing[5].operation, "gaussian_apodization_2d");
+    assert_eq!(processed.processing[6].operation, "normalize_2d_max_abs");
     Ok(())
 }
 

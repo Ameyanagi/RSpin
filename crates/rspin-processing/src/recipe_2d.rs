@@ -6,8 +6,8 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 
 use crate::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingStep, abs_2d,
-    auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d, normalize_2d_max_abs,
-    resample_2d, scale_2d, zero_fill_2d,
+    auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d, gaussian_apodization_2d,
+    normalize_2d_max_abs, resample_2d, scale_2d, zero_fill_2d,
 };
 
 /// A serializable two-dimensional processing operation.
@@ -61,6 +61,17 @@ pub enum ProcessingOperation2D {
         /// Y-dimension dwell time in seconds.
         y_dwell_time_s: f64,
     },
+    /// Applies separable Gaussian apodization.
+    GaussianApodization {
+        /// X-dimension Gaussian broadening full width at half maximum in hertz.
+        x_gaussian_broadening_hz: f64,
+        /// Y-dimension Gaussian broadening full width at half maximum in hertz.
+        y_gaussian_broadening_hz: f64,
+        /// X-dimension dwell time in seconds.
+        x_dwell_time_s: f64,
+        /// Y-dimension dwell time in seconds.
+        y_dwell_time_s: f64,
+    },
     /// Applies a forward or inverse 2D FFT.
     Fft {
         /// Transform direction.
@@ -108,6 +119,18 @@ impl ProcessingStep<Spectrum2D> for ProcessingOperation2D {
                 spectrum,
                 *x_line_broadening_hz,
                 *y_line_broadening_hz,
+                *x_dwell_time_s,
+                *y_dwell_time_s,
+            ),
+            Self::GaussianApodization {
+                x_gaussian_broadening_hz,
+                y_gaussian_broadening_hz,
+                x_dwell_time_s,
+                y_dwell_time_s,
+            } => gaussian_apodization_2d(
+                spectrum,
+                *x_gaussian_broadening_hz,
+                *y_gaussian_broadening_hz,
                 *x_dwell_time_s,
                 *y_dwell_time_s,
             ),
@@ -266,6 +289,23 @@ impl ProcessingRecipe2D {
         self.with_operation(ProcessingOperation2D::ExponentialApodization {
             x_line_broadening_hz,
             y_line_broadening_hz,
+            x_dwell_time_s,
+            y_dwell_time_s,
+        })
+    }
+
+    /// Appends a separable Gaussian apodization operation.
+    #[must_use]
+    pub fn gaussian_apodization(
+        self,
+        x_gaussian_broadening_hz: f64,
+        y_gaussian_broadening_hz: f64,
+        x_dwell_time_s: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation2D::GaussianApodization {
+            x_gaussian_broadening_hz,
+            y_gaussian_broadening_hz,
             x_dwell_time_s,
             y_dwell_time_s,
         })

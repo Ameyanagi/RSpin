@@ -1,6 +1,6 @@
 //! Complex-domain one-dimensional processing.
 
-use std::f64::consts::PI;
+use std::f64::consts::{LN_2, PI};
 
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
 use rustfft::{FftPlanner, num_complex::Complex};
@@ -20,6 +20,21 @@ pub struct ExponentialApodization {
 impl ProcessingStep<Spectrum1D> for ExponentialApodization {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         exponential_apodization(spectrum, self.line_broadening_hz, self.dwell_time_s)
+    }
+}
+
+/// Applies Gaussian apodization to real and imaginary channels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GaussianApodization {
+    /// Gaussian broadening full width at half maximum in hertz.
+    pub gaussian_broadening_hz: f64,
+    /// Dwell time in seconds.
+    pub dwell_time_s: f64,
+}
+
+impl ProcessingStep<Spectrum1D> for GaussianApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        gaussian_apodization(spectrum, self.gaussian_broadening_hz, self.dwell_time_s)
     }
 }
 
@@ -112,6 +127,49 @@ pub fn exponential_apodization(
     Ok(processed.with_processing_record(
         ProcessingRecord::new("exponential_apodization").with_details(format!(
             "line_broadening_hz={line_broadening_hz},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies Gaussian apodization.
+///
+/// The multiplier at point `i` is
+/// `exp(-(pi * gaussian_broadening_hz * dwell_time_s * i)^2 / (4 * ln(2)))`.
+/// `gaussian_broadening_hz` is interpreted as the frequency-domain full width
+/// at half maximum contributed by the Gaussian window.
+///
+/// # Errors
+///
+/// Returns an error when Gaussian broadening is negative, dwell time is not
+/// positive, any parameter is non-finite, or the point count is too large for
+/// checked numeric conversion.
+pub fn gaussian_apodization(
+    spectrum: &Spectrum1D,
+    gaussian_broadening_hz: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    ensure_non_negative("gaussian_broadening_hz", gaussian_broadening_hz)?;
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let weights = gaussian_weights(
+        spectrum.len(),
+        gaussian_broadening_hz,
+        dwell_time_s,
+        "Gaussian apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("gaussian_apodization").with_details(format!(
+            "gaussian_broadening_hz={gaussian_broadening_hz},dwell_time_s={dwell_time_s}"
         )),
     ))
 }
@@ -269,6 +327,28 @@ fn index_denominator(len: usize) -> Result<f64> {
         message: "spectrum is too large for phase correction".to_owned(),
     })?;
     Ok(f64::from(denominator))
+}
+
+fn gaussian_weights(
+    len: usize,
+    gaussian_broadening_hz: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    let scale = PI * gaussian_broadening_hz * dwell_time_s;
+    let denominator = 4.0 * LN_2;
+    (0..len)
+        .map(|index| {
+            let index =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let scaled = scale * index;
+            Ok((-(scaled * scaled) / denominator).exp())
+        })
+        .collect()
 }
 
 fn ensure_non_negative(field: &'static str, value: f64) -> Result<()> {

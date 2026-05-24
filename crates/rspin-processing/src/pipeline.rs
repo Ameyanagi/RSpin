@@ -4,8 +4,8 @@ use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
     Abs1D, AutoPhaseOptions, BaselineMethod, Crop1D, ExponentialApodization, Fft1D, FftDirection,
-    Magnitude, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D,
-    ScaleIntensity, ShiftAxis, SubtractBaseline, ZeroFill,
+    GaussianApodization, Magnitude, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection,
+    ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis, SubtractBaseline, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -123,6 +123,15 @@ impl Spectrum1DPipeline {
         })
     }
 
+    /// Applies Gaussian apodization to real and imaginary channels.
+    #[must_use]
+    pub fn gaussian_apodization(self, gaussian_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        self.then(GaussianApodization {
+            gaussian_broadening_hz,
+            dwell_time_s,
+        })
+    }
+
     /// Applies a forward or inverse FFT.
     #[must_use]
     pub fn fft(self, direction: FftDirection) -> Self {
@@ -220,17 +229,19 @@ mod tests {
             .crop(0.0, 1.0)
             .resample(Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 3)?)
             .zero_fill(5)
+            .gaussian_apodization(0.0, 0.1)
             .normalize_max_abs()
             .finish()?;
 
         assert_eq!(processed.len(), 5);
         assert_eq!(processed.intensities, vec![0.0, 0.5, 1.0, 0.0, 0.0]);
-        assert_eq!(processed.processing.len(), 7);
+        assert_eq!(processed.processing.len(), 8);
         assert_eq!(processed.processing[0].operation, "scale_intensity");
         assert_eq!(processed.processing[2].operation, "abs_1d");
         assert_eq!(processed.processing[3].operation, "crop_1d");
         assert_eq!(processed.processing[4].operation, "resample_1d");
-        assert_eq!(processed.processing[6].operation, "normalize_max_abs");
+        assert_eq!(processed.processing[6].operation, "gaussian_apodization");
+        assert_eq!(processed.processing[7].operation, "normalize_max_abs");
         Ok(())
     }
 

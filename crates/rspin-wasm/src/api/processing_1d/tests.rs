@@ -140,6 +140,20 @@ fn apodizes_and_subtracts_baseline_json() -> anyhow::Result<()> {
             .map(|record| record.operation.as_str()),
         Some("exponential_apodization")
     );
+    let gaussian_json = gaussian_apodization_spectrum_1d_json(
+        &spectrum_json,
+        r#"{"gaussian_broadening_hz":1.0,"dwell_time_s":0.1}"#,
+    )?;
+    let gaussian: Spectrum1D = from_json(&gaussian_json)?;
+    assert!(gaussian.intensities[1] < 4.0);
+    assert!(gaussian.intensities[2] < 6.0);
+    assert_eq!(
+        gaussian
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("gaussian_apodization")
+    );
 
     let corrected_json =
         subtract_baseline_spectrum_1d_json(&spectrum_json, r#"{"method":"constant","value":1.5}"#)?;

@@ -24,7 +24,10 @@ mod zero_fill_2d;
 
 pub use abs_1d::{Abs1D, abs_1d};
 pub use abs_2d::{Abs2D, abs_2d};
-pub use apodization_2d::{ExponentialApodization2D, exponential_apodization_2d};
+pub use apodization_2d::{
+    ExponentialApodization2D, GaussianApodization2D, exponential_apodization_2d,
+    gaussian_apodization_2d,
+};
 pub use auto_phase::{AutoPhaseCorrection, AutoPhaseOptions, AutoPhaseResult, auto_phase_correct};
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
@@ -53,8 +56,8 @@ pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
 pub use transform::{
-    ExponentialApodization, Fft1D, FftDirection, Magnitude, PhaseCorrection,
-    exponential_apodization, fft_1d, magnitude_spectrum, phase_correct,
+    ExponentialApodization, Fft1D, FftDirection, GaussianApodization, Magnitude, PhaseCorrection,
+    exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum, phase_correct,
 };
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{

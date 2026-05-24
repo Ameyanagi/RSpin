@@ -4,9 +4,9 @@ use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     Abs2D, AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
-    FftDirection, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Resample2D,
-    Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
-    slice_y_at_x_index,
+    FftDirection, GaussianApodization2D, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep,
+    ProjectionMode, Resample2D, Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y,
+    slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -124,6 +124,23 @@ impl Spectrum2DPipeline {
         self.then(ExponentialApodization2D {
             x_line_broadening_hz,
             y_line_broadening_hz,
+            x_dwell_time_s,
+            y_dwell_time_s,
+        })
+    }
+
+    /// Applies separable Gaussian apodization.
+    #[must_use]
+    pub fn gaussian_apodization(
+        self,
+        x_gaussian_broadening_hz: f64,
+        y_gaussian_broadening_hz: f64,
+        x_dwell_time_s: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        self.then(GaussianApodization2D {
+            x_gaussian_broadening_hz,
+            y_gaussian_broadening_hz,
             x_dwell_time_s,
             y_dwell_time_s,
         })
