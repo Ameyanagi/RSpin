@@ -104,10 +104,11 @@ mod tests {
         let spectrum = Spectrum1D::new(
             Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
             vec![1.0, 2.0, 3.0],
-            Metadata::named("one"),
+            Metadata::named("one").with_property("vendor.field", "value"),
         )?;
         let text = write_spectrum1d_json(&spectrum)?;
         let parsed = read_spectrum1d_json(&text)?;
+        assert!(text.contains("properties"));
         assert_eq!(parsed, spectrum);
         Ok(())
     }

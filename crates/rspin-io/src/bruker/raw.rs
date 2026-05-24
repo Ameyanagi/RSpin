@@ -12,7 +12,8 @@ use std::{
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
 use super::{
-    optional_f64, optional_i32, parse_parameter_file, read_text, required_usize, text_parameter,
+    optional_f64, optional_i32, parse_parameter_file, prefixed_parameter_properties, read_text,
+    required_usize, text_parameter,
 };
 
 pub use two_d::{BrukerSer2D, read_bruker_ser_2d_dir};
@@ -142,7 +143,8 @@ pub(super) fn build_raw_metadata(acqus: &BTreeMap<String, String>) -> Result<Met
         solvent,
         temperature_k,
         origin,
-        molecules: Vec::new(),
+        properties: prefixed_parameter_properties("bruker.acqus", acqus),
+        ..Metadata::default()
     })
 }
 

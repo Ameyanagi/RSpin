@@ -298,8 +298,9 @@ fn spectrum_from_frequency_domain(raw: RawNmrMl1D, version: &str) -> Result<Spec
         solvent: raw.solvent,
         temperature_k: raw.temperature_k,
         origin: Some(format!("nmrML {version}")),
-        molecules: Vec::new(),
-    };
+        ..Metadata::default()
+    }
+    .with_property("nmrml.version", version);
 
     Spectrum1D::new(axis, intensities, metadata)
 }
@@ -318,8 +319,9 @@ fn fid_from_raw(raw: RawNmrMl1D, version: &str) -> Result<Spectrum1D> {
         solvent: raw.solvent,
         temperature_k: raw.temperature_k,
         origin: Some(format!("nmrML {version}")),
-        molecules: Vec::new(),
-    };
+        ..Metadata::default()
+    }
+    .with_property("nmrml.version", version);
 
     Spectrum1D::new_complex(axis, real, imaginary, metadata)
 }

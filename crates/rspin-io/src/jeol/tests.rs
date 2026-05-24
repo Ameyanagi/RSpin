@@ -17,6 +17,10 @@ fn reads_synthetic_complex_1d_jdf() -> Result<()> {
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("DMSO-D6"));
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+    assert_eq!(
+        spectrum.metadata.property("jeol.parameter.solvent"),
+        Some("DMSO-D6")
+    );
     assert_close(spectrum.metadata.frequency_mhz, Some(400.0));
     assert_close(spectrum.metadata.temperature_k, Some(298.15));
     Ok(())

@@ -189,7 +189,8 @@ fn build_metadata(header: &Header, parameters: &Parameters) -> Metadata {
         solvent,
         temperature_k,
         origin: Some("JEOL".to_owned()),
-        molecules: Vec::new(),
+        properties: parameters.properties(),
+        ..Metadata::default()
     }
 }
 

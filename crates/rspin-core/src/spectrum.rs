@@ -179,6 +179,7 @@ impl Spectrum1D {
         imaginary: Option<Vec<f64>>,
         metadata: Metadata,
     ) -> Result<Self> {
+        metadata.validate()?;
         validate_vector("intensities", &intensities)?;
         if x.len() != intensities.len() {
             return Err(RSpinError::InvalidSpectrum {
@@ -284,6 +285,7 @@ impl Spectrum2D {
         imaginary: Option<Vec<f64>>,
         metadata: Metadata,
     ) -> Result<Self> {
+        metadata.validate()?;
         validate_vector("z", &z)?;
         let expected = x
             .len()

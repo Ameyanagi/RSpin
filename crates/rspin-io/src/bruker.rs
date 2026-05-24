@@ -251,8 +251,30 @@ fn build_metadata(
         solvent,
         temperature_k,
         origin,
-        molecules: Vec::new(),
+        properties: processed_metadata_properties(procs, acqus),
+        ..Metadata::default()
     })
+}
+
+fn processed_metadata_properties(
+    procs: &BTreeMap<String, String>,
+    acqus: Option<&BTreeMap<String, String>>,
+) -> BTreeMap<String, String> {
+    let mut properties = prefixed_parameter_properties("bruker.procs", procs);
+    if let Some(acqus) = acqus {
+        properties.extend(prefixed_parameter_properties("bruker.acqus", acqus));
+    }
+    properties
+}
+
+pub(super) fn prefixed_parameter_properties(
+    prefix: &str,
+    parameters: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    parameters
+        .iter()
+        .map(|(key, value)| (format!("{prefix}.{key}"), value.clone()))
+        .collect()
 }
 
 fn text_parameter(parameters: &BTreeMap<String, String>, key: &str) -> Option<String> {

@@ -34,6 +34,10 @@ fn reads_raw_1d_fid_dataset_root() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCl3"));
     assert_eq!(spectrum.metadata.temperature_k, Some(300.0));
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("raw fixture"));
+    assert_eq!(
+        spectrum.metadata.property("bruker.acqus.PULPROG"),
+        Some("zg")
+    );
 
     remove_dir(root)?;
     Ok(())

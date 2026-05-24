@@ -38,6 +38,11 @@ fn reads_processed_1d_dataset_root() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCl3"));
     assert_eq!(spectrum.metadata.temperature_k, Some(298.15));
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("local fixture"));
+    assert_eq!(spectrum.metadata.property("bruker.procs.SF"), Some("400"));
+    assert_eq!(
+        spectrum.metadata.property("bruker.acqus.SFO1"),
+        Some("400.13")
+    );
     assert_eq!(spectrum.x.unit, Unit::Ppm);
     assert_close(spectrum.x.values[0], 10.0);
     assert_close(spectrum.x.values[1], 20.0 / 3.0);

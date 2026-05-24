@@ -1,5 +1,7 @@
 //! Metadata carried by spectra and derived values.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::Nucleus;
@@ -23,6 +25,13 @@ pub struct Metadata {
     /// Sample molecules associated with this spectrum or dataset.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub molecules: Vec<Molecule>,
+    /// Additional stable metadata properties.
+    ///
+    /// Readers use these key/value pairs to preserve format-specific metadata
+    /// that does not have a dedicated field yet. Keys should be namespaced by
+    /// source, for example `bruker.acqus.SFO1` or `agilent.procpar.sfrq`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub properties: BTreeMap<String, String>,
 }
 
 impl Metadata {
@@ -146,10 +155,62 @@ impl Metadata {
         self
     }
 
+    /// Sets an additional metadata property.
+    #[must_use]
+    pub fn with_property(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.properties.insert(key.into(), value.into());
+        self
+    }
+
+    /// Replaces all additional metadata properties.
+    #[must_use]
+    pub fn with_properties(mut self, properties: BTreeMap<String, String>) -> Self {
+        self.properties = properties;
+        self
+    }
+
+    /// Removes an additional metadata property.
+    #[must_use]
+    pub fn without_property(mut self, key: &str) -> Self {
+        self.properties.remove(key);
+        self
+    }
+
+    /// Clears all additional metadata properties.
+    #[must_use]
+    pub fn without_properties(mut self) -> Self {
+        self.properties.clear();
+        self
+    }
+
+    /// Returns an additional metadata property by key.
+    #[must_use]
+    pub fn property(&self, key: &str) -> Option<&str> {
+        self.properties.get(key).map(String::as_str)
+    }
+
     /// Finds a sample molecule by stable identifier.
     #[must_use]
     pub fn molecule(&self, id: &str) -> Option<&Molecule> {
         self.molecules.iter().find(|molecule| molecule.id == id)
+    }
+
+    /// Validates molecules and additional metadata properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a molecule is invalid, molecule IDs are duplicate,
+    /// or a property key is empty.
+    pub fn validate(&self) -> Result<()> {
+        self.validate_molecules()?;
+        for key in self.properties.keys() {
+            if key.trim().is_empty() {
+                return Err(RSpinError::InvalidMetadata {
+                    message: "metadata property key must not be empty".to_owned(),
+                });
+            }
+        }
+        Ok(())
     }
 
     /// Validates all sample molecules and checks for duplicate molecule IDs.
@@ -185,7 +246,8 @@ mod tests {
             .with_solvent("CDCl3")
             .with_temperature_k(298.0)
             .with_origin("fixture")
-            .with_molecule(Molecule::new("sample").with_name("Sample"));
+            .with_molecule(Molecule::new("sample").with_name("Sample"))
+            .with_property("vendor.field", "value");
 
         assert_eq!(metadata.name.as_deref(), Some("demo"));
         assert_eq!(metadata.nucleus, Some(Nucleus::Hydrogen1));
@@ -199,7 +261,8 @@ mod tests {
                 .and_then(|molecule| molecule.name.as_deref()),
             Some("Sample")
         );
-        metadata.validate_molecules()?;
+        assert_eq!(metadata.property("vendor.field"), Some("value"));
+        metadata.validate()?;
 
         let cleared = metadata
             .without_name()
@@ -208,7 +271,8 @@ mod tests {
             .without_solvent()
             .without_temperature_k()
             .without_origin()
-            .without_molecules();
+            .without_molecules()
+            .without_properties();
 
         assert_eq!(cleared, Metadata::default());
         Ok(())
@@ -221,7 +285,17 @@ mod tests {
             .with_molecule(Molecule::new("sample"));
 
         assert!(matches!(
-            metadata.validate_molecules(),
+            metadata.validate(),
+            Err(RSpinError::InvalidMetadata { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_metadata_property_keys() {
+        let metadata = Metadata::new().with_property(" ", "value");
+
+        assert!(matches!(
+            metadata.validate(),
             Err(RSpinError::InvalidMetadata { .. })
         ));
     }

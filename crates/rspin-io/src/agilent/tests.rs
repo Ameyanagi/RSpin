@@ -53,6 +53,10 @@ operator 2 2 8 0 0 2 1 0 1 64
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCl3"));
     assert_eq!(spectrum.metadata.temperature_k, Some(298.15));
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("fixture user"));
+    assert_eq!(
+        spectrum.metadata.property("agilent.procpar.sfrq"),
+        Some("400.13")
+    );
 
     remove_dir(root)?;
     Ok(())

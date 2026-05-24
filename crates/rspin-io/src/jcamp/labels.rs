@@ -47,7 +47,7 @@ pub(super) fn metadata_from_raw(raw: &RawJcamp) -> Metadata {
         solvent: raw.solvent.clone(),
         temperature_k: raw.temperature_k,
         origin: raw.origin.clone(),
-        molecules: Vec::new(),
+        ..Metadata::default()
     }
 }
 

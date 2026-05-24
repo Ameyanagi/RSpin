@@ -829,8 +829,18 @@ fn build_metadata(parameters: &BTreeMap<String, Vec<String>>) -> Metadata {
         solvent,
         temperature_k,
         origin: first_text(parameters, "operator").or_else(|| first_text(parameters, "username")),
-        molecules: Vec::new(),
+        properties: procpar_metadata_properties(parameters),
+        ..Metadata::default()
     }
+}
+
+fn procpar_metadata_properties(
+    parameters: &BTreeMap<String, Vec<String>>,
+) -> BTreeMap<String, String> {
+    parameters
+        .iter()
+        .map(|(key, values)| (format!("agilent.procpar.{key}"), values.join(" ")))
+        .collect()
 }
 
 fn validate_2d_procpar(parameters: &BTreeMap<String, Vec<String>>) -> Result<()> {

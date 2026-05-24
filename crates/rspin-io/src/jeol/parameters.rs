@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rspin_core::{RSpinError, Result};
 
 use super::{
@@ -83,6 +85,18 @@ impl Parameters {
         self.get(name).and_then(Parameter::magnitude)
     }
 
+    pub(super) fn properties(&self) -> BTreeMap<String, String> {
+        self.entries
+            .iter()
+            .map(|entry| {
+                (
+                    format!("jeol.parameter.{}", entry.name),
+                    entry.value.as_string(),
+                )
+            })
+            .collect()
+    }
+
     fn get(&self, name: &str) -> Option<&Parameter> {
         self.entries.iter().find(|entry| entry.name == name)
     }
@@ -148,4 +162,14 @@ enum ParameterValue {
     String(String),
     Integer(i32),
     Float(f64),
+}
+
+impl ParameterValue {
+    fn as_string(&self) -> String {
+        match self {
+            Self::String(value) => value.clone(),
+            Self::Integer(value) => value.to_string(),
+            Self::Float(value) => value.to_string(),
+        }
+    }
 }
