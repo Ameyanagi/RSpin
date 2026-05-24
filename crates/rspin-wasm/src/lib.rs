@@ -6,11 +6,12 @@ use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
 
 pub use api::{
-    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, integrate_region_json,
-    normalize_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json, pick_peaks_json,
-    render_prediction_1d_json, scale_spectrum_1d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
-    summarize_signals_1d_json, validate_j_coupling_graph_json, validate_prediction_json,
+    auto_phase_spectrum_1d_json, decompose_exact_spin_half_spectrum_json, detect_multiplets_json,
+    integrate_region_json, normalize_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
+    pick_peaks_json, render_prediction_1d_json, scale_spectrum_1d_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    simulate_first_order_multiplet_json, summarize_signals_1d_json, validate_j_coupling_graph_json,
+    validate_prediction_json,
 };
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
@@ -43,6 +44,20 @@ pub fn scale_spectrum_1d(spectrum_json: &str, factor: f64) -> std::result::Resul
 #[wasm_bindgen(js_name = normalizeSpectrum1d)]
 pub fn normalize_spectrum_1d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
     normalize_spectrum_1d_json(spectrum_json).map_err(|error| js_error(&error))
+}
+
+/// Automatically phases a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = autoPhaseSpectrum1d)]
+pub fn auto_phase_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    auto_phase_spectrum_1d_json(spectrum_json, options_json).map_err(|error| js_error(&error))
 }
 
 /// Picks peaks from a serialized one-dimensional spectrum.

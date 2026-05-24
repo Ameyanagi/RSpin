@@ -11,7 +11,7 @@ use rspin_analysis::{
 use rspin_core::{RSpinError, Result, Spectrum1D};
 use rspin_io::read_jcamp_dx_1d;
 use rspin_prediction::{PredictionSet, PredictionSpectrumOptions, render_prediction_1d};
-use rspin_processing::{normalize_max_abs, scale_intensity};
+use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 use rspin_simulation::{
     ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
     decompose_exact_spin_half_1d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
@@ -48,6 +48,23 @@ pub fn normalize_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
     let spectrum: Spectrum1D = from_json(spectrum_json)?;
     let processed = normalize_max_abs(&spectrum)?;
     to_json(&processed)
+}
+
+/// Automatically phases serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn auto_phase_spectrum_1d_json(spectrum_json: &str, options_json: &str) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let options: AutoPhaseOptionsJson = from_json(options_json)?;
+    let result = auto_phase_correct(&spectrum, options.into())?;
+    to_json(&AutoPhaseResponseJson {
+        spectrum: result.spectrum,
+        zero_order_deg: result.zero_order_deg,
+        first_order_deg: result.first_order_deg,
+        score: result.score,
+    })
 }
 
 /// Picks peaks from serialized `Spectrum1D` JSON.
@@ -244,6 +261,61 @@ fn to_json<T: Serialize>(value: &T) -> Result<String> {
         format: "JSON",
         message: error.to_string(),
     })
+}
+
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+#[serde(default)]
+struct AutoPhaseOptionsJson {
+    zero_order_min_deg: f64,
+    zero_order_max_deg: f64,
+    zero_order_step_deg: f64,
+    first_order_min_deg: f64,
+    first_order_max_deg: f64,
+    first_order_step_deg: f64,
+    pivot_fraction: f64,
+    imaginary_weight: f64,
+    negative_weight: f64,
+}
+
+impl Default for AutoPhaseOptionsJson {
+    fn default() -> Self {
+        let options = AutoPhaseOptions::default();
+        Self {
+            zero_order_min_deg: options.zero_order_min_deg,
+            zero_order_max_deg: options.zero_order_max_deg,
+            zero_order_step_deg: options.zero_order_step_deg,
+            first_order_min_deg: options.first_order_min_deg,
+            first_order_max_deg: options.first_order_max_deg,
+            first_order_step_deg: options.first_order_step_deg,
+            pivot_fraction: options.pivot_fraction,
+            imaginary_weight: options.imaginary_weight,
+            negative_weight: options.negative_weight,
+        }
+    }
+}
+
+impl From<AutoPhaseOptionsJson> for AutoPhaseOptions {
+    fn from(options: AutoPhaseOptionsJson) -> Self {
+        Self {
+            zero_order_min_deg: options.zero_order_min_deg,
+            zero_order_max_deg: options.zero_order_max_deg,
+            zero_order_step_deg: options.zero_order_step_deg,
+            first_order_min_deg: options.first_order_min_deg,
+            first_order_max_deg: options.first_order_max_deg,
+            first_order_step_deg: options.first_order_step_deg,
+            pivot_fraction: options.pivot_fraction,
+            imaginary_weight: options.imaginary_weight,
+            negative_weight: options.negative_weight,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+struct AutoPhaseResponseJson {
+    spectrum: Spectrum1D,
+    zero_order_deg: f64,
+    first_order_deg: f64,
+    score: f64,
 }
 
 #[cfg(test)]

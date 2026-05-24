@@ -1,4 +1,4 @@
-use rspin_core::Spectrum1D;
+use rspin_core::{Axis, Metadata, Spectrum1D, Unit};
 
 use super::*;
 
@@ -35,6 +35,34 @@ fn scales_spectrum_json() -> anyhow::Result<()> {
     let scaled_json = scale_spectrum_1d_json(&spectrum_json, 0.5)?;
     let scaled: Spectrum1D = from_json(&scaled_json)?;
     assert_eq!(scaled.intensities, vec![1.0, 2.0]);
+    Ok(())
+}
+
+#[test]
+fn auto_phases_spectrum_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new_complex(
+        Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![
+            std::f64::consts::FRAC_1_SQRT_2,
+            2.0 * std::f64::consts::FRAC_1_SQRT_2,
+            std::f64::consts::FRAC_1_SQRT_2,
+        ],
+        Some(vec![
+            std::f64::consts::FRAC_1_SQRT_2,
+            2.0 * std::f64::consts::FRAC_1_SQRT_2,
+            std::f64::consts::FRAC_1_SQRT_2,
+        ]),
+        Metadata::default(),
+    )?;
+    let spectrum_json = to_json(&spectrum)?;
+    let result_json = auto_phase_spectrum_1d_json(
+        &spectrum_json,
+        r#"{"zero_order_min_deg":-90.0,"zero_order_max_deg":90.0,"zero_order_step_deg":5.0,"first_order_min_deg":0.0,"first_order_max_deg":0.0,"first_order_step_deg":1.0,"pivot_fraction":0.5,"imaginary_weight":1.0,"negative_weight":4.0}"#,
+    )?;
+    let result: AutoPhaseResponseJson = from_json(&result_json)?;
+
+    assert!((result.zero_order_deg + 45.0).abs() < 1.0e-12);
+    assert!(result.spectrum.intensities[1] > 1.99);
     Ok(())
 }
 
