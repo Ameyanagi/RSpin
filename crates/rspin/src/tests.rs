@@ -250,6 +250,9 @@ Larmor=500.0
     assert_eq!(assignment_set.len(), 1);
     let coupling_graph = nmredata_couplings_to_j_coupling_graph(&trait_record, Nucleus::Hydrogen1)?;
     assert_eq!(coupling_graph.couplings.len(), 1);
+    let analysis: NmreDataAnalysis = nmredata_to_analysis(&trait_record, Nucleus::Hydrogen1)?;
+    assert_eq!(analysis.assignment_set.len(), 1);
+    assert_eq!(analysis.j_coupling_graph.couplings.len(), 1);
     let records = vec![trait_record];
     let records_text =
         <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;

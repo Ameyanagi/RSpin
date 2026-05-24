@@ -218,6 +218,12 @@ H1, Hcombo, 7.0
     assert_eq!(graph.couplings[0].node_b, "Hcombo");
     assert_close(graph.couplings[0].j_hz, 7.0);
     assert_eq!(graph.couplings[0].source.as_deref(), Some("NMReDATA"));
+
+    let analysis = nmredata_to_analysis(&record, Nucleus::Hydrogen1)?;
+    assert_eq!(analysis.assignment_set, assignments);
+    assert_eq!(analysis.j_coupling_graph, graph);
+    let inherent_analysis = record.to_analysis(Nucleus::Hydrogen1)?;
+    assert_eq!(inherent_analysis, analysis);
     Ok(())
 }
 

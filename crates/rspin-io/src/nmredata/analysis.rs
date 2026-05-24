@@ -7,10 +7,29 @@ use rspin_analysis::{
     JCouplingGraph,
 };
 use rspin_core::{Nucleus, Result};
+use serde::{Deserialize, Serialize};
 
 use super::NmreDataRecord;
 
+/// Analysis models derived from one parsed `NMReDATA` record.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct NmreDataAnalysis {
+    /// Converted one-dimensional assignment set.
+    pub assignment_set: AssignmentSet,
+    /// Converted J-coupling graph.
+    pub j_coupling_graph: JCouplingGraph,
+}
+
 impl NmreDataRecord {
+    /// Converts parsed assignments and scalar couplings into analysis models.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either generated analysis payload is invalid.
+    pub fn to_analysis(&self, nucleus: impl Into<Nucleus>) -> Result<NmreDataAnalysis> {
+        nmredata_to_analysis(self, nucleus)
+    }
+
     /// Converts parsed `NMReDATA` chemical-shift assignments to an [`AssignmentSet`].
     ///
     /// Each `NMReDATA` assignment becomes a one-dimensional peak target at the
@@ -37,6 +56,22 @@ impl NmreDataRecord {
     pub fn to_j_coupling_graph(&self, nucleus: impl Into<Nucleus>) -> Result<JCouplingGraph> {
         nmredata_couplings_to_j_coupling_graph(self, nucleus)
     }
+}
+
+/// Converts parsed assignments and scalar couplings into analysis models.
+///
+/// # Errors
+///
+/// Returns an error when either generated analysis payload is invalid.
+pub fn nmredata_to_analysis(
+    record: &NmreDataRecord,
+    nucleus: impl Into<Nucleus>,
+) -> Result<NmreDataAnalysis> {
+    let nucleus = nucleus.into();
+    Ok(NmreDataAnalysis {
+        assignment_set: nmredata_assignments_to_assignment_set(record, nucleus.clone())?,
+        j_coupling_graph: nmredata_couplings_to_j_coupling_graph(record, nucleus)?,
+    })
 }
 
 /// Converts parsed `NMReDATA` chemical-shift assignments to an [`AssignmentSet`].
