@@ -42,7 +42,7 @@ pub use clustering::{
     cluster_spectrum_matrix_2d_json, cut_cluster_result_at_distance_json,
     cut_cluster_result_to_count_json,
 };
-pub use consensus::detect_consensus_peaks_1d_json;
+pub use consensus::{detect_consensus_peaks_1d_json, detect_consensus_ranges_1d_json};
 pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,

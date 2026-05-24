@@ -7,8 +7,13 @@ use rspin_core::{RSpinError, Result, Spectrum1D};
 use crate::{Peak, PeakPolarity, pick_peaks};
 
 mod model;
+mod ranges;
 
-pub use model::{ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions};
+pub use model::{
+    ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions, ConsensusRange1D,
+    ConsensusRangeMember1D, ConsensusRangeOptions,
+};
+pub use ranges::detect_consensus_ranges_1d;
 
 /// Detects and groups consensus peaks across one-dimensional spectra.
 ///

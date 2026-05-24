@@ -14,10 +14,10 @@ pub use analysis::{
     align_spectra_by_peak_to_matrix_1d, bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d,
     bucket_spectrum_2d, cluster_bucket_matrix_1d, cluster_bucket_matrix_2d,
     cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d, cut_cluster_result_at_distance,
-    cut_cluster_result_to_count, detect_consensus_peaks_1d, detect_ranges_1d, detect_zones_2d,
-    pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d, pairwise_spectrum_matrix_1d,
-    pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d, pca_bucket_matrix_2d,
-    pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
+    cut_cluster_result_to_count, detect_consensus_peaks_1d, detect_consensus_ranges_1d,
+    detect_ranges_1d, detect_zones_2d, pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d,
+    pairwise_spectrum_matrix_1d, pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d,
+    pca_bucket_matrix_2d, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
 };
 #[cfg(feature = "first-order")]
 pub use api::simulate_first_order_multiplet_json;
@@ -32,7 +32,7 @@ pub use api::{
     cluster_spectrum_matrix_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
     cut_cluster_result_at_distance_json, cut_cluster_result_to_count_json,
     decompose_exact_spin_half_spectrum_json, detect_consensus_peaks_1d_json,
-    detect_multiplets_json, detect_ranges_json, detect_zones_json,
+    detect_consensus_ranges_1d_json, detect_multiplets_json, detect_ranges_json, detect_zones_json,
     exponential_apodization_spectrum_1d_json, extract_contours_2d_json, fft_spectrum_1d_json,
     fft_spectrum_2d_json, generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
     integrate_region_2d_json, integrate_region_json, magnitude_spectrum_1d_json,

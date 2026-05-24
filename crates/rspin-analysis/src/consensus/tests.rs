@@ -1,7 +1,7 @@
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 
 use super::*;
-use crate::{PeakPickOptions, PeakPolarity};
+use crate::{PeakPickOptions, PeakPolarity, RangeDetectionOptions};
 
 #[test]
 fn detects_consensus_peaks_across_spectra() -> anyhow::Result<()> {
@@ -78,6 +78,113 @@ fn returns_empty_when_no_peaks_pass_threshold() -> anyhow::Result<()> {
     )?;
 
     assert!(peaks.is_empty());
+    Ok(())
+}
+
+#[test]
+fn detects_consensus_ranges_across_spectra() -> anyhow::Result<()> {
+    let spectra = vec![
+        spectrum("a", 0.0, &[0.0, 2.0, 3.0, 0.0, 0.0])?,
+        spectrum("b", 0.02, &[0.0, 4.0, 5.0, 0.0, 0.0])?,
+    ];
+
+    let ranges = detect_consensus_ranges_1d(
+        &spectra,
+        ConsensusRangeOptions::new()
+            .with_max_gap(0.05)
+            .with_min_spectrum_count(2)
+            .with_range_options(
+                RangeDetectionOptions::new()
+                    .with_threshold_abs(1.0)
+                    .with_min_active_points(1),
+            ),
+    )?;
+
+    assert_eq!(ranges.len(), 1);
+    assert_eq!(ranges[0].id, "consensus-range1d:0");
+    assert_eq!(ranges[0].range_count, 2);
+    assert_eq!(ranges[0].spectrum_count, 2);
+    assert_eq!(ranges[0].members[0].row_id, "0:a");
+    assert_eq!(ranges[0].members[1].row_id, "1:b");
+    assert_close(ranges[0].from, 1.0);
+    assert_close(ranges[0].to, 2.02);
+    assert_close(ranges[0].max_abs_intensity, 5.0);
+    assert!(ranges[0].total_abs_area > 0.0);
+    assert!(ranges[0].center_x > 1.0 && ranges[0].center_x < 2.02);
+    Ok(())
+}
+
+#[test]
+fn filters_consensus_ranges_by_spectrum_count_and_gap() -> anyhow::Result<()> {
+    let spectra = vec![
+        spectrum("a", 0.0, &[0.0, 2.0, 3.0, 0.0, 5.0, 0.0])?,
+        spectrum("b", 0.02, &[0.0, 4.0, 5.0, 0.0, 0.0, 0.0])?,
+        spectrum("c", 0.5, &[0.0, 0.0, 0.0, 6.0, 0.0, 0.0])?,
+    ];
+
+    let ranges = detect_consensus_ranges_1d(
+        &spectra,
+        ConsensusRangeOptions::new()
+            .with_max_gap(0.05)
+            .with_min_spectrum_count(2)
+            .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0)),
+    )?;
+
+    assert_eq!(ranges.len(), 1);
+    assert_eq!(ranges[0].spectrum_count, 2);
+    assert_eq!(ranges[0].members.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn returns_empty_when_no_ranges_pass_threshold() -> anyhow::Result<()> {
+    let spectra = vec![
+        spectrum("a", 0.0, &[0.0, 0.5, 0.0])?,
+        spectrum("b", 0.0, &[0.0, 0.6, 0.0])?,
+    ];
+
+    let ranges = detect_consensus_ranges_1d(
+        &spectra,
+        ConsensusRangeOptions::new()
+            .with_max_gap(0.1)
+            .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0)),
+    )?;
+
+    assert!(ranges.is_empty());
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_consensus_range_inputs() -> anyhow::Result<()> {
+    let spectra = vec![spectrum("a", 0.0, &[0.0, 1.0, 0.0])?];
+    let negative_gap_error =
+        detect_consensus_ranges_1d(&spectra, ConsensusRangeOptions::new().with_max_gap(-1.0))
+            .expect_err("negative gap should fail");
+    assert!(matches!(
+        negative_gap_error,
+        RSpinError::InvalidSpectrum { .. }
+    ));
+
+    let empty_error = detect_consensus_ranges_1d(&[], ConsensusRangeOptions::new())
+        .expect_err("empty input should fail");
+    assert!(matches!(empty_error, RSpinError::InvalidSpectrum { .. }));
+
+    let mixed_units = vec![
+        Spectrum1D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![0.0, 1.0, 0.0],
+            Metadata::named("ppm"),
+        )?,
+        Spectrum1D::new(
+            Axis::linear("x", Unit::Hertz, 0.0, 2.0, 3)?,
+            vec![0.0, 1.0, 0.0],
+            Metadata::named("hz"),
+        )?,
+    ];
+    let unit_error = detect_consensus_ranges_1d(&mixed_units, ConsensusRangeOptions::new())
+        .expect_err("mixed units should fail");
+    assert!(matches!(unit_error, RSpinError::InvalidSpectrum { .. }));
+
     Ok(())
 }
 
