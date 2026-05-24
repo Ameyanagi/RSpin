@@ -3,8 +3,9 @@
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    ExponentialApodization2D, Normalize2DMaxAbs, ProcessingStep, ProjectionMode, Scale2D,
-    ZeroFill2D, project_x, project_y, slice_x_at_y_index, slice_y_at_x_index,
+    ExponentialApodization2D, Fft2D, FftDirection, Normalize2DMaxAbs, ProcessingStep,
+    ProjectionMode, Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y_index,
+    slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -96,6 +97,12 @@ impl Spectrum2DPipeline {
             x_dwell_time_s,
             y_dwell_time_s,
         })
+    }
+
+    /// Applies a full two-dimensional FFT or inverse FFT.
+    #[must_use]
+    pub fn fft(self, direction: FftDirection) -> Self {
+        self.then(Fft2D { direction })
     }
 
     /// Returns the processed 2D spectrum.
@@ -239,6 +246,23 @@ mod tests {
 
         assert_eq!(row.intensities, vec![2.0, -2.5, 3.0]);
         assert_eq!(column.intensities, vec![-1.0, -2.5]);
+        Ok(())
+    }
+
+    #[test]
+    fn chains_2d_fft_steps() -> anyhow::Result<()> {
+        let spectrum = demo_spectrum()?;
+        let processed = spectrum
+            .process()
+            .fft(FftDirection::Forward)
+            .fft(FftDirection::Inverse)
+            .finish()?;
+
+        assert_vec_close(&processed.z, &[1.0, -2.0, 3.0, 4.0, -5.0, 6.0]);
+        assert!(processed.imaginary.is_some());
+        assert_eq!(processed.processing.len(), 2);
+        assert_eq!(processed.processing[0].operation, "fft_2d");
+        assert_eq!(processed.processing[1].operation, "fft_2d");
         Ok(())
     }
 
