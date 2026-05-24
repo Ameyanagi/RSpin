@@ -196,6 +196,18 @@ pub fn nmredata_couplings_to_j_coupling_graph_json(
     to_json(&graph)
 }
 
+/// Converts `NMReDATA` record JSON into serialized combined analysis JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, nucleus parsing, conversion, or
+/// serialization fails.
+pub fn nmredata_to_analysis_json(record_json: &str, nucleus_label: &str) -> Result<String> {
+    let record: NmreDataRecord = from_json(record_json)?;
+    let analysis = record.to_analysis(parse_nucleus_label(nucleus_label)?)?;
+    to_json(&analysis)
+}
+
 /// Parses root-level nmrML document metadata into JSON.
 ///
 /// # Errors

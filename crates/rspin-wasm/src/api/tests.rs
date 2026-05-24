@@ -325,6 +325,29 @@ H1, Hcombo, 7.0
     assert_eq!(graph["couplings"][0]["node_a"], "H1");
     assert_eq!(graph["couplings"][0]["node_b"], "Hcombo");
     assert_eq!(graph["couplings"][0]["j_hz"], 7.0);
+
+    let analysis_json = nmredata_to_analysis_json(&record_json, "1H")?;
+    let analysis: serde_json::Value = from_json(&analysis_json)?;
+    assert_eq!(
+        analysis["assignment_set"]["assignments"]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
+    assert_eq!(
+        analysis["assignment_set"]["assignments"][1]["atoms"][1]["nucleus"],
+        "Hydrogen1"
+    );
+    assert_eq!(
+        analysis["j_coupling_graph"]["couplings"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        analysis["j_coupling_graph"]["couplings"][0]["node_b"],
+        "Hcombo"
+    );
     Ok(())
 }
 
@@ -342,6 +365,12 @@ H2, H1, 7.0
         .expect_err("duplicate coupling pairs should fail");
     assert!(matches!(
         duplicate_error,
+        RSpinError::InvalidAssignment { .. }
+    ));
+    let analysis_error = nmredata_to_analysis_json(&record_json, "1H")
+        .expect_err("duplicate coupling pairs should fail in combined analysis");
+    assert!(matches!(
+        analysis_error,
         RSpinError::InvalidAssignment { .. }
     ));
 
