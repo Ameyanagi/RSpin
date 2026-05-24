@@ -4,7 +4,7 @@ use rspin_analysis::AssignmentTarget;
 use rspin_core::{Nucleus, RSpinError};
 
 use super::*;
-use crate::{SpectrumPathWriter, SpectrumReader, SpectrumWriter};
+use crate::{SpectrumPathReader, SpectrumPathWriter, SpectrumReader, SpectrumWriter};
 
 #[test]
 fn parses_header_assignments_couplings_and_spectra() -> anyhow::Result<()> {
@@ -268,6 +268,13 @@ H1, 4.200, H1
     let records_text =
         <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;
     assert_eq!(records_text.matches("$$$$").count(), 2);
+    let trait_records = SpectrumReader::read_str(&NmreDataRecords, &records_text)?;
+    assert_eq!(trait_records.len(), 2);
+    let records_codec_text = <NmreDataRecords as SpectrumWriter<[NmreDataRecord]>>::write_string(
+        &NmreDataRecords,
+        &trait_records,
+    )?;
+    assert_eq!(records_codec_text.matches("$$$$").count(), 2);
 
     let path = std::env::temp_dir().join(format!(
         "rspin-nmredata-trait-{}-{}.sdf",
@@ -276,8 +283,12 @@ H1, 4.200, H1
             .duration_since(std::time::UNIX_EPOCH)?
             .as_nanos()
     ));
-    <NmreData as SpectrumPathWriter<[NmreDataRecord]>>::write_path(&NmreData, &records, &path)?;
-    let from_file = read_nmredata_records_str(&std::fs::read_to_string(&path)?)?;
+    <NmreDataRecords as SpectrumPathWriter<[NmreDataRecord]>>::write_path(
+        &NmreDataRecords,
+        &records,
+        &path,
+    )?;
+    let from_file = SpectrumPathReader::read_path(&NmreDataRecords, &path)?;
     assert_eq!(from_file.len(), 2);
     std::fs::remove_file(path)?;
     Ok(())
@@ -411,11 +422,20 @@ a, not-a-number, 1
 
 #[test]
 fn reads_bytes_and_file() -> anyhow::Result<()> {
-    let payload = b">  <NMREDATA_VERSION>\n1.1\n";
+    let payload = b">  <NMREDATA_VERSION>\n1.1\n$$$$\n>  <NMREDATA_VERSION>\n1.2\n";
     let parsed = NmreData.read_bytes(payload)?;
     assert_eq!(
         parsed.version.as_ref().map(|version| version.major),
         Some(1)
+    );
+    let parsed_records = read_nmredata_records_bytes(payload)?;
+    assert_eq!(parsed_records.len(), 2);
+    assert_eq!(
+        parsed_records[1]
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.2")
     );
 
     let path = std::env::temp_dir().join(format!(
@@ -431,6 +451,10 @@ fn reads_bytes_and_file() -> anyhow::Result<()> {
         from_file.version.as_ref().map(|version| version.minor),
         Some(Some(1))
     );
+    let all_from_file = read_nmredata_records_file(&path)?;
+    assert_eq!(all_from_file.len(), 2);
+    let all_from_codec = NmreDataRecords.read_file(&path)?;
+    assert_eq!(all_from_codec, all_from_file);
     std::fs::remove_file(path)?;
     Ok(())
 }

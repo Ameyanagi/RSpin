@@ -257,7 +257,18 @@ Larmor=500.0
     let records_text =
         <NmreData as SpectrumWriter<[NmreDataRecord]>>::write_string(&NmreData, &records)?;
     assert_eq!(records_text.matches("$$$$").count(), 1);
+    let trait_records: Vec<NmreDataRecord> =
+        SpectrumReader::read_str(&NmreDataRecords, &records_text)?;
+    assert_eq!(trait_records.len(), 1);
+    let bytes_records = read_nmredata_records_bytes(records_text.as_bytes())?;
+    assert_eq!(bytes_records, trait_records);
+    let records_codec_text = <NmreDataRecords as SpectrumWriter<[NmreDataRecord]>>::write_string(
+        &NmreDataRecords,
+        &trait_records,
+    )?;
+    assert_eq!(records_codec_text.matches("$$$$").count(), 1);
     assert_eq!(format!("{NmreData:?}"), "NmreData");
+    assert_eq!(format!("{NmreDataRecords:?}"), "NmreDataRecords");
     Ok(())
 }
 

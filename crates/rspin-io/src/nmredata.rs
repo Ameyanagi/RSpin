@@ -24,6 +24,10 @@ const FORMAT: &str = "NMReDATA";
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NmreData;
 
+/// Reader for multi-record `NMReDATA` SDF payloads.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct NmreDataRecords;
+
 impl NmreData {
     /// Reads the first `NMReDATA` record from an SDF string.
     ///
@@ -122,6 +126,71 @@ impl SpectrumWriter<NmreDataRecord> for NmreData {
 }
 
 impl SpectrumWriter<[NmreDataRecord]> for NmreData {
+    fn write_string(&self, records: &[NmreDataRecord]) -> Result<String> {
+        write_nmredata_records(records)
+    }
+}
+
+impl NmreDataRecords {
+    /// Reads all `NMReDATA` records from an SDF string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the payload contains no records or any record has
+    /// malformed `NMReDATA` tags.
+    pub fn read_str(self, input: &str) -> Result<Vec<NmreDataRecord>> {
+        read_nmredata_records_str(input)
+    }
+
+    /// Reads all `NMReDATA` records from a file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be read, contains no records, or
+    /// any record has malformed `NMReDATA` tags.
+    pub fn read_file(self, path: impl AsRef<Path>) -> Result<Vec<NmreDataRecord>> {
+        read_nmredata_records_file(path)
+    }
+
+    /// Reads all `NMReDATA` records from UTF-8 bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the payload is not UTF-8, contains no records, or
+    /// any record has malformed `NMReDATA` tags.
+    pub fn read_bytes(self, bytes: &[u8]) -> Result<Vec<NmreDataRecord>> {
+        read_nmredata_records_bytes(bytes)
+    }
+
+    /// Writes multiple `NMReDATA` records as SDF text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the record list is empty or any record contains
+    /// invalid tag names or values.
+    pub fn write_string(self, records: &[NmreDataRecord]) -> Result<String> {
+        write_nmredata_records(records)
+    }
+
+    /// Writes multiple `NMReDATA` records to an SDF file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when serialization or filesystem writing fails.
+    pub fn write_file(self, records: &[NmreDataRecord], path: impl AsRef<Path>) -> Result<()> {
+        write_nmredata_records_file(records, path)
+    }
+}
+
+impl SpectrumReader for NmreDataRecords {
+    type Output = Vec<NmreDataRecord>;
+
+    fn read_str(&self, input: &str) -> Result<Self::Output> {
+        read_nmredata_records_str(input)
+    }
+}
+
+impl SpectrumWriter<[NmreDataRecord]> for NmreDataRecords {
     fn write_string(&self, records: &[NmreDataRecord]) -> Result<String> {
         write_nmredata_records(records)
     }
@@ -322,12 +391,8 @@ pub struct NmreDataSignal2D {
 /// Returns an error when the file cannot be read, contains no records, or has
 /// malformed `NMReDATA` tags.
 pub fn read_nmredata_file(path: impl AsRef<Path>) -> Result<NmreDataRecord> {
-    let path = path.as_ref();
-    let input = fs::read_to_string(path).map_err(|error| RSpinError::Parse {
-        format: FORMAT,
-        message: format!("failed to read {}: {error}", path.display()),
-    })?;
-    read_nmredata_str(&input)
+    let records = read_nmredata_records_file(path)?;
+    first_record(records)
 }
 
 /// Reads the first `NMReDATA` SDF record from UTF-8 bytes.
@@ -337,11 +402,8 @@ pub fn read_nmredata_file(path: impl AsRef<Path>) -> Result<NmreDataRecord> {
 /// Returns an error when the payload is not UTF-8, contains no records, or has
 /// malformed `NMReDATA` tags.
 pub fn read_nmredata_bytes(bytes: &[u8]) -> Result<NmreDataRecord> {
-    let input = std::str::from_utf8(bytes).map_err(|error| RSpinError::Parse {
-        format: FORMAT,
-        message: format!("input is not valid UTF-8: {error}"),
-    })?;
-    read_nmredata_str(input)
+    let records = read_nmredata_records_bytes(bytes)?;
+    first_record(records)
 }
 
 /// Reads the first `NMReDATA` SDF record from a string.
@@ -352,10 +414,43 @@ pub fn read_nmredata_bytes(bytes: &[u8]) -> Result<NmreDataRecord> {
 /// `NMReDATA` tags.
 pub fn read_nmredata_str(input: &str) -> Result<NmreDataRecord> {
     let records = read_nmredata_records_str(input)?;
+    first_record(records)
+}
+
+fn first_record(records: Vec<NmreDataRecord>) -> Result<NmreDataRecord> {
     records.into_iter().next().ok_or_else(|| RSpinError::Parse {
         format: FORMAT,
         message: "missing NMReDATA record".to_owned(),
     })
+}
+
+/// Reads all `NMReDATA` SDF records from a file.
+///
+/// # Errors
+///
+/// Returns an error when the file cannot be read, contains no records, or any
+/// record has malformed `NMReDATA` tags.
+pub fn read_nmredata_records_file(path: impl AsRef<Path>) -> Result<Vec<NmreDataRecord>> {
+    let path = path.as_ref();
+    let input = fs::read_to_string(path).map_err(|error| RSpinError::Parse {
+        format: FORMAT,
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    read_nmredata_records_str(&input)
+}
+
+/// Reads all `NMReDATA` SDF records from UTF-8 bytes.
+///
+/// # Errors
+///
+/// Returns an error when the payload is not UTF-8, contains no records, or any
+/// record has malformed `NMReDATA` tags.
+pub fn read_nmredata_records_bytes(bytes: &[u8]) -> Result<Vec<NmreDataRecord>> {
+    let input = std::str::from_utf8(bytes).map_err(|error| RSpinError::Parse {
+        format: FORMAT,
+        message: format!("input is not valid UTF-8: {error}"),
+    })?;
+    read_nmredata_records_str(input)
 }
 
 /// Reads all `NMReDATA` SDF records from a string.
