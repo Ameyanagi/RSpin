@@ -274,6 +274,43 @@ fn reads_two_dimensional_ntuple_pages() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_two_dimensional_complex_ntuple_pages() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=complex two dimensional
+##UNITS=PPM, PPM, ARBITRARY UNITS
+##FACTOR=1,1,0.5
+##FIRST=1,10,0
+##LAST=0,11,0
+##VAR_DIM=2,2,2
+##PAGE=F1=10
+##DATA TABLE=(X++(R..R)), XYDATA
+1 2 4
+##PAGE=F1=10
+##DATA TABLE=(X++(I..I)), XYDATA
+1 1 3
+##PAGE=F1=11
+##DATA TABLE=(X++(R..R)), XYDATA
+1 6 8
+##PAGE=F1=11
+##DATA TABLE=(X++(I..I)), XYDATA
+1 5 7
+##END=
+";
+    let spectrum = read_jcamp_dx_2d(input)?;
+
+    assert_eq!(
+        spectrum.metadata.name.as_deref(),
+        Some("complex two dimensional")
+    );
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_axis_close(&spectrum.x.values, &[1.0, 0.0]);
+    assert_axis_close(&spectrum.y.values, &[10.0, 11.0]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![0.5, 1.5, 2.5, 3.5]));
+    Ok(())
+}
+
+#[test]
 fn reads_two_dimensional_pages_with_linear_indirect_axis() -> anyhow::Result<()> {
     let input = "\
 ##TITLE=linear indirect
@@ -540,7 +577,7 @@ fn rejects_non_uniform_two_dimensional_x_export() -> anyhow::Result<()> {
 }
 
 #[test]
-fn rejects_complex_two_dimensional_jcamp_export() -> anyhow::Result<()> {
+fn writes_complex_two_dimensional_jcamp_export() -> anyhow::Result<()> {
     let spectrum = Spectrum2D::new_complex(
         Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
         Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
@@ -549,8 +586,13 @@ fn rejects_complex_two_dimensional_jcamp_export() -> anyhow::Result<()> {
         Metadata::named("complex 2d"),
     )?;
 
-    let error = write_jcamp_dx_2d(&spectrum).expect_err("complex 2D export should fail explicitly");
-    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    let text = write_jcamp_dx_2d(&spectrum)?;
+    assert!(text.contains("##DATA TABLE=(X++(R..R)), XYDATA"));
+    assert!(text.contains("##DATA TABLE=(X++(I..I)), XYDATA"));
+    let parsed = read_jcamp_dx_2d(&text)?;
+    assert_eq!(parsed.metadata.name.as_deref(), Some("complex 2d"));
+    assert_eq!(parsed.z, spectrum.z);
+    assert_eq!(parsed.imaginary, spectrum.imaginary);
     Ok(())
 }
 

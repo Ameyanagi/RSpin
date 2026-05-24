@@ -46,19 +46,28 @@ struct RawJcamp2D {
 #[derive(Clone, Debug, Default)]
 struct Jcamp2DPage {
     y_value: Option<f64>,
+    channel: Channel2D,
     values: Vec<f64>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Channel2D {
+    #[default]
+    Real,
+    Imaginary,
 }
 
 #[derive(Clone, Copy)]
 enum DataBlock2D {
-    PageValues,
+    PageValues(Channel2D),
 }
 
 /// Reads a two-dimensional spectrum from JCAMP-DX text.
 ///
 /// This parser targets numeric or ASDF-compressed NTUPLES page data where each
 /// page contains an `XYDATA`/`DATA TABLE` row sequence for one indirect-axis
-/// coordinate. It supports `VAR_DIM`, `FACTOR`, `FIRST`, `LAST`, `UNITS`,
+/// coordinate. Real and imaginary pages may be encoded as paired `R..R`/`I..I`
+/// data tables. It supports `VAR_DIM`, `FACTOR`, `FIRST`, `LAST`, `UNITS`,
 /// `PAGE`, and common metadata labels.
 ///
 /// # Errors
@@ -72,8 +81,18 @@ pub fn read_jcamp_dx_2d(input: &str) -> Result<Spectrum2D> {
         if let Some((key, value)) = super::parse_labeled_line(line) {
             let normalized_key = super::normalized_key(key);
             data_block = match normalized_key.as_str() {
-                "XYDATA" => Some(DataBlock2D::PageValues),
-                "DATATABLE" => data_table_block_2d(value),
+                "XYDATA" => {
+                    let channel = data_table_channel_2d(value);
+                    set_current_page_channel(&mut raw, channel);
+                    Some(DataBlock2D::PageValues(channel))
+                }
+                "DATATABLE" => {
+                    let block = data_table_block_2d(value);
+                    if let Some(DataBlock2D::PageValues(channel)) = block {
+                        set_current_page_channel(&mut raw, channel);
+                    }
+                    block
+                }
                 _ => None,
             };
             apply_label_2d(&mut raw, &normalized_key, value)?;
@@ -95,15 +114,16 @@ pub fn read_jcamp_dx_2d(input: &str) -> Result<Spectrum2D> {
         }
 
         match data_block {
-            Some(DataBlock2D::PageValues) => {
+            Some(DataBlock2D::PageValues(channel)) => {
                 let page = current_page(&mut raw);
+                page.channel = channel;
                 super::parse_xydata_line(line, &mut page.values)?;
             }
             None => {}
         }
     }
 
-    spectrum_from_raw_2d(raw)
+    spectrum_from_raw_2d(&raw)
 }
 
 fn apply_label_2d(raw: &mut RawJcamp2D, key: &str, value: &str) -> Result<()> {
@@ -138,6 +158,7 @@ fn apply_label_2d(raw: &mut RawJcamp2D, key: &str, value: &str) -> Result<()> {
         "UNITS" => apply_units(raw, value),
         "PAGE" => raw.pages.push(Jcamp2DPage {
             y_value: parse_page_coordinate(value)?,
+            channel: Channel2D::Real,
             values: Vec::new(),
         }),
         _ => {}
@@ -215,10 +236,23 @@ fn apply_units(raw: &mut RawJcamp2D, value: &str) {
 fn data_table_block_2d(value: &str) -> Option<DataBlock2D> {
     let upper = value.to_ascii_uppercase();
     if upper.contains("XYDATA") || upper.contains("PEAKS") {
-        Some(DataBlock2D::PageValues)
+        Some(DataBlock2D::PageValues(data_table_channel_2d(value)))
     } else {
         None
     }
+}
+
+fn data_table_channel_2d(value: &str) -> Channel2D {
+    let upper = value.to_ascii_uppercase();
+    if upper.contains("I..I") {
+        Channel2D::Imaginary
+    } else {
+        Channel2D::Real
+    }
+}
+
+fn set_current_page_channel(raw: &mut RawJcamp2D, channel: Channel2D) {
+    current_page(raw).channel = channel;
 }
 
 fn current_page(raw: &mut RawJcamp2D) -> &mut Jcamp2DPage {
@@ -229,7 +263,7 @@ fn current_page(raw: &mut RawJcamp2D) -> &mut Jcamp2DPage {
     &mut raw.pages[index]
 }
 
-fn spectrum_from_raw_2d(raw: RawJcamp2D) -> Result<Spectrum2D> {
+fn spectrum_from_raw_2d(raw: &RawJcamp2D) -> Result<Spectrum2D> {
     if raw.pages.is_empty() {
         return Err(RSpinError::Parse {
             format: "JCAMP-DX",
@@ -237,43 +271,57 @@ fn spectrum_from_raw_2d(raw: RawJcamp2D) -> Result<Spectrum2D> {
         });
     }
 
-    let width = infer_width(&raw)?;
-    let height = infer_height(&raw)?;
-    let x_axis = x_axis(&raw, width)?;
-    let y_axis = y_axis(&raw, height)?;
-    let metadata = metadata_from_raw_2d(&raw);
+    let real_page_indices = page_indices(raw, Channel2D::Real);
+    let imaginary_page_indices = page_indices(raw, Channel2D::Imaginary);
+    let width = infer_width(raw, &real_page_indices)?;
+    let height = infer_height(raw, real_page_indices.len())?;
+    validate_imaginary_pages(raw, &real_page_indices, &imaginary_page_indices)?;
+    let x_axis = x_axis(raw, width)?;
+    let y_axis = y_axis(raw, &real_page_indices, height)?;
+    let metadata = metadata_from_raw_2d(raw);
     let z_factor = super::option_or(raw.z_factor, 1.0);
-    let mut z = Vec::with_capacity(width * height);
+    let z = scaled_page_values(
+        raw,
+        &real_page_indices,
+        width,
+        z_factor,
+        "2D JCAMP-DX intensity",
+    )?;
+    let imaginary = if imaginary_page_indices.is_empty() {
+        None
+    } else {
+        Some(scaled_page_values(
+            raw,
+            &imaginary_page_indices,
+            width,
+            z_factor,
+            "2D JCAMP-DX imaginary intensity",
+        )?)
+    };
 
-    for (page_index, page) in raw.pages.into_iter().enumerate() {
-        if page.values.len() < width {
-            return Err(RSpinError::Parse {
-                format: "JCAMP-DX",
-                message: format!(
-                    "2D JCAMP-DX page {} has {} values but expected at least {width}",
-                    page_index + 1,
-                    page.values.len()
-                ),
-            });
-        }
-        for value in page.values.into_iter().take(width) {
-            z.push(super::scale_value(
-                "2D JCAMP-DX intensity",
-                value,
-                z_factor,
-            )?);
-        }
-    }
-
-    Spectrum2D::new(x_axis, y_axis, z, metadata)
+    Spectrum2D::new_complex(x_axis, y_axis, z, imaginary, metadata)
 }
 
-fn infer_width(raw: &RawJcamp2D) -> Result<usize> {
+fn page_indices(raw: &RawJcamp2D, channel: Channel2D) -> Vec<usize> {
+    raw.pages
+        .iter()
+        .enumerate()
+        .filter_map(|(index, page)| {
+            if page.channel == channel {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+fn infer_width(raw: &RawJcamp2D, page_indices: &[usize]) -> Result<usize> {
     let width = match raw.x_points {
         Some(points) => points,
-        None => raw
-            .pages
+        None => page_indices
             .iter()
+            .filter_map(|index| raw.pages.get(*index))
             .find_map(|page| {
                 if page.values.is_empty() {
                     None
@@ -295,12 +343,12 @@ fn infer_width(raw: &RawJcamp2D) -> Result<usize> {
     Ok(width)
 }
 
-fn infer_height(raw: &RawJcamp2D) -> Result<usize> {
-    let height = raw.pages.len();
+fn infer_height(raw: &RawJcamp2D, real_page_count: usize) -> Result<usize> {
+    let height = real_page_count;
     if height == 0 {
         return Err(RSpinError::Parse {
             format: "JCAMP-DX",
-            message: "2D JCAMP-DX height must be positive".to_owned(),
+            message: "2D JCAMP-DX requires at least one real page".to_owned(),
         });
     }
     if let Some(declared) = raw.y_points {
@@ -332,9 +380,9 @@ fn x_axis(raw: &RawJcamp2D, width: usize) -> Result<Axis> {
     Axis::linear("x", raw.x_unit, first, last, width)
 }
 
-fn y_axis(raw: &RawJcamp2D, height: usize) -> Result<Axis> {
+fn y_axis(raw: &RawJcamp2D, page_indices: &[usize], height: usize) -> Result<Axis> {
     let factor = super::option_or(raw.y_axis_factor, 1.0);
-    if let Some(values) = page_y_values(raw, factor)? {
+    if let Some(values) = page_y_values(raw, page_indices, factor)? {
         return Axis::new("y", raw.y_unit, values);
     }
 
@@ -352,9 +400,19 @@ fn y_axis(raw: &RawJcamp2D, height: usize) -> Result<Axis> {
     Axis::linear("y", raw.y_unit, first, last, height)
 }
 
-fn page_y_values(raw: &RawJcamp2D, factor: f64) -> Result<Option<Vec<f64>>> {
-    let mut values = Vec::with_capacity(raw.pages.len());
-    for page in &raw.pages {
+fn page_y_values(
+    raw: &RawJcamp2D,
+    page_indices: &[usize],
+    factor: f64,
+) -> Result<Option<Vec<f64>>> {
+    let mut values = Vec::with_capacity(page_indices.len());
+    for index in page_indices {
+        let Some(page) = raw.pages.get(*index) else {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: "2D JCAMP-DX internal page index is invalid".to_owned(),
+            });
+        };
         let Some(value) = page.y_value else {
             return Ok(None);
         };
@@ -365,6 +423,93 @@ fn page_y_values(raw: &RawJcamp2D, factor: f64) -> Result<Option<Vec<f64>>> {
         )?);
     }
     Ok(Some(values))
+}
+
+fn validate_imaginary_pages(
+    raw: &RawJcamp2D,
+    real_page_indices: &[usize],
+    imaginary_page_indices: &[usize],
+) -> Result<()> {
+    if imaginary_page_indices.is_empty() {
+        return Ok(());
+    }
+    if imaginary_page_indices.len() != real_page_indices.len() {
+        return Err(RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: format!(
+                "2D JCAMP-DX contains {} real pages but {} imaginary pages",
+                real_page_indices.len(),
+                imaginary_page_indices.len()
+            ),
+        });
+    }
+
+    for (row_index, (real_index, imaginary_index)) in real_page_indices
+        .iter()
+        .copied()
+        .zip(imaginary_page_indices.iter().copied())
+        .enumerate()
+    {
+        let Some(real_page) = raw.pages.get(real_index) else {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: "2D JCAMP-DX internal real page index is invalid".to_owned(),
+            });
+        };
+        let Some(imaginary_page) = raw.pages.get(imaginary_index) else {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: "2D JCAMP-DX internal imaginary page index is invalid".to_owned(),
+            });
+        };
+        if let (Some(real_y), Some(imaginary_y)) = (real_page.y_value, imaginary_page.y_value) {
+            if !close_enough(real_y, imaginary_y) {
+                return Err(RSpinError::Parse {
+                    format: "JCAMP-DX",
+                    message: format!(
+                        "2D JCAMP-DX imaginary page {} coordinate does not match real page",
+                        row_index + 1
+                    ),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn close_enough(left: f64, right: f64) -> bool {
+    let tolerance = 1.0e-10 * left.abs().max(right.abs()).max(1.0);
+    (left - right).abs() <= tolerance
+}
+
+fn scaled_page_values(
+    raw: &RawJcamp2D,
+    page_indices: &[usize],
+    width: usize,
+    factor: f64,
+    field: &'static str,
+) -> Result<Vec<f64>> {
+    let mut values = Vec::with_capacity(width * page_indices.len());
+    for (row_index, page_index) in page_indices.iter().copied().enumerate() {
+        let page = raw.pages.get(page_index).ok_or_else(|| RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: "2D JCAMP-DX internal page index is invalid".to_owned(),
+        })?;
+        if page.values.len() < width {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: format!(
+                    "2D JCAMP-DX page {} has {} values but expected at least {width}",
+                    row_index + 1,
+                    page.values.len()
+                ),
+            });
+        }
+        for value in page.values.iter().copied().take(width) {
+            values.push(super::scale_value(field, value, factor)?);
+        }
+    }
+    Ok(values)
 }
 
 fn metadata_from_raw_2d(raw: &RawJcamp2D) -> Metadata {

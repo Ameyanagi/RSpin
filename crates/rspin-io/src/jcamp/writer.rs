@@ -80,23 +80,18 @@ pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
 
 /// Writes a two-dimensional spectrum to a JCAMP-DX string.
 ///
-/// This writer emits a focused real-valued NTUPLES/page representation with one
-/// indirect-axis page per matrix row. The direct axis must be uniformly spaced
-/// because the matching reader interprets the direct dimension from `FIRST` and
-/// `LAST` labels. Non-uniform indirect axes are preserved through `PAGE=F1=...`
-/// labels.
+/// This writer emits a focused NTUPLES/page representation with one real page
+/// per matrix row, and one matching imaginary page per row when the spectrum is
+/// complex. The direct axis must be uniformly spaced because the matching
+/// reader interprets the direct dimension from `FIRST` and `LAST` labels.
+/// Non-uniform indirect axes are preserved through `PAGE=F1=...` labels.
 ///
 /// # Errors
 ///
-/// Returns an error when the spectrum contains non-finite values, has an
-/// imaginary channel, or uses a non-uniform direct axis.
+/// Returns an error when the spectrum contains non-finite values or uses a
+/// non-uniform direct axis.
 pub fn write_jcamp_dx_2d(spectrum: &Spectrum2D) -> Result<String> {
     validate_finite_spectrum_2d(spectrum)?;
-    if spectrum.imaginary.is_some() {
-        return Err(RSpinError::Unsupported {
-            feature: "complex 2D JCAMP-DX export",
-        });
-    }
     if !has_uniform_spacing(&spectrum.x.values) {
         return Err(RSpinError::InvalidSpectrum {
             message: "2D JCAMP-DX export requires a uniform x axis".to_owned(),
@@ -328,24 +323,49 @@ fn write_complex_data_tables(
 }
 
 fn write_2d_data_pages(output: &mut String, spectrum: &Spectrum2D, width: usize, height: usize) {
+    let imaginary = spectrum.imaginary.as_deref();
+    let real_channel = if imaginary.is_some() { "R" } else { "Y" };
     for y_index in 0..height {
         let y_value = spectrum.y.values[y_index];
-        push_label(output, "PAGE", &format!("F1={}", format_float(y_value)));
-        push_label(output, "DATA TABLE", "(X++(Y..Y)), XYDATA");
         let row_start = y_index * width;
         let row_end = row_start + width;
-        for (x_value, value) in spectrum
-            .x
-            .values
-            .iter()
-            .copied()
-            .zip(spectrum.z[row_start..row_end].iter().copied())
-        {
-            output.push_str(&format_float(x_value));
-            output.push(' ');
-            output.push_str(&format_float(value));
-            output.push('\n');
+        write_2d_data_page(
+            output,
+            y_value,
+            real_channel,
+            &spectrum.x.values,
+            &spectrum.z[row_start..row_end],
+        );
+        if let Some(imaginary) = imaginary {
+            write_2d_data_page(
+                output,
+                y_value,
+                "I",
+                &spectrum.x.values,
+                &imaginary[row_start..row_end],
+            );
         }
+    }
+}
+
+fn write_2d_data_page(
+    output: &mut String,
+    y_value: f64,
+    channel: &str,
+    x_values: &[f64],
+    values: &[f64],
+) {
+    push_label(output, "PAGE", &format!("F1={}", format_float(y_value)));
+    push_label(
+        output,
+        "DATA TABLE",
+        &format!("(X++({channel}..{channel})), XYDATA"),
+    );
+    for (x_value, value) in x_values.iter().copied().zip(values.iter().copied()) {
+        output.push_str(&format_float(x_value));
+        output.push(' ');
+        output.push_str(&format_float(value));
+        output.push('\n');
     }
 }
 

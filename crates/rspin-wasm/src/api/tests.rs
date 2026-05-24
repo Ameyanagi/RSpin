@@ -60,10 +60,11 @@ fn writes_jcamp_from_json() -> anyhow::Result<()> {
 
 #[test]
 fn writes_jcamp_2d_from_json() -> anyhow::Result<()> {
-    let spectrum = Spectrum2D::new(
+    let spectrum = Spectrum2D::new_complex(
         Axis::linear_ppm(10.0, 8.0, 3)?,
         Axis::new("indirect", Unit::Ppm, vec![200.0, 225.0])?,
         vec![1.0, -2.0, 3.5, 4.0, 5.0, 6.0],
+        Some(vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
         Metadata::named("wasm jcamp 2d export"),
     )?;
     let text = write_jcamp_dx_2d_json(&to_json(&spectrum)?)?;
@@ -76,6 +77,7 @@ fn writes_jcamp_2d_from_json() -> anyhow::Result<()> {
     assert_eq!(parsed.x.values, spectrum.x.values);
     assert_eq!(parsed.y.values, spectrum.y.values);
     assert_eq!(parsed.z, spectrum.z);
+    assert_eq!(parsed.imaginary, spectrum.imaginary);
     Ok(())
 }
 
