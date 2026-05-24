@@ -2,7 +2,7 @@
 
 use serde::Deserialize;
 
-use rspin_core::{Axis, Result, Spectrum1D};
+use rspin_core::{Axis, Result};
 use rspin_io::read_processing_recipe_1d_json;
 use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
@@ -11,7 +11,7 @@ use rspin_processing::{
     shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
 };
 
-use super::{from_json, to_json};
+use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
 
 /// Offsets serialized `Spectrum1D` real intensities.
 ///
@@ -19,9 +19,9 @@ use super::{from_json, to_json};
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn offset_spectrum_1d_json(spectrum_json: &str, offset: f64) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = offset_intensity(&spectrum, offset)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Shifts the x axis of serialized `Spectrum1D` JSON.
@@ -30,9 +30,9 @@ pub fn offset_spectrum_1d_json(spectrum_json: &str, offset: f64) -> Result<Strin
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn shift_spectrum_1d_axis_json(spectrum_json: &str, delta: f64) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = shift_axis(&spectrum, delta)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Zero-fills serialized `Spectrum1D` JSON to the requested length.
@@ -41,9 +41,9 @@ pub fn shift_spectrum_1d_axis_json(spectrum_json: &str, delta: f64) -> Result<St
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn zero_fill_spectrum_1d_json(spectrum_json: &str, target_len: usize) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = zero_fill(&spectrum, target_len)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Crops serialized `Spectrum1D` JSON to an inclusive x-axis window.
@@ -52,9 +52,9 @@ pub fn zero_fill_spectrum_1d_json(spectrum_json: &str, target_len: usize) -> Res
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn crop_spectrum_1d_json(spectrum_json: &str, from: f64, to: f64) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = crop_1d(&spectrum, from, to)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies component-wise absolute value to serialized `Spectrum1D` JSON.
@@ -63,9 +63,9 @@ pub fn crop_spectrum_1d_json(spectrum_json: &str, from: f64, to: f64) -> Result<
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn abs_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = abs_1d(&spectrum)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Resamples serialized `Spectrum1D` JSON onto a serialized target axis.
@@ -78,10 +78,10 @@ pub fn resample_spectrum_1d_json(
     target_axis_json: &str,
     outside_value: f64,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let target_axis: Axis = from_json(target_axis_json)?;
     let processed = resample_1d(&spectrum, target_axis, outside_value)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies a one-dimensional FFT to serialized `Spectrum1D` JSON.
@@ -92,10 +92,10 @@ pub fn resample_spectrum_1d_json(
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn fft_spectrum_1d_json(spectrum_json: &str, direction_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let direction: FftDirectionJson = from_json(direction_json)?;
     let processed = fft_1d(&spectrum, direction.into())?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies manual phase correction to serialized `Spectrum1D` JSON.
@@ -104,7 +104,7 @@ pub fn fft_spectrum_1d_json(spectrum_json: &str, direction_json: &str) -> Result
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn phase_spectrum_1d_json(spectrum_json: &str, correction_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let correction: PhaseCorrectionJson = from_json(correction_json)?;
     let processed = phase_correct(
         &spectrum,
@@ -112,7 +112,7 @@ pub fn phase_spectrum_1d_json(spectrum_json: &str, correction_json: &str) -> Res
         correction.first_order_deg,
         correction.pivot_fraction,
     )?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Converts serialized `Spectrum1D` JSON to magnitude mode.
@@ -121,9 +121,9 @@ pub fn phase_spectrum_1d_json(spectrum_json: &str, correction_json: &str) -> Res
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn magnitude_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = magnitude_spectrum(&spectrum)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies exponential apodization to serialized `Spectrum1D` JSON.
@@ -135,11 +135,11 @@ pub fn exponential_apodization_spectrum_1d_json(
     spectrum_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: ExponentialApodizationJson = from_json(options_json)?;
     let processed =
         exponential_apodization(&spectrum, options.line_broadening_hz, options.dwell_time_s)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies Gaussian apodization to serialized `Spectrum1D` JSON.
@@ -151,14 +151,14 @@ pub fn gaussian_apodization_spectrum_1d_json(
     spectrum_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: GaussianApodizationJson = from_json(options_json)?;
     let processed = gaussian_apodization(
         &spectrum,
         options.gaussian_broadening_hz,
         options.dwell_time_s,
     )?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies sine-bell apodization to serialized `Spectrum1D` JSON.
@@ -170,7 +170,7 @@ pub fn sine_bell_apodization_spectrum_1d_json(
     spectrum_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: SineBellApodizationJson = from_json(options_json)?;
     let processed = sine_bell_apodization(
         &spectrum,
@@ -178,7 +178,7 @@ pub fn sine_bell_apodization_spectrum_1d_json(
         options.end_angle_deg,
         options.exponent,
     )?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Subtracts a fitted baseline from serialized `Spectrum1D` JSON.
@@ -190,10 +190,10 @@ pub fn subtract_baseline_spectrum_1d_json(
     spectrum_json: &str,
     method_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let method: BaselineMethodJson = from_json(method_json)?;
     let processed = subtract_baseline(&spectrum, method.into())?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies a serialized one-dimensional processing recipe to serialized `Spectrum1D` JSON.
@@ -202,10 +202,10 @@ pub fn subtract_baseline_spectrum_1d_json(
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn apply_processing_recipe_1d_json(spectrum_json: &str, recipe_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let recipe = read_processing_recipe_1d_json(recipe_json)?;
     let processed = apply_processing_recipe_1d(&spectrum, &recipe)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Applies the first operations in a serialized one-dimensional recipe.
@@ -218,10 +218,10 @@ pub fn apply_processing_recipe_1d_until_json(
     recipe_json: &str,
     operation_count: usize,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let recipe = read_processing_recipe_1d_json(recipe_json)?;
     let processed = apply_processing_recipe_1d_until(&spectrum, &recipe, operation_count)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

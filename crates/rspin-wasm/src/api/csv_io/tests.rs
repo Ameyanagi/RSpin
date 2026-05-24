@@ -1,6 +1,4 @@
-use rspin_core::{Spectrum1D, Spectrum2D};
-
-use super::super::{from_json, to_json};
+use super::super::{spectrum1d_from_json, spectrum2d_from_json, to_json};
 use super::*;
 
 #[test]
@@ -13,7 +11,8 @@ x,intensity,imaginary
 2,3,-0.25
 ";
     let spectrum_json = parse_spectrum_1d_csv_json(csv)?;
-    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
+    assert!(spectrum_json.contains("\"format\":\"rspin.spectrum_1d\""));
+    let spectrum = spectrum1d_from_json(&spectrum_json)?;
 
     assert_eq!(spectrum.metadata.name.as_deref(), Some("one"));
     assert_eq!(spectrum.x.values, vec![1.0, 2.0]);
@@ -22,7 +21,7 @@ x,intensity,imaginary
 
     let written = write_spectrum_1d_csv_json(&spectrum_json)?;
     let reparsed_json = parse_spectrum_1d_csv_json(&written)?;
-    let reparsed: Spectrum1D = from_json(&reparsed_json)?;
+    let reparsed = spectrum1d_from_json(&reparsed_json)?;
     assert_eq!(reparsed, spectrum);
     Ok(())
 }
@@ -40,7 +39,8 @@ x,y,intensity,imaginary
 2,20,5,-1
 ";
     let spectrum_json = parse_spectrum_2d_csv_json(csv)?;
-    let spectrum: Spectrum2D = from_json(&spectrum_json)?;
+    assert!(spectrum_json.contains("\"format\":\"rspin.spectrum_2d\""));
+    let spectrum = spectrum2d_from_json(&spectrum_json)?;
 
     assert_eq!(spectrum.metadata.name.as_deref(), Some("two"));
     assert_eq!(spectrum.shape(), (2, 2));
@@ -51,7 +51,7 @@ x,y,intensity,imaginary
 
     let written = write_spectrum_2d_csv_json(&spectrum_json)?;
     let reparsed_json = parse_spectrum_2d_csv_json(&written)?;
-    let reparsed: Spectrum2D = from_json(&reparsed_json)?;
+    let reparsed = spectrum2d_from_json(&reparsed_json)?;
     assert_eq!(reparsed, spectrum);
     Ok(())
 }

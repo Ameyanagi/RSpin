@@ -6,7 +6,7 @@ use rspin_analysis::{
 };
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
-use super::{from_json, to_json};
+use super::{from_json, spectrum1d_from_json, spectrum2d_from_json, to_json};
 
 /// Buckets a serialized one-dimensional spectrum.
 ///
@@ -14,7 +14,7 @@ use super::{from_json, to_json};
 ///
 /// Returns an error when deserialization, bucketing, or serialization fails.
 pub fn bucket_spectrum_1d_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: BucketOptions1D = from_json(options_json)?;
     let buckets = bucket_spectrum_1d(&spectrum, options)?;
     to_json(&buckets)
@@ -38,7 +38,7 @@ pub fn bucket_spectra_1d_json(spectra_json: &str, options_json: &str) -> Result<
 ///
 /// Returns an error when deserialization, bucketing, or serialization fails.
 pub fn bucket_spectrum_2d_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let options: BucketOptions2D = from_json(options_json)?;
     let buckets = bucket_spectrum_2d(&spectrum, options)?;
     to_json(&buckets)

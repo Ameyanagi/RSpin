@@ -28,7 +28,8 @@ use rspin_analysis::{
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
     read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
-    read_spectrum1d_text, read_spectrum2d_text, write_nmrml_1d, write_nmrml_2d,
+    read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json, read_spectrum2d_text,
+    write_nmrml_1d, write_nmrml_2d, write_spectrum1d_json, write_spectrum2d_json,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -100,7 +101,7 @@ pub use workflow::{analyze_spectrum_1d_json, analyze_spectrum_2d_json};
 /// Returns an error when parsing or serialization fails.
 pub fn parse_jcamp_dx_1d_json(input: &str) -> Result<String> {
     let spectrum = read_jcamp_dx_1d(input)?;
-    to_json(&spectrum)
+    spectrum1d_to_json(&spectrum)
 }
 
 /// Parses nmrML text into serialized `Spectrum1D` JSON.
@@ -110,7 +111,7 @@ pub fn parse_jcamp_dx_1d_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_nmrml_1d_json(input: &str) -> Result<String> {
     let spectrum = read_nmrml_1d_str(input)?;
-    to_json(&spectrum)
+    spectrum1d_to_json(&spectrum)
 }
 
 /// Parses two-dimensional nmrML text into serialized `Spectrum2D` JSON.
@@ -120,7 +121,7 @@ pub fn parse_nmrml_1d_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_nmrml_2d_json(input: &str) -> Result<String> {
     let spectrum = read_nmrml_2d_str(input)?;
-    to_json(&spectrum)
+    spectrum2d_to_json(&spectrum)
 }
 
 /// Parses root-level nmrML document metadata into JSON.
@@ -139,7 +140,7 @@ pub fn inspect_nmrml_document_json(input: &str) -> Result<String> {
 ///
 /// Returns an error when deserialization or nmrML serialization fails.
 pub fn write_nmrml_1d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     write_nmrml_1d(&spectrum)
 }
 
@@ -149,7 +150,7 @@ pub fn write_nmrml_1d_json(spectrum_json: &str) -> Result<String> {
 ///
 /// Returns an error when deserialization or nmrML serialization fails.
 pub fn write_nmrml_2d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     write_nmrml_2d(&spectrum)
 }
 
@@ -160,7 +161,7 @@ pub fn write_nmrml_2d_json(spectrum_json: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_spectrum_1d_text_json(input: &str) -> Result<String> {
     let spectrum = read_spectrum1d_text(input)?;
-    to_json(&spectrum)
+    spectrum1d_to_json(&spectrum)
 }
 
 /// Parses auto-detected two-dimensional spectrum text into serialized `Spectrum2D` JSON.
@@ -170,7 +171,7 @@ pub fn parse_spectrum_1d_text_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_spectrum_2d_text_json(input: &str) -> Result<String> {
     let spectrum = read_spectrum2d_text(input)?;
-    to_json(&spectrum)
+    spectrum2d_to_json(&spectrum)
 }
 
 /// Scales serialized `Spectrum1D` JSON.
@@ -179,9 +180,9 @@ pub fn parse_spectrum_2d_text_json(input: &str) -> Result<String> {
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn scale_spectrum_1d_json(spectrum_json: &str, factor: f64) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = scale_intensity(&spectrum, factor)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Normalizes serialized `Spectrum1D` JSON by maximum absolute intensity.
@@ -190,9 +191,9 @@ pub fn scale_spectrum_1d_json(spectrum_json: &str, factor: f64) -> Result<String
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn normalize_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let processed = normalize_max_abs(&spectrum)?;
-    to_json(&processed)
+    spectrum1d_to_json(&processed)
 }
 
 /// Automatically phases serialized `Spectrum1D` JSON.
@@ -201,7 +202,7 @@ pub fn normalize_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn auto_phase_spectrum_1d_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: AutoPhaseOptionsJson = from_json(options_json)?;
     let result = auto_phase_correct(&spectrum, options.into())?;
     to_json(&AutoPhaseResponseJson {
@@ -218,7 +219,7 @@ pub fn auto_phase_spectrum_1d_json(spectrum_json: &str, options_json: &str) -> R
 ///
 /// Returns an error when deserialization, analysis, or serialization fails.
 pub fn pick_peaks_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: PeakPickOptions = from_json(options_json)?;
     let peaks = pick_peaks(&spectrum, options)?;
     to_json(&peaks)
@@ -234,7 +235,7 @@ pub fn optimize_peaks_json(
     peaks_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let peaks: Vec<rspin_analysis::Peak> = from_json(peaks_json)?;
     let options: PeakOptimizationOptions = from_json(options_json)?;
     let optimized = optimize_peaks_quadratic(&spectrum, &peaks, options)?;
@@ -251,7 +252,7 @@ pub fn detect_multiplets_json(
     peaks_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let peaks: Vec<rspin_analysis::Peak> = from_json(peaks_json)?;
     let options: MultipletDetectionOptions = from_json(options_json)?;
     let multiplets = detect_multiplets(&spectrum, &peaks, options)?;
@@ -264,7 +265,7 @@ pub fn detect_multiplets_json(
 ///
 /// Returns an error when deserialization, analysis, or serialization fails.
 pub fn detect_ranges_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let options: RangeDetectionOptions = from_json(options_json)?;
     let ranges = detect_ranges(&spectrum, options)?;
     to_json(&ranges)
@@ -276,7 +277,7 @@ pub fn detect_ranges_json(spectrum_json: &str, options_json: &str) -> Result<Str
 ///
 /// Returns an error when deserialization, analysis, or serialization fails.
 pub fn detect_zones_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let options: ZoneDetectionOptions = from_json(options_json)?;
     let zones = detect_zones(&spectrum, options)?;
     to_json(&zones)
@@ -306,7 +307,7 @@ pub fn summarize_signals_1d_json(
     coupling_graph_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let ranges: Vec<DetectedRange> = from_json(ranges_json)?;
     let multiplets: Vec<DetectedMultiplet> = from_json(multiplets_json)?;
     let assignments: AssignmentSet = from_json(assignments_json)?;
@@ -334,7 +335,7 @@ pub fn summarize_signals_2d_json(
     assignments_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let zones: Vec<DetectedZone> = from_json(zones_json)?;
     let assignments: AssignmentSet = from_json(assignments_json)?;
     let options: SignalSummary2DOptions = from_json(options_json)?;
@@ -348,7 +349,7 @@ pub fn summarize_signals_2d_json(
 ///
 /// Returns an error when deserialization, analysis, or serialization fails.
 pub fn integrate_region_json(spectrum_json: &str, region_json: &str) -> Result<String> {
-    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
     let region: IntegralRegion = from_json(region_json)?;
     let integral = integrate_region(&spectrum, region)?;
     to_json(&integral)
@@ -360,7 +361,7 @@ pub fn integrate_region_json(spectrum_json: &str, region_json: &str) -> Result<S
 ///
 /// Returns an error when deserialization, analysis, or serialization fails.
 pub fn integrate_region_2d_json(spectrum_json: &str, region_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let region: IntegralRegion2D = from_json(region_json)?;
     let integral = integrate_region_2d(&spectrum, region)?;
     to_json(&integral)
@@ -378,6 +379,22 @@ fn to_json<T: Serialize>(value: &T) -> Result<String> {
         format: "JSON",
         message: error.to_string(),
     })
+}
+
+fn spectrum1d_from_json(input: &str) -> Result<Spectrum1D> {
+    read_spectrum1d_json(input)
+}
+
+fn spectrum2d_from_json(input: &str) -> Result<Spectrum2D> {
+    read_spectrum2d_json(input)
+}
+
+fn spectrum1d_to_json(spectrum: &Spectrum1D) -> Result<String> {
+    write_spectrum1d_json(spectrum)
+}
+
+fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
+    write_spectrum2d_json(spectrum)
 }
 
 #[derive(Clone, Copy, Debug, serde::Deserialize)]

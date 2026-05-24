@@ -26,7 +26,8 @@ fn parses_jcamp_to_json() -> anyhow::Result<()> {
 ##END=
 ",
     )?;
-    let spectrum: Spectrum1D = from_json(&json)?;
+    assert!(json.contains("\"format\":\"rspin.spectrum_1d\""));
+    let spectrum = spectrum1d_from_json(&json)?;
     assert_eq!(spectrum.len(), 3);
     Ok(())
 }
@@ -56,7 +57,7 @@ fn parses_nmrml_to_json() -> anyhow::Result<()> {
         </nmrML>
         "#,
     )?;
-    let spectrum: Spectrum1D = from_json(&json)?;
+    let spectrum = spectrum1d_from_json(&json)?;
 
     assert_eq!(spectrum.x.unit, Unit::Ppm);
     assert_eq!(spectrum.x.values, vec![10.0, 9.0, 8.0]);
@@ -77,7 +78,7 @@ fn writes_nmrml_1d_from_json() -> anyhow::Result<()> {
     )?;
     let text = write_nmrml_1d_json(&to_json(&spectrum)?)?;
     let parsed_json = parse_nmrml_1d_json(&text)?;
-    let parsed: Spectrum1D = from_json(&parsed_json)?;
+    let parsed = spectrum1d_from_json(&parsed_json)?;
 
     assert!(text.contains("byteFormat=\"float64\""));
     assert_eq!(parsed.x, spectrum.x);
@@ -95,7 +96,7 @@ fn writes_nmrml_2d_from_json() -> anyhow::Result<()> {
     )?;
     let text = write_nmrml_2d_json(&to_json(&spectrum)?)?;
     let parsed_json = parse_nmrml_2d_json(&text)?;
-    let parsed: Spectrum2D = from_json(&parsed_json)?;
+    let parsed = spectrum2d_from_json(&parsed_json)?;
 
     assert!(text.contains("<spectrumMultiD"));
     assert_eq!(parsed.x, spectrum.x);
@@ -132,7 +133,8 @@ fn parses_nmrml_2d_to_json() -> anyhow::Result<()> {
         </nmrML>
         "#,
     )?;
-    let spectrum: Spectrum2D = from_json(&json)?;
+    assert!(json.contains("\"format\":\"rspin.spectrum_2d\""));
+    let spectrum = spectrum2d_from_json(&json)?;
 
     assert_eq!(spectrum.shape(), (2, 2));
     assert_eq!(spectrum.x.unit, Unit::Seconds);
@@ -182,7 +184,7 @@ x,intensity
 1.0,2.0
 ",
     )?;
-    let spectrum: Spectrum1D = from_json(&json)?;
+    let spectrum = spectrum1d_from_json(&json)?;
 
     assert_eq!(spectrum.metadata.name.as_deref(), Some("auto one"));
     assert_eq!(spectrum.x.unit, Unit::Ppm);
@@ -201,7 +203,7 @@ fn parses_auto_detected_2d_text_to_json() -> anyhow::Result<()> {
     )?;
     let input = to_json(&spectrum)?;
     let json = parse_spectrum_2d_text_json(&input)?;
-    let parsed: Spectrum2D = from_json(&json)?;
+    let parsed = spectrum2d_from_json(&json)?;
 
     assert_eq!(parsed, spectrum);
     Ok(())
@@ -219,8 +221,9 @@ fn scales_spectrum_json() -> anyhow::Result<()> {
 ##END=
 ",
     )?;
+    assert!(spectrum_json.contains("\"format\":\"rspin.spectrum_1d\""));
     let scaled_json = scale_spectrum_1d_json(&spectrum_json, 0.5)?;
-    let scaled: Spectrum1D = from_json(&scaled_json)?;
+    let scaled = spectrum1d_from_json(&scaled_json)?;
     assert_eq!(scaled.intensities, vec![1.0, 2.0]);
     Ok(())
 }

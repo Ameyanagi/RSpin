@@ -1,9 +1,7 @@
-use rspin_core::{Spectrum1D, Spectrum2D};
-
 use super::super::{
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, from_json,
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json,
+    simulate_exact_spin_half_transitions_json, spectrum1d_from_json, spectrum2d_from_json,
 };
 
 #[test]
@@ -38,7 +36,7 @@ fn simulates_exact_spectrum_json() -> anyhow::Result<()> {
         r#"{"spins":[{"shift_ppm":2.0}],"couplings":[]}"#,
         r#"{"from_ppm":1.99,"to_ppm":2.01,"points":11,"area":2.0,"line_width_hz":1.0,"line_shape":"PseudoVoigt","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
     )?;
-    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
+    let spectrum = spectrum1d_from_json(&spectrum_json)?;
 
     assert_eq!(spectrum.len(), 11);
     assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
@@ -69,7 +67,7 @@ fn simulates_exact_2d_spectrum_json() -> anyhow::Result<()> {
         r#"{"spins":[{"shift_ppm":1.0},{"shift_ppm":2.0}],"couplings":[]}"#,
         r#"{"x_from_ppm":0.95,"x_to_ppm":1.05,"x_points":5,"y_from_ppm":1.95,"y_to_ppm":2.05,"y_points":5,"volume":1.0,"x_line_width_hz":1.0,"y_line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10},"spin_pairs":[{"x_spin":0,"y_spin":1}]}"#,
     )?;
-    let spectrum: Spectrum2D = from_json(&spectrum_json)?;
+    let spectrum = spectrum2d_from_json(&spectrum_json)?;
 
     assert_eq!(spectrum.shape(), (5, 5));
     assert!(spectrum.z[12] > spectrum.z[0]);

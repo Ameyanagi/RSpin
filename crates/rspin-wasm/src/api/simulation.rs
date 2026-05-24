@@ -7,7 +7,7 @@ use rspin_simulation::{
     simulate_exact_spin_half_1d, simulate_exact_spin_half_2d,
 };
 
-use super::{from_json, to_json};
+use super::{from_json, spectrum1d_to_json, spectrum2d_to_json, to_json};
 
 /// Simulates exact spin-1/2 transitions and returns serialized transition JSON.
 ///
@@ -36,7 +36,7 @@ pub fn simulate_exact_spin_half_spectrum_json(
     let system: SpinHalfSystem = from_json(system_json)?;
     let options: ExactSpectrumOptions = from_json(options_json)?;
     let spectrum = simulate_exact_spin_half_1d(&system, &options)?;
-    to_json(&spectrum)
+    spectrum1d_to_json(&spectrum)
 }
 
 /// Simulates exact spin-1/2 spectrum JSON with per-transition contributions.
@@ -66,7 +66,7 @@ pub fn simulate_exact_spin_half_spectrum_2d_json(
     let system: SpinHalfSystem = from_json(system_json)?;
     let options: ExactSpectrum2DOptions = from_json(options_json)?;
     let spectrum = simulate_exact_spin_half_2d(&system, &options)?;
-    to_json(&spectrum)
+    spectrum2d_to_json(&spectrum)
 }
 
 /// Simulates exact spin-1/2 2D spectrum JSON with per-correlation contributions.

@@ -7,7 +7,7 @@ use rspin_prediction::{
     render_prediction_2d,
 };
 
-use super::{from_json, to_json};
+use super::{from_json, spectrum1d_to_json, spectrum2d_to_json, to_json};
 
 /// Predicts molecule signals with a serialized element shift rule table.
 ///
@@ -61,7 +61,7 @@ pub fn render_prediction_1d_json(prediction_json: &str, options_json: &str) -> R
     let prediction: PredictionSet = from_json(prediction_json)?;
     let options: PredictionSpectrumOptions = from_json(options_json)?;
     let spectrum: Spectrum1D = render_prediction_1d(&prediction, &options)?;
-    to_json(&spectrum)
+    spectrum1d_to_json(&spectrum)
 }
 
 /// Renders serialized two-dimensional prediction JSON into `Spectrum2D` JSON.
@@ -73,5 +73,5 @@ pub fn render_prediction_2d_json(prediction_json: &str, options_json: &str) -> R
     let prediction: PredictionSet = from_json(prediction_json)?;
     let options: PredictionSpectrum2DOptions = from_json(options_json)?;
     let spectrum: Spectrum2D = render_prediction_2d(&prediction, &options)?;
-    to_json(&spectrum)
+    spectrum2d_to_json(&spectrum)
 }

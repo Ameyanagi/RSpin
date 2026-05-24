@@ -12,7 +12,7 @@ use rspin_processing::{
     slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
 };
 
-use super::{from_json, to_json};
+use super::{from_json, spectrum1d_to_json, spectrum2d_from_json, spectrum2d_to_json, to_json};
 
 /// Scales serialized `Spectrum2D` JSON.
 ///
@@ -20,9 +20,9 @@ use super::{from_json, to_json};
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn scale_spectrum_2d_json(spectrum_json: &str, factor: f64) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = scale_2d(&spectrum, factor)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Normalizes serialized `Spectrum2D` JSON by maximum absolute intensity.
@@ -31,9 +31,9 @@ pub fn scale_spectrum_2d_json(spectrum_json: &str, factor: f64) -> Result<String
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn normalize_spectrum_2d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = normalize_2d_max_abs(&spectrum)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Zero-fills serialized `Spectrum2D` JSON to the requested shape.
@@ -46,9 +46,9 @@ pub fn zero_fill_spectrum_2d_json(
     target_width: usize,
     target_height: usize,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = zero_fill_2d(&spectrum, target_width, target_height)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Crops serialized `Spectrum2D` JSON to inclusive x and y windows.
@@ -63,9 +63,9 @@ pub fn crop_spectrum_2d_json(
     y_from: f64,
     y_to: f64,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = crop_2d(&spectrum, x_from, x_to, y_from, y_to)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies component-wise absolute value to serialized `Spectrum2D` JSON.
@@ -74,9 +74,9 @@ pub fn crop_spectrum_2d_json(
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn abs_spectrum_2d_json(spectrum_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = abs_2d(&spectrum)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Resamples serialized `Spectrum2D` JSON onto serialized target axes.
@@ -90,11 +90,11 @@ pub fn resample_spectrum_2d_json(
     target_rows_json: &str,
     outside_value: f64,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let target_x: Axis = from_json(target_columns_json)?;
     let target_y: Axis = from_json(target_rows_json)?;
     let processed = resample_2d(&spectrum, target_x, target_y, outside_value)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies a two-dimensional FFT to serialized `Spectrum2D` JSON.
@@ -105,10 +105,10 @@ pub fn resample_spectrum_2d_json(
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn fft_spectrum_2d_json(spectrum_json: &str, direction_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let direction: FftDirectionJson = from_json(direction_json)?;
     let processed = fft_2d(&spectrum, direction.into())?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies separable exponential apodization to serialized `Spectrum2D` JSON.
@@ -120,7 +120,7 @@ pub fn exponential_apodization_spectrum_2d_json(
     spectrum_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let options: ExponentialApodization2DJson = from_json(options_json)?;
     let processed = exponential_apodization_2d(
         &spectrum,
@@ -129,7 +129,7 @@ pub fn exponential_apodization_spectrum_2d_json(
         options.x_dwell_time_s,
         options.y_dwell_time_s,
     )?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies separable Gaussian apodization to serialized `Spectrum2D` JSON.
@@ -141,7 +141,7 @@ pub fn gaussian_apodization_spectrum_2d_json(
     spectrum_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let options: GaussianApodization2DJson = from_json(options_json)?;
     let processed = gaussian_apodization_2d(
         &spectrum,
@@ -150,7 +150,7 @@ pub fn gaussian_apodization_spectrum_2d_json(
         options.x_dwell_time_s,
         options.y_dwell_time_s,
     )?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies separable sine-bell apodization to serialized `Spectrum2D` JSON.
@@ -162,7 +162,7 @@ pub fn sine_bell_apodization_spectrum_2d_json(
     spectrum_json: &str,
     options_json: &str,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let options: SineBellApodization2DJson = from_json(options_json)?;
     let processed = sine_bell_apodization_2d(
         &spectrum,
@@ -173,7 +173,7 @@ pub fn sine_bell_apodization_spectrum_2d_json(
         options.y_end_angle_deg,
         options.y_exponent,
     )?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies manual x/y phase correction to serialized `Spectrum2D` JSON.
@@ -182,10 +182,10 @@ pub fn sine_bell_apodization_spectrum_2d_json(
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn phase_spectrum_2d_json(spectrum_json: &str, correction_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let correction: PhaseCorrection2DJson = from_json(correction_json)?;
     let processed = phase_correct_2d(&spectrum, correction.into())?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Automatically phases serialized `Spectrum2D` JSON.
@@ -194,7 +194,7 @@ pub fn phase_spectrum_2d_json(spectrum_json: &str, correction_json: &str) -> Res
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn auto_phase_spectrum_2d_json(spectrum_json: &str, options_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let options: AutoPhase2DOptionsJson = from_json(options_json)?;
     let result = auto_phase_correct_2d(&spectrum, options.into())?;
     to_json(&AutoPhase2DResponseJson {
@@ -210,10 +210,10 @@ pub fn auto_phase_spectrum_2d_json(spectrum_json: &str, options_json: &str) -> R
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn apply_processing_recipe_2d_json(spectrum_json: &str, recipe_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let recipe = read_processing_recipe_2d_json(recipe_json)?;
     let processed = apply_processing_recipe_2d(&spectrum, &recipe)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Applies the first operations in a serialized two-dimensional recipe.
@@ -226,10 +226,10 @@ pub fn apply_processing_recipe_2d_until_json(
     recipe_json: &str,
     operation_count: usize,
 ) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let recipe = read_processing_recipe_2d_json(recipe_json)?;
     let processed = apply_processing_recipe_2d_until(&spectrum, &recipe, operation_count)?;
-    to_json(&processed)
+    spectrum2d_to_json(&processed)
 }
 
 /// Projects serialized `Spectrum2D` JSON onto the x axis.
@@ -240,10 +240,10 @@ pub fn apply_processing_recipe_2d_until_json(
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn project_spectrum_2d_x_json(spectrum_json: &str, mode_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let mode: ProjectionModeJson = from_json(mode_json)?;
     let projection = project_x(&spectrum, mode.into())?;
-    to_json(&projection)
+    spectrum1d_to_json(&projection)
 }
 
 /// Projects serialized `Spectrum2D` JSON onto the y axis.
@@ -254,10 +254,10 @@ pub fn project_spectrum_2d_x_json(spectrum_json: &str, mode_json: &str) -> Resul
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn project_spectrum_2d_y_json(spectrum_json: &str, mode_json: &str) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let mode: ProjectionModeJson = from_json(mode_json)?;
     let projection = project_y(&spectrum, mode.into())?;
-    to_json(&projection)
+    spectrum1d_to_json(&projection)
 }
 
 /// Extracts an x-axis row from serialized `Spectrum2D` JSON.
@@ -266,9 +266,9 @@ pub fn project_spectrum_2d_y_json(spectrum_json: &str, mode_json: &str) -> Resul
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn slice_spectrum_2d_x_at_y_index_json(spectrum_json: &str, y_index: usize) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let slice = slice_x_at_y_index(&spectrum, y_index)?;
-    to_json(&slice)
+    spectrum1d_to_json(&slice)
 }
 
 /// Extracts the x-axis row nearest `y` from serialized `Spectrum2D` JSON.
@@ -277,9 +277,9 @@ pub fn slice_spectrum_2d_x_at_y_index_json(spectrum_json: &str, y_index: usize) 
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn slice_spectrum_2d_x_at_y_json(spectrum_json: &str, y: f64) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let slice = slice_x_at_y(&spectrum, y)?;
-    to_json(&slice)
+    spectrum1d_to_json(&slice)
 }
 
 /// Extracts a y-axis column from serialized `Spectrum2D` JSON.
@@ -288,9 +288,9 @@ pub fn slice_spectrum_2d_x_at_y_json(spectrum_json: &str, y: f64) -> Result<Stri
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn slice_spectrum_2d_y_at_x_index_json(spectrum_json: &str, x_index: usize) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let slice = slice_y_at_x_index(&spectrum, x_index)?;
-    to_json(&slice)
+    spectrum1d_to_json(&slice)
 }
 
 /// Extracts the y-axis column nearest `x` from serialized `Spectrum2D` JSON.
@@ -299,9 +299,9 @@ pub fn slice_spectrum_2d_y_at_x_index_json(spectrum_json: &str, x_index: usize) 
 ///
 /// Returns an error when deserialization, processing, or serialization fails.
 pub fn slice_spectrum_2d_y_at_x_json(spectrum_json: &str, x: f64) -> Result<String> {
-    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
     let slice = slice_y_at_x(&spectrum, x)?;
-    to_json(&slice)
+    spectrum1d_to_json(&slice)
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
