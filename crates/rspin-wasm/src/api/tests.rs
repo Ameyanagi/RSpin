@@ -59,6 +59,27 @@ fn writes_jcamp_from_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_jcamp_2d_from_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear_ppm(10.0, 8.0, 3)?,
+        Axis::new("indirect", Unit::Ppm, vec![200.0, 225.0])?,
+        vec![1.0, -2.0, 3.5, 4.0, 5.0, 6.0],
+        Metadata::named("wasm jcamp 2d export"),
+    )?;
+    let text = write_jcamp_dx_2d_json(&to_json(&spectrum)?)?;
+    let parsed_json = parse_jcamp_dx_2d_json(&text)?;
+    let parsed = spectrum2d_from_json(&parsed_json)?;
+
+    assert!(text.contains("##TITLE=wasm jcamp 2d export"));
+    assert!(text.contains("##PAGE=F1=200"));
+    assert_eq!(parsed.x.unit, spectrum.x.unit);
+    assert_eq!(parsed.x.values, spectrum.x.values);
+    assert_eq!(parsed.y.values, spectrum.y.values);
+    assert_eq!(parsed.z, spectrum.z);
+    Ok(())
+}
+
+#[test]
 fn parses_jcamp_2d_to_json() -> anyhow::Result<()> {
     let json = parse_jcamp_dx_2d_json(
         "\
@@ -115,9 +136,9 @@ fn writes_spectrum_text_by_format_json() -> anyhow::Result<()> {
     let parsed_csv_2d = spectrum2d_from_json(&parse_spectrum_2d_text_json(&csv_2d)?)?;
     assert_eq!(parsed_csv_2d.z, spectrum_2d.z);
 
-    let error = write_spectrum_2d_text_json(&spectrum_2d_json, "jdx")
-        .expect_err("2D JCAMP-DX text export should fail");
-    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    let jcamp_2d = write_spectrum_2d_text_json(&spectrum_2d_json, "jdx")?;
+    let parsed_jcamp_2d = spectrum2d_from_json(&parse_spectrum_2d_text_json(&jcamp_2d)?)?;
+    assert_eq!(parsed_jcamp_2d.z, spectrum_2d.z);
     Ok(())
 }
 

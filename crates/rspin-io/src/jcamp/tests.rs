@@ -1,4 +1,4 @@
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Spectrum1D, Unit};
+use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Spectrum1D, Spectrum2D, Unit};
 
 use super::*;
 
@@ -493,6 +493,68 @@ fn writes_xypoints_for_non_uniform_axis() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_two_dimensional_ntuple_pages() -> anyhow::Result<()> {
+    let x = Axis::linear("direct", Unit::Ppm, 10.0, 8.0, 3)?;
+    let y = Axis::new("indirect", Unit::Ppm, vec![200.0, 225.0])?;
+    let metadata = Metadata::named("two dimensional export")
+        .with_origin("local")
+        .with_solvent("CDCl3")
+        .with_nucleus(Nucleus::Hydrogen1)
+        .with_frequency_mhz(600.0);
+    let spectrum = Spectrum2D::new(x, y, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], metadata)?;
+
+    let text = write_jcamp_dx_2d(&spectrum)?;
+
+    assert!(text.contains("##DATA CLASS=NTUPLES"));
+    assert!(text.contains("##VAR_DIM=3, 2, 3"));
+    assert!(text.contains("##PAGE=F1=200"));
+    assert!(text.contains("##DATA TABLE=(X++(Y..Y)), XYDATA"));
+    let parsed = read_jcamp_dx_2d(&text)?;
+    assert_eq!(
+        parsed.metadata.name.as_deref(),
+        Some("two dimensional export")
+    );
+    assert_eq!(parsed.metadata.origin.as_deref(), Some("local"));
+    assert_eq!(parsed.metadata.solvent.as_deref(), Some("CDCl3"));
+    assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(parsed.metadata.frequency_mhz, Some(600.0));
+    assert_axis_close(&parsed.x.values, &spectrum.x.values);
+    assert_axis_close(&parsed.y.values, &spectrum.y.values);
+    assert_eq!(parsed.z, spectrum.z);
+    Ok(())
+}
+
+#[test]
+fn rejects_non_uniform_two_dimensional_x_export() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::new("x", Unit::Ppm, vec![0.0, 0.4, 1.5])?,
+        Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        Metadata::named("nonlinear x"),
+    )?;
+
+    let error = write_jcamp_dx_2d(&spectrum)
+        .expect_err("non-uniform direct axis should fail for 2D export");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_complex_two_dimensional_jcamp_export() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new_complex(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Some(vec![0.1, 0.2, 0.3, 0.4]),
+        Metadata::named("complex 2d"),
+    )?;
+
+    let error = write_jcamp_dx_2d(&spectrum).expect_err("complex 2D export should fail explicitly");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
 fn supports_trait_api() -> anyhow::Result<()> {
     let codec = JcampDx;
     let x = Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 2)?;
@@ -500,6 +562,17 @@ fn supports_trait_api() -> anyhow::Result<()> {
     let text = codec.write_string(&spectrum)?;
     let parsed = codec.read_str(&text)?;
     assert_eq!(parsed.intensities, vec![5.0, 6.0]);
+
+    let codec_2d = JcampDx2D;
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("trait 2d"),
+    )?;
+    let text_2d = codec_2d.write_string(&spectrum_2d)?;
+    let parsed_2d = codec_2d.read_str(&text_2d)?;
+    assert_eq!(parsed_2d.z, spectrum_2d.z);
     Ok(())
 }
 

@@ -1,6 +1,6 @@
-//! JCAMP-DX one-dimensional spectrum writer.
+//! JCAMP-DX one- and two-dimensional spectrum writers.
 
-use rspin_core::{RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
 
 /// Writes a one-dimensional spectrum to a JCAMP-DX string.
 ///
@@ -78,6 +78,94 @@ pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
     Ok(output)
 }
 
+/// Writes a two-dimensional spectrum to a JCAMP-DX string.
+///
+/// This writer emits a focused real-valued NTUPLES/page representation with one
+/// indirect-axis page per matrix row. The direct axis must be uniformly spaced
+/// because the matching reader interprets the direct dimension from `FIRST` and
+/// `LAST` labels. Non-uniform indirect axes are preserved through `PAGE=F1=...`
+/// labels.
+///
+/// # Errors
+///
+/// Returns an error when the spectrum contains non-finite values, has an
+/// imaginary channel, or uses a non-uniform direct axis.
+pub fn write_jcamp_dx_2d(spectrum: &Spectrum2D) -> Result<String> {
+    validate_finite_spectrum_2d(spectrum)?;
+    if spectrum.imaginary.is_some() {
+        return Err(RSpinError::Unsupported {
+            feature: "complex 2D JCAMP-DX export",
+        });
+    }
+    if !has_uniform_spacing(&spectrum.x.values) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "2D JCAMP-DX export requires a uniform x axis".to_owned(),
+        });
+    }
+
+    let (width, height) = spectrum.shape();
+    let first_x = axis_endpoint("first x value", &spectrum.x.values, Endpoint::First)?;
+    let last_x = axis_endpoint("last x value", &spectrum.x.values, Endpoint::Last)?;
+    let first_y = axis_endpoint("first y value", &spectrum.y.values, Endpoint::First)?;
+    let last_y = axis_endpoint("last y value", &spectrum.y.values, Endpoint::Last)?;
+    let first_z = data_endpoint("first z value", &spectrum.z, Endpoint::First)?;
+    let last_z = data_endpoint("last z value", &spectrum.z, Endpoint::Last)?;
+    let title = option_ref_or(spectrum.metadata.name.as_deref(), "untitled");
+
+    let mut output = String::new();
+    push_label(&mut output, "TITLE", title);
+    push_label(&mut output, "JCAMP-DX", "5.00");
+    push_label(&mut output, "DATA TYPE", "NMR SPECTRUM");
+    push_label(&mut output, "DATA CLASS", "NTUPLES");
+    write_common_metadata_labels(
+        &mut output,
+        spectrum.metadata.origin.as_deref(),
+        spectrum.metadata.solvent.as_deref(),
+        spectrum.metadata.temperature_k,
+        spectrum.metadata.nucleus.as_ref(),
+        spectrum.metadata.frequency_mhz,
+    );
+    push_label(
+        &mut output,
+        "UNITS",
+        &format!(
+            "{}, {}, ARBITRARY UNITS",
+            unit_label(spectrum.x.unit),
+            unit_label(spectrum.y.unit)
+        ),
+    );
+    push_label(&mut output, "FACTOR", "1, 1, 1");
+    push_label(
+        &mut output,
+        "FIRST",
+        &format!(
+            "{}, {}, {}",
+            format_float(first_x),
+            format_float(first_y),
+            format_float(first_z)
+        ),
+    );
+    push_label(
+        &mut output,
+        "LAST",
+        &format!(
+            "{}, {}, {}",
+            format_float(last_x),
+            format_float(last_y),
+            format_float(last_z)
+        ),
+    );
+    push_label(
+        &mut output,
+        "VAR_DIM",
+        &format!("{width}, {height}, {width}"),
+    );
+    write_2d_data_pages(&mut output, spectrum, width, height);
+    output.push_str("##END=\n");
+
+    Ok(output)
+}
+
 fn validate_finite_spectrum(spectrum: &Spectrum1D) -> Result<()> {
     if !spectrum.x.values.iter().all(|value| value.is_finite())
         || !spectrum.intensities.iter().all(|value| value.is_finite())
@@ -109,6 +197,69 @@ fn validate_finite_spectrum(spectrum: &Spectrum1D) -> Result<()> {
         });
     }
     Ok(())
+}
+
+fn validate_finite_spectrum_2d(spectrum: &Spectrum2D) -> Result<()> {
+    if !spectrum.x.values.iter().all(|value| value.is_finite())
+        || !spectrum.y.values.iter().all(|value| value.is_finite())
+        || !spectrum.z.iter().all(|value| value.is_finite())
+    {
+        return Err(RSpinError::NonFinite { field: "spectrum" });
+    }
+    if let Some(imaginary) = spectrum.imaginary.as_deref() {
+        if imaginary.len() != spectrum.z.len() {
+            return Err(RSpinError::InvalidSpectrum {
+                message: format!(
+                    "imaginary matrix has {} values but real matrix has {} values",
+                    imaginary.len(),
+                    spectrum.z.len()
+                ),
+            });
+        }
+        if !imaginary.iter().all(|value| value.is_finite()) {
+            return Err(RSpinError::NonFinite { field: "imaginary" });
+        }
+    }
+    if !spectrum.metadata.frequency_mhz.is_none_or(f64::is_finite) {
+        return Err(RSpinError::NonFinite {
+            field: "frequency_mhz",
+        });
+    }
+    if !spectrum.metadata.temperature_k.is_none_or(f64::is_finite) {
+        return Err(RSpinError::NonFinite {
+            field: "temperature_k",
+        });
+    }
+    Ok(())
+}
+
+fn write_common_metadata_labels(
+    output: &mut String,
+    origin: Option<&str>,
+    solvent: Option<&str>,
+    temperature_k: Option<f64>,
+    nucleus: Option<&rspin_core::Nucleus>,
+    frequency_mhz: Option<f64>,
+) {
+    if let Some(origin) = origin {
+        push_label(output, "ORIGIN", origin);
+    }
+    if let Some(solvent) = solvent {
+        push_label(output, ".SOLVENT NAME", solvent);
+    }
+    if let Some(temperature_k) = temperature_k {
+        push_label(
+            output,
+            "TEMPERATURE",
+            &format!("{} K", format_float(temperature_k)),
+        );
+    }
+    if let Some(nucleus) = nucleus {
+        push_label(output, "OBSERVE NUCLEUS", nucleus.as_label());
+    }
+    if let Some(frequency_mhz) = frequency_mhz {
+        push_label(output, "OBSERVE FREQUENCY", &format_float(frequency_mhz));
+    }
 }
 
 fn write_complex_data_tables(
@@ -176,6 +327,28 @@ fn write_complex_data_tables(
     Ok(())
 }
 
+fn write_2d_data_pages(output: &mut String, spectrum: &Spectrum2D, width: usize, height: usize) {
+    for y_index in 0..height {
+        let y_value = spectrum.y.values[y_index];
+        push_label(output, "PAGE", &format!("F1={}", format_float(y_value)));
+        push_label(output, "DATA TABLE", "(X++(Y..Y)), XYDATA");
+        let row_start = y_index * width;
+        let row_end = row_start + width;
+        for (x_value, value) in spectrum
+            .x
+            .values
+            .iter()
+            .copied()
+            .zip(spectrum.z[row_start..row_end].iter().copied())
+        {
+            output.push_str(&format_float(x_value));
+            output.push(' ');
+            output.push_str(&format_float(value));
+            output.push('\n');
+        }
+    }
+}
+
 fn write_data_table_page(
     output: &mut String,
     page: &str,
@@ -224,6 +397,10 @@ enum Endpoint {
 }
 
 fn data_endpoint(field: &'static str, values: &[f64], endpoint: Endpoint) -> Result<f64> {
+    axis_endpoint(field, values, endpoint)
+}
+
+fn axis_endpoint(field: &'static str, values: &[f64], endpoint: Endpoint) -> Result<f64> {
     let value = match endpoint {
         Endpoint::First => values.first().copied(),
         Endpoint::Last => values.last().copied(),

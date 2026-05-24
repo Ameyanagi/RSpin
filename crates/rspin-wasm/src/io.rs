@@ -16,8 +16,8 @@ use crate::{
     parse_nmrml_version_json, parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json,
     parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json,
     parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
-    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
-    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_jcamp_dx_2d_json,
+    write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
     write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
     write_spectrum_2d_text_json,
 };
@@ -50,6 +50,16 @@ pub fn parse_jcamp_dx_version(input: &str) -> std::result::Result<String, JsValu
 #[wasm_bindgen(js_name = parseJcampDx2d)]
 pub fn parse_jcamp_dx_2d(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_2d_json(input).map_err(|error| js_error(&error))
+}
+
+/// Serializes two-dimensional spectrum JSON into JCAMP-DX text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or serialization fails.
+#[wasm_bindgen(js_name = writeJcampDx2d)]
+pub fn write_jcamp_dx_2d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    write_jcamp_dx_2d_json(spectrum_json).map_err(|error| js_error(&error))
 }
 
 /// Parses an nmrML version label into serialized metadata JSON.

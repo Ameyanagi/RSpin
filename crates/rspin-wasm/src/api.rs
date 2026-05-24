@@ -39,7 +39,7 @@ use rspin_io::{
     read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum1d_bytes_as,
     read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as,
     read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
-    write_j_coupling_graph_json, write_jcamp_dx_1d, write_nmredata_record,
+    write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record,
     write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum1d_json, write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
@@ -310,6 +310,16 @@ pub fn parse_jeol_jdf_2d_bytes_json(input: &[u8]) -> Result<String> {
 pub fn write_jcamp_dx_1d_json(spectrum_json: &str) -> Result<String> {
     let spectrum = spectrum1d_from_json(spectrum_json)?;
     write_jcamp_dx_1d(&spectrum)
+}
+
+/// Serializes `Spectrum2D` JSON into JCAMP-DX text.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or JCAMP-DX serialization fails.
+pub fn write_jcamp_dx_2d_json(spectrum_json: &str) -> Result<String> {
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
+    write_jcamp_dx_2d(&spectrum)
 }
 
 /// Parses a JCAMP-DX version label into serialized metadata JSON.

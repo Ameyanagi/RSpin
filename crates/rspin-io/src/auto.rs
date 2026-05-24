@@ -224,6 +224,8 @@ pub enum Spectrum2DWritePathFormat {
     Json,
     /// nmrML XML payload.
     NmrMl,
+    /// JCAMP-DX text payload.
+    JcampDx,
     /// `RSpin` CSV payload.
     Csv,
 }
@@ -235,6 +237,7 @@ impl Spectrum2DWritePathFormat {
         match self {
             Self::Json => "json",
             Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
             Self::Csv => "csv",
         }
     }
@@ -717,6 +720,9 @@ pub fn detect_spectrum2d_write_path_format(
     if is_extension(path, &["nmrml", "xml"]) {
         return Ok(Spectrum2DWritePathFormat::NmrMl);
     }
+    if is_extension(path, &["jdx", "dx"]) {
+        return Ok(Spectrum2DWritePathFormat::JcampDx);
+    }
     if is_extension(path, &["csv"]) {
         return Ok(Spectrum2DWritePathFormat::Csv);
     }
@@ -727,7 +733,8 @@ pub fn detect_spectrum2d_write_path_format(
 
 /// Parses a two-dimensional path writer format name.
 ///
-/// Accepted names include `json`, `nmrml`, `xml`, and `csv`.
+/// Accepted names include `json`, `nmrml`, `xml`, `jcamp_dx`, `jcamp`, `jdx`,
+/// `dx`, and `csv`.
 ///
 /// # Errors
 ///
@@ -737,6 +744,7 @@ pub fn parse_spectrum2d_write_path_format(input: &str) -> Result<Spectrum2DWrite
     match normalized_format_name(input).as_str() {
         "json" => Ok(Spectrum2DWritePathFormat::Json),
         "nmrml" | "xml" => Ok(Spectrum2DWritePathFormat::NmrMl),
+        "jcampdx" | "jcamp" | "jdx" | "dx" => Ok(Spectrum2DWritePathFormat::JcampDx),
         "csv" => Ok(Spectrum2DWritePathFormat::Csv),
         _ => Err(RSpinError::Unsupported {
             feature: "two-dimensional spectrum path writer format name",
@@ -839,7 +847,7 @@ pub fn write_spectrum1d_path_as(
     write_text_file(path, &payload)
 }
 
-/// Writes a two-dimensional spectrum to JSON, nmrML, or CSV by extension.
+/// Writes a two-dimensional spectrum to JSON, nmrML, JCAMP-DX, or CSV by extension.
 ///
 /// # Errors
 ///
@@ -1114,11 +1122,11 @@ mod tests {
             Spectrum1DWritePathFormat::JcampDx
         );
         assert_eq!(
-            parse_spectrum2d_write_path_format("xml")?,
-            Spectrum2DWritePathFormat::NmrMl
+            parse_spectrum2d_write_path_format("jcamp_dx")?,
+            Spectrum2DWritePathFormat::JcampDx
         );
         assert_eq!(Spectrum1DWritePathFormat::Csv.to_string(), "csv");
-        assert_eq!(Spectrum2DWritePathFormat::NmrMl.as_str(), "nmrml");
+        assert_eq!(Spectrum2DWritePathFormat::JcampDx.as_str(), "jcamp_dx");
 
         Ok(())
     }
@@ -1167,6 +1175,13 @@ mod tests {
         assert_eq!(
             read_spectrum2d_path_as(&two_json_path, Spectrum2DPathFormat::Json)?,
             two
+        );
+
+        let two_jcamp_export = root.join("two-export.payload");
+        write_spectrum2d_path_as(&two, &two_jcamp_export, Spectrum2DWritePathFormat::JcampDx)?;
+        assert_eq!(
+            read_spectrum2d_path_as(&two_jcamp_export, Spectrum2DPathFormat::JcampDx)?.z,
+            two.z
         );
 
         let jcamp = "\
@@ -1426,6 +1441,7 @@ x,intensity
         let json_path = root.join("two.json");
         let csv_path = root.join("two.csv");
         let nmrml_path = root.join("two.nmrml");
+        let jcamp_path = root.join("two.jdx");
 
         assert_eq!(
             detect_spectrum2d_write_path_format(&json_path)?,
@@ -1439,10 +1455,15 @@ x,intensity
             detect_spectrum2d_write_path_format(&nmrml_path)?,
             Spectrum2DWritePathFormat::NmrMl
         );
+        assert_eq!(
+            detect_spectrum2d_write_path_format(&jcamp_path)?,
+            Spectrum2DWritePathFormat::JcampDx
+        );
 
         AutoSpectrum2DPathWriter.write_path(&spectrum, &json_path)?;
         write_spectrum2d_path(&spectrum, &csv_path)?;
         write_spectrum2d_path(&spectrum, &nmrml_path)?;
+        write_spectrum2d_path(&spectrum, &jcamp_path)?;
 
         assert_eq!(read_spectrum2d_path(&json_path)?, spectrum);
 
@@ -1460,6 +1481,14 @@ x,intensity
         assert_eq!(nmrml.z, spectrum.z);
         assert_eq!(nmrml.metadata.name, spectrum.metadata.name);
 
+        let jcamp = read_spectrum2d_path(&jcamp_path)?;
+        assert_eq!(jcamp.x.unit, spectrum.x.unit);
+        assert_eq!(jcamp.x.values, spectrum.x.values);
+        assert_eq!(jcamp.y.unit, spectrum.y.unit);
+        assert_eq!(jcamp.y.values, spectrum.y.values);
+        assert_eq!(jcamp.z, spectrum.z);
+        assert_eq!(jcamp.metadata.name, spectrum.metadata.name);
+
         remove_dir(root)?;
         Ok(())
     }
@@ -1470,8 +1499,8 @@ x,intensity
             .expect_err("unsupported 1D write extension should fail");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
 
-        let error = detect_spectrum2d_write_path_format("two.dx")
-            .expect_err("2D JCAMP-DX path writer should not be supported");
+        let error = detect_spectrum2d_write_path_format("two.bin")
+            .expect_err("unsupported 2D write extension should fail");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
     }
 

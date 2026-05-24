@@ -77,10 +77,11 @@ pub use api::{
     validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
     validate_exact_spin_options_json, validate_j_coupling_graph_json, validate_prediction_json,
     write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_exact_transitions_csv_json,
-    write_jcamp_dx_1d_json, write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json,
-    write_nmrml_2d_json, write_prediction_csv_json, write_spectrum_1d_csv_json,
-    write_spectrum_1d_text_json, write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
-    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    write_jcamp_dx_1d_json, write_jcamp_dx_2d_json, write_nmredata_json,
+    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    write_prediction_csv_json, write_spectrum_1d_csv_json, write_spectrum_1d_text_json,
+    write_spectrum_2d_csv_json, write_spectrum_2d_text_json, zero_fill_spectrum_1d_json,
+    zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -95,9 +96,9 @@ pub use io::{
     parse_nmrml_2d, parse_nmrml_version, parse_spectrum_1d_bytes_as, parse_spectrum_1d_csv,
     parse_spectrum_1d_text, parse_spectrum_1d_text_as, parse_spectrum_2d_bytes_as,
     parse_spectrum_2d_csv, parse_spectrum_2d_text, parse_spectrum_2d_text_as,
-    write_analysis_1d_csv, write_analysis_2d_csv, write_nmredata, write_nmredata_records,
-    write_nmrml_1d, write_nmrml_2d, write_spectrum_1d_csv, write_spectrum_1d_text,
-    write_spectrum_2d_csv, write_spectrum_2d_text,
+    write_analysis_1d_csv, write_analysis_2d_csv, write_jcamp_dx_2d, write_nmredata,
+    write_nmredata_records, write_nmrml_1d, write_nmrml_2d, write_spectrum_1d_csv,
+    write_spectrum_1d_text, write_spectrum_2d_csv, write_spectrum_2d_text,
 };
 pub use prediction::{
     parse_prediction_csv, predict_formula_with_element_rules, predict_molecule_with_element_rules,

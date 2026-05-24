@@ -246,6 +246,8 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     )?;
     assert_eq!(jcamp_2d.shape(), (2, 2));
     assert_eq!(jcamp_2d.z, vec![1.0, 2.0, 3.0, 4.0]);
+    let jcamp_2d_text = write_jcamp_dx_2d(&jcamp_2d)?;
+    assert_eq!(read_jcamp_dx_2d(&jcamp_2d_text)?.z, jcamp_2d.z);
     assert_eq!(
         parse_spectrum2d_path_format("jdx")?,
         Spectrum2DPathFormat::JcampDx

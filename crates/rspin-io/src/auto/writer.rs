@@ -5,8 +5,8 @@ use std::{fmt, str::FromStr};
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    SpectrumWriter, write_jcamp_dx_1d, write_nmrml_1d, write_nmrml_2d, write_spectrum1d_csv,
-    write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
+    SpectrumWriter, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmrml_1d, write_nmrml_2d,
+    write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 
 use super::{Spectrum1DWritePathFormat, Spectrum2DWritePathFormat, normalized_format_name};
@@ -69,6 +69,8 @@ pub enum Spectrum2DWriteFormat {
     Json,
     /// nmrML XML payload.
     NmrMl,
+    /// JCAMP-DX text payload.
+    JcampDx,
     /// `RSpin` CSV payload.
     Csv,
 }
@@ -80,6 +82,7 @@ impl Spectrum2DWriteFormat {
         match self {
             Self::Json => "json",
             Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
             Self::Csv => "csv",
         }
     }
@@ -104,6 +107,7 @@ impl From<Spectrum2DWritePathFormat> for Spectrum2DWriteFormat {
         match value {
             Spectrum2DWritePathFormat::Json => Self::Json,
             Spectrum2DWritePathFormat::NmrMl => Self::NmrMl,
+            Spectrum2DWritePathFormat::JcampDx => Self::JcampDx,
             Spectrum2DWritePathFormat::Csv => Self::Csv,
         }
     }
@@ -195,6 +199,12 @@ impl Spectrum2DTextWriter {
         Self::new(Spectrum2DWriteFormat::NmrMl)
     }
 
+    /// Creates a JCAMP-DX text writer.
+    #[must_use]
+    pub fn jcamp_dx() -> Self {
+        Self::new(Spectrum2DWriteFormat::JcampDx)
+    }
+
     /// Creates a CSV text writer.
     #[must_use]
     pub fn csv() -> Self {
@@ -245,7 +255,8 @@ pub fn parse_spectrum1d_write_format(input: &str) -> Result<Spectrum1DWriteForma
 
 /// Parses a two-dimensional text export format name.
 ///
-/// Accepted names include `json`, `nmrml`, `xml`, and `csv`.
+/// Accepted names include `json`, `nmrml`, `xml`, `jcamp_dx`, `jdx`, `dx`, and
+/// `csv`.
 ///
 /// # Errors
 ///
@@ -254,6 +265,7 @@ pub fn parse_spectrum2d_write_format(input: &str) -> Result<Spectrum2DWriteForma
     match normalized_format_name(input).as_str() {
         "json" => Ok(Spectrum2DWriteFormat::Json),
         "nmrml" | "xml" => Ok(Spectrum2DWriteFormat::NmrMl),
+        "jcampdx" | "jcamp" | "jdx" | "dx" => Ok(Spectrum2DWriteFormat::JcampDx),
         "csv" => Ok(Spectrum2DWriteFormat::Csv),
         _ => Err(RSpinError::Unsupported {
             feature: "two-dimensional spectrum text writer format",
@@ -290,6 +302,7 @@ pub fn write_spectrum2d_text(
     match format {
         Spectrum2DWriteFormat::Json => write_spectrum2d_json(spectrum),
         Spectrum2DWriteFormat::NmrMl => write_nmrml_2d(spectrum),
+        Spectrum2DWriteFormat::JcampDx => write_jcamp_dx_2d(spectrum),
         Spectrum2DWriteFormat::Csv => write_spectrum2d_csv(spectrum),
     }
 }
@@ -351,8 +364,8 @@ mod tests {
         )?;
 
         assert_eq!(
-            parse_spectrum2d_write_format("xml")?,
-            Spectrum2DWriteFormat::NmrMl
+            parse_spectrum2d_write_format("jdx")?,
+            Spectrum2DWriteFormat::JcampDx
         );
         assert_eq!(
             "csv".parse::<Spectrum2DWriteFormat>()?,
@@ -375,6 +388,12 @@ mod tests {
         assert_eq!(parsed_nmrml.x.values, spectrum.x.values);
         assert_eq!(parsed_nmrml.y.values, spectrum.y.values);
         assert_eq!(parsed_nmrml.z, spectrum.z);
+
+        let jcamp = Spectrum2DTextWriter::jcamp_dx().write_string(&spectrum)?;
+        let parsed_jcamp = read_spectrum2d_text(&jcamp)?;
+        assert_eq!(parsed_jcamp.x.values, spectrum.x.values);
+        assert_eq!(parsed_jcamp.y.values, spectrum.y.values);
+        assert_eq!(parsed_jcamp.z, spectrum.z);
         Ok(())
     }
 
@@ -384,8 +403,8 @@ mod tests {
             .expect_err("unsupported 1D text writer should fail");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
 
-        let error = parse_spectrum2d_write_format("jdx")
-            .expect_err("2D JCAMP-DX text writer should not be supported");
+        let error = parse_spectrum2d_write_format("binary")
+            .expect_err("unsupported 2D text writer should fail");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
     }
 

@@ -1,6 +1,6 @@
 //! Minimal JCAMP-DX support for one- and two-dimensional spectra.
 
-use rspin_core::{Axis, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{Axis, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
 use serde::{Deserialize, Serialize};
 
 use crate::{SpectrumReader, SpectrumWriter};
@@ -11,7 +11,7 @@ mod two_d;
 mod writer;
 
 pub use two_d::{JcampDx2D, read_jcamp_dx_2d};
-pub use writer::write_jcamp_dx_1d;
+pub use writer::{write_jcamp_dx_1d, write_jcamp_dx_2d};
 
 /// Reader and writer for a focused JCAMP-DX 1D subset.
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,6 +28,12 @@ impl SpectrumReader for JcampDx {
 impl SpectrumWriter<Spectrum1D> for JcampDx {
     fn write_string(&self, spectrum: &Spectrum1D) -> Result<String> {
         write_jcamp_dx_1d(spectrum)
+    }
+}
+
+impl SpectrumWriter<Spectrum2D> for JcampDx2D {
+    fn write_string(&self, spectrum: &Spectrum2D) -> Result<String> {
+        write_jcamp_dx_2d(spectrum)
     }
 }
 
