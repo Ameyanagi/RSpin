@@ -15,11 +15,13 @@ use hamiltonian::{basis_dimension, hamiltonian_matrix, observation_matrix, total
 pub use model::{ExactSpinOptions, ExactTransition, ScalarCoupling, SpinHalf, SpinHalfSystem};
 pub use spectrum::{
     ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactTransitionContribution1D,
-    decompose_exact_spin_half_1d, simulate_exact_spin_half_1d,
+    decompose_exact_spin_half_1d, simulate_exact_spin_half_1d, validate_exact_spectrum_options,
+    validate_exact_spin_half_spectrum_inputs,
 };
 pub use spectrum_2d::{
     ExactSpectrum2DOptions, ExactSpectrumDecomposition2D, ExactSpinPair,
     ExactTransitionContribution2D, decompose_exact_spin_half_2d, simulate_exact_spin_half_2d,
+    validate_exact_spectrum_2d_options, validate_exact_spin_half_spectrum_2d_inputs,
 };
 pub use workflow::{
     ExactSpinHalfResultWorkflow, ExactSpinHalfSpectrum1DResultWorkflow,
@@ -87,6 +89,45 @@ pub fn exact_spin_half_transitions(
         options.frequency_tolerance_hz,
         options.spectrometer_mhz,
     ))
+}
+
+/// Validates an exact spin-1/2 system without running simulation.
+///
+/// # Errors
+///
+/// Returns an error when the system has no spins, non-finite shifts, invalid
+/// couplings, duplicate couplings, or out-of-range coupling indices.
+pub fn validate_spin_half_system(system: &SpinHalfSystem) -> Result<()> {
+    validate_system(system)
+}
+
+/// Validates exact transition simulation options without running simulation.
+///
+/// This validates option-local constraints. Use
+/// [`validate_exact_spin_half_inputs`] when detected-spin indices should also be
+/// checked against a concrete system.
+///
+/// # Errors
+///
+/// Returns an error when options contain non-finite or invalid values.
+pub fn validate_exact_spin_options(options: &ExactSpinOptions) -> Result<()> {
+    validate_options(options)
+}
+
+/// Validates an exact spin-1/2 system and transition options together.
+///
+/// # Errors
+///
+/// Returns an error when the system, options, spin-count limit, or detected-spin
+/// indices are invalid.
+pub fn validate_exact_spin_half_inputs(
+    system: &SpinHalfSystem,
+    options: &ExactSpinOptions,
+) -> Result<()> {
+    validate_system(system)?;
+    validate_options(options)?;
+    validate_spin_count(system.spins.len(), options.max_spins)?;
+    detected_spin_indices(system.spins.len(), &options.detected_spins).map(|_| ())
 }
 
 fn signed_offset(energy_delta_hz: f64, lower_magnetization: f64, upper_magnetization: f64) -> f64 {

@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{LineShape, Simulator};
 
-use super::{ExactSpinOptions, ExactTransition, SpinHalfSystem, exact_spin_half_transitions};
+use super::{
+    ExactSpinOptions, ExactTransition, SpinHalfSystem, exact_spin_half_transitions,
+    validate_exact_spin_half_inputs, validate_exact_spin_options,
+};
 
 /// Dense one-dimensional rendering options for exact spin-1/2 simulations.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -88,6 +91,29 @@ impl ExactSpectrumOptions {
     pub fn with_transition_options(mut self, transition_options: ExactSpinOptions) -> Self {
         self.transition_options = transition_options;
         self
+    }
+
+    /// Validates option-local constraints without running simulation.
+    ///
+    /// Use [`Self::validate_for_system`] to check the embedded transition
+    /// options against a concrete spin system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when rendering options or embedded transition options
+    /// contain non-finite or invalid values.
+    pub fn validate(&self) -> Result<()> {
+        validate_exact_spectrum_options(self)
+    }
+
+    /// Validates this rendering option set against a concrete spin system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the system, transition options, spin-count limit,
+    /// detected-spin indices, or rendering options are invalid.
+    pub fn validate_for_system(&self, system: &SpinHalfSystem) -> Result<()> {
+        validate_exact_spin_half_spectrum_inputs(system, self)
     }
 }
 
@@ -182,6 +208,35 @@ pub fn decompose_exact_spin_half_1d(
         transitions,
         contributions,
     })
+}
+
+/// Validates exact one-dimensional rendering options without running simulation.
+///
+/// This validates rendering and embedded transition option-local constraints. Use
+/// [`validate_exact_spin_half_spectrum_inputs`] when embedded transition
+/// options should also be checked against a concrete system.
+///
+/// # Errors
+///
+/// Returns an error when rendering options or embedded transition options contain
+/// non-finite or invalid values.
+pub fn validate_exact_spectrum_options(options: &ExactSpectrumOptions) -> Result<()> {
+    validate_options(options)?;
+    validate_exact_spin_options(&options.transition_options)
+}
+
+/// Validates a spin system and exact one-dimensional rendering options together.
+///
+/// # Errors
+///
+/// Returns an error when the system, transition options, spin-count limit,
+/// detected-spin indices, or rendering options are invalid.
+pub fn validate_exact_spin_half_spectrum_inputs(
+    system: &SpinHalfSystem,
+    options: &ExactSpectrumOptions,
+) -> Result<()> {
+    validate_options(options)?;
+    validate_exact_spin_half_inputs(system, &options.transition_options)
 }
 
 fn render_contributions(

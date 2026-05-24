@@ -4,7 +4,9 @@ use rspin_core::Result;
 use rspin_io::{
     read_exact_spectrum_2d_options_json, read_exact_spectrum_options_json,
     read_exact_spin_options_json, read_spin_half_system_json, write_exact_decomposition_1d_json,
-    write_exact_decomposition_2d_json, write_exact_transitions_json,
+    write_exact_decomposition_2d_json, write_exact_spectrum_2d_options_json,
+    write_exact_spectrum_options_json, write_exact_spin_options_json, write_exact_transitions_json,
+    write_spin_half_system_json,
 };
 use rspin_simulation::{
     decompose_exact_spin_half_1d, decompose_exact_spin_half_2d, exact_spin_half_transitions,
@@ -12,6 +14,50 @@ use rspin_simulation::{
 };
 
 use super::{spectrum1d_to_json, spectrum2d_to_json};
+
+/// Validates exact spin-1/2 system JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_exact_spin_half_system_json(system_json: &str) -> Result<String> {
+    let system = read_spin_half_system_json(system_json)?;
+    system.validate()?;
+    write_spin_half_system_json(&system)
+}
+
+/// Validates exact transition option JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_exact_spin_options_json(options_json: &str) -> Result<String> {
+    let options = read_exact_spin_options_json(options_json)?;
+    options.validate()?;
+    write_exact_spin_options_json(&options)
+}
+
+/// Validates exact one-dimensional rendering option JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_exact_spectrum_options_json(options_json: &str) -> Result<String> {
+    let options = read_exact_spectrum_options_json(options_json)?;
+    options.validate()?;
+    write_exact_spectrum_options_json(&options)
+}
+
+/// Validates exact two-dimensional rendering option JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_exact_spectrum_2d_options_json(options_json: &str) -> Result<String> {
+    let options = read_exact_spectrum_2d_options_json(options_json)?;
+    options.validate()?;
+    write_exact_spectrum_2d_options_json(&options)
+}
 
 /// Simulates exact spin-1/2 transitions and returns serialized transition JSON.
 ///

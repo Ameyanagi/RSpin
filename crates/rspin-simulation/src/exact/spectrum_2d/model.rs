@@ -7,7 +7,8 @@ use crate::{LineShape, Simulator};
 
 use super::{
     super::{ExactSpinOptions, ExactTransition, SpinHalfSystem},
-    simulate_exact_spin_half_2d,
+    simulate_exact_spin_half_2d, validate_exact_spectrum_2d_options,
+    validate_exact_spin_half_spectrum_2d_inputs,
 };
 
 /// Directed spin pair used when rendering exact two-dimensional correlations.
@@ -164,6 +165,30 @@ impl ExactSpectrum2DOptions {
     pub fn without_spin_pairs(mut self) -> Self {
         self.spin_pairs.clear();
         self
+    }
+
+    /// Validates option-local constraints without running simulation.
+    ///
+    /// Use [`Self::validate_for_system`] to check resolved spin pairs and the
+    /// embedded transition options against a concrete spin system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when rendering options or embedded transition options
+    /// contain non-finite or invalid values.
+    pub fn validate(&self) -> Result<()> {
+        validate_exact_spectrum_2d_options(self)
+    }
+
+    /// Validates this two-dimensional rendering option set against a concrete
+    /// spin system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the system, transition options, spin-count limit,
+    /// resolved spin pairs, or rendering options are invalid.
+    pub fn validate_for_system(&self, system: &SpinHalfSystem) -> Result<()> {
+        validate_exact_spin_half_spectrum_2d_inputs(system, self)
     }
 }
 

@@ -5,8 +5,56 @@ use wasm_bindgen::prelude::*;
 use crate::{
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, js_error,
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json,
+    simulate_exact_spin_half_transitions_json, validate_exact_spectrum_2d_options_json,
+    validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
+    validate_exact_spin_options_json,
 };
+
+/// Validates exact spin-1/2 system JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateExactSpinHalfSystem)]
+pub fn validate_exact_spin_half_system(system_json: &str) -> std::result::Result<String, JsValue> {
+    validate_exact_spin_half_system_json(system_json).map_err(|error| js_error(&error))
+}
+
+/// Validates exact transition option JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateExactSpinOptions)]
+pub fn validate_exact_spin_options(options_json: &str) -> std::result::Result<String, JsValue> {
+    validate_exact_spin_options_json(options_json).map_err(|error| js_error(&error))
+}
+
+/// Validates exact one-dimensional rendering option JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateExactSpectrumOptions)]
+pub fn validate_exact_spectrum_options(options_json: &str) -> std::result::Result<String, JsValue> {
+    validate_exact_spectrum_options_json(options_json).map_err(|error| js_error(&error))
+}
+
+/// Validates exact two-dimensional rendering option JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateExactSpectrum2dOptions)]
+pub fn validate_exact_spectrum_2d_options(
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    validate_exact_spectrum_2d_options_json(options_json).map_err(|error| js_error(&error))
+}
 
 /// Simulates exact spin-1/2 transitions as serialized JSON.
 ///

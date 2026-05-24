@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::Simulator;
 
-use super::exact_spin_half_transitions;
+use super::{
+    exact_spin_half_transitions, validate_exact_spin_half_inputs, validate_exact_spin_options,
+    validate_spin_half_system,
+};
 
 /// A spin-1/2 nucleus in an exact spin system.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -85,6 +88,17 @@ impl SpinHalfSystem {
         self.couplings
             .push(ScalarCoupling::new(spin_a, spin_b, j_hz));
         self
+    }
+
+    /// Validates the spin system without running simulation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the system has no spins, non-finite shifts,
+    /// invalid couplings, duplicate couplings, or out-of-range coupling
+    /// indices.
+    pub fn validate(&self) -> Result<()> {
+        validate_spin_half_system(self)
     }
 }
 
@@ -167,6 +181,28 @@ impl ExactSpinOptions {
     pub fn with_detected_spins(mut self, detected_spins: impl IntoIterator<Item = usize>) -> Self {
         self.detected_spins = detected_spins.into_iter().collect();
         self
+    }
+
+    /// Validates option-local constraints without running simulation.
+    ///
+    /// Use [`Self::validate_for_system`] when detected-spin indices should also
+    /// be checked against a concrete system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when options contain non-finite or invalid values.
+    pub fn validate(&self) -> Result<()> {
+        validate_exact_spin_options(self)
+    }
+
+    /// Validates this option set against a concrete spin system.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the system, options, spin-count limit, or
+    /// detected-spin indices are invalid.
+    pub fn validate_for_system(&self, system: &SpinHalfSystem) -> Result<()> {
+        validate_exact_spin_half_inputs(system, self)
     }
 }
 

@@ -62,7 +62,9 @@ pub use api::{
     slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
     slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
     subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
-    validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
+    validate_assignment_set_json, validate_exact_spectrum_2d_options_json,
+    validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
+    validate_exact_spin_options_json, validate_j_coupling_graph_json, validate_prediction_json,
     write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
     write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
     write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
@@ -101,7 +103,8 @@ pub use processing_2d::{
 pub use simulation::{
     decompose_exact_spin_half_spectrum, decompose_exact_spin_half_spectrum_2d,
     simulate_exact_spin_half_spectrum, simulate_exact_spin_half_spectrum_2d,
-    simulate_exact_spin_half_transitions,
+    simulate_exact_spin_half_transitions, validate_exact_spectrum_2d_options,
+    validate_exact_spectrum_options, validate_exact_spin_half_system, validate_exact_spin_options,
 };
 pub use workflow::{analyze_spectrum_1d, analyze_spectrum_2d};
 

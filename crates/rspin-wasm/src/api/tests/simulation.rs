@@ -2,7 +2,60 @@ use super::super::{
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json, spectrum1d_from_json, spectrum2d_from_json,
+    validate_exact_spectrum_2d_options_json, validate_exact_spectrum_options_json,
+    validate_exact_spin_half_system_json, validate_exact_spin_options_json,
 };
+
+#[test]
+fn validates_exact_simulation_json() -> anyhow::Result<()> {
+    let system_json = validate_exact_spin_half_system_json(
+        r#"{"spins":[{"shift_ppm":1.0},{"shift_ppm":2.0}],"couplings":[{"spin_a":0,"spin_b":1,"j_hz":8.0}]}"#,
+    )?;
+    assert!(system_json.contains(rspin_io::SPIN_HALF_SYSTEM_JSON_FORMAT));
+    assert_eq!(
+        rspin_io::read_spin_half_system_json(&system_json)?
+            .spins
+            .len(),
+        2
+    );
+
+    let options_json = validate_exact_spin_options_json(
+        r#"{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}"#,
+    )?;
+    assert!(options_json.contains(rspin_io::EXACT_SPIN_OPTIONS_JSON_FORMAT));
+    let parsed_options = rspin_io::read_exact_spin_options_json(&options_json)?;
+    assert!((parsed_options.spectrometer_mhz - 400.0).abs() < 1.0e-12);
+
+    let options_1d_json = validate_exact_spectrum_options_json(
+        r#"{"from_ppm":0.0,"to_ppm":3.0,"points":16,"area":1.0,"line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
+    )?;
+    assert!(options_1d_json.contains(rspin_io::EXACT_SPECTRUM_1D_OPTIONS_JSON_FORMAT));
+
+    let options_2d_json = validate_exact_spectrum_2d_options_json(
+        r#"{"x_from_ppm":0.0,"x_to_ppm":3.0,"x_points":8,"y_from_ppm":0.0,"y_to_ppm":3.0,"y_points":8,"volume":1.0,"x_line_width_hz":1.0,"y_line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10},"spin_pairs":[{"x_spin":0,"y_spin":1}]}"#,
+    )?;
+    assert!(options_2d_json.contains(rspin_io::EXACT_SPECTRUM_2D_OPTIONS_JSON_FORMAT));
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_exact_simulation_json_validation() {
+    let error = validate_exact_spin_half_system_json(r#"{"spins":[],"couplings":[]}"#)
+        .expect_err("empty system should fail validation");
+    assert!(matches!(
+        error,
+        rspin_core::RSpinError::InvalidSpectrum { .. }
+    ));
+
+    let error = validate_exact_spectrum_options_json(
+        r#"{"from_ppm":0.0,"to_ppm":3.0,"points":0,"area":1.0,"line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
+    )
+    .expect_err("zero render point count should fail validation");
+    assert!(matches!(
+        error,
+        rspin_core::RSpinError::InvalidSpectrum { .. }
+    ));
+}
 
 #[test]
 fn simulates_exact_transitions_json() -> anyhow::Result<()> {

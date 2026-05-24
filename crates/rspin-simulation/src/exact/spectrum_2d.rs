@@ -6,7 +6,8 @@ use rspin_core::{Axis, Metadata, ProcessingRecord, RSpinError, Result, Spectrum2
 
 use super::{
     ExactSpinOptions, ExactTransition, SpinHalfSystem, exact_spin_half_transitions,
-    validate_options as validate_transition_options, validate_spin_count, validate_system,
+    validate_exact_spin_options, validate_options as validate_transition_options,
+    validate_spin_count, validate_system,
 };
 
 mod model;
@@ -88,6 +89,39 @@ pub fn decompose_exact_spin_half_2d(
         spectrum,
         contributions,
     })
+}
+
+/// Validates exact two-dimensional rendering options without running simulation.
+///
+/// This validates rendering and embedded transition option-local constraints. Use
+/// [`validate_exact_spin_half_spectrum_2d_inputs`] when spin pairs and embedded
+/// transition options should also be checked against a concrete system.
+///
+/// # Errors
+///
+/// Returns an error when rendering options or embedded transition options contain
+/// non-finite or invalid values.
+pub fn validate_exact_spectrum_2d_options(options: &ExactSpectrum2DOptions) -> Result<()> {
+    validate_render_options(options)?;
+    validate_exact_spin_options(&options.transition_options)
+}
+
+/// Validates a spin system and exact two-dimensional rendering options together.
+///
+/// # Errors
+///
+/// Returns an error when the system, transition options, spin-count limit,
+/// resolved spin pairs, or rendering options are invalid.
+pub fn validate_exact_spin_half_spectrum_2d_inputs(
+    system: &SpinHalfSystem,
+    options: &ExactSpectrum2DOptions,
+) -> Result<()> {
+    validate_render_options(options)?;
+    validate_system(system)?;
+    validate_transition_options(&options.transition_options)?;
+    validate_spin_count(system.spins.len(), options.transition_options.max_spins)?;
+    let spin_pairs = resolved_spin_pairs(system, options);
+    validate_spin_pairs(system.spins.len(), &spin_pairs)
 }
 
 fn resolved_spin_pairs(

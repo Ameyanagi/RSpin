@@ -166,6 +166,8 @@ fn builders_create_chainable_exact_system_and_options() -> anyhow::Result<()> {
         .with_spin(1.2)
         .with_spin(1.25)
         .with_coupling(0, 1, 7.0);
+    system.validate()?;
+    validate_spin_half_system(&system)?;
 
     assert_eq!(system.spins, vec![SpinHalf::new(1.2), SpinHalf::new(1.25)]);
     assert_eq!(system.couplings, vec![ScalarCoupling::new(0, 1, 7.0)]);
@@ -176,6 +178,9 @@ fn builders_create_chainable_exact_system_and_options() -> anyhow::Result<()> {
         .with_frequency_tolerance_hz(1.0e-8)
         .with_max_spins(4)
         .with_detected_spins([0, 1]);
+    options.validate()?;
+    options.validate_for_system(&system)?;
+    validate_exact_spin_half_inputs(&system, &options)?;
     let transitions = options.simulate(&system)?;
 
     assert_eq!(transitions.len(), 4);
@@ -184,6 +189,47 @@ fn builders_create_chainable_exact_system_and_options() -> anyhow::Result<()> {
             .iter()
             .all(|transition| transition.frequency_hz > 0.0)
     );
+    Ok(())
+}
+
+#[test]
+fn validates_exact_spectrum_options_without_simulation() -> anyhow::Result<()> {
+    let system = SpinHalfSystem::new()
+        .with_spin(1.0)
+        .with_spin(2.0)
+        .with_coupling(0, 1, 8.0);
+    let options_1d = ExactSpectrumOptions::new()
+        .with_points(16)
+        .with_transition_options(ExactSpinOptions::new().with_detected_spin(0));
+    options_1d.validate()?;
+    options_1d.validate_for_system(&system)?;
+    validate_exact_spin_half_spectrum_inputs(&system, &options_1d)?;
+
+    let options_2d = ExactSpectrum2DOptions::new()
+        .with_points(8, 8)
+        .with_spin_pair(0, 1);
+    options_2d.validate()?;
+    options_2d.validate_for_system(&system)?;
+    validate_exact_spin_half_spectrum_2d_inputs(&system, &options_2d)?;
+
+    let bad_1d = ExactSpectrumOptions::new().with_points(0);
+    let error = bad_1d
+        .validate()
+        .expect_err("zero 1D render points should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+
+    let bad_transition_options = ExactSpectrumOptions::new()
+        .with_transition_options(ExactSpinOptions::new().with_spectrometer_mhz(-400.0));
+    let error = bad_transition_options
+        .validate()
+        .expect_err("invalid embedded transition options should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+
+    let bad_2d = ExactSpectrum2DOptions::new().with_spin_pair(2, 0);
+    let error = bad_2d
+        .validate_for_system(&system)
+        .expect_err("out-of-range 2D spin pair should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
     Ok(())
 }
 
