@@ -201,6 +201,23 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_path_writer_exports() -> Result<()> {
+    let path_writer_1d = AutoSpectrum1DPathWriter;
+    let path_writer_2d = AutoSpectrum2DPathWriter;
+    assert_eq!(format!("{path_writer_1d:?}"), "AutoSpectrum1DPathWriter");
+    assert_eq!(format!("{path_writer_2d:?}"), "AutoSpectrum2DPathWriter");
+    assert_eq!(
+        detect_spectrum1d_write_path_format("one.csv")?,
+        Spectrum1DWritePathFormat::Csv
+    );
+    assert_eq!(
+        detect_spectrum2d_write_path_format("two.nmrml")?,
+        Spectrum2DWritePathFormat::NmrMl
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_prediction_bond_correlations() -> Result<()> {
     let molecule = Molecule::new("methanol")
         .with_atom(Atom::new("H1", "H"))

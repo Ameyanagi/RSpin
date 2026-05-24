@@ -26,10 +26,13 @@ pub use analysis_json::{
     write_analysis1d_json, write_analysis2d_json,
 };
 pub use auto::{
-    AutoSpectrum1DPath, AutoSpectrum1DText, AutoSpectrum2DPath, AutoSpectrum2DText,
-    Spectrum1DPathFormat, Spectrum2DPathFormat, SpectrumTextFormat, detect_spectrum_text_format,
-    detect_spectrum1d_path_format, detect_spectrum2d_path_format, read_spectrum1d_path,
-    read_spectrum1d_text, read_spectrum2d_path, read_spectrum2d_text,
+    AutoSpectrum1DPath, AutoSpectrum1DPathWriter, AutoSpectrum1DText, AutoSpectrum2DPath,
+    AutoSpectrum2DPathWriter, AutoSpectrum2DText, Spectrum1DPathFormat, Spectrum1DWritePathFormat,
+    Spectrum2DPathFormat, Spectrum2DWritePathFormat, SpectrumTextFormat,
+    detect_spectrum_text_format, detect_spectrum1d_path_format,
+    detect_spectrum1d_write_path_format, detect_spectrum2d_path_format,
+    detect_spectrum2d_write_path_format, read_spectrum1d_path, read_spectrum1d_text,
+    read_spectrum2d_path, read_spectrum2d_text, write_spectrum1d_path, write_spectrum2d_path,
 };
 pub use bruker::{
     BrukerFid1D, BrukerProcessed1D, BrukerProcessed2D, BrukerSer2D, read_bruker_fid_1d_dir,

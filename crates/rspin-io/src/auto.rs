@@ -9,7 +9,8 @@ use crate::{
     read_bruker_fid_1d_dir, read_bruker_processed_1d_dir, read_bruker_processed_2d_dir,
     read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
     read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json,
-    read_spectrum2d_csv, read_spectrum2d_json,
+    read_spectrum2d_csv, read_spectrum2d_json, write_jcamp_dx_1d, write_nmrml_1d, write_nmrml_2d,
+    write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 
 /// Text spectrum formats supported by the auto-detecting readers.
@@ -63,6 +64,30 @@ pub enum Spectrum2DPathFormat {
     BrukerSer,
     /// Agilent/Varian raw two-dimensional FID dataset directory or `fid` file.
     AgilentFid,
+}
+
+/// Filesystem text formats supported by the one-dimensional auto writer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spectrum1DWritePathFormat {
+    /// `RSpin` JSON spectrum payload.
+    Json,
+    /// nmrML XML payload.
+    NmrMl,
+    /// JCAMP-DX text payload.
+    JcampDx,
+    /// `RSpin` CSV payload.
+    Csv,
+}
+
+/// Filesystem text formats supported by the two-dimensional auto writer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spectrum2DWritePathFormat {
+    /// `RSpin` JSON spectrum payload.
+    Json,
+    /// nmrML XML payload.
+    NmrMl,
+    /// `RSpin` CSV payload.
+    Csv,
 }
 
 /// Auto-detecting reader for one-dimensional text spectra.
@@ -132,6 +157,40 @@ impl SpectrumPathReader for AutoSpectrum2DPath {
 
     fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_spectrum2d_path(path)
+    }
+}
+
+/// Extension-selecting writer for one-dimensional spectrum paths.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AutoSpectrum1DPathWriter;
+
+impl AutoSpectrum1DPathWriter {
+    /// Writes a one-dimensional spectrum to a path using the path extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path extension is unsupported, the spectrum
+    /// cannot be represented by the selected writer, or the file cannot be
+    /// written.
+    pub fn write_path(self, spectrum: &Spectrum1D, path: impl AsRef<Path>) -> Result<()> {
+        write_spectrum1d_path(spectrum, path)
+    }
+}
+
+/// Extension-selecting writer for two-dimensional spectrum paths.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AutoSpectrum2DPathWriter;
+
+impl AutoSpectrum2DPathWriter {
+    /// Writes a two-dimensional spectrum to a path using the path extension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path extension is unsupported, the spectrum
+    /// cannot be represented by the selected writer, or the file cannot be
+    /// written.
+    pub fn write_path(self, spectrum: &Spectrum2D, path: impl AsRef<Path>) -> Result<()> {
+        write_spectrum2d_path(spectrum, path)
     }
 }
 
@@ -267,6 +326,63 @@ pub fn detect_spectrum2d_path_format(path: impl AsRef<Path>) -> Result<Spectrum2
     }
 }
 
+/// Detects the one-dimensional text writer format selected by a destination path.
+///
+/// Unlike reader detection, writer detection uses only the path extension and
+/// does not require the destination path to exist.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when the extension is not a supported
+/// one-dimensional text export format.
+pub fn detect_spectrum1d_write_path_format(
+    path: impl AsRef<Path>,
+) -> Result<Spectrum1DWritePathFormat> {
+    let path = path.as_ref();
+    if is_extension(path, &["json"]) {
+        return Ok(Spectrum1DWritePathFormat::Json);
+    }
+    if is_extension(path, &["nmrml", "xml"]) {
+        return Ok(Spectrum1DWritePathFormat::NmrMl);
+    }
+    if is_extension(path, &["jdx", "dx"]) {
+        return Ok(Spectrum1DWritePathFormat::JcampDx);
+    }
+    if is_extension(path, &["csv"]) {
+        return Ok(Spectrum1DWritePathFormat::Csv);
+    }
+    Err(RSpinError::Unsupported {
+        feature: "one-dimensional spectrum path writer format",
+    })
+}
+
+/// Detects the two-dimensional text writer format selected by a destination path.
+///
+/// Unlike reader detection, writer detection uses only the path extension and
+/// does not require the destination path to exist.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when the extension is not a supported
+/// two-dimensional text export format.
+pub fn detect_spectrum2d_write_path_format(
+    path: impl AsRef<Path>,
+) -> Result<Spectrum2DWritePathFormat> {
+    let path = path.as_ref();
+    if is_extension(path, &["json"]) {
+        return Ok(Spectrum2DWritePathFormat::Json);
+    }
+    if is_extension(path, &["nmrml", "xml"]) {
+        return Ok(Spectrum2DWritePathFormat::NmrMl);
+    }
+    if is_extension(path, &["csv"]) {
+        return Ok(Spectrum2DWritePathFormat::Csv);
+    }
+    Err(RSpinError::Unsupported {
+        feature: "two-dimensional spectrum path writer format",
+    })
+}
+
 /// Reads a one-dimensional spectrum from an auto-detected path.
 ///
 /// # Errors
@@ -304,6 +420,39 @@ pub fn read_spectrum2d_path(path: impl AsRef<Path>) -> Result<Spectrum2D> {
         Spectrum2DPathFormat::BrukerSer => read_bruker_ser_2d_dir(path),
         Spectrum2DPathFormat::AgilentFid => read_agilent_fid_2d_dir(path),
     }
+}
+
+/// Writes a one-dimensional spectrum to JSON, nmrML, JCAMP-DX, or CSV by extension.
+///
+/// # Errors
+///
+/// Returns an error when the extension is unsupported, the spectrum cannot be
+/// represented by the selected writer, or the file cannot be written.
+pub fn write_spectrum1d_path(spectrum: &Spectrum1D, path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+    let payload = match detect_spectrum1d_write_path_format(path)? {
+        Spectrum1DWritePathFormat::Json => write_spectrum1d_json(spectrum)?,
+        Spectrum1DWritePathFormat::NmrMl => write_nmrml_1d(spectrum)?,
+        Spectrum1DWritePathFormat::JcampDx => write_jcamp_dx_1d(spectrum)?,
+        Spectrum1DWritePathFormat::Csv => write_spectrum1d_csv(spectrum)?,
+    };
+    write_text_file(path, &payload)
+}
+
+/// Writes a two-dimensional spectrum to JSON, nmrML, or CSV by extension.
+///
+/// # Errors
+///
+/// Returns an error when the extension is unsupported, the spectrum cannot be
+/// represented by the selected writer, or the file cannot be written.
+pub fn write_spectrum2d_path(spectrum: &Spectrum2D, path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+    let payload = match detect_spectrum2d_write_path_format(path)? {
+        Spectrum2DWritePathFormat::Json => write_spectrum2d_json(spectrum)?,
+        Spectrum2DWritePathFormat::NmrMl => write_nmrml_2d(spectrum)?,
+        Spectrum2DWritePathFormat::Csv => write_spectrum2d_csv(spectrum)?,
+    };
+    write_text_file(path, &payload)
 }
 
 fn looks_like_nmrml(input: &str) -> bool {
@@ -365,6 +514,13 @@ fn read_text_file(path: &Path) -> Result<String> {
     fs::read_to_string(path).map_err(|error| RSpinError::Parse {
         format: "text spectrum file",
         message: format!("failed to read {}: {error}", path.display()),
+    })
+}
+
+fn write_text_file(path: &Path, payload: &str) -> Result<()> {
+    fs::write(path, payload).map_err(|error| RSpinError::Parse {
+        format: "text spectrum file",
+        message: format!("failed to write {}: {error}", path.display()),
     })
 }
 
@@ -596,6 +752,126 @@ x,intensity
 
         remove_dir(root)?;
         Ok(())
+    }
+
+    #[test]
+    fn writes_1d_paths_by_extension() -> anyhow::Result<()> {
+        let root = temp_dir("write-1d")?;
+        let spectrum = Spectrum1D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, 2.0, 3.0],
+            Metadata::named("auto write one"),
+        )?;
+
+        let json_path = root.join("one.json");
+        let csv_path = root.join("one.csv");
+        let nmrml_path = root.join("one.nmrml");
+        let jcamp_path = root.join("one.jdx");
+
+        assert_eq!(
+            detect_spectrum1d_write_path_format(&json_path)?,
+            Spectrum1DWritePathFormat::Json
+        );
+        assert_eq!(
+            detect_spectrum1d_write_path_format(&csv_path)?,
+            Spectrum1DWritePathFormat::Csv
+        );
+        assert_eq!(
+            detect_spectrum1d_write_path_format(&nmrml_path)?,
+            Spectrum1DWritePathFormat::NmrMl
+        );
+        assert_eq!(
+            detect_spectrum1d_write_path_format(&jcamp_path)?,
+            Spectrum1DWritePathFormat::JcampDx
+        );
+
+        AutoSpectrum1DPathWriter.write_path(&spectrum, &json_path)?;
+        write_spectrum1d_path(&spectrum, &csv_path)?;
+        write_spectrum1d_path(&spectrum, &nmrml_path)?;
+        write_spectrum1d_path(&spectrum, &jcamp_path)?;
+
+        assert_eq!(read_spectrum1d_path(&json_path)?, spectrum);
+
+        let csv = read_spectrum1d_path(&csv_path)?;
+        assert_eq!(csv.x, spectrum.x);
+        assert_eq!(csv.intensities, spectrum.intensities);
+        assert_eq!(csv.metadata.name, spectrum.metadata.name);
+
+        let nmrml = read_spectrum1d_path(&nmrml_path)?;
+        assert_eq!(nmrml.x.unit, spectrum.x.unit);
+        assert_eq!(nmrml.x.values, spectrum.x.values);
+        assert_eq!(nmrml.intensities, spectrum.intensities);
+        assert_eq!(nmrml.metadata.name, spectrum.metadata.name);
+
+        let jcamp = read_spectrum1d_path(&jcamp_path)?;
+        assert_eq!(jcamp.x, spectrum.x);
+        assert_eq!(jcamp.intensities, spectrum.intensities);
+        assert_eq!(jcamp.metadata.name, spectrum.metadata.name);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn writes_2d_paths_by_extension() -> anyhow::Result<()> {
+        let root = temp_dir("write-2d")?;
+        let spectrum = Spectrum2D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+            Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+            vec![1.0, 2.0, 3.0, 4.0],
+            Metadata::named("auto write two"),
+        )?;
+
+        let json_path = root.join("two.json");
+        let csv_path = root.join("two.csv");
+        let nmrml_path = root.join("two.nmrml");
+
+        assert_eq!(
+            detect_spectrum2d_write_path_format(&json_path)?,
+            Spectrum2DWritePathFormat::Json
+        );
+        assert_eq!(
+            detect_spectrum2d_write_path_format(&csv_path)?,
+            Spectrum2DWritePathFormat::Csv
+        );
+        assert_eq!(
+            detect_spectrum2d_write_path_format(&nmrml_path)?,
+            Spectrum2DWritePathFormat::NmrMl
+        );
+
+        AutoSpectrum2DPathWriter.write_path(&spectrum, &json_path)?;
+        write_spectrum2d_path(&spectrum, &csv_path)?;
+        write_spectrum2d_path(&spectrum, &nmrml_path)?;
+
+        assert_eq!(read_spectrum2d_path(&json_path)?, spectrum);
+
+        let csv = read_spectrum2d_path(&csv_path)?;
+        assert_eq!(csv.x, spectrum.x);
+        assert_eq!(csv.y, spectrum.y);
+        assert_eq!(csv.z, spectrum.z);
+        assert_eq!(csv.metadata.name, spectrum.metadata.name);
+
+        let nmrml = read_spectrum2d_path(&nmrml_path)?;
+        assert_eq!(nmrml.x.unit, spectrum.x.unit);
+        assert_eq!(nmrml.x.values, spectrum.x.values);
+        assert_eq!(nmrml.y.unit, spectrum.y.unit);
+        assert_eq!(nmrml.y.values, spectrum.y.values);
+        assert_eq!(nmrml.z, spectrum.z);
+        assert_eq!(nmrml.metadata.name, spectrum.metadata.name);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_unsupported_write_path_extensions() {
+        let error = detect_spectrum1d_write_path_format("one.bin")
+            .expect_err("unsupported 1D write extension should fail");
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+        let error = detect_spectrum2d_write_path_format("two.dx")
+            .expect_err("2D JCAMP-DX path writer should not be supported");
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
     }
 
     #[test]
