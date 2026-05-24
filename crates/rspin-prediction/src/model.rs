@@ -33,6 +33,24 @@ pub struct PredictionProvenance {
     pub version: Option<String>,
 }
 
+impl PredictionProvenance {
+    /// Creates provenance with a source label.
+    #[must_use]
+    pub fn new(source: impl Into<String>) -> Self {
+        Self {
+            source: source.into(),
+            version: None,
+        }
+    }
+
+    /// Sets the source version.
+    #[must_use]
+    pub fn with_version(mut self, version: impl Into<String>) -> Self {
+        self.version = Some(version.into());
+        self
+    }
+}
+
 /// A predicted one-dimensional signal.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PredictedSignal1D {
@@ -48,6 +66,59 @@ pub struct PredictedSignal1D {
     pub confidence: Option<f64>,
     /// Assignment labels or atom identifiers.
     pub assignments: Vec<String>,
+}
+
+impl PredictedSignal1D {
+    /// Creates a one-dimensional predicted signal with unit intensity.
+    #[must_use]
+    pub fn new(experiment: Experiment, nucleus: Nucleus, delta_ppm: f64) -> Self {
+        Self {
+            experiment,
+            nucleus,
+            delta_ppm,
+            intensity: 1.0,
+            confidence: None,
+            assignments: Vec::new(),
+        }
+    }
+
+    /// Sets the relative signal intensity.
+    #[must_use]
+    pub fn with_intensity(mut self, intensity: f64) -> Self {
+        self.intensity = intensity;
+        self
+    }
+
+    /// Sets the confidence score.
+    #[must_use]
+    pub fn with_confidence(mut self, confidence: f64) -> Self {
+        self.confidence = Some(confidence);
+        self
+    }
+
+    /// Clears the confidence score.
+    #[must_use]
+    pub fn without_confidence(mut self) -> Self {
+        self.confidence = None;
+        self
+    }
+
+    /// Adds one assignment label or atom identifier.
+    #[must_use]
+    pub fn with_assignment(mut self, assignment: impl Into<String>) -> Self {
+        self.assignments.push(assignment.into());
+        self
+    }
+
+    /// Replaces the assignment labels or atom identifiers.
+    #[must_use]
+    pub fn with_assignments(
+        mut self,
+        assignments: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.assignments = assignments.into_iter().map(Into::into).collect();
+        self
+    }
 }
 
 /// A predicted two-dimensional correlation.
@@ -71,6 +142,67 @@ pub struct PredictedCorrelation2D {
     pub assignments: Vec<String>,
 }
 
+impl PredictedCorrelation2D {
+    /// Creates a two-dimensional predicted correlation with unit intensity.
+    #[must_use]
+    pub fn new(
+        experiment: Experiment,
+        x_nucleus: Nucleus,
+        y_nucleus: Nucleus,
+        x_ppm: f64,
+        y_ppm: f64,
+    ) -> Self {
+        Self {
+            experiment,
+            x_nucleus,
+            y_nucleus,
+            x_ppm,
+            y_ppm,
+            intensity: 1.0,
+            confidence: None,
+            assignments: Vec::new(),
+        }
+    }
+
+    /// Sets the relative correlation intensity.
+    #[must_use]
+    pub fn with_intensity(mut self, intensity: f64) -> Self {
+        self.intensity = intensity;
+        self
+    }
+
+    /// Sets the confidence score.
+    #[must_use]
+    pub fn with_confidence(mut self, confidence: f64) -> Self {
+        self.confidence = Some(confidence);
+        self
+    }
+
+    /// Clears the confidence score.
+    #[must_use]
+    pub fn without_confidence(mut self) -> Self {
+        self.confidence = None;
+        self
+    }
+
+    /// Adds one assignment label or atom identifier.
+    #[must_use]
+    pub fn with_assignment(mut self, assignment: impl Into<String>) -> Self {
+        self.assignments.push(assignment.into());
+        self
+    }
+
+    /// Replaces the assignment labels or atom identifiers.
+    #[must_use]
+    pub fn with_assignments(
+        mut self,
+        assignments: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        self.assignments = assignments.into_iter().map(Into::into).collect();
+        self
+    }
+}
+
 /// A backend-neutral prediction result.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PredictionSet {
@@ -85,6 +217,54 @@ pub struct PredictionSet {
 }
 
 impl PredictionSet {
+    /// Creates an empty prediction set.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the prediction name.
+    #[must_use]
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    /// Clears the prediction name.
+    #[must_use]
+    pub fn without_name(mut self) -> Self {
+        self.name = None;
+        self
+    }
+
+    /// Adds a one-dimensional predicted signal.
+    #[must_use]
+    pub fn with_signal_1d(mut self, signal: PredictedSignal1D) -> Self {
+        self.signals_1d.push(signal);
+        self
+    }
+
+    /// Adds a two-dimensional predicted correlation.
+    #[must_use]
+    pub fn with_correlation_2d(mut self, correlation: PredictedCorrelation2D) -> Self {
+        self.correlations_2d.push(correlation);
+        self
+    }
+
+    /// Sets prediction provenance.
+    #[must_use]
+    pub fn with_provenance(mut self, provenance: PredictionProvenance) -> Self {
+        self.provenance = Some(provenance);
+        self
+    }
+
+    /// Clears prediction provenance.
+    #[must_use]
+    pub fn without_provenance(mut self) -> Self {
+        self.provenance = None;
+        self
+    }
+
     /// Validates all numeric payload values.
     ///
     /// # Errors
@@ -114,6 +294,14 @@ pub struct StaticPrediction {
     pub prediction: PredictionSet,
 }
 
+impl StaticPrediction {
+    /// Creates a predictor that returns a precomputed prediction payload.
+    #[must_use]
+    pub fn new(prediction: PredictionSet) -> Self {
+        Self { prediction }
+    }
+}
+
 impl<I> Predictor<I> for StaticPrediction {
     fn predict(&self, _input: &I) -> Result<PredictionSet> {
         self.prediction.validate()?;
@@ -141,64 +329,4 @@ fn require_finite(field: &'static str, value: f64) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use rspin_core::Nucleus;
-
-    use super::*;
-
-    #[test]
-    fn validates_prediction_payload() -> anyhow::Result<()> {
-        let prediction = demo_prediction();
-        prediction.validate()?;
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_invalid_confidence() {
-        let mut prediction = demo_prediction();
-        prediction.signals_1d[0].confidence = Some(1.2);
-        let error = prediction
-            .validate()
-            .expect_err("invalid confidence should fail");
-        assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
-    }
-
-    #[test]
-    fn static_predictor_returns_validated_payload() -> anyhow::Result<()> {
-        let predictor = StaticPrediction {
-            prediction: demo_prediction(),
-        };
-        let prediction = predictor.predict(&"CCO")?;
-        assert_eq!(prediction.signals_1d.len(), 1);
-        assert_eq!(prediction.correlations_2d.len(), 1);
-        Ok(())
-    }
-
-    fn demo_prediction() -> PredictionSet {
-        PredictionSet {
-            name: Some("ethanol".to_owned()),
-            signals_1d: vec![PredictedSignal1D {
-                experiment: Experiment::Proton1D,
-                nucleus: Nucleus::Hydrogen1,
-                delta_ppm: 1.2,
-                intensity: 3.0,
-                confidence: Some(0.8),
-                assignments: vec!["H1".to_owned()],
-            }],
-            correlations_2d: vec![PredictedCorrelation2D {
-                experiment: Experiment::Hsqc,
-                x_nucleus: Nucleus::Hydrogen1,
-                y_nucleus: Nucleus::Carbon13,
-                x_ppm: 1.2,
-                y_ppm: 18.0,
-                intensity: 1.0,
-                confidence: None,
-                assignments: vec!["H1-C1".to_owned()],
-            }],
-            provenance: Some(PredictionProvenance {
-                source: "static-fixture".to_owned(),
-                version: None,
-            }),
-        }
-    }
-}
+mod tests;

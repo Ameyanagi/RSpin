@@ -32,6 +32,28 @@ fn renders_prediction_signals_to_spectrum() -> anyhow::Result<()> {
 }
 
 #[test]
+fn builder_options_render_prediction_spectrum() -> anyhow::Result<()> {
+    let spectrum = render_prediction_1d(
+        &prediction_set(),
+        &PredictionSpectrumOptions::new()
+            .with_experiment(Experiment::Proton1D)
+            .with_nucleus(Nucleus::Hydrogen1)
+            .with_ppm_range(0.99, 1.01)
+            .with_points(3)
+            .with_spectrometer_mhz(500.0)
+            .with_line_width_hz(2.0)
+            .with_line_shape(PredictionLineShape::PseudoVoigt)
+            .with_area_scale(2.0),
+    )?;
+
+    assert_eq!(spectrum.len(), 3);
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(500.0));
+    assert!(spectrum.intensities[1] > spectrum.intensities[0]);
+    Ok(())
+}
+
+#[test]
 fn filters_by_experiment_and_renders_zero_for_empty_selection() -> anyhow::Result<()> {
     let spectrum = render_prediction_1d(
         &prediction_set(),
