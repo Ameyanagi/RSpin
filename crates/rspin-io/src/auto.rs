@@ -1,10 +1,15 @@
 //! Text spectrum format detection and convenience readers.
 
+use std::{fs, path::Path};
+
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    SpectrumReader, read_jcamp_dx_1d, read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv,
-    read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json,
+    SpectrumPathReader, SpectrumReader, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
+    read_bruker_fid_1d_dir, read_bruker_processed_1d_dir, read_bruker_processed_2d_dir,
+    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
+    read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json,
+    read_spectrum2d_csv, read_spectrum2d_json,
 };
 
 /// Text spectrum formats supported by the auto-detecting readers.
@@ -18,6 +23,46 @@ pub enum SpectrumTextFormat {
     JcampDx,
     /// `RSpin` CSV payload.
     Csv,
+}
+
+/// Filesystem formats supported by the one-dimensional auto reader.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spectrum1DPathFormat {
+    /// Text payload detected as JSON.
+    Json,
+    /// Text payload detected as nmrML.
+    NmrMl,
+    /// Text payload detected as JCAMP-DX.
+    JcampDx,
+    /// Text payload detected as CSV.
+    Csv,
+    /// JEOL Delta `.jdf` file.
+    JeolJdf,
+    /// Bruker processed one-dimensional dataset directory.
+    BrukerProcessed,
+    /// Bruker raw one-dimensional FID dataset directory or `fid` file.
+    BrukerFid,
+    /// Agilent/Varian raw one-dimensional FID dataset directory or `fid` file.
+    AgilentFid,
+}
+
+/// Filesystem formats supported by the two-dimensional auto reader.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Spectrum2DPathFormat {
+    /// Text payload detected as JSON.
+    Json,
+    /// Text payload detected as nmrML.
+    NmrMl,
+    /// Text payload detected as CSV.
+    Csv,
+    /// JEOL Delta `.jdf` file.
+    JeolJdf,
+    /// Bruker processed two-dimensional dataset directory.
+    BrukerProcessed,
+    /// Bruker raw two-dimensional `ser` dataset directory or `ser` file.
+    BrukerSer,
+    /// Agilent/Varian raw two-dimensional FID dataset directory or `fid` file.
+    AgilentFid,
 }
 
 /// Auto-detecting reader for one-dimensional text spectra.
@@ -41,6 +86,52 @@ impl SpectrumReader for AutoSpectrum2DText {
 
     fn read_str(&self, input: &str) -> Result<Self::Output> {
         read_spectrum2d_text(input)
+    }
+}
+
+/// Auto-detecting reader for one-dimensional spectrum paths.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AutoSpectrum1DPath;
+
+impl AutoSpectrum1DPath {
+    /// Reads a one-dimensional spectrum from an auto-detected path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is missing, unsupported, or malformed.
+    pub fn read_path(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_spectrum1d_path(path)
+    }
+}
+
+impl SpectrumPathReader for AutoSpectrum1DPath {
+    type Output = Spectrum1D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        read_spectrum1d_path(path)
+    }
+}
+
+/// Auto-detecting reader for two-dimensional spectrum paths.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AutoSpectrum2DPath;
+
+impl AutoSpectrum2DPath {
+    /// Reads a two-dimensional spectrum from an auto-detected path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is missing, unsupported, or malformed.
+    pub fn read_path(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_spectrum2d_path(path)
+    }
+}
+
+impl SpectrumPathReader for AutoSpectrum2DPath {
+    type Output = Spectrum2D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        read_spectrum2d_path(path)
     }
 }
 
@@ -112,6 +203,109 @@ pub fn read_spectrum2d_text(input: &str) -> Result<Spectrum2D> {
     }
 }
 
+/// Detects a supported one-dimensional spectrum format from a filesystem path.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or does not look like a supported
+/// one-dimensional spectrum path.
+pub fn detect_spectrum1d_path_format(path: impl AsRef<Path>) -> Result<Spectrum1DPathFormat> {
+    let path = path.as_ref();
+    ensure_path_exists(path)?;
+
+    if looks_like_bruker_processed_1d(path) {
+        return Ok(Spectrum1DPathFormat::BrukerProcessed);
+    }
+    if looks_like_bruker_fid(path) {
+        return Ok(Spectrum1DPathFormat::BrukerFid);
+    }
+    if looks_like_agilent_fid(path) {
+        return Ok(Spectrum1DPathFormat::AgilentFid);
+    }
+    if is_extension(path, &["jdf"]) {
+        return Ok(Spectrum1DPathFormat::JeolJdf);
+    }
+
+    match text_format_from_path(path)? {
+        SpectrumTextFormat::Json => Ok(Spectrum1DPathFormat::Json),
+        SpectrumTextFormat::NmrMl => Ok(Spectrum1DPathFormat::NmrMl),
+        SpectrumTextFormat::JcampDx => Ok(Spectrum1DPathFormat::JcampDx),
+        SpectrumTextFormat::Csv => Ok(Spectrum1DPathFormat::Csv),
+    }
+}
+
+/// Detects a supported two-dimensional spectrum format from a filesystem path.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or does not look like a supported
+/// two-dimensional spectrum path.
+pub fn detect_spectrum2d_path_format(path: impl AsRef<Path>) -> Result<Spectrum2DPathFormat> {
+    let path = path.as_ref();
+    ensure_path_exists(path)?;
+
+    if looks_like_bruker_processed_2d(path) {
+        return Ok(Spectrum2DPathFormat::BrukerProcessed);
+    }
+    if looks_like_bruker_ser(path) {
+        return Ok(Spectrum2DPathFormat::BrukerSer);
+    }
+    if looks_like_agilent_fid(path) {
+        return Ok(Spectrum2DPathFormat::AgilentFid);
+    }
+    if is_extension(path, &["jdf"]) {
+        return Ok(Spectrum2DPathFormat::JeolJdf);
+    }
+
+    match text_format_from_path(path)? {
+        SpectrumTextFormat::Json => Ok(Spectrum2DPathFormat::Json),
+        SpectrumTextFormat::NmrMl => Ok(Spectrum2DPathFormat::NmrMl),
+        SpectrumTextFormat::Csv => Ok(Spectrum2DPathFormat::Csv),
+        SpectrumTextFormat::JcampDx => Err(RSpinError::Unsupported {
+            feature: "two-dimensional JCAMP-DX path reader",
+        }),
+    }
+}
+
+/// Reads a one-dimensional spectrum from an auto-detected path.
+///
+/// # Errors
+///
+/// Returns an error when the format cannot be detected or the selected parser
+/// rejects the path contents.
+pub fn read_spectrum1d_path(path: impl AsRef<Path>) -> Result<Spectrum1D> {
+    let path = path.as_ref();
+    match detect_spectrum1d_path_format(path)? {
+        Spectrum1DPathFormat::Json => read_spectrum1d_json(&read_text_file(path)?),
+        Spectrum1DPathFormat::NmrMl => read_nmrml_1d_str(&read_text_file(path)?),
+        Spectrum1DPathFormat::JcampDx => read_jcamp_dx_1d(&read_text_file(path)?),
+        Spectrum1DPathFormat::Csv => read_spectrum1d_csv(&read_text_file(path)?),
+        Spectrum1DPathFormat::JeolJdf => read_jeol_jdf_1d_file(path),
+        Spectrum1DPathFormat::BrukerProcessed => read_bruker_processed_1d_dir(path),
+        Spectrum1DPathFormat::BrukerFid => read_bruker_fid_1d_dir(path),
+        Spectrum1DPathFormat::AgilentFid => read_agilent_fid_1d_dir(path),
+    }
+}
+
+/// Reads a two-dimensional spectrum from an auto-detected path.
+///
+/// # Errors
+///
+/// Returns an error when the format cannot be detected or the selected parser
+/// rejects the path contents.
+pub fn read_spectrum2d_path(path: impl AsRef<Path>) -> Result<Spectrum2D> {
+    let path = path.as_ref();
+    match detect_spectrum2d_path_format(path)? {
+        Spectrum2DPathFormat::Json => read_spectrum2d_json(&read_text_file(path)?),
+        Spectrum2DPathFormat::NmrMl => read_nmrml_2d_str(&read_text_file(path)?),
+        Spectrum2DPathFormat::Csv => read_spectrum2d_csv(&read_text_file(path)?),
+        Spectrum2DPathFormat::JeolJdf => read_jeol_jdf_2d_file(path),
+        Spectrum2DPathFormat::BrukerProcessed => read_bruker_processed_2d_dir(path),
+        Spectrum2DPathFormat::BrukerSer => read_bruker_ser_2d_dir(path),
+        Spectrum2DPathFormat::AgilentFid => read_agilent_fid_2d_dir(path),
+    }
+}
+
 fn looks_like_nmrml(input: &str) -> bool {
     (input.starts_with("<nmrML") || input.starts_with("<?xml"))
         && contains_ascii_case_insensitive(input, "<nmrML")
@@ -140,8 +334,107 @@ fn contains_ascii_case_insensitive(input: &str, needle: &str) -> bool {
         .any(|window| window.eq_ignore_ascii_case(needle))
 }
 
+fn text_format_from_path(path: &Path) -> Result<SpectrumTextFormat> {
+    if is_extension(path, &["json"]) {
+        return Ok(SpectrumTextFormat::Json);
+    }
+    if is_extension(path, &["nmrml", "xml"]) {
+        return Ok(SpectrumTextFormat::NmrMl);
+    }
+    if is_extension(path, &["jdx", "dx"]) {
+        return Ok(SpectrumTextFormat::JcampDx);
+    }
+    if is_extension(path, &["csv"]) {
+        return Ok(SpectrumTextFormat::Csv);
+    }
+    detect_spectrum_text_format(&read_text_file(path)?)
+}
+
+fn ensure_path_exists(path: &Path) -> Result<()> {
+    if path.exists() {
+        Ok(())
+    } else {
+        Err(RSpinError::Parse {
+            format: "spectrum path",
+            message: format!("{} does not exist", path.display()),
+        })
+    }
+}
+
+fn read_text_file(path: &Path) -> Result<String> {
+    fs::read_to_string(path).map_err(|error| RSpinError::Parse {
+        format: "text spectrum file",
+        message: format!("failed to read {}: {error}", path.display()),
+    })
+}
+
+fn looks_like_bruker_processed_1d(path: &Path) -> bool {
+    let processed = processed_dir(path);
+    processed.join("procs").is_file() && processed.join("1r").is_file()
+}
+
+fn looks_like_bruker_processed_2d(path: &Path) -> bool {
+    let processed = processed_dir(path);
+    processed.join("procs").is_file()
+        && processed.join("proc2s").is_file()
+        && processed.join("2rr").is_file()
+}
+
+fn looks_like_bruker_fid(path: &Path) -> bool {
+    let dataset = dataset_dir(path);
+    dataset.join("fid").is_file() && dataset.join("acqus").is_file()
+}
+
+fn looks_like_bruker_ser(path: &Path) -> bool {
+    let dataset = dataset_dir(path);
+    dataset.join("ser").is_file()
+        && dataset.join("acqus").is_file()
+        && dataset.join("acqu2s").is_file()
+}
+
+fn looks_like_agilent_fid(path: &Path) -> bool {
+    let dataset = dataset_dir(path);
+    dataset.join("fid").is_file() && dataset.join("procpar").is_file()
+}
+
+fn processed_dir(path: &Path) -> std::path::PathBuf {
+    if path.join("pdata").join("1").is_dir() {
+        path.join("pdata").join("1")
+    } else if path.is_file() {
+        path.parent()
+            .map_or_else(std::path::PathBuf::new, Path::to_path_buf)
+    } else {
+        path.to_path_buf()
+    }
+}
+
+fn dataset_dir(path: &Path) -> std::path::PathBuf {
+    if path.is_file() {
+        path.parent()
+            .map_or_else(std::path::PathBuf::new, Path::to_path_buf)
+    } else {
+        path.to_path_buf()
+    }
+}
+
+fn is_extension(path: &Path, candidates: &[&str]) -> bool {
+    path.extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .is_some_and(|extension| {
+            candidates
+                .iter()
+                .any(|candidate| extension.eq_ignore_ascii_case(candidate))
+        })
+}
+
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
     use rspin_core::{Axis, Metadata, Unit};
 
     use super::*;
@@ -250,5 +543,145 @@ mod tests {
         let error = read_spectrum2d_text("##TITLE=demo\n##XYDATA=(X++(Y..Y))\n")
             .expect_err("2D JCAMP text is not supported");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
+    }
+
+    #[test]
+    fn reads_csv_1d_path_with_trait_api() -> anyhow::Result<()> {
+        let root = temp_dir("csv-1d")?;
+        let path = root.join("one.csv");
+        fs::write(
+            &path,
+            "\
+# name=path one
+# x_unit=PPM
+x,intensity
+0,1
+1,2
+",
+        )?;
+
+        assert_eq!(
+            detect_spectrum1d_path_format(&path)?,
+            Spectrum1DPathFormat::Csv
+        );
+        let parsed = SpectrumPathReader::read_path(&AutoSpectrum1DPath, &path)?;
+
+        assert_eq!(parsed.metadata.name.as_deref(), Some("path one"));
+        assert_eq!(parsed.x.unit, Unit::Ppm);
+        assert_eq!(parsed.intensities, vec![1.0, 2.0]);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn reads_json_2d_path_by_content() -> anyhow::Result<()> {
+        let root = temp_dir("json-2d")?;
+        let path = root.join("two.spectrum");
+        let spectrum = Spectrum2D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+            Axis::linear("y", Unit::Ppm, 10.0, 10.0, 1)?,
+            vec![1.0, 2.0],
+            Metadata::named("path two"),
+        )?;
+        fs::write(&path, write_spectrum2d_json(&spectrum)?)?;
+
+        assert_eq!(
+            detect_spectrum2d_path_format(&path)?,
+            Spectrum2DPathFormat::Json
+        );
+        let parsed = AutoSpectrum2DPath.read_path(&path)?;
+
+        assert_eq!(parsed, spectrum);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn reads_bruker_processed_1d_path() -> anyhow::Result<()> {
+        let root = temp_dir("bruker-1d")?;
+        let processed = root.join("pdata/1");
+        fs::create_dir_all(&processed)?;
+        fs::write(
+            processed.join("procs"),
+            "\
+##$SI= 3
+##$BYTORDP= 0
+##$DTYPP= 0
+##$NC_proc= 0
+",
+        )?;
+        fs::write(processed.join("1r"), i32_bytes(&[1, -2, 3]))?;
+
+        assert_eq!(
+            detect_spectrum1d_path_format(&root)?,
+            Spectrum1DPathFormat::BrukerProcessed
+        );
+        let parsed = read_spectrum1d_path(&root)?;
+
+        assert_eq!(parsed.x.unit, Unit::Points);
+        assert_eq!(parsed.x.values, vec![0.0, 1.0, 2.0]);
+        assert_eq!(parsed.intensities, vec![1.0, -2.0, 3.0]);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn reads_bruker_processed_2d_path() -> anyhow::Result<()> {
+        let root = temp_dir("bruker-2d")?;
+        let processed = root.join("pdata/1");
+        fs::create_dir_all(&processed)?;
+        fs::write(
+            processed.join("procs"),
+            "\
+##$SI= 2
+##$BYTORDP= 0
+##$DTYPP= 0
+##$NC_proc= 0
+",
+        )?;
+        fs::write(
+            processed.join("proc2s"),
+            "\
+##$SI= 2
+",
+        )?;
+        fs::write(processed.join("2rr"), i32_bytes(&[1, 2, 3, 4]))?;
+
+        assert_eq!(
+            detect_spectrum2d_path_format(&root)?,
+            Spectrum2DPathFormat::BrukerProcessed
+        );
+        let parsed = read_spectrum2d_path(&root)?;
+
+        assert_eq!(parsed.shape(), (2, 2));
+        assert_eq!(parsed.x.unit, Unit::Points);
+        assert_eq!(parsed.y.unit, Unit::Points);
+        assert_eq!(parsed.z, vec![1.0, 2.0, 3.0, 4.0]);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
+    fn temp_dir(name: &str) -> anyhow::Result<PathBuf> {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let mut path = std::env::temp_dir();
+        path.push(format!("rspin-auto-{name}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&path)?;
+        Ok(path)
+    }
+
+    fn remove_dir(path: PathBuf) -> anyhow::Result<()> {
+        fs::remove_dir_all(path)?;
+        Ok(())
+    }
+
+    fn i32_bytes(values: &[i32]) -> Vec<u8> {
+        values
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect::<Vec<_>>()
     }
 }
