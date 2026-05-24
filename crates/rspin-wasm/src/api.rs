@@ -1,9 +1,11 @@
 //! JSON-oriented API helpers for WASM bindings.
 
+mod assignments;
 mod contours;
 mod csv_io;
 mod processing_1d;
 mod processing_2d;
+mod simulation;
 
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -23,12 +25,11 @@ use rspin_prediction::{
     render_prediction_2d,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
-use rspin_simulation::{
-    ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
-    decompose_exact_spin_half_1d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
-    simulate_multiplet_1d,
-};
 
+pub use assignments::{
+    annotate_spectrum_1d_with_assignments_json, annotate_spectrum_2d_with_assignments_json,
+    validate_assignment_set_json,
+};
 pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
@@ -48,6 +49,10 @@ pub use processing_2d::{
     project_spectrum_2d_y_json, resample_spectrum_2d_json, scale_spectrum_2d_json,
     slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
     slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
+};
+pub use simulation::{
+    decompose_exact_spin_half_spectrum_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
 };
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.
@@ -180,17 +185,6 @@ pub fn validate_j_coupling_graph_json(graph_json: &str) -> Result<String> {
     to_json(&graph)
 }
 
-/// Validates serialized assignment set JSON and returns normalized JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, validation, or serialization fails.
-pub fn validate_assignment_set_json(assignments_json: &str) -> Result<String> {
-    let assignments: AssignmentSet = from_json(assignments_json)?;
-    assignments.validate()?;
-    to_json(&assignments)
-}
-
 /// Assembles one-dimensional signal summary JSON from analysis payloads.
 ///
 /// # Errors
@@ -286,66 +280,6 @@ pub fn generate_spectrum_matrix_2d_json(spectra_json: &str, options_json: &str) 
     let options: MatrixGeneration2DOptions = from_json(options_json)?;
     let matrix = generate_spectrum_matrix_2d(&spectra, options)?;
     to_json(&matrix)
-}
-
-/// Simulates a serialized first-order multiplet and options into `Spectrum1D` JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, simulation, or serialization fails.
-pub fn simulate_first_order_multiplet_json(
-    multiplet_json: &str,
-    options_json: &str,
-) -> Result<String> {
-    let multiplet: FirstOrderMultiplet = from_json(multiplet_json)?;
-    let options: SimulationOptions = from_json(options_json)?;
-    let spectrum = simulate_multiplet_1d(&multiplet, options)?;
-    to_json(&spectrum)
-}
-
-/// Simulates exact spin-1/2 transitions and returns serialized transition JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, exact simulation, or serialization fails.
-pub fn simulate_exact_spin_half_transitions_json(
-    system_json: &str,
-    options_json: &str,
-) -> Result<String> {
-    let system: SpinHalfSystem = from_json(system_json)?;
-    let options: ExactSpinOptions = from_json(options_json)?;
-    let transitions = exact_spin_half_transitions(&system, &options)?;
-    to_json(&transitions)
-}
-
-/// Simulates an exact spin-1/2 system into serialized `Spectrum1D` JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, exact simulation, or serialization fails.
-pub fn simulate_exact_spin_half_spectrum_json(
-    system_json: &str,
-    options_json: &str,
-) -> Result<String> {
-    let system: SpinHalfSystem = from_json(system_json)?;
-    let options: ExactSpectrumOptions = from_json(options_json)?;
-    let spectrum = simulate_exact_spin_half_1d(&system, &options)?;
-    to_json(&spectrum)
-}
-
-/// Simulates exact spin-1/2 spectrum JSON with per-transition contributions.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, exact simulation, or serialization fails.
-pub fn decompose_exact_spin_half_spectrum_json(
-    system_json: &str,
-    options_json: &str,
-) -> Result<String> {
-    let system: SpinHalfSystem = from_json(system_json)?;
-    let options: ExactSpectrumOptions = from_json(options_json)?;
-    let decomposition = decompose_exact_spin_half_1d(&system, &options)?;
-    to_json(&decomposition)
 }
 
 /// Validates serialized prediction JSON and returns normalized JSON.

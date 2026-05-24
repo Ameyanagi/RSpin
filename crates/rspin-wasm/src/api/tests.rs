@@ -2,6 +2,10 @@ use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
 
 use super::*;
 
+mod assignments;
+mod prediction;
+mod simulation;
+
 #[test]
 fn parses_jcamp_to_json() -> anyhow::Result<()> {
     let json = parse_jcamp_dx_1d_json(
@@ -375,117 +379,5 @@ fn generates_spectrum_matrix_2d_json() -> anyhow::Result<()> {
             1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 10.0, 12.0, 14.0, 20.0, 22.0, 24.0
         ]
     );
-    Ok(())
-}
-
-#[test]
-fn simulates_first_order_json() -> anyhow::Result<()> {
-    let spectrum_json = simulate_first_order_multiplet_json(
-        r#"{"center_ppm":7.0,"area":1.0,"couplings":[{"j_hz":8.0,"equivalent_spins":1}]}"#,
-        r#"{"from_ppm":6.95,"to_ppm":7.05,"points":16,"line_width_hz":1.0,"spectrometer_mhz":400.0,"line_shape":"Lorentzian"}"#,
-    )?;
-    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
-    assert_eq!(spectrum.len(), 16);
-    Ok(())
-}
-
-#[test]
-fn simulates_exact_transitions_json() -> anyhow::Result<()> {
-    let transitions_json = simulate_exact_spin_half_transitions_json(
-        r#"{"spins":[{"shift_ppm":7.0},{"shift_ppm":7.04}],"couplings":[{"spin_a":0,"spin_b":1,"j_hz":8.0}]}"#,
-        r#"{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}"#,
-    )?;
-    let transitions: Vec<rspin_simulation::ExactTransition> = from_json(&transitions_json)?;
-
-    assert_eq!(transitions.len(), 4);
-    assert!((transitions[0].center_ppm - 6.987_639_320_225_002).abs() < 1.0e-10);
-    Ok(())
-}
-
-#[test]
-fn simulates_exact_detected_spin_json() -> anyhow::Result<()> {
-    let transitions_json = simulate_exact_spin_half_transitions_json(
-        r#"{"spins":[{"shift_ppm":1.0},{"shift_ppm":2.0}],"couplings":[]}"#,
-        r#"{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10,"detected_spins":[1]}"#,
-    )?;
-    let transitions: Vec<rspin_simulation::ExactTransition> = from_json(&transitions_json)?;
-
-    assert_eq!(transitions.len(), 1);
-    assert!((transitions[0].center_ppm - 2.0).abs() < 1.0e-12);
-    Ok(())
-}
-
-#[test]
-fn simulates_exact_spectrum_json() -> anyhow::Result<()> {
-    let spectrum_json = simulate_exact_spin_half_spectrum_json(
-        r#"{"spins":[{"shift_ppm":2.0}],"couplings":[]}"#,
-        r#"{"from_ppm":1.99,"to_ppm":2.01,"points":11,"area":2.0,"line_width_hz":1.0,"line_shape":"PseudoVoigt","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
-    )?;
-    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
-
-    assert_eq!(spectrum.len(), 11);
-    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
-    assert!(spectrum.intensities.iter().any(|value| *value > 0.0));
-    Ok(())
-}
-
-#[test]
-fn decomposes_exact_spectrum_json() -> anyhow::Result<()> {
-    let decomposition_json = decompose_exact_spin_half_spectrum_json(
-        r#"{"spins":[{"shift_ppm":7.0},{"shift_ppm":7.04}],"couplings":[{"spin_a":0,"spin_b":1,"j_hz":8.0}]}"#,
-        r#"{"from_ppm":6.95,"to_ppm":7.08,"points":32,"area":1.0,"line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
-    )?;
-    let decomposition: rspin_simulation::ExactSpectrumDecomposition1D =
-        from_json(&decomposition_json)?;
-
-    assert_eq!(decomposition.spectrum.len(), 32);
-    assert_eq!(
-        decomposition.contributions.len(),
-        decomposition.transitions.len()
-    );
-    Ok(())
-}
-
-#[test]
-fn validates_prediction_json() -> anyhow::Result<()> {
-    let json = validate_prediction_json(
-        r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":1.0,"confidence":0.9,"assignments":[]}],"correlations_2d":[],"provenance":null}"#,
-    )?;
-    let prediction: PredictionSet = from_json(&json)?;
-    assert_eq!(prediction.signals_1d.len(), 1);
-    Ok(())
-}
-
-#[test]
-fn renders_prediction_json() -> anyhow::Result<()> {
-    let spectrum_json = render_prediction_1d_json(
-        r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":1.0,"confidence":0.9,"assignments":["H1"]}],"correlations_2d":[],"provenance":{"source":"fixture","version":null}}"#,
-        r#"{"experiment":"Proton1D","nucleus":"Hydrogen1","from_ppm":0.99,"to_ppm":1.01,"points":3,"spectrometer_mhz":400.0,"line_width_hz":1.0,"line_shape":"PseudoVoigt","area_scale":1.0}"#,
-    )?;
-    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
-
-    assert_eq!(spectrum.len(), 3);
-    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
-    assert!(spectrum.intensities[1] > spectrum.intensities[0]);
-    Ok(())
-}
-
-#[test]
-fn renders_prediction_2d_json() -> anyhow::Result<()> {
-    let spectrum_json = render_prediction_2d_json(
-        r#"{"name":"demo","signals_1d":[],"correlations_2d":[{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","x_ppm":1.0,"y_ppm":20.0,"intensity":1.0,"confidence":0.9,"assignments":["H1-C1"]}],"provenance":{"source":"fixture","version":null}}"#,
-        r#"{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","x_from_ppm":0.99,"x_to_ppm":1.01,"x_points":3,"y_from_ppm":19.9,"y_to_ppm":20.1,"y_points":3,"x_spectrometer_mhz":400.0,"y_spectrometer_mhz":100.0,"x_line_width_hz":1.0,"y_line_width_hz":4.0,"line_shape":"PseudoVoigt","volume_scale":1.0}"#,
-    )?;
-    let spectrum: Spectrum2D = from_json(&spectrum_json)?;
-
-    assert_eq!(spectrum.shape(), (3, 3));
-    assert_eq!(spectrum.metadata.origin, Some("fixture".to_owned()));
-    let Some(center) = spectrum.value_at(1, 1) else {
-        panic!("center point should exist");
-    };
-    let Some(edge) = spectrum.value_at(0, 0) else {
-        panic!("edge point should exist");
-    };
-    assert!(center > edge);
     Ok(())
 }

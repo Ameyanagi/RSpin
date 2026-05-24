@@ -12,7 +12,8 @@ use wasm_bindgen::prelude::*;
 
 pub use analysis::{detect_ranges_1d, detect_zones_2d};
 pub use api::{
-    abs_spectrum_1d_json, abs_spectrum_2d_json, apply_processing_recipe_1d_json,
+    abs_spectrum_1d_json, abs_spectrum_2d_json, annotate_spectrum_1d_with_assignments_json,
+    annotate_spectrum_2d_with_assignments_json, apply_processing_recipe_1d_json,
     apply_processing_recipe_1d_until_json, apply_processing_recipe_2d_json,
     apply_processing_recipe_2d_until_json, auto_phase_spectrum_1d_json,
     auto_phase_spectrum_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
@@ -129,6 +130,36 @@ pub fn validate_j_coupling_graph(graph_json: &str) -> std::result::Result<String
 #[wasm_bindgen(js_name = validateAssignmentSet)]
 pub fn validate_assignment_set(assignments_json: &str) -> std::result::Result<String, JsValue> {
     validate_assignment_set_json(assignments_json).map_err(|error| js_error(&error))
+}
+
+/// Appends assignment annotations to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, assignment
+/// validation, annotation validation, or serialization fails.
+#[wasm_bindgen(js_name = annotateSpectrum1dWithAssignments)]
+pub fn annotate_spectrum_1d_with_assignments(
+    spectrum_json: &str,
+    assignments_json: &str,
+) -> std::result::Result<String, JsValue> {
+    annotate_spectrum_1d_with_assignments_json(spectrum_json, assignments_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Appends assignment annotations to a serialized two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, assignment
+/// validation, annotation validation, or serialization fails.
+#[wasm_bindgen(js_name = annotateSpectrum2dWithAssignments)]
+pub fn annotate_spectrum_2d_with_assignments(
+    spectrum_json: &str,
+    assignments_json: &str,
+) -> std::result::Result<String, JsValue> {
+    annotate_spectrum_2d_with_assignments_json(spectrum_json, assignments_json)
+        .map_err(|error| js_error(&error))
 }
 
 /// Assembles serialized one-dimensional signal summaries.
