@@ -1,4 +1,4 @@
-//! Agilent/Varian raw one-dimensional FID import.
+//! Agilent/Varian raw and processed spectrum import.
 
 use std::{
     collections::BTreeMap,
@@ -58,6 +58,56 @@ pub fn read_agilent_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
 }
 
+/// Reader for Agilent/Varian processed one-dimensional `phasefile` datasets.
+///
+/// The reader accepts the dataset directory, its `datdir` directory, or the
+/// `phasefile` itself. It pairs the binary phasefile with the nearest `procpar`
+/// and returns a frequency-domain spectrum.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AgilentProcessed1D;
+
+impl AgilentProcessed1D {
+    /// Reads a processed one-dimensional spectrum from an Agilent/Varian dataset.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `phasefile` or `procpar` is missing, malformed, or
+    /// the phasefile is multidimensional.
+    pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_agilent_processed_1d_dir(path)
+    }
+}
+
+/// Reads a processed one-dimensional spectrum from an Agilent/Varian phasefile.
+///
+/// The path may point to the dataset directory, `datdir`, or directly to the
+/// `phasefile`. When `sw`, `sfrq`, `rfl`, and `rfp` are available in `procpar`,
+/// the returned axis is chemical shift in ppm. Otherwise the reader falls back
+/// to frequency offsets in hertz, then point indices.
+///
+/// # Errors
+///
+/// Returns an error when the dataset is missing, malformed, multidimensional,
+/// or uses an unsupported data representation.
+pub fn read_agilent_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
+    let path = path.as_ref();
+    let phasefile_path = locate_phasefile_path(path)?;
+    let procpar_path = locate_procpar_path(path, &phasefile_path)?;
+    let procpar = parse_procpar(&read_text(&procpar_path, "Agilent procpar")?);
+    let phasefile_bytes = fs::read(&phasefile_path).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!(
+            "failed to read phasefile at {}: {error}",
+            phasefile_path.display()
+        ),
+    })?;
+
+    let (real, imaginary) = read_phasefile_values(&phasefile_bytes)?;
+    let axis = build_processed_axis(real.len(), &procpar)?;
+    let metadata = build_metadata(&procpar);
+    Spectrum1D::new_complex(axis, real, imaginary, metadata)
+}
+
 /// Reader for Agilent/Varian raw two-dimensional FID directories.
 ///
 /// The returned `Spectrum2D` preserves the acquired trace matrix. Each direct
@@ -111,6 +161,51 @@ fn locate_dataset_dir(path: &Path) -> PathBuf {
     }
 }
 
+fn locate_phasefile_path(path: &Path) -> Result<PathBuf> {
+    if path.is_file() {
+        return Ok(path.to_path_buf());
+    }
+
+    let datdir_phasefile = path.join("datdir").join("phasefile");
+    if datdir_phasefile.is_file() {
+        return Ok(datdir_phasefile);
+    }
+
+    let direct_phasefile = path.join("phasefile");
+    if direct_phasefile.is_file() {
+        return Ok(direct_phasefile);
+    }
+
+    Err(RSpinError::Parse {
+        format: "Agilent",
+        message: format!("missing Agilent phasefile below {}", path.display()),
+    })
+}
+
+fn locate_procpar_path(path: &Path, phasefile_path: &Path) -> Result<PathBuf> {
+    let candidates = [
+        path.join("procpar"),
+        phasefile_path
+            .parent()
+            .and_then(Path::parent)
+            .map_or_else(PathBuf::new, |parent| parent.join("procpar")),
+        phasefile_path
+            .parent()
+            .map_or_else(PathBuf::new, |parent| parent.join("procpar")),
+    ];
+
+    for candidate in candidates {
+        if candidate.is_file() {
+            return Ok(candidate);
+        }
+    }
+
+    Err(RSpinError::Parse {
+        format: "Agilent",
+        message: format!("missing Agilent procpar for {}", phasefile_path.display()),
+    })
+}
+
 fn read_fid_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>)> {
     let header = FileHeader::parse(bytes)?;
     header.validate_1d()?;
@@ -124,17 +219,27 @@ fn read_fid_matrix_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>, usize, us
     read_complex_trace_matrix(bytes, &header)
 }
 
+fn read_phasefile_values(bytes: &[u8]) -> Result<(Vec<f64>, Option<Vec<f64>>)> {
+    let header = FileHeader::parse(bytes)?;
+    header.validate_processed_1d()?;
+    let trace = first_trace(bytes, &header, "phasefile")?;
+    if header.is_complex() {
+        let mut real = Vec::with_capacity(header.np_values / 2);
+        let mut imaginary = Vec::with_capacity(header.np_values / 2);
+        append_complex_trace(trace, &header, &mut real, &mut imaginary)?;
+        Ok((real, Some(imaginary)))
+    } else {
+        let mut real = Vec::with_capacity(header.np_values);
+        append_real_trace(trace, &header, &mut real)?;
+        Ok((real, None))
+    }
+}
+
 fn read_complex_trace_matrix(
     bytes: &[u8],
     header: &FileHeader,
 ) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
     header.validate_complex()?;
-    let block_header_len = header
-        .nbheaders
-        .checked_mul(BLOCK_HEADER_LEN)
-        .ok_or_else(|| RSpinError::InvalidSpectrum {
-            message: "Agilent block header size overflow".to_owned(),
-        })?;
     let x_count = header.np_values / 2;
     let y_count = header.trace_count()?;
     let matrix_len = x_count
@@ -146,48 +251,87 @@ fn read_complex_trace_matrix(
     let mut imaginary = Vec::with_capacity(matrix_len);
 
     for block_index in 0..header.nblocks {
-        let block_start = FILE_HEADER_LEN
-            .checked_add(block_index.checked_mul(header.bbytes).ok_or_else(|| {
-                RSpinError::InvalidSpectrum {
-                    message: "Agilent block offset overflow".to_owned(),
-                }
-            })?)
-            .ok_or_else(|| RSpinError::InvalidSpectrum {
-                message: "Agilent block offset overflow".to_owned(),
-            })?;
-        let data_start = block_start.checked_add(block_header_len).ok_or_else(|| {
-            RSpinError::InvalidSpectrum {
-                message: "Agilent block data offset overflow".to_owned(),
-            }
-        })?;
         for trace_index in 0..header.ntraces {
-            let trace_start = data_start
-                .checked_add(trace_index.checked_mul(header.tbytes).ok_or_else(|| {
-                    RSpinError::InvalidSpectrum {
-                        message: "Agilent trace offset overflow".to_owned(),
-                    }
-                })?)
-                .ok_or_else(|| RSpinError::InvalidSpectrum {
-                    message: "Agilent trace offset overflow".to_owned(),
-                })?;
-            let trace_end = trace_start.checked_add(header.tbytes).ok_or_else(|| {
-                RSpinError::InvalidSpectrum {
-                    message: "Agilent trace end overflow".to_owned(),
-                }
-            })?;
-            let trace = bytes
-                .get(trace_start..trace_end)
-                .ok_or_else(|| RSpinError::Parse {
-                    format: "Agilent",
-                    message: format!(
-                        "fid has {} bytes but trace ending at {trace_end} is required",
-                        bytes.len()
-                    ),
-                })?;
+            let trace = trace_at(bytes, header, block_index, trace_index, "fid")?;
             append_complex_trace(trace, header, &mut real, &mut imaginary)?;
         }
     }
     Ok((real, imaginary, x_count, y_count))
+}
+
+fn first_trace<'a>(
+    bytes: &'a [u8],
+    header: &FileHeader,
+    file_label: &'static str,
+) -> Result<&'a [u8]> {
+    trace_at(bytes, header, 0, 0, file_label)
+}
+
+fn trace_at<'a>(
+    bytes: &'a [u8],
+    header: &FileHeader,
+    block_index: usize,
+    trace_index: usize,
+    file_label: &'static str,
+) -> Result<&'a [u8]> {
+    let block_header_len = header
+        .nbheaders
+        .checked_mul(BLOCK_HEADER_LEN)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "Agilent block header size overflow".to_owned(),
+        })?;
+    let block_start = FILE_HEADER_LEN
+        .checked_add(block_index.checked_mul(header.bbytes).ok_or_else(|| {
+            RSpinError::InvalidSpectrum {
+                message: "Agilent block offset overflow".to_owned(),
+            }
+        })?)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "Agilent block offset overflow".to_owned(),
+        })?;
+    let data_start =
+        block_start
+            .checked_add(block_header_len)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent block data offset overflow".to_owned(),
+            })?;
+    let trace_start = data_start
+        .checked_add(trace_index.checked_mul(header.tbytes).ok_or_else(|| {
+            RSpinError::InvalidSpectrum {
+                message: "Agilent trace offset overflow".to_owned(),
+            }
+        })?)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "Agilent trace offset overflow".to_owned(),
+        })?;
+    let trace_end =
+        trace_start
+            .checked_add(header.tbytes)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent trace end overflow".to_owned(),
+            })?;
+    bytes
+        .get(trace_start..trace_end)
+        .ok_or_else(|| RSpinError::Parse {
+            format: "Agilent",
+            message: format!(
+                "{file_label} has {} bytes but trace ending at {trace_end} is required",
+                bytes.len()
+            ),
+        })
+}
+
+fn append_real_trace(bytes: &[u8], header: &FileHeader, real: &mut Vec<f64>) -> Result<()> {
+    for point_index in 0..header.np_values {
+        let offset =
+            point_index
+                .checked_mul(header.ebytes)
+                .ok_or_else(|| RSpinError::InvalidSpectrum {
+                    message: "Agilent data offset overflow".to_owned(),
+                })?;
+        real.push(decode_value(bytes, header, offset)?);
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy)]
@@ -208,7 +352,7 @@ impl FileHeader {
         if bytes.len() < FILE_HEADER_LEN {
             return Err(RSpinError::Parse {
                 format: "Agilent",
-                message: "fid is shorter than the file header".to_owned(),
+                message: "binary file is shorter than the file header".to_owned(),
             });
         }
         [Endian::Big, Endian::Little]
@@ -218,7 +362,7 @@ impl FileHeader {
             })
             .ok_or_else(|| RSpinError::Parse {
                 format: "Agilent",
-                message: "fid file header is not recognized".to_owned(),
+                message: "binary file header is not recognized".to_owned(),
             })
     }
 
@@ -243,7 +387,7 @@ impl FileHeader {
         self.nblocks > 0
             && self.ntraces > 0
             && self.np_values > 0
-            && self.np_values % 2 == 0
+            && (!self.is_complex() || self.np_values % 2 == 0)
             && matches!(self.ebytes, 2 | 4 | 8)
             && self.tbytes == self.np_values.saturating_mul(self.ebytes)
             && self.nbheaders > 0
@@ -270,8 +414,23 @@ impl FileHeader {
         Ok(())
     }
 
+    fn validate_processed_1d(self) -> Result<()> {
+        if self.nblocks != 1 || self.ntraces != 1 {
+            return Err(RSpinError::Unsupported {
+                feature: "Agilent multidimensional phasefile",
+            });
+        }
+        if self.is_complex() && self.np_values % 2 != 0 {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "Agilent complex phasefile trace must contain an even value count"
+                    .to_owned(),
+            });
+        }
+        Ok(())
+    }
+
     fn validate_complex(self) -> Result<()> {
-        if self.status & (STATUS_COMPLEX | STATUS_COMPLEX_ALT) == 0 {
+        if !self.is_complex() {
             return Err(RSpinError::Unsupported {
                 feature: "Agilent real-only FID",
             });
@@ -286,6 +445,10 @@ impl FileHeader {
 
     fn is_float(self) -> bool {
         self.status & STATUS_FLOAT != 0
+    }
+
+    fn is_complex(self) -> bool {
+        self.status & (STATUS_COMPLEX | STATUS_COMPLEX_ALT) != 0
     }
 
     fn trace_count(self) -> Result<usize> {
@@ -392,13 +555,13 @@ fn decode_value(bytes: &[u8], header: &FileHeader, offset: usize) -> Result<f64>
             .ok_or_else(|| parse_error("truncated 64-bit float data"))?,
         _ => {
             return Err(RSpinError::Unsupported {
-                feature: "Agilent FID numeric representation",
+                feature: "Agilent binary numeric representation",
             });
         }
     };
     if !value.is_finite() {
         return Err(RSpinError::NonFinite {
-            field: "Agilent FID data",
+            field: "Agilent binary data",
         });
     }
     Ok(value)
@@ -418,6 +581,35 @@ fn build_axis(point_count: usize, parameters: &BTreeMap<String, Vec<String>>) ->
             };
             Axis::linear("time", Unit::Seconds, 0.0, end, point_count)
         }
+        _ => {
+            let end = u32::try_from(point_count.saturating_sub(1)).map_or(0.0, f64::from);
+            Axis::linear("point", Unit::Points, 0.0, end, point_count)
+        }
+    }
+}
+
+fn build_processed_axis(
+    point_count: usize,
+    parameters: &BTreeMap<String, Vec<String>>,
+) -> Result<Axis> {
+    let sw = first_f64(parameters, "sw")?;
+    let sfrq = first_f64(parameters, "sfrq")?;
+    let rfl = first_f64(parameters, "rfl")?;
+    let rfp = first_f64(parameters, "rfp")?;
+
+    match (sw, sfrq, rfl, rfp) {
+        (Some(sw), Some(sfrq), Some(rfl), Some(rfp)) if sw > 0.0 && sfrq > 0.0 => {
+            let start_ppm = (sw - rfl + rfp) / sfrq;
+            let end_ppm = (-rfl + rfp) / sfrq;
+            Axis::linear_ppm(start_ppm, end_ppm, point_count)
+        }
+        (Some(sw), _, _, _) if sw > 0.0 => Axis::linear(
+            "frequency offset",
+            Unit::Hertz,
+            sw / 2.0,
+            -sw / 2.0,
+            point_count,
+        ),
         _ => {
             let end = u32::try_from(point_count.saturating_sub(1)).map_or(0.0, f64::from);
             Axis::linear("point", Unit::Points, 0.0, end, point_count)

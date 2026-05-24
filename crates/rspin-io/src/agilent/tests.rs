@@ -88,6 +88,93 @@ sw 1 1 5 5 5 2 1 8203 1 64
 }
 
 #[test]
+fn reads_big_endian_i32_processed_phasefile() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-phasefile")?;
+    write_procpar(
+        &root,
+        "\
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"H1\"
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 500
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+rfl 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 750
+0
+rfp 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 250
+0
+comment 2 2 32 0 0 2 1 0 1 64
+1 \"processed demo\"
+0
+",
+    )?;
+    write_phasefile(&root, EndianForTest::Big, DataForTest::I32(&[10, 20, -5]))?;
+
+    let spectrum = AgilentProcessed1D.read_dir(root.join("datdir"))?;
+
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.x.values, vec![1.0, 0.0, -1.0]);
+    assert_eq!(spectrum.intensities, vec![10.0, 20.0, -5.0]);
+    assert!(spectrum.imaginary.is_none());
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(500.0));
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("processed demo"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn reads_processed_phasefile_path_with_hertz_axis_fallback() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-hertz-axis")?;
+    write_procpar(
+        &root,
+        "\
+sw 1 1 5 5 5 2 1 8203 1 64
+1 400
+0
+",
+    )?;
+    write_phasefile(&root, EndianForTest::Little, DataForTest::F32(&[0.5, 1.5]))?;
+
+    let spectrum = read_agilent_processed_1d_dir(root.join("datdir/phasefile"))?;
+
+    assert_eq!(spectrum.x.unit, Unit::Hertz);
+    assert_eq!(spectrum.x.values, vec![200.0, -200.0]);
+    assert_eq!(spectrum.intensities, vec![0.5, 1.5]);
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn rejects_truncated_processed_phasefile() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-truncated")?;
+    write_procpar(&root, "")?;
+    write_phasefile(&root, EndianForTest::Big, DataForTest::I32(&[1, 2, 3]))?;
+    let phasefile = root.join("datdir/phasefile");
+    let mut bytes = fs::read(&phasefile)?;
+    let truncated_len = bytes
+        .len()
+        .checked_sub(4)
+        .ok_or_else(|| anyhow::anyhow!("synthetic phasefile is unexpectedly short"))?;
+    bytes.truncate(truncated_len);
+    fs::write(&phasefile, bytes)?;
+
+    let error = read_agilent_processed_1d_dir(&root).expect_err("truncated phasefile should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    assert!(error.to_string().contains("phasefile"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn rejects_arrayed_or_multidimensional_fid() -> anyhow::Result<()> {
     let root = synthetic_dataset("arrayed")?;
     write_procpar(&root, "")?;
@@ -346,6 +433,49 @@ fn write_fid(
     Ok(())
 }
 
+fn write_phasefile(
+    root: &Path,
+    endian: EndianForTest,
+    data: DataForTest<'_>,
+) -> anyhow::Result<()> {
+    let datdir = root.join("datdir");
+    fs::create_dir_all(&datdir)?;
+    let (ebytes, status, data_bytes) = encode_real_data(endian, data);
+    let point_count = data_bytes.len() / usize::try_from(ebytes)?;
+    let tbytes = i32::try_from(point_count)?
+        .checked_mul(ebytes)
+        .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile trace size overflow"))?;
+    let bbytes = i32::try_from(
+        BLOCK_HEADER_LEN
+            .checked_add(data_bytes.len())
+            .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile block size overflow"))?,
+    )?;
+
+    let mut phasefile_bytes = Vec::new();
+    push_i32(&mut phasefile_bytes, endian, 1);
+    push_i32(&mut phasefile_bytes, endian, 1);
+    push_i32(&mut phasefile_bytes, endian, i32::try_from(point_count)?);
+    push_i32(&mut phasefile_bytes, endian, ebytes);
+    push_i32(&mut phasefile_bytes, endian, tbytes);
+    push_i32(&mut phasefile_bytes, endian, bbytes);
+    push_i16(&mut phasefile_bytes, endian, 0);
+    push_i16(&mut phasefile_bytes, endian, status);
+    push_i32(&mut phasefile_bytes, endian, 1);
+    push_i16(&mut phasefile_bytes, endian, 0);
+    push_i16(&mut phasefile_bytes, endian, status);
+    push_i16(&mut phasefile_bytes, endian, 1);
+    push_i16(&mut phasefile_bytes, endian, 0);
+    push_i32(&mut phasefile_bytes, endian, 1);
+    push_f32(&mut phasefile_bytes, endian, 0.0);
+    push_f32(&mut phasefile_bytes, endian, 0.0);
+    push_f32(&mut phasefile_bytes, endian, 0.0);
+    push_f32(&mut phasefile_bytes, endian, 0.0);
+    phasefile_bytes.extend(data_bytes);
+
+    fs::write(datdir.join("phasefile"), phasefile_bytes)?;
+    Ok(())
+}
+
 fn encode_data(endian: EndianForTest, data: DataForTest<'_>) -> (i32, i16, Vec<u8>) {
     match data {
         DataForTest::I16(values) => {
@@ -368,6 +498,32 @@ fn encode_data(endian: EndianForTest, data: DataForTest<'_>) -> (i32, i16, Vec<u
                 push_f32(&mut bytes, endian, *value);
             }
             (4, 0x0001 | STATUS_FLOAT | STATUS_COMPLEX, bytes)
+        }
+    }
+}
+
+fn encode_real_data(endian: EndianForTest, data: DataForTest<'_>) -> (i32, i16, Vec<u8>) {
+    match data {
+        DataForTest::I16(values) => {
+            let mut bytes = Vec::with_capacity(values.len() * 2);
+            for value in values {
+                push_i16(&mut bytes, endian, *value);
+            }
+            (2, 0x0001, bytes)
+        }
+        DataForTest::I32(values) => {
+            let mut bytes = Vec::with_capacity(values.len() * 4);
+            for value in values {
+                push_i32(&mut bytes, endian, *value);
+            }
+            (4, 0x0001 | 0x0004, bytes)
+        }
+        DataForTest::F32(values) => {
+            let mut bytes = Vec::with_capacity(values.len() * 4);
+            for value in values {
+                push_f32(&mut bytes, endian, *value);
+            }
+            (4, 0x0001 | STATUS_FLOAT, bytes)
         }
     }
 }

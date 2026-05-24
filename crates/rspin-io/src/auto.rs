@@ -6,11 +6,12 @@ use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     SpectrumPathReader, SpectrumReader, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
-    read_bruker_fid_1d_dir, read_bruker_processed_1d_dir, read_bruker_processed_2d_dir,
-    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
-    read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json,
-    read_spectrum2d_csv, read_spectrum2d_json, write_jcamp_dx_1d, write_nmrml_1d, write_nmrml_2d,
-    write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
+    read_agilent_processed_1d_dir, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
+    read_bruker_processed_2d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
+    read_jeol_jdf_2d_file, read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv,
+    read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, write_jcamp_dx_1d,
+    write_nmrml_1d, write_nmrml_2d, write_spectrum1d_csv, write_spectrum1d_json,
+    write_spectrum2d_csv, write_spectrum2d_json,
 };
 
 /// Text spectrum formats supported by the auto-detecting readers.
@@ -43,6 +44,8 @@ pub enum Spectrum1DPathFormat {
     BrukerProcessed,
     /// Bruker raw one-dimensional FID dataset directory or `fid` file.
     BrukerFid,
+    /// Agilent/Varian processed one-dimensional `phasefile` dataset.
+    AgilentProcessed,
     /// Agilent/Varian raw one-dimensional FID dataset directory or `fid` file.
     AgilentFid,
 }
@@ -278,6 +281,9 @@ pub fn detect_spectrum1d_path_format(path: impl AsRef<Path>) -> Result<Spectrum1
     if looks_like_bruker_fid(path) {
         return Ok(Spectrum1DPathFormat::BrukerFid);
     }
+    if looks_like_agilent_processed_1d(path) {
+        return Ok(Spectrum1DPathFormat::AgilentProcessed);
+    }
     if looks_like_agilent_fid(path) {
         return Ok(Spectrum1DPathFormat::AgilentFid);
     }
@@ -399,6 +405,7 @@ pub fn read_spectrum1d_path(path: impl AsRef<Path>) -> Result<Spectrum1D> {
         Spectrum1DPathFormat::JeolJdf => read_jeol_jdf_1d_file(path),
         Spectrum1DPathFormat::BrukerProcessed => read_bruker_processed_1d_dir(path),
         Spectrum1DPathFormat::BrukerFid => read_bruker_fid_1d_dir(path),
+        Spectrum1DPathFormat::AgilentProcessed => read_agilent_processed_1d_dir(path),
         Spectrum1DPathFormat::AgilentFid => read_agilent_fid_1d_dir(path),
     }
 }
@@ -551,6 +558,31 @@ fn looks_like_bruker_ser(path: &Path) -> bool {
 fn looks_like_agilent_fid(path: &Path) -> bool {
     let dataset = dataset_dir(path);
     dataset.join("fid").is_file() && dataset.join("procpar").is_file()
+}
+
+fn looks_like_agilent_processed_1d(path: &Path) -> bool {
+    if path.is_file() {
+        return path
+            .file_name()
+            .and_then(std::ffi::OsStr::to_str)
+            .is_some_and(|name| name.eq_ignore_ascii_case("phasefile"))
+            && agilent_phasefile_procpar_candidates(path)
+                .iter()
+                .any(|candidate| candidate.is_file());
+    }
+
+    (path.join("datdir").join("phasefile").is_file() || path.join("phasefile").is_file())
+        && path.join("procpar").is_file()
+}
+
+fn agilent_phasefile_procpar_candidates(path: &Path) -> [std::path::PathBuf; 2] {
+    [
+        path.parent()
+            .and_then(Path::parent)
+            .map_or_else(std::path::PathBuf::new, |parent| parent.join("procpar")),
+        path.parent()
+            .map_or_else(std::path::PathBuf::new, |parent| parent.join("procpar")),
+    ]
 }
 
 fn processed_dir(path: &Path) -> std::path::PathBuf {
@@ -941,6 +973,46 @@ x,intensity
         Ok(())
     }
 
+    #[test]
+    fn reads_agilent_processed_1d_path() -> anyhow::Result<()> {
+        let root = temp_dir("agilent-processed-1d")?;
+        fs::create_dir_all(root.join("datdir"))?;
+        fs::write(
+            root.join("procpar"),
+            "\
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 500
+0
+rfl 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 500
+0
+rfp 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 0
+0
+",
+        )?;
+        fs::write(
+            root.join("datdir/phasefile"),
+            agilent_phasefile_i32_le(&[4, -2])?,
+        )?;
+
+        assert_eq!(
+            detect_spectrum1d_path_format(&root)?,
+            Spectrum1DPathFormat::AgilentProcessed
+        );
+        let parsed = read_spectrum1d_path(root.join("datdir/phasefile"))?;
+
+        assert_eq!(parsed.x.unit, Unit::Ppm);
+        assert_eq!(parsed.x.values, vec![1.0, -1.0]);
+        assert_eq!(parsed.intensities, vec![4.0, -2.0]);
+
+        remove_dir(root)?;
+        Ok(())
+    }
+
     fn temp_dir(name: &str) -> anyhow::Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
         let mut path = std::env::temp_dir();
@@ -959,5 +1031,45 @@ x,intensity
             .iter()
             .flat_map(|value| value.to_le_bytes())
             .collect::<Vec<_>>()
+    }
+
+    fn agilent_phasefile_i32_le(values: &[i32]) -> anyhow::Result<Vec<u8>> {
+        let data_len = values
+            .len()
+            .checked_mul(4)
+            .ok_or_else(|| anyhow::anyhow!("synthetic phasefile data size overflow"))?;
+        let bbytes = 28_usize
+            .checked_add(data_len)
+            .ok_or_else(|| anyhow::anyhow!("synthetic phasefile block size overflow"))?;
+        let mut payload = Vec::new();
+        push_i32_le(&mut payload, 1);
+        push_i32_le(&mut payload, 1);
+        push_i32_le(&mut payload, i32::try_from(values.len())?);
+        push_i32_le(&mut payload, 4);
+        push_i32_le(&mut payload, i32::try_from(data_len)?);
+        push_i32_le(&mut payload, i32::try_from(bbytes)?);
+        push_i16_le(&mut payload, 0);
+        push_i16_le(&mut payload, 0x0001 | 0x0004);
+        push_i32_le(&mut payload, 1);
+        push_i16_le(&mut payload, 0);
+        push_i16_le(&mut payload, 0x0001 | 0x0004);
+        push_i16_le(&mut payload, 1);
+        push_i16_le(&mut payload, 0);
+        push_i32_le(&mut payload, 1);
+        for _ in 0..4 {
+            payload.extend(0.0_f32.to_le_bytes());
+        }
+        for value in values {
+            payload.extend(value.to_le_bytes());
+        }
+        Ok(payload)
+    }
+
+    fn push_i32_le(bytes: &mut Vec<u8>, value: i32) {
+        bytes.extend(value.to_le_bytes());
+    }
+
+    fn push_i16_le(bytes: &mut Vec<u8>, value: i16) {
+        bytes.extend(value.to_le_bytes());
     }
 }
