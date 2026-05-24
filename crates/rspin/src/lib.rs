@@ -88,9 +88,12 @@ mod tests {
     #[test]
     fn prelude_supports_common_processing_workflow() -> Result<()> {
         let spectrum = Spectrum1D::new(
-            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            Axis::linear_ppm(0.0, 2.0, 3)?,
             vec![1.0, -2.0, 4.0],
-            Metadata::named("demo"),
+            Metadata::new()
+                .with_name("demo")
+                .with_nucleus(Nucleus::Hydrogen1)
+                .with_frequency_mhz(400.0),
         )?;
 
         let processed = spectrum.process().scale(2.0).normalize_max_abs().finish()?;

@@ -37,6 +37,15 @@ impl Axis {
         })
     }
 
+    /// Creates a chemical-shift axis in ppm from explicit values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the axis is empty or contains non-finite values.
+    pub fn ppm(values: Vec<f64>) -> Result<Self> {
+        Self::new("chemical shift", Unit::Ppm, values)
+    }
+
     /// Creates a linearly spaced axis.
     ///
     /// # Errors
@@ -80,6 +89,15 @@ impl Axis {
         };
 
         Self::new(label, unit, values)
+    }
+
+    /// Creates a linearly spaced chemical-shift axis in ppm.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `points` is zero or the bounds are not finite.
+    pub fn linear_ppm(start: f64, end: f64, points: usize) -> Result<Self> {
+        Self::linear("chemical shift", Unit::Ppm, start, end, points)
     }
 
     /// Returns the number of axis points.

@@ -8,6 +8,20 @@ fn creates_linear_axis() -> Result<()> {
 }
 
 #[test]
+fn creates_ppm_axes_with_helpers() -> Result<()> {
+    let axis = Axis::ppm(vec![1.0, 2.0, 3.0])?;
+    assert_eq!(axis.label, "chemical shift");
+    assert_eq!(axis.unit, Unit::Ppm);
+    assert_eq!(axis.values, vec![1.0, 2.0, 3.0]);
+
+    let linear = Axis::linear_ppm(10.0, 8.0, 3)?;
+    assert_eq!(linear.label, "chemical shift");
+    assert_eq!(linear.unit, Unit::Ppm);
+    assert_eq!(linear.values, vec![10.0, 9.0, 8.0]);
+    Ok(())
+}
+
+#[test]
 fn rejects_empty_axis() {
     assert!(Axis::new("x", Unit::Points, Vec::new()).is_err());
 }
