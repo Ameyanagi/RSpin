@@ -1,15 +1,15 @@
-//! JEOL Delta `.jdf` one-dimensional import.
+//! JEOL Delta `.jdf` import.
 
 use std::{fs, path::Path, str::FromStr};
 
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
 
 mod binary;
 mod data;
 mod header;
 mod parameters;
 
-use data::read_data_sections;
+use data::{read_data_matrix_sections, read_data_sections};
 use header::Header;
 use parameters::Parameters;
 
@@ -19,6 +19,7 @@ const VALUE_TYPE_FLOAT: i32 = 2;
 const DATA_TYPE_FLOAT_64: u8 = 0;
 const DATA_TYPE_FLOAT_32: u8 = 1;
 const DATA_FORMAT_ONE_D: u8 = 1;
+const DATA_FORMAT_TWO_D: u8 = 2;
 const AXIS_TYPE_COMPLEX: u8 = 3;
 const AXIS_TYPE_REAL_COMPLEX: u8 = 4;
 const PARAMETER_RECORD_LEN: usize = 64;
@@ -77,15 +78,78 @@ pub fn read_jeol_jdf_1d_bytes(bytes: &[u8]) -> Result<Spectrum1D> {
 
     let parameters = Parameters::parse(bytes, &header)?;
     let (real, imaginary) = read_data_sections(bytes, &header)?;
-    let axis = build_axis(&header)?;
+    let axis = build_axis(&header, 0, header.point_count()?)?;
     let metadata = build_metadata(&header, &parameters);
 
     Spectrum1D::new_complex(axis, real, imaginary, metadata)
 }
 
-fn build_axis(header: &Header) -> Result<Axis> {
-    let point_count = header.point_count()?;
-    let unit = header.data_units[0].axis_unit();
+/// Reader for JEOL Delta `.jdf` two-dimensional spectra or FIDs.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct JeolJdf2D;
+
+impl JeolJdf2D {
+    /// Reads a JEOL Delta `.jdf` two-dimensional file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file is missing, malformed,
+    /// non-two-dimensional, or uses an unsupported numeric representation.
+    pub fn read_file(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_jeol_jdf_2d_file(path)
+    }
+
+    /// Reads a JEOL Delta `.jdf` two-dimensional payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the payload is malformed, non-two-dimensional, or
+    /// uses an unsupported numeric representation.
+    pub fn read_bytes(self, bytes: &[u8]) -> Result<Spectrum2D> {
+        read_jeol_jdf_2d_bytes(bytes)
+    }
+}
+
+/// Reads a JEOL Delta `.jdf` two-dimensional file.
+///
+/// # Errors
+///
+/// Returns an error when the file is missing, malformed, non-two-dimensional,
+/// or uses an unsupported numeric representation.
+pub fn read_jeol_jdf_2d_file(path: impl AsRef<Path>) -> Result<Spectrum2D> {
+    let path = path.as_ref();
+    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
+        format: "JEOL",
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    read_jeol_jdf_2d_bytes(&bytes)
+}
+
+/// Reads a JEOL Delta `.jdf` two-dimensional payload.
+///
+/// JEOL hypercomplex files may contain more than two planes. `RSpin`'s current
+/// `Spectrum2D` model stores one optional companion plane, so this reader keeps
+/// the first real plane and the first following companion plane.
+///
+/// # Errors
+///
+/// Returns an error when the payload is malformed, non-two-dimensional, or uses
+/// an unsupported numeric representation.
+pub fn read_jeol_jdf_2d_bytes(bytes: &[u8]) -> Result<Spectrum2D> {
+    let header = Header::parse(bytes)?;
+    header.validate_2d()?;
+
+    let parameters = Parameters::parse(bytes, &header)?;
+    let (z, imaginary, x_count, y_count) = read_data_matrix_sections(bytes, &header)?;
+    let x = build_axis(&header, 0, x_count)?;
+    let y = build_axis(&header, 1, y_count)?;
+    let metadata = build_metadata(&header, &parameters);
+
+    Spectrum2D::new_complex(x, y, z, imaginary, metadata)
+}
+
+fn build_axis(header: &Header, axis_index: usize, point_count: usize) -> Result<Axis> {
+    let unit = header.data_units[axis_index].axis_unit();
     let label = match unit {
         Unit::Ppm => "chemical shift",
         Unit::Hertz => "frequency",
@@ -96,8 +160,8 @@ fn build_axis(header: &Header) -> Result<Axis> {
     Axis::linear(
         label,
         unit,
-        header.data_axis_start[0],
-        header.data_axis_stop[0],
+        header.data_axis_start[axis_index],
+        header.data_axis_stop[axis_index],
         point_count,
     )
 }

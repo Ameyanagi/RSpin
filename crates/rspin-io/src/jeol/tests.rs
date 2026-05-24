@@ -1,6 +1,6 @@
 use rspin_core::{Nucleus, RSpinError, Result, Unit};
 
-use super::{JeolJdf1D, read_jeol_jdf_1d_bytes};
+use super::{JeolJdf1D, JeolJdf2D, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes};
 
 #[test]
 fn reads_synthetic_complex_1d_jdf() -> Result<()> {
@@ -23,6 +23,25 @@ fn reads_synthetic_complex_1d_jdf() -> Result<()> {
 }
 
 #[test]
+fn reads_synthetic_complex_2d_jdf() -> Result<()> {
+    let bytes = synthetic_complex_2d_jdf()?;
+
+    let spectrum = JeolJdf2D.read_bytes(&bytes)?;
+
+    assert_eq!(spectrum.shape(), (3, 2));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.x.values, vec![0.0, 0.1, 0.2]);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.values, vec![0.0, 0.5]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]));
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("sample"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+    Ok(())
+}
+
+#[test]
 fn rejects_unknown_signature() {
     let error = read_jeol_jdf_1d_bytes(b"not jdf").expect_err("invalid signature should fail");
 
@@ -35,6 +54,16 @@ fn rejects_multidimensional_jdf_for_1d_reader() -> Result<()> {
     bytes[12] = 2;
 
     let error = read_jeol_jdf_1d_bytes(&bytes).expect_err("2D JDF should be unsupported");
+
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_one_dimensional_jdf_for_2d_reader() -> Result<()> {
+    let bytes = synthetic_complex_jdf()?;
+
+    let error = read_jeol_jdf_2d_bytes(&bytes).expect_err("1D JDF should be unsupported");
 
     assert!(matches!(error, RSpinError::Unsupported { .. }));
     Ok(())
@@ -75,6 +104,67 @@ fn synthetic_complex_jdf() -> Result<Vec<u8>> {
     push_be_u32_array(&mut bytes, &[3, 0, 0, 0, 0, 0, 0, 0]);
     push_be_f64_array(&mut bytes, &[0.0; 8]);
     push_be_f64_array(&mut bytes, &[0.75, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+    bytes.extend_from_slice(&[0; 8]);
+    push_padded(&mut bytes, "", 16, 0);
+    push_padded(&mut bytes, "", 128, 0);
+    push_padded(&mut bytes, "", 128, 0);
+    push_padded(&mut bytes, "", 128, 0);
+    bytes.extend_from_slice(&[0; 8 * 32]);
+    bytes.extend_from_slice(&[0; 8 * 8]);
+    bytes.extend_from_slice(&[0; 8 * 8]);
+    bytes.extend_from_slice(&[0; 8]);
+    bytes.extend_from_slice(&[0; 4]);
+    bytes.extend_from_slice(&[0; 8]);
+
+    let param_start_pos = bytes.len();
+    push_be_u32(&mut bytes, 0);
+    let param_length_pos = bytes.len();
+    push_be_u32(&mut bytes, 0);
+    bytes.extend_from_slice(&[0; 8 * 4]);
+    bytes.extend_from_slice(&[0; 8 * 4]);
+    let data_start_pos = bytes.len();
+    push_be_u32(&mut bytes, 0);
+
+    let param_start = bytes.len();
+    let params = parameter_section()?;
+    bytes.extend_from_slice(&params);
+    let data_start = bytes.len();
+    for value in real {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in imaginary {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    write_be_u32_at(&mut bytes, param_start_pos, usize_to_u32(param_start)?)?;
+    write_be_u32_at(&mut bytes, param_length_pos, usize_to_u32(params.len())?)?;
+    write_be_u32_at(&mut bytes, data_start_pos, usize_to_u32(data_start)?)?;
+    Ok(bytes)
+}
+
+fn synthetic_complex_2d_jdf() -> Result<Vec<u8>> {
+    let real: [f64; 6] = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let imaginary: [f64; 6] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6];
+    let mut bytes = Vec::new();
+
+    bytes.extend_from_slice(b"JEOL.NMR");
+    bytes.push(1);
+    bytes.push(1);
+    push_be_u16(&mut bytes, 2);
+    bytes.push(2);
+    bytes.push(0xC0);
+    bytes.push(2);
+    bytes.push(25);
+    bytes.extend_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+    bytes.extend_from_slice(&[4, 4, 0, 0, 0, 0, 0, 0]);
+    push_unit_array_with(&mut bytes, &[28, 28]);
+    push_padded(&mut bytes, "synthetic 2d", 124, 0);
+    bytes.extend_from_slice(&[0; 4]);
+    push_be_u32_array(&mut bytes, &[3, 2, 1, 1, 1, 1, 1, 1]);
+    push_be_u32_array(&mut bytes, &[0; 8]);
+    push_be_u32_array(&mut bytes, &[2, 1, 0, 0, 0, 0, 0, 0]);
+    push_be_f64_array(&mut bytes, &[0.0; 8]);
+    push_be_f64_array(&mut bytes, &[0.2, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     bytes.extend_from_slice(&[0; 8]);
     push_padded(&mut bytes, "", 16, 0);
     push_padded(&mut bytes, "", 128, 0);
@@ -165,11 +255,22 @@ fn parameter_record(name: &str, base_unit: u8) -> [u8; 64] {
 }
 
 fn push_unit_array(bytes: &mut Vec<u8>, first_base_unit: u8) {
+    push_unit_array_with(bytes, &[first_base_unit]);
+}
+
+fn push_unit_array_with(bytes: &mut Vec<u8>, base_units: &[u8]) {
     bytes.push(0);
-    bytes.push(first_base_unit);
-    for _ in 1..8 {
+    bytes.push(unit_base_at(base_units, 0));
+    for index in 1..8 {
         bytes.push(0);
-        bytes.push(0);
+        bytes.push(unit_base_at(base_units, index));
+    }
+}
+
+fn unit_base_at(base_units: &[u8], index: usize) -> u8 {
+    match base_units.get(index) {
+        Some(value) => *value,
+        None => 0,
     }
 }
 

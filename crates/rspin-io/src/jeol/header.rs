@@ -1,8 +1,8 @@
 use rspin_core::{RSpinError, Result};
 
 use super::{
-    AXIS_TYPE_COMPLEX, AXIS_TYPE_REAL_COMPLEX, DATA_FORMAT_ONE_D, DATA_TYPE_FLOAT_32,
-    DATA_TYPE_FLOAT_64,
+    AXIS_TYPE_COMPLEX, AXIS_TYPE_REAL_COMPLEX, DATA_FORMAT_ONE_D, DATA_FORMAT_TWO_D,
+    DATA_TYPE_FLOAT_32, DATA_TYPE_FLOAT_64,
     binary::{BinaryReader, Endian, UnitComponent, parse_error, read_unit_array, usize_from_u32},
 };
 
@@ -98,20 +98,10 @@ impl Header {
     }
 
     pub(super) fn validate_1d(&self) -> Result<()> {
-        if self.major_version != 1 {
-            return Err(parse_error(format!(
-                "unsupported JEOL JDF major version {}; minor version is {}",
-                self.major_version, self.minor_version
-            )));
-        }
+        self.validate_common()?;
         if self.data_dimension_number != 1 || self.data_format != DATA_FORMAT_ONE_D {
             return Err(RSpinError::Unsupported {
                 feature: "JEOL multidimensional JDF data",
-            });
-        }
-        if !matches!(self.data_type, DATA_TYPE_FLOAT_64 | DATA_TYPE_FLOAT_32) {
-            return Err(RSpinError::Unsupported {
-                feature: "JEOL JDF numeric representation",
             });
         }
         if self.point_count()? == 0 {
@@ -122,8 +112,46 @@ impl Header {
         Ok(())
     }
 
+    pub(super) fn validate_2d(&self) -> Result<()> {
+        self.validate_common()?;
+        if self.data_dimension_number != 2 || self.data_format != DATA_FORMAT_TWO_D {
+            return Err(RSpinError::Unsupported {
+                feature: "JEOL non-two-dimensional JDF data",
+            });
+        }
+        let (x_count, y_count) = self.matrix_shape()?;
+        if x_count == 0 || y_count == 0 {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "JEOL JDF 2D point counts must be positive".to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    fn validate_common(&self) -> Result<()> {
+        if self.major_version != 1 {
+            return Err(parse_error(format!(
+                "unsupported JEOL JDF major version {}; minor version is {}",
+                self.major_version, self.minor_version
+            )));
+        }
+        if !matches!(self.data_type, DATA_TYPE_FLOAT_64 | DATA_TYPE_FLOAT_32) {
+            return Err(RSpinError::Unsupported {
+                feature: "JEOL JDF numeric representation",
+            });
+        }
+        Ok(())
+    }
+
     pub(super) fn point_count(&self) -> Result<usize> {
         usize_from_u32(self.data_points[0], "JEOL JDF point count")
+    }
+
+    pub(super) fn matrix_shape(&self) -> Result<(usize, usize)> {
+        Ok((
+            usize_from_u32(self.data_points[0], "JEOL JDF x point count")?,
+            usize_from_u32(self.data_points[1], "JEOL JDF y point count")?,
+        ))
     }
 
     pub(super) fn data_section_count(&self) -> Result<usize> {

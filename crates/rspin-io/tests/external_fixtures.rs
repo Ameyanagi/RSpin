@@ -11,7 +11,7 @@ use std::{
 use rspin_core::{Nucleus, Unit};
 use rspin_io::{
     read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
-    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
+    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
 };
 
 #[test]
@@ -224,6 +224,26 @@ fn parses_external_jeol_1d_jdf_when_available() -> anyhow::Result<()> {
     assert_close(spectrum.metadata.temperature_k, Some(298.15));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
+    Ok(())
+}
+
+#[test]
+fn parses_external_jeol_2d_jdf_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_HSQC_400MHz_Jeol.jdf");
+    require_fixture(&fixture)?;
+
+    let spectrum = read_jeol_jdf_2d_file(&fixture)?;
+
+    assert_eq!(spectrum.shape(), (4096, 256));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+    assert!(spectrum.imaginary.is_some());
+    assert!(spectrum.z.iter().any(|value| value.abs() > 1.0e-12));
     Ok(())
 }
 
