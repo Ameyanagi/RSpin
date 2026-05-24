@@ -9,6 +9,8 @@ use std::{
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
 
+use crate::SpectrumPathReader;
+
 mod procpar;
 
 use procpar::{first_f64, first_text, first_usize, parse_procpar};
@@ -31,6 +33,14 @@ impl AgilentFid1D {
     /// Returns an error when `fid` or `procpar` is missing, malformed, arrayed,
     /// or stored in an unsupported numeric representation.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_agilent_fid_1d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for AgilentFid1D {
+    type Output = Spectrum1D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_agilent_fid_1d_dir(path)
     }
 }
@@ -74,6 +84,14 @@ impl AgilentProcessed1D {
     /// Returns an error when `phasefile` or `procpar` is missing, malformed, or
     /// the phasefile is multidimensional.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_agilent_processed_1d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for AgilentProcessed1D {
+    type Output = Spectrum1D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_agilent_processed_1d_dir(path)
     }
 }
@@ -129,6 +147,14 @@ impl AgilentFid2D {
     }
 }
 
+impl SpectrumPathReader for AgilentFid2D {
+    type Output = Spectrum2D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        read_agilent_fid_2d_dir(path)
+    }
+}
+
 /// Reads a raw two-dimensional FID from an Agilent/Varian dataset directory.
 ///
 /// The path may point to the dataset directory or directly to `fid`.
@@ -169,6 +195,14 @@ impl AgilentProcessed2D {
     /// Returns an error when `phasefile` or `procpar` is missing, malformed, or
     /// the phasefile is not two-dimensional.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_agilent_processed_2d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for AgilentProcessed2D {
+    type Output = Spectrum2D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_agilent_processed_2d_dir(path)
     }
 }

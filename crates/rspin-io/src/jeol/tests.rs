@@ -1,4 +1,12 @@
+use std::{
+    fs,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use rspin_core::{Nucleus, RSpinError, Result, Unit};
+
+use crate::SpectrumPathReader;
 
 use super::{JeolJdf1D, JeolJdf2D, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes};
 
@@ -46,6 +54,24 @@ fn reads_synthetic_complex_2d_jdf() -> Result<()> {
 }
 
 #[test]
+fn path_reader_trait_reads_synthetic_jdf_files() -> anyhow::Result<()> {
+    let root = temp_dir("path-reader")?;
+    let one_d_path = root.join("one.jdf");
+    let two_d_path = root.join("two.jdf");
+    fs::write(&one_d_path, synthetic_complex_jdf()?)?;
+    fs::write(&two_d_path, synthetic_complex_2d_jdf()?)?;
+
+    let one_d = JeolJdf1D.read_path(&one_d_path)?;
+    let two_d = JeolJdf2D.read_path(&two_d_path)?;
+
+    assert_eq!(one_d.len(), 4);
+    assert_eq!(two_d.shape(), (3, 2));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn rejects_unknown_signature() {
     let error = read_jeol_jdf_1d_bytes(b"not jdf").expect_err("invalid signature should fail");
 
@@ -82,6 +108,19 @@ fn rejects_unsupported_jdf_major_version() -> Result<()> {
         read_jeol_jdf_1d_bytes(&bytes).expect_err("unsupported JDF major version should fail");
 
     assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+fn temp_dir(name: &str) -> anyhow::Result<PathBuf> {
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let mut path = std::env::temp_dir();
+    path.push(format!("rspin-jeol-{name}-{}-{nanos}", std::process::id()));
+    fs::create_dir_all(&path)?;
+    Ok(path)
+}
+
+fn remove_dir(path: PathBuf) -> anyhow::Result<()> {
+    fs::remove_dir_all(path)?;
     Ok(())
 }
 

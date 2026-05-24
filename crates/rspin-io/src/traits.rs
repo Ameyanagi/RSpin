@@ -31,6 +31,21 @@ pub trait SpectrumPathReader {
     fn read_path(&self, path: &Path) -> Result<Self::Output>;
 }
 
+impl<T> SpectrumPathReader for T
+where
+    T: SpectrumReader,
+{
+    type Output = T::Output;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        let input = fs::read_to_string(path).map_err(|error| RSpinError::Parse {
+            format: "spectrum path",
+            message: format!("failed to read {}: {error}", path.display()),
+        })?;
+        self.read_str(&input)
+    }
+}
+
 /// Writes a spectrum-like value to a string payload.
 pub trait SpectrumWriter<S> {
     /// Writes a value to a string.

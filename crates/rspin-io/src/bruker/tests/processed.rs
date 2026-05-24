@@ -69,7 +69,7 @@ fn reads_processed_directory_with_scaling_and_big_endian_data() -> anyhow::Resul
         ByteOrder::Big,
     )?;
 
-    let spectrum = BrukerProcessed1D.read_dir(root.join("pdata/1"))?;
+    let spectrum = BrukerProcessed1D.read_path(&root.join("pdata/1"))?;
 
     assert_eq!(spectrum.x.unit, Unit::Points);
     assert_eq!(spectrum.x.values, vec![0.0, 1.0, 2.0]);
@@ -185,7 +185,7 @@ fn reads_processed_2d_dataset_root_with_imaginary_plane() -> anyhow::Result<()> 
     )?;
     write_text(&root.join("pdata/1/title"), "processed hsqc\n")?;
 
-    let spectrum = BrukerProcessed2D.read_dir(&root)?;
+    let spectrum = BrukerProcessed2D.read_path(&root)?;
 
     assert_eq!(spectrum.shape(), (3, 2));
     assert_eq!(spectrum.metadata.name.as_deref(), Some("processed hsqc"));

@@ -4,6 +4,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 
 use rspin_core::{Axis, RSpinError, Result, Spectrum2D, Unit};
 
+use crate::SpectrumPathReader;
 use crate::bruker::{optional_i32, parse_parameter_file, read_text, required_usize};
 
 use super::{
@@ -29,6 +30,14 @@ impl BrukerSer2D {
     /// Returns an error when `ser`, `acqus`, or `acqu2s` are missing or when
     /// the binary layout is malformed or unsupported.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_bruker_ser_2d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for BrukerSer2D {
+    type Output = Spectrum2D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_bruker_ser_2d_dir(path)
     }
 }

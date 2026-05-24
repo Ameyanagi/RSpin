@@ -95,7 +95,7 @@ mod tests {
         AnnotationTarget, Atom, Axis, Bond, Metadata, Molecule, SpectrumAnnotation, Unit,
     };
 
-    use crate::SpectrumPathWriter;
+    use crate::{SpectrumPathReader, SpectrumPathWriter};
 
     use super::*;
 
@@ -166,8 +166,7 @@ mod tests {
         )?;
 
         JsonSpectrum1D.write_path(&spectrum, &path)?;
-        let text = fs::read_to_string(&path)?;
-        let parsed = read_spectrum1d_json(&text)?;
+        let parsed = JsonSpectrum1D.read_path(&path)?;
 
         assert_eq!(parsed, spectrum);
         remove_dir(root)?;

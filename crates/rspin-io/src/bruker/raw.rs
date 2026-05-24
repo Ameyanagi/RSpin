@@ -11,6 +11,8 @@ use std::{
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
+use crate::SpectrumPathReader;
+
 use super::{
     optional_f64, optional_i32, parse_parameter_file, prefixed_parameter_properties, read_text,
     required_usize, text_parameter,
@@ -34,6 +36,14 @@ impl BrukerFid1D {
     /// Returns an error when required `fid` or `acqus` files are missing,
     /// malformed, real-only, odd-length, or use an unsupported binary data type.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_bruker_fid_1d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for BrukerFid1D {
+    type Output = Spectrum1D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_bruker_fid_1d_dir(path)
     }
 }

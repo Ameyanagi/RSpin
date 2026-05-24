@@ -6,6 +6,8 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 
+use crate::SpectrumPathReader;
+
 use super::*;
 
 #[test]
@@ -81,7 +83,7 @@ sw 1 1 5 5 5 2 1 8203 1 64
         1,
     )?;
 
-    let spectrum = AgilentFid1D.read_dir(root.join("fid"))?;
+    let spectrum = AgilentFid1D.read_path(&root.join("fid"))?;
 
     assert_eq!(spectrum.x.values, vec![0.0, 0.002]);
     assert_eq!(spectrum.intensities, vec![0.5, 1.5]);
@@ -119,7 +121,7 @@ comment 2 2 32 0 0 2 1 0 1 64
     )?;
     write_phasefile(&root, EndianForTest::Big, DataForTest::I32(&[10, 20, -5]))?;
 
-    let spectrum = AgilentProcessed1D.read_dir(root.join("datdir"))?;
+    let spectrum = AgilentProcessed1D.read_path(&root.join("datdir"))?;
 
     assert_eq!(spectrum.x.unit, Unit::Ppm);
     assert_eq!(spectrum.x.values, vec![1.0, 0.0, -1.0]);
@@ -205,7 +207,7 @@ comment 2 2 32 0 0 2 1 0 1 64
         1,
     )?;
 
-    let spectrum = AgilentProcessed2D.read_dir(root.join("datdir/phasefile"))?;
+    let spectrum = AgilentProcessed2D.read_path(&root.join("datdir/phasefile"))?;
 
     assert_eq!(spectrum.shape(), (3, 2));
     assert_eq!(spectrum.x.unit, Unit::Ppm);
@@ -359,7 +361,7 @@ sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
         1,
     )?;
 
-    let spectrum = AgilentFid2D.read_dir(&root)?;
+    let spectrum = AgilentFid2D.read_path(&root)?;
 
     assert_eq!(spectrum.shape(), (2, 2));
     assert_eq!(spectrum.y.unit, Unit::Points);

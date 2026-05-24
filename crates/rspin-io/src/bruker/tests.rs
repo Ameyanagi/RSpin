@@ -6,6 +6,8 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 
+use crate::SpectrumPathReader;
+
 use super::*;
 
 mod processed;

@@ -9,6 +9,8 @@ use std::{
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
+use crate::SpectrumPathReader;
+
 mod processed_2d;
 mod raw;
 
@@ -32,6 +34,14 @@ impl BrukerProcessed1D {
     /// optional `1i` data is malformed, or binary data uses an unsupported
     /// type.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        read_bruker_processed_1d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for BrukerProcessed1D {
+    type Output = Spectrum1D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_bruker_processed_1d_dir(path)
     }
 }

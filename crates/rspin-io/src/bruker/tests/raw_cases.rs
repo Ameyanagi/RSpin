@@ -56,7 +56,7 @@ fn reads_raw_1d_fid_file_path() -> anyhow::Result<()> {
     )?;
     write_raw_fid(&root, &[5, -7], ByteOrder::Little)?;
 
-    let spectrum = BrukerFid1D.read_dir(root.join("fid"))?;
+    let spectrum = BrukerFid1D.read_path(&root.join("fid"))?;
 
     assert_eq!(spectrum.x.unit, Unit::Points);
     assert_eq!(spectrum.intensities, vec![5.0]);
@@ -114,7 +114,7 @@ fn reads_raw_2d_ser_dataset_root() -> anyhow::Result<()> {
     )?;
     write_raw_ser(&root, &[vec![1, 2, 3, 4], vec![5, 6, 7, 8]], ByteOrder::Big)?;
 
-    let spectrum = BrukerSer2D.read_dir(&root)?;
+    let spectrum = BrukerSer2D.read_path(&root)?;
 
     assert_eq!(spectrum.shape(), (2, 2));
     assert_eq!(spectrum.x.unit, Unit::Seconds);

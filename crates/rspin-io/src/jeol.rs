@@ -4,6 +4,8 @@ use std::{fs, path::Path, str::FromStr};
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
 
+use crate::SpectrumPathReader;
+
 mod binary;
 mod data;
 mod header;
@@ -48,6 +50,14 @@ impl JeolJdf1D {
     /// uses an unsupported numeric representation.
     pub fn read_bytes(self, bytes: &[u8]) -> Result<Spectrum1D> {
         read_jeol_jdf_1d_bytes(bytes)
+    }
+}
+
+impl SpectrumPathReader for JeolJdf1D {
+    type Output = Spectrum1D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        read_jeol_jdf_1d_file(path)
     }
 }
 
@@ -107,6 +117,14 @@ impl JeolJdf2D {
     /// uses an unsupported numeric representation.
     pub fn read_bytes(self, bytes: &[u8]) -> Result<Spectrum2D> {
         read_jeol_jdf_2d_bytes(bytes)
+    }
+}
+
+impl SpectrumPathReader for JeolJdf2D {
+    type Output = Spectrum2D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        read_jeol_jdf_2d_file(path)
     }
 }
 

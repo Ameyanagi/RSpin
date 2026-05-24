@@ -4,6 +4,8 @@ use std::path::{Path, PathBuf};
 
 use rspin_core::{RSpinError, Result, Spectrum2D};
 
+use crate::SpectrumPathReader;
+
 use super::{
     build_axis, build_metadata, parse_parameter_file, read_acqus, read_processed_i32_data,
     read_text, read_title, required_usize,
@@ -25,6 +27,14 @@ impl BrukerProcessed2D {
     /// Returns an error when required `procs`, `proc2s`, or `2rr` files are
     /// missing, malformed, or use an unsupported binary data type.
     pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_bruker_processed_2d_dir(path)
+    }
+}
+
+impl SpectrumPathReader for BrukerProcessed2D {
+    type Output = Spectrum2D;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
         read_bruker_processed_2d_dir(path)
     }
 }
