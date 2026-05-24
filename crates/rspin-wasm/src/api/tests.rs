@@ -69,6 +69,50 @@ fn parses_nmrml_to_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn parses_nmrml_2d_to_json() -> anyhow::Result<()> {
+    let json = parse_nmrml_2d_json(
+        r#"
+        <nmrML version="v1.0.rc1" id="two-d" xmlns="http://nmrml.org/schema">
+          <acquisition>
+            <acquisitionMultiD>
+              <acquisitionParameterSet numberOfScans="1" numberOfSteadyStateScans="0">
+                <sampleAcquisitionTemperature value="25.0" unitName="degree celsius"/>
+                <directDimensionParameterSet decoupled="false" numberOfDataPoints="2">
+                  <acquisitionNucleus cvRef="NMR" accession="NMR:1400151" name="1H"/>
+                  <irradiationFrequency value="600.0" unitName="megaHertz"/>
+                  <sweepWidth value="2.0" unitName="hertz"/>
+                </directDimensionParameterSet>
+                <indirectDimensionParameterSet decoupled="false" numberOfDataPoints="2">
+                  <acquisitionNucleus cvRef="NMR" accession="NMR:1400154" name="13C"/>
+                  <irradiationFrequency value="150.0" unitName="megaHertz"/>
+                  <sweepWidth value="4.0" unitName="hertz"/>
+                </indirectDimensionParameterSet>
+              </acquisitionParameterSet>
+              <fidData compressed="true" encodedLength="44" byteFormat="complex64">
+                eJxjYGiwZ2Bo2M/AwOAAxAeAFJB2ANINQLrhAABd6gZ/
+              </fidData>
+            </acquisitionMultiD>
+          </acquisition>
+        </nmrML>
+        "#,
+    )?;
+    let spectrum: Spectrum2D = from_json(&json)?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_eq!(spectrum.x.values, vec![0.0, 0.5]);
+    assert_eq!(spectrum.y.values, vec![0.0, 0.25]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-1.0, -2.0, -3.0, -4.0]));
+    assert_eq!(
+        spectrum.metadata.nucleus,
+        Some(rspin_core::Nucleus::Hydrogen1)
+    );
+    Ok(())
+}
+
+#[test]
 fn scales_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\
