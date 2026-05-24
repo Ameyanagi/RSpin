@@ -17,19 +17,20 @@ pub use api::{
     decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
     detect_zones_json, exponential_apodization_spectrum_1d_json, extract_contours_2d_json,
     fft_spectrum_1d_json, fft_spectrum_2d_json, generate_spectrum_matrix_1d_json,
-    integrate_region_2d_json, integrate_region_json, magnitude_spectrum_1d_json,
-    normalize_spectrum_1d_json, normalize_spectrum_2d_json, offset_spectrum_1d_json,
-    optimize_peaks_json, parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json,
-    parse_spectrum_2d_csv_json, phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
-    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
-    render_prediction_2d_json, resample_spectrum_1d_json, resample_spectrum_2d_json,
-    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
-    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
-    simulate_first_order_multiplet_json, slice_spectrum_2d_x_at_y_index_json,
-    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
-    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
-    validate_j_coupling_graph_json, validate_prediction_json, write_spectrum_1d_csv_json,
-    write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    generate_spectrum_matrix_2d_json, integrate_region_2d_json, integrate_region_json,
+    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
+    offset_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
+    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, phase_spectrum_1d_json,
+    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
+    project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
+    resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
+    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
+    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
+    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
+    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, validate_j_coupling_graph_json,
+    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
+    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -181,6 +182,20 @@ pub fn generate_spectrum_matrix_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     generate_spectrum_matrix_1d_json(spectra_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Generates a layer-major matrix from serialized two-dimensional spectra.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, analysis, or
+/// serialization fails.
+#[wasm_bindgen(js_name = generateSpectrumMatrix2d)]
+pub fn generate_spectrum_matrix_2d(
+    spectra_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    generate_spectrum_matrix_2d_json(spectra_json, options_json).map_err(|error| js_error(&error))
 }
 
 /// Simulates a first-order multiplet as a serialized one-dimensional spectrum.

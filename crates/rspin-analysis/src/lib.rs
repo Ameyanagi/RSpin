@@ -24,7 +24,10 @@ pub use assignments::{
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
 pub use integration_2d::{BilinearIntegrator2D, Integral2D, IntegralRegion2D, integrate_region_2d};
-pub use matrix::{MatrixGenerationOptions, SpectrumMatrix1D, generate_spectrum_matrix_1d};
+pub use matrix::{
+    MatrixGeneration2DOptions, MatrixGenerationOptions, SpectrumMatrix1D, SpectrumMatrix2D,
+    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d,
+};
 pub use multiplets::{
     DetectedMultiplet, GapMultipletDetector, MultipletDetectionOptions, MultipletKind,
     detect_multiplets,

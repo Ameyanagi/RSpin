@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
+mod two_d;
+
+pub use two_d::{MatrixGeneration2DOptions, SpectrumMatrix2D, generate_spectrum_matrix_2d};
+
 /// Options for generating a 1D spectrum matrix.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MatrixGenerationOptions {
@@ -152,7 +156,11 @@ fn target_axis(spectra: &[Spectrum1D], configured_axis: Option<Axis>) -> Result<
 }
 
 fn row_id(index: usize, spectrum: &Spectrum1D) -> String {
-    match spectrum.metadata.name.as_deref() {
+    spectrum_id(index, spectrum.metadata.name.as_deref())
+}
+
+fn spectrum_id(index: usize, name: Option<&str>) -> String {
+    match name {
         Some(name) if !name.trim().is_empty() => format!("{index}:{}", sanitize_id_token(name)),
         _ => format!("spectrum-{index}"),
     }

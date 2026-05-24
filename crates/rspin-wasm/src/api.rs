@@ -9,9 +9,10 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
     AssignmentSet, DetectedMultiplet, DetectedRange, IntegralRegion, IntegralRegion2D,
-    JCouplingGraph, MatrixGenerationOptions, MultipletDetectionOptions, PeakOptimizationOptions,
-    PeakPickOptions, RangeDetectionOptions, SignalSummaryOptions, ZoneDetectionOptions,
-    detect_multiplets, detect_ranges, detect_zones, generate_spectrum_matrix_1d, integrate_region,
+    JCouplingGraph, MatrixGeneration2DOptions, MatrixGenerationOptions, MultipletDetectionOptions,
+    PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions, SignalSummaryOptions,
+    ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones,
+    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
     integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
@@ -239,6 +240,18 @@ pub fn generate_spectrum_matrix_1d_json(spectra_json: &str, options_json: &str) 
     let spectra: Vec<Spectrum1D> = from_json(spectra_json)?;
     let options: MatrixGenerationOptions = from_json(options_json)?;
     let matrix = generate_spectrum_matrix_1d(&spectra, options)?;
+    to_json(&matrix)
+}
+
+/// Generates a layer-major matrix from serialized `Spectrum2D` JSON values.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, analysis, or serialization fails.
+pub fn generate_spectrum_matrix_2d_json(spectra_json: &str, options_json: &str) -> Result<String> {
+    let spectra: Vec<Spectrum2D> = from_json(spectra_json)?;
+    let options: MatrixGeneration2DOptions = from_json(options_json)?;
+    let matrix = generate_spectrum_matrix_2d(&spectra, options)?;
     to_json(&matrix)
 }
 
