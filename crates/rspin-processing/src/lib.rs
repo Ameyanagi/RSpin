@@ -6,6 +6,7 @@ mod baseline;
 mod contours;
 mod one_d;
 mod pipeline;
+mod pipeline_2d;
 mod traits;
 mod transform;
 mod two_d;
@@ -22,6 +23,7 @@ pub use one_d::{
     offset_intensity, scale_intensity, shift_axis, zero_fill,
 };
 pub use pipeline::{ProcessSpectrum1D, Spectrum1DPipeline};
+pub use pipeline_2d::{ProcessSpectrum2D, Spectrum2DPipeline};
 pub use traits::ProcessingStep;
 pub use transform::{
     ExponentialApodization, Fft1D, FftDirection, Magnitude, PhaseCorrection,
