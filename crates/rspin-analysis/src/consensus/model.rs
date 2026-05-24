@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{RSpinError, Result};
 
-use crate::{DetectedRange, Peak, PeakPickOptions, RangeDetectionOptions};
+use crate::{
+    DetectedRange, DetectedZone, Peak, PeakPickOptions, RangeDetectionOptions, ZoneDetectionOptions,
+};
 
 /// Options for building a consensus peak table across one-dimensional spectra.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -204,4 +206,135 @@ pub struct ConsensusRange1D {
     pub max_abs_intensity: f64,
     /// Range observations in input spectrum order.
     pub members: Vec<ConsensusRangeMember1D>,
+}
+
+/// Options for building a consensus zone table across two-dimensional spectra.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConsensusZoneOptions {
+    /// Maximum x-coordinate gap allowed between grouped zone bounding boxes.
+    pub max_x_gap: f64,
+    /// Maximum y-coordinate gap allowed between grouped zone bounding boxes.
+    pub max_y_gap: f64,
+    /// Minimum number of spectra represented by a reported group.
+    pub min_spectrum_count: usize,
+    /// Zone detection options applied to each input spectrum.
+    pub zone_options: ZoneDetectionOptions,
+}
+
+impl Default for ConsensusZoneOptions {
+    fn default() -> Self {
+        Self {
+            max_x_gap: 0.03,
+            max_y_gap: 0.03,
+            min_spectrum_count: 1,
+            zone_options: ZoneDetectionOptions::default(),
+        }
+    }
+}
+
+impl ConsensusZoneOptions {
+    /// Creates default consensus zone options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the maximum x-coordinate gap allowed between grouped zones.
+    #[must_use]
+    pub fn with_max_x_gap(mut self, max_x_gap: f64) -> Self {
+        self.max_x_gap = max_x_gap;
+        self
+    }
+
+    /// Sets the maximum y-coordinate gap allowed between grouped zones.
+    #[must_use]
+    pub fn with_max_y_gap(mut self, max_y_gap: f64) -> Self {
+        self.max_y_gap = max_y_gap;
+        self
+    }
+
+    /// Sets the same maximum coordinate gap for both dimensions.
+    #[must_use]
+    pub fn with_max_gap(mut self, max_gap: f64) -> Self {
+        self.max_x_gap = max_gap;
+        self.max_y_gap = max_gap;
+        self
+    }
+
+    /// Sets the minimum number of spectra represented by a reported group.
+    #[must_use]
+    pub fn with_min_spectrum_count(mut self, min_spectrum_count: usize) -> Self {
+        self.min_spectrum_count = min_spectrum_count;
+        self
+    }
+
+    /// Sets the zone detection options applied to each spectrum.
+    #[must_use]
+    pub fn with_zone_options(mut self, zone_options: ZoneDetectionOptions) -> Self {
+        self.zone_options = zone_options;
+        self
+    }
+
+    pub(super) fn validate(self) -> Result<()> {
+        validate_gap("max_x_gap", self.max_x_gap)?;
+        validate_gap("max_y_gap", self.max_y_gap)?;
+        if self.min_spectrum_count == 0 {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "minimum consensus spectrum count must be positive".to_owned(),
+            });
+        }
+        Ok(())
+    }
+}
+
+/// One zone observation contributing to a consensus zone.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConsensusZoneMember2D {
+    /// Deterministic row identifier for the source spectrum.
+    pub row_id: String,
+    /// Input spectrum index.
+    pub spectrum_index: usize,
+    /// Zone detected from that spectrum.
+    pub zone: DetectedZone,
+}
+
+/// One consensus zone group across two-dimensional spectra.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConsensusZone2D {
+    /// Deterministic consensus zone id.
+    pub id: String,
+    /// Lowest x coordinate covered by the group.
+    pub x_from: f64,
+    /// Highest x coordinate covered by the group.
+    pub x_to: f64,
+    /// Lowest y coordinate covered by the group.
+    pub y_from: f64,
+    /// Highest y coordinate covered by the group.
+    pub y_to: f64,
+    /// Absolute-intensity-weighted x centroid.
+    pub centroid_x: f64,
+    /// Absolute-intensity-weighted y centroid.
+    pub centroid_y: f64,
+    /// Number of zone observations in the group.
+    pub zone_count: usize,
+    /// Number of spectra represented in the group.
+    pub spectrum_count: usize,
+    /// Sum of absolute zone intensities.
+    pub total_abs_intensity: f64,
+    /// Maximum absolute intensity across member zones.
+    pub max_abs_intensity: f64,
+    /// Zone observations in input spectrum order.
+    pub members: Vec<ConsensusZoneMember2D>,
+}
+
+fn validate_gap(field: &'static str, value: f64) -> Result<()> {
+    if !value.is_finite() {
+        return Err(RSpinError::NonFinite { field });
+    }
+    if value < 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!("consensus zone {field} must be non-negative"),
+        });
+    }
+    Ok(())
 }

@@ -37,8 +37,9 @@ pub use clustering::{
 };
 pub use consensus::{
     ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions, ConsensusRange1D,
-    ConsensusRangeMember1D, ConsensusRangeOptions, detect_consensus_peaks_1d,
-    detect_consensus_ranges_1d,
+    ConsensusRangeMember1D, ConsensusRangeOptions, ConsensusZone2D, ConsensusZoneMember2D,
+    ConsensusZoneOptions, detect_consensus_peaks_1d, detect_consensus_ranges_1d,
+    detect_consensus_zones_2d,
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};

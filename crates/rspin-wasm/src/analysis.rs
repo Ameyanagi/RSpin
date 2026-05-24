@@ -8,8 +8,8 @@ use crate::{
     cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
     cluster_spectrum_matrix_2d_json, cut_cluster_result_at_distance_json,
     cut_cluster_result_to_count_json, detect_consensus_peaks_1d_json,
-    detect_consensus_ranges_1d_json, detect_ranges_json, detect_zones_json, js_error,
-    pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
+    detect_consensus_ranges_1d_json, detect_consensus_zones_2d_json, detect_ranges_json,
+    detect_zones_json, js_error, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
     pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, pca_bucket_matrix_1d_json,
     pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
 };
@@ -228,6 +228,20 @@ pub fn detect_consensus_ranges_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     detect_consensus_ranges_1d_json(spectra_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Detects consensus zones across two-dimensional spectra.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, zone detection,
+/// grouping, or serialization fails.
+#[wasm_bindgen(js_name = detectConsensusZones2d)]
+pub fn detect_consensus_zones_2d(
+    spectra_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    detect_consensus_zones_2d_json(spectra_json, options_json).map_err(|error| js_error(&error))
 }
 
 /// Runs PCA on a one-dimensional spectrum matrix.

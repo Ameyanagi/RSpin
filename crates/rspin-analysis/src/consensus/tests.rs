@@ -1,3 +1,5 @@
+mod zones;
+
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 
 use super::*;

@@ -1,7 +1,8 @@
-use rspin_core::{Axis, Metadata, Spectrum1D, Unit};
+use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
 
 use super::super::{
-    detect_consensus_peaks_1d_json, detect_consensus_ranges_1d_json, from_json, to_json,
+    detect_consensus_peaks_1d_json, detect_consensus_ranges_1d_json,
+    detect_consensus_zones_2d_json, from_json, to_json,
 };
 
 #[test]
@@ -46,11 +47,51 @@ fn detects_consensus_ranges_json() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn detects_consensus_zones_json() -> anyhow::Result<()> {
+    let spectra = vec![
+        spectrum_2d(
+            "a",
+            0.0,
+            0.0,
+            &[0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0],
+        )?,
+        spectrum_2d(
+            "b",
+            0.02,
+            0.01,
+            &[0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0],
+        )?,
+    ];
+
+    let result_json = detect_consensus_zones_2d_json(
+        &to_json(&spectra)?,
+        r#"{"max_x_gap":0.05,"max_y_gap":0.05,"min_spectrum_count":2,"zone_options":{"threshold_abs":1.0,"min_active_points":1,"connectivity":"Four"}}"#,
+    )?;
+    let result: Vec<rspin_analysis::ConsensusZone2D> = from_json(&result_json)?;
+
+    assert_eq!(result.len(), 1);
+    assert_eq!(result[0].id, "consensus-zone2d:0");
+    assert_eq!(result[0].spectrum_count, 2);
+    assert_eq!(result[0].members[0].row_id, "0:a");
+    assert_eq!(result[0].members[1].row_id, "1:b");
+    Ok(())
+}
+
 fn spectrum(name: &str, offset: f64, intensities: &[f64]) -> anyhow::Result<Spectrum1D> {
     let end = offset + f64::from(u32::try_from(intensities.len() - 1)?);
     Ok(Spectrum1D::new(
         Axis::linear("x", Unit::Ppm, offset, end, intensities.len())?,
         intensities.to_vec(),
+        Metadata::named(name),
+    )?)
+}
+
+fn spectrum_2d(name: &str, x_offset: f64, y_offset: f64, z: &[f64]) -> anyhow::Result<Spectrum2D> {
+    Ok(Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, x_offset, x_offset + 2.0, 3)?,
+        Axis::linear("y", Unit::Ppm, y_offset, y_offset + 2.0, 3)?,
+        z.to_vec(),
         Metadata::named(name),
     )?)
 }

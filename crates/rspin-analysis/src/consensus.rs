@@ -2,18 +2,21 @@
 
 use std::collections::BTreeSet;
 
-use rspin_core::{RSpinError, Result, Spectrum1D};
+use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use crate::{Peak, PeakPolarity, pick_peaks};
 
 mod model;
 mod ranges;
+mod zones;
 
 pub use model::{
     ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions, ConsensusRange1D,
-    ConsensusRangeMember1D, ConsensusRangeOptions,
+    ConsensusRangeMember1D, ConsensusRangeOptions, ConsensusZone2D, ConsensusZoneMember2D,
+    ConsensusZoneOptions,
 };
 pub use ranges::detect_consensus_ranges_1d;
+pub use zones::detect_consensus_zones_2d;
 
 /// Detects and groups consensus peaks across one-dimensional spectra.
 ///
@@ -107,6 +110,25 @@ fn validate_spectra(spectra: &[Spectrum1D]) -> Result<()> {
         if spectrum.x.unit != first.x.unit {
             return Err(RSpinError::InvalidSpectrum {
                 message: "consensus peak spectra must use the same x unit".to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn validate_spectra_2d(spectra: &[Spectrum2D]) -> Result<()> {
+    let first = spectra.first().ok_or_else(|| RSpinError::InvalidSpectrum {
+        message: "consensus zone detection requires at least one spectrum".to_owned(),
+    })?;
+    for spectrum in spectra {
+        if spectrum.x.unit != first.x.unit {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "consensus zone spectra must use the same x unit".to_owned(),
+            });
+        }
+        if spectrum.y.unit != first.y.unit {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "consensus zone spectra must use the same y unit".to_owned(),
             });
         }
     }
@@ -241,6 +263,13 @@ fn polarities_compatible(left: PeakPolarity, right: PeakPolarity) -> bool {
 }
 
 fn row_id(index: usize, spectrum: &Spectrum1D) -> String {
+    match spectrum.metadata.name.as_deref() {
+        Some(name) if !name.trim().is_empty() => format!("{index}:{}", sanitize_id_token(name)),
+        _ => format!("spectrum-{index}"),
+    }
+}
+
+fn row_id_2d(index: usize, spectrum: &Spectrum2D) -> String {
     match spectrum.metadata.name.as_deref() {
         Some(name) if !name.trim().is_empty() => format!("{index}:{}", sanitize_id_token(name)),
         _ => format!("spectrum-{index}"),

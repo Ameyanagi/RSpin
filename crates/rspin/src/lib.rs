@@ -11,9 +11,10 @@ pub use analysis::{
     AlignmentWindow, AssignedAtom, Assignment, AssignmentSet, AssignmentTarget,
     BilinearIntegrator2D, BucketMatrix1D, BucketMatrix2D, BucketOptions1D, BucketOptions2D,
     ClusterMerge, ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions, ConsensusRange1D,
-    ConsensusRangeMember1D, ConsensusRangeOptions, CouplingNode, DetectedMultiplet, DetectedRange,
-    DetectedZone, GapMultipletDetector, Integral, Integral2D, IntegralRegion, IntegralRegion2D,
-    Integrator, Integrator2D, JCoupling, JCouplingGraph, LocalExtremaPeakPicker, MatrixClusterCut,
+    ConsensusRangeMember1D, ConsensusRangeOptions, ConsensusZone2D, ConsensusZoneMember2D,
+    ConsensusZoneOptions, CouplingNode, DetectedMultiplet, DetectedRange, DetectedZone,
+    GapMultipletDetector, Integral, Integral2D, IntegralRegion, IntegralRegion2D, Integrator,
+    Integrator2D, JCoupling, JCouplingGraph, LocalExtremaPeakPicker, MatrixClusterCut,
     MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions, MatrixGeneration2DOptions,
     MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric, MatrixPairwiseOptions,
     MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult, MatrixScaling,
@@ -27,10 +28,10 @@ pub use analysis::{
     align_spectra_by_peak, align_spectra_by_peak_to_matrix, bucket_spectra_1d, bucket_spectra_2d,
     bucket_spectrum_1d, bucket_spectrum_2d, cluster_bucket_matrix_1d, cluster_bucket_matrix_2d,
     cluster_matrix, cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d,
-    detect_consensus_peaks_1d, detect_consensus_ranges_1d, detect_multiplets, detect_ranges,
-    detect_zones, deterministic_assignment_id, deterministic_j_coupling_id,
-    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
-    integrate_region_2d, optimize_peaks_quadratic, pairwise_bucket_matrix_1d,
+    detect_consensus_peaks_1d, detect_consensus_ranges_1d, detect_consensus_zones_2d,
+    detect_multiplets, detect_ranges, detect_zones, deterministic_assignment_id,
+    deterministic_j_coupling_id, generate_spectrum_matrix_1d, generate_spectrum_matrix_2d,
+    integrate_region, integrate_region_2d, optimize_peaks_quadratic, pairwise_bucket_matrix_1d,
     pairwise_bucket_matrix_2d, pairwise_matrix, pairwise_spectrum_matrix_1d,
     pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d, pca_bucket_matrix_2d, pca_matrix,
     pca_spectrum_matrix_1d, pca_spectrum_matrix_2d, pick_peaks, summarize_signals_1d,
@@ -91,32 +92,33 @@ pub mod prelude {
         BondCorrelationRule, BondOrder, BucketMatrix1D, BucketMatrix2D, BucketOptions1D,
         BucketOptions2D, ClusterMerge, ConsensusPeak1D, ConsensusPeakMember1D,
         ConsensusPeakOptions, ConsensusRange1D, ConsensusRangeMember1D, ConsensusRangeOptions,
-        Crop1D, Crop2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange,
-        DetectedZone, ElementShiftPredictor, ElementShiftRule, ExactSpectrum2DOptions,
-        ExactSpectrumOptions, ExactSpinOptions, ExactSpinPair, ExactTransition, Experiment,
-        FftDirection, Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling,
-        JCouplingGraph, LineShape, MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult,
-        MatrixClusteringOptions, MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage,
-        MatrixPairwiseMetric, MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions,
-        MatrixPcaResult, MatrixScaling, Metadata, Molecule, MultipletDetectionOptions,
-        MultipletKind, Nucleus, Peak, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions,
-        PeakPolarity, PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions,
-        PredictionSpectrumOptions, ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D,
-        ProcessingOperation2D, ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError,
-        RangeDetectionOptions, Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D,
-        SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D,
-        SpectralBucket2D, Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D,
-        SpectrumMatrix2D, SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem,
-        TrapezoidalIntegrator, Unit, ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d,
-        align_spectra_by_peak, align_spectra_by_peak_to_matrix, apply_processing_recipe_1d,
+        ConsensusZone2D, ConsensusZoneMember2D, ConsensusZoneOptions, Crop1D, Crop2D,
+        CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange, DetectedZone,
+        ElementShiftPredictor, ElementShiftRule, ExactSpectrum2DOptions, ExactSpectrumOptions,
+        ExactSpinOptions, ExactSpinPair, ExactTransition, Experiment, FftDirection, Integral,
+        Integral2D, IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape,
+        MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
+        MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric,
+        MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult,
+        MatrixScaling, Metadata, Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak,
+        PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions, PeakPolarity,
+        PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
+        ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D,
+        ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions,
+        Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D, SignalSummary2D,
+        SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D, SpectralBucket2D,
+        Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D, SpectrumMatrix2D,
+        SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem, TrapezoidalIntegrator, Unit,
+        ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d, align_spectra_by_peak,
+        align_spectra_by_peak_to_matrix, apply_processing_recipe_1d,
         apply_processing_recipe_1d_until, apply_processing_recipe_2d,
         apply_processing_recipe_2d_until, auto_phase_correct, auto_phase_correct_2d,
         bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d,
         cluster_bucket_matrix_1d, cluster_bucket_matrix_2d, cluster_matrix,
         cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d, crop_1d, crop_2d,
         decompose_exact_spin_half_1d, decompose_exact_spin_half_2d, detect_consensus_peaks_1d,
-        detect_consensus_ranges_1d, detect_multiplets, detect_ranges, detect_zones,
-        exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
+        detect_consensus_ranges_1d, detect_consensus_zones_2d, detect_multiplets, detect_ranges,
+        detect_zones, exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
         generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, normalize_max_abs,
         pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d, pairwise_matrix,
         pairwise_spectrum_matrix_1d, pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d,
@@ -348,6 +350,34 @@ mod tests {
 
         assert_eq!(consensus_ranges.len(), 1);
         assert_eq!(consensus_ranges[0].spectrum_count, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn prelude_supports_consensus_zone_workflows() -> Result<()> {
+        let consensus_zones = detect_consensus_zones_2d(
+            &[
+                Spectrum2D::new(
+                    Axis::linear_ppm(0.0, 2.0, 3)?,
+                    Axis::linear_ppm(0.0, 2.0, 3)?,
+                    vec![0.0, 0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 0.0, 0.0],
+                    Metadata::named("a"),
+                )?,
+                Spectrum2D::new(
+                    Axis::linear_ppm(0.02, 2.02, 3)?,
+                    Axis::linear_ppm(0.01, 2.01, 3)?,
+                    vec![0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 0.0],
+                    Metadata::named("b"),
+                )?,
+            ],
+            ConsensusZoneOptions::new()
+                .with_max_gap(0.05)
+                .with_min_spectrum_count(2)
+                .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0)),
+        )?;
+
+        assert_eq!(consensus_zones.len(), 1);
+        assert_eq!(consensus_zones[0].spectrum_count, 2);
         Ok(())
     }
 }
