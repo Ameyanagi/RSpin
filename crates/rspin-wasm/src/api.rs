@@ -177,6 +177,17 @@ pub fn validate_j_coupling_graph_json(graph_json: &str) -> Result<String> {
     to_json(&graph)
 }
 
+/// Validates serialized assignment set JSON and returns normalized JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_assignment_set_json(assignments_json: &str) -> Result<String> {
+    let assignments: AssignmentSet = from_json(assignments_json)?;
+    assignments.validate()?;
+    to_json(&assignments)
+}
+
 /// Assembles one-dimensional signal summary JSON from analysis payloads.
 ///
 /// # Errors

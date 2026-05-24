@@ -206,6 +206,18 @@ fn validates_j_coupling_graph_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn validates_assignment_set_json() -> anyhow::Result<()> {
+    let assignments_json = validate_assignment_set_json(
+        r#"{"assignments":[{"id":"assign:peak1d:2:H2","target":{"Peak1D":{"index":2,"x":7.12}},"atoms":[{"id":"H2","label":null,"nucleus":"Hydrogen1"}],"confidence":0.9,"note":null}]}"#,
+    )?;
+    let assignments: rspin_analysis::AssignmentSet = from_json(&assignments_json)?;
+
+    assert_eq!(assignments.len(), 1);
+    assert_eq!(assignments.assignments[0].id, "assign:peak1d:2:H2");
+    Ok(())
+}
+
+#[test]
 fn summarizes_signals_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\

@@ -3,6 +3,67 @@ use rspin_core::{Nucleus, RSpinError};
 use super::*;
 
 #[test]
+fn creates_targets_from_detected_features_and_chains_set_building() -> anyhow::Result<()> {
+    let peak = crate::Peak {
+        index: 2,
+        x: 7.12,
+        intensity: 3.0,
+        prominence: 1.0,
+        polarity: crate::PeakPolarity::Positive,
+    };
+    let range = crate::DetectedRange {
+        start_index: 4,
+        end_index: 7,
+        from: 3.2,
+        to: 2.8,
+        active_points: 3,
+        max_abs_intensity: 12.0,
+        area: 8.0,
+    };
+    let zone = crate::DetectedZone {
+        id: "zone:x1-2:y3-4".to_owned(),
+        x_start_index: 1,
+        x_end_index: 2,
+        y_start_index: 3,
+        y_end_index: 4,
+        x_from: 1.0,
+        x_to: 2.0,
+        y_from: 3.0,
+        y_to: 4.0,
+        centroid_x: 1.5,
+        centroid_y: 3.5,
+        active_points: 4,
+        max_abs_intensity: 10.0,
+        sum_intensity: 20.0,
+        sum_abs_intensity: 20.0,
+    };
+
+    let peak_target = AssignmentTarget::peak_1d(&peak);
+    let range_target = AssignmentTarget::range_1d(&range);
+    let zone_target = AssignmentTarget::zone_2d(&zone);
+    let set = AssignmentSet::default()
+        .with_deterministic_assignment(
+            peak_target.clone(),
+            vec![AssignedAtom::new("H2", Nucleus::Hydrogen1)],
+        )?
+        .with_deterministic_assignment(
+            range_target.clone(),
+            vec![AssignedAtom::new("H4", Nucleus::Hydrogen1)],
+        )?
+        .with_assignment(Assignment::deterministic(
+            zone_target.clone(),
+            vec![AssignedAtom::new("C1", Nucleus::Carbon13)],
+        )?)?;
+
+    assert_eq!(set.len(), 3);
+    assert_eq!(set.assignments[0].id, "assign:peak1d:2:H2");
+    assert_eq!(set.assignments[1].id, "assign:range1d:4-7:H4");
+    assert_eq!(set.assignments[2].id, "assign:zone2d:zone_x1-2_y3-4:C1");
+    assert_eq!(set.for_target(&zone_target).len(), 1);
+    Ok(())
+}
+
+#[test]
 fn creates_deterministic_assignment_ids() -> anyhow::Result<()> {
     let target = AssignmentTarget::Peak1D { index: 4, x: 7.12 };
     let atoms = vec![

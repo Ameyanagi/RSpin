@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{Nucleus, RSpinError, Result};
 
+use crate::{peaks::Peak, ranges::DetectedRange, zones::DetectedZone};
+
 /// Atom or resonance label assigned to a detected feature.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AssignedAtom {
@@ -80,6 +82,34 @@ pub enum AssignmentTarget {
 }
 
 impl AssignmentTarget {
+    /// Creates a one-dimensional peak assignment target from a detected peak.
+    #[must_use]
+    pub fn peak_1d(peak: &Peak) -> Self {
+        Self::Peak1D {
+            index: peak.index,
+            x: peak.x,
+        }
+    }
+
+    /// Creates a one-dimensional range assignment target from a detected range.
+    #[must_use]
+    pub fn range_1d(range: &DetectedRange) -> Self {
+        Self::Range1D {
+            start_index: range.start_index,
+            end_index: range.end_index,
+            from: range.from,
+            to: range.to,
+        }
+    }
+
+    /// Creates a two-dimensional zone assignment target from a detected zone.
+    #[must_use]
+    pub fn zone_2d(zone: &DetectedZone) -> Self {
+        Self::Zone2D {
+            id: zone.id.clone(),
+        }
+    }
+
     fn validate(&self) -> Result<()> {
         match self {
             Self::Peak1D { x, .. } => ensure_finite("peak coordinate", *x),
@@ -240,6 +270,31 @@ impl AssignmentSet {
         }
         self.assignments.push(assignment);
         Ok(())
+    }
+
+    /// Returns a copy with one appended assignment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the assignment is invalid or duplicates an id.
+    pub fn with_assignment(mut self, assignment: Assignment) -> Result<Self> {
+        self.push(assignment)?;
+        Ok(self)
+    }
+
+    /// Returns a copy with one deterministic assignment appended.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when target or atom data is invalid or the generated id
+    /// duplicates an existing assignment id.
+    pub fn with_deterministic_assignment(
+        mut self,
+        target: AssignmentTarget,
+        atoms: Vec<AssignedAtom>,
+    ) -> Result<Self> {
+        self.push(Assignment::deterministic(target, atoms)?)?;
+        Ok(self)
     }
 
     /// Returns assignments targeting the same feature.

@@ -28,9 +28,9 @@ pub use api::{
     simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
     slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
     slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
-    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, validate_j_coupling_graph_json,
-    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
-    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, validate_assignment_set_json,
+    validate_j_coupling_graph_json, validate_prediction_json, write_spectrum_1d_csv_json,
+    write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -114,6 +114,17 @@ pub fn detect_multiplets_1d(
 #[wasm_bindgen(js_name = validateJCouplingGraph)]
 pub fn validate_j_coupling_graph(graph_json: &str) -> std::result::Result<String, JsValue> {
     validate_j_coupling_graph_json(graph_json).map_err(|error| js_error(&error))
+}
+
+/// Validates a serialized assignment set and returns its normalized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateAssignmentSet)]
+pub fn validate_assignment_set(assignments_json: &str) -> std::result::Result<String, JsValue> {
+    validate_assignment_set_json(assignments_json).map_err(|error| js_error(&error))
 }
 
 /// Assembles serialized one-dimensional signal summaries.
