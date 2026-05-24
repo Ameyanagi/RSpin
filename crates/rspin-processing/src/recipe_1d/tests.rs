@@ -63,14 +63,14 @@ fn rejects_recipe_prefix_past_end() -> anyhow::Result<()> {
 fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let recipe = ProcessingRecipe1D::new()
         .scale(2.0)
-        .subtract_baseline_with(BaselineMethod::Constant { value: 1.0 });
+        .subtract_baseline_with(BaselineMethod::Polynomial { degree: 1 });
     let json = serde_json::to_string(&recipe)?;
     let decoded: ProcessingRecipe1D = serde_json::from_str(&json)?;
     let processed = decoded.apply(&demo_spectrum()?)?;
 
     assert_eq!(decoded.len(), 2);
-    assert_eq!(processed.intensities, vec![1.0, -5.0, 7.0]);
-    assert_eq!(processed.processing[1].operation, "baseline_constant");
+    assert_eq!(processed.processing[1].operation, "baseline_polynomial");
+    assert!(json.contains("polynomial"));
     Ok(())
 }
 

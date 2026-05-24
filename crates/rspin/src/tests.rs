@@ -37,6 +37,19 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
         .normalize_max_abs();
     let recipe_2d_json = write_processing_recipe_2d_json(&recipe_2d)?;
     assert_eq!(read_processing_recipe_2d_json(&recipe_2d_json)?, recipe_2d);
+
+    let baseline_corrected = Spectrum1D::new(
+        Axis::linear_ppm(0.0, 3.0, 4)?,
+        vec![1.0, 3.0, 5.0, 7.0],
+        Metadata::named("sloped baseline"),
+    )?
+    .process()
+    .subtract_baseline_with(BaselineMethod::Polynomial { degree: 1 })
+    .finish()?;
+    for value in baseline_corrected.intensities {
+        assert!(value.abs() < 1.0e-12);
+    }
+
     Ok(())
 }
 

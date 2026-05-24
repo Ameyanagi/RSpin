@@ -1,10 +1,12 @@
 //! One-dimensional baseline correction.
 
-use nalgebra::{DMatrix, DVector};
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
 use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
+
+mod polynomial;
+mod whittaker;
 
 /// Baseline-correction algorithm.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -19,6 +21,11 @@ pub enum BaselineMethod {
     MovingMinimum {
         /// Number of points on each side of the center point.
         half_window: usize,
+    },
+    /// Least-squares polynomial fit over the spectrum x axis.
+    Polynomial {
+        /// Polynomial degree. Degree `0` fits a constant mean baseline.
+        degree: usize,
     },
     /// Asymmetric least-squares Whittaker smoothing.
     WhittakerAsls {
@@ -57,6 +64,7 @@ impl BaselineMethod {
                 }
                 Ok(())
             }
+            Self::Polynomial { degree } => validate_polynomial(len, degree),
             Self::WhittakerAsls {
                 lambda,
                 p,
@@ -91,6 +99,7 @@ impl BaselineMethod {
         match self {
             Self::Constant { .. } => "baseline_constant",
             Self::MovingMinimum { .. } => "baseline_moving_minimum",
+            Self::Polynomial { .. } => "baseline_polynomial",
             Self::WhittakerAsls { .. } => "baseline_whittaker_asls",
             #[cfg(feature = "external-baselines")]
             Self::BaselinesAsls { .. } => "baseline_baselines_asls",
@@ -103,6 +112,7 @@ impl BaselineMethod {
             Self::MovingMinimum { half_window } => {
                 format!("method=moving_minimum,half_window={half_window}")
             }
+            Self::Polynomial { degree } => format!("method=polynomial,degree={degree}"),
             Self::WhittakerAsls {
                 lambda,
                 p,
@@ -197,12 +207,22 @@ pub fn fit_baseline(spectrum: &Spectrum1D, method: BaselineMethod) -> Result<Bas
             moving_minimum_baseline(&spectrum.intensities, half_window),
             BaselineReport::converged_without_iteration(),
         ),
+        BaselineMethod::Polynomial { degree } => (
+            polynomial::polynomial_baseline(&spectrum.x.values, &spectrum.intensities, degree)?,
+            BaselineReport::converged_without_iteration(),
+        ),
         BaselineMethod::WhittakerAsls {
             lambda,
             p,
             max_iter,
             tolerance,
-        } => whittaker_asls_baseline(&spectrum.intensities, lambda, p, max_iter, tolerance)?,
+        } => whittaker::whittaker_asls_baseline(
+            &spectrum.intensities,
+            lambda,
+            p,
+            max_iter,
+            tolerance,
+        )?,
         #[cfg(feature = "external-baselines")]
         BaselineMethod::BaselinesAsls {
             lambda,
@@ -251,103 +271,6 @@ fn moving_minimum_baseline(intensities: &[f64], half_window: usize) -> Vec<f64> 
                 .fold(f64::INFINITY, f64::min)
         })
         .collect()
-}
-
-fn whittaker_asls_baseline(
-    intensities: &[f64],
-    lambda: f64,
-    p: f64,
-    max_iter: usize,
-    tolerance: f64,
-) -> Result<(Vec<f64>, BaselineReport)> {
-    let mut weights = vec![1.0; intensities.len()];
-    let mut baseline = solve_whittaker(intensities, &weights, lambda)?;
-    let mut final_tolerance = f64::INFINITY;
-
-    for iteration in 1..=max_iter {
-        let previous = weights.clone();
-        for ((weight, observed), fitted) in weights.iter_mut().zip(intensities).zip(&baseline) {
-            *weight = if observed > fitted { p } else { 1.0 - p };
-        }
-        final_tolerance = relative_change(&previous, &weights);
-        if final_tolerance <= tolerance {
-            return Ok((
-                baseline,
-                BaselineReport {
-                    iterations: iteration,
-                    converged: true,
-                    tolerance: final_tolerance,
-                },
-            ));
-        }
-        baseline = solve_whittaker(intensities, &weights, lambda)?;
-    }
-
-    Ok((
-        baseline,
-        BaselineReport {
-            iterations: max_iter,
-            converged: false,
-            tolerance: final_tolerance,
-        },
-    ))
-}
-
-fn solve_whittaker(intensities: &[f64], weights: &[f64], lambda: f64) -> Result<Vec<f64>> {
-    let len = intensities.len();
-    let mut matrix = DMatrix::<f64>::zeros(len, len);
-    for (index, weight) in weights.iter().copied().enumerate() {
-        matrix[(index, index)] = weight;
-    }
-    add_second_difference_penalty(&mut matrix, lambda);
-
-    let rhs = DVector::from_iterator(
-        len,
-        intensities
-            .iter()
-            .copied()
-            .zip(weights.iter().copied())
-            .map(|(observed, weight)| observed * weight),
-    );
-    let solution = matrix
-        .lu()
-        .solve(&rhs)
-        .ok_or_else(|| RSpinError::InvalidSpectrum {
-            message: "Whittaker baseline linear solve failed".to_owned(),
-        })?;
-    Ok(solution.iter().copied().collect())
-}
-
-fn add_second_difference_penalty(matrix: &mut DMatrix<f64>, lambda: f64) {
-    let len = matrix.nrows();
-    for row in 0..(len - 2) {
-        let positions = [row, row + 1, row + 2];
-        let coefficients = [1.0, -2.0, 1.0];
-        for (left_index, left_coefficient) in positions.iter().zip(coefficients) {
-            for (right_index, right_coefficient) in positions.iter().zip(coefficients) {
-                matrix[(*left_index, *right_index)] +=
-                    lambda * left_coefficient * right_coefficient;
-            }
-        }
-    }
-}
-
-fn relative_change(previous: &[f64], current: &[f64]) -> f64 {
-    let numerator = previous
-        .iter()
-        .zip(current)
-        .map(|(old, new)| {
-            let difference = new - old;
-            difference * difference
-        })
-        .sum::<f64>()
-        .sqrt();
-    let denominator = previous
-        .iter()
-        .map(|value| value * value)
-        .sum::<f64>()
-        .sqrt();
-    numerator / denominator.max(f64::EPSILON)
 }
 
 #[cfg(feature = "external-baselines")]
@@ -404,6 +327,27 @@ fn validate_asls(
         });
     }
     ensure_positive("tolerance", tolerance)
+}
+
+fn validate_polynomial(len: usize, degree: usize) -> Result<()> {
+    if len == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "polynomial baseline correction requires at least one point".to_owned(),
+        });
+    }
+    let coefficient_count = degree
+        .checked_add(1)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "polynomial degree is too large".to_owned(),
+        })?;
+    if coefficient_count > len {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!(
+                "polynomial degree {degree} requires at least {coefficient_count} points"
+            ),
+        });
+    }
+    Ok(())
 }
 
 fn ensure_finite(field: &'static str, value: f64) -> Result<()> {

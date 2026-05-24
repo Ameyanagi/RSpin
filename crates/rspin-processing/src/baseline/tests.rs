@@ -25,6 +25,33 @@ fn fits_moving_minimum_baseline() -> anyhow::Result<()> {
 }
 
 #[test]
+fn fits_polynomial_baseline_on_sloped_data() -> anyhow::Result<()> {
+    let spectrum = spectrum_with_axis(&[0.0, 1.0, 2.0, 3.0], &[1.0, 3.0, 5.0, 7.0])?;
+    let fit = fit_baseline(&spectrum, BaselineMethod::Polynomial { degree: 1 })?;
+    let processed = subtract_baseline(&spectrum, BaselineMethod::Polynomial { degree: 1 })?;
+
+    for (actual, expected) in fit.baseline.iter().zip([1.0, 3.0, 5.0, 7.0]) {
+        assert_close(*actual, expected, 1.0e-12);
+    }
+    for value in &processed.intensities {
+        assert_close(*value, 0.0, 1.0e-12);
+    }
+    assert_eq!(processed.processing[0].operation, "baseline_polynomial");
+    Ok(())
+}
+
+#[test]
+fn fits_constant_polynomial_baseline() -> anyhow::Result<()> {
+    let spectrum = spectrum(&[1.0, 3.0, 5.0])?;
+    let fit = fit_baseline(&spectrum, BaselineMethod::Polynomial { degree: 0 })?;
+
+    assert_eq!(fit.baseline, vec![3.0, 3.0, 3.0]);
+    assert_eq!(fit.corrected, vec![-2.0, 0.0, 2.0]);
+    assert!(fit.report.converged);
+    Ok(())
+}
+
+#[test]
 fn whittaker_asls_preserves_flat_baseline() -> anyhow::Result<()> {
     let spectrum = spectrum(&[2.0, 2.0, 2.0, 2.0, 2.0])?;
     let fit = fit_baseline(
@@ -105,10 +132,39 @@ fn rejects_invalid_whittaker_options() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn rejects_invalid_polynomial_options() -> anyhow::Result<()> {
+    let spectrum = spectrum(&[1.0, 2.0, 3.0])?;
+    let too_high = fit_baseline(&spectrum, BaselineMethod::Polynomial { degree: 3 })
+        .expect_err("too-high degree should fail");
+    assert!(matches!(too_high, RSpinError::InvalidSpectrum { .. }));
+
+    let degenerate = Spectrum1D::new(
+        Axis::new("x", Unit::Ppm, vec![1.0, 1.0, 1.0])?,
+        vec![1.0, 2.0, 3.0],
+        Metadata::default(),
+    )?;
+    let degenerate_error = fit_baseline(&degenerate, BaselineMethod::Polynomial { degree: 1 })
+        .expect_err("degenerate x axis should fail");
+    assert!(matches!(
+        degenerate_error,
+        RSpinError::InvalidSpectrum { .. }
+    ));
+    Ok(())
+}
+
 fn spectrum(intensities: &[f64]) -> anyhow::Result<Spectrum1D> {
     let end = f64::from(u32::try_from(intensities.len() - 1)?);
     Ok(Spectrum1D::new(
         Axis::linear("x", Unit::Ppm, 0.0, end, intensities.len())?,
+        intensities.to_vec(),
+        Metadata::default(),
+    )?)
+}
+
+fn spectrum_with_axis(x_values: &[f64], intensities: &[f64]) -> anyhow::Result<Spectrum1D> {
+    Ok(Spectrum1D::new(
+        Axis::new("x", Unit::Ppm, x_values.to_vec())?,
         intensities.to_vec(),
         Metadata::default(),
     )?)
