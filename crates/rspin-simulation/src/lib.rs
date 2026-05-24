@@ -8,10 +8,13 @@ mod traits;
 
 pub use exact::{
     ExactSpectrum2DOptions, ExactSpectrumDecomposition1D, ExactSpectrumDecomposition2D,
-    ExactSpectrumOptions, ExactSpinOptions, ExactSpinPair, ExactTransition,
-    ExactTransitionContribution1D, ExactTransitionContribution2D, MAX_EXACT_SPINS, ScalarCoupling,
-    SpinHalf, SpinHalfSystem, decompose_exact_spin_half_1d, decompose_exact_spin_half_2d,
-    exact_spin_half_transitions, simulate_exact_spin_half_1d, simulate_exact_spin_half_2d,
+    ExactSpectrumOptions, ExactSpinHalfResultWorkflow, ExactSpinHalfSpectrum1DResultWorkflow,
+    ExactSpinHalfSpectrum1DWorkflow, ExactSpinHalfSpectrum2DResultWorkflow,
+    ExactSpinHalfSpectrum2DWorkflow, ExactSpinHalfWorkflow, ExactSpinOptions, ExactSpinPair,
+    ExactTransition, ExactTransitionContribution1D, ExactTransitionContribution2D, MAX_EXACT_SPINS,
+    ScalarCoupling, SimulateExactSpinHalf, SimulateExactSpinHalfResult, SpinHalf, SpinHalfSystem,
+    decompose_exact_spin_half_1d, decompose_exact_spin_half_2d, exact_spin_half_transitions,
+    simulate_exact_spin_half_1d, simulate_exact_spin_half_2d,
 };
 #[cfg(feature = "first-order")]
 pub use first_order::{

@@ -136,13 +136,10 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
     assert_eq!(cluster_cut.cluster_ids, vec![0, 0, 1]);
 
     let system = SpinHalfSystem::new().with_spin(1.0);
-    let transitions = exact_spin_half_transitions(
-        &system,
-        &ExactSpinOptions {
-            spectrometer_mhz: 400.0,
-            ..ExactSpinOptions::default()
-        },
-    )?;
+    let transitions = system
+        .simulate_exact()
+        .with_spectrometer_mhz(400.0)
+        .transitions()?;
 
     assert_eq!(transitions.len(), 1);
     assert!((transitions[0].center_ppm - 1.0).abs() < 1.0e-12);
@@ -185,14 +182,14 @@ fn prelude_supports_prediction_bond_correlations() -> Result<()> {
 #[test]
 fn prelude_supports_exact_2d_simulation() -> Result<()> {
     let system = SpinHalfSystem::new().with_spin(1.0).with_spin(2.0);
-    let spectrum = simulate_exact_spin_half_2d(
-        &system,
-        &ExactSpectrum2DOptions::new()
-            .with_x_ppm_range(0.95, 1.05)
-            .with_y_ppm_range(1.95, 2.05)
-            .with_points(5, 5)
-            .with_spin_pair(0, 1),
-    )?;
+    let spectrum = system
+        .simulate_exact()
+        .render_2d()
+        .with_x_ppm_range(0.95, 1.05)
+        .with_y_ppm_range(1.95, 2.05)
+        .with_points(5, 5)
+        .with_spin_pair(0, 1)
+        .run()?;
 
     assert_eq!(spectrum.shape(), (5, 5));
     assert!(spectrum.z[12] > spectrum.z[0]);

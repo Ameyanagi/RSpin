@@ -8,6 +8,7 @@ mod hamiltonian;
 mod model;
 mod spectrum;
 mod spectrum_2d;
+mod workflow;
 
 use hamiltonian::{basis_dimension, hamiltonian_matrix, observation_matrix, total_z_expectations};
 
@@ -19,6 +20,12 @@ pub use spectrum::{
 pub use spectrum_2d::{
     ExactSpectrum2DOptions, ExactSpectrumDecomposition2D, ExactSpinPair,
     ExactTransitionContribution2D, decompose_exact_spin_half_2d, simulate_exact_spin_half_2d,
+};
+pub use workflow::{
+    ExactSpinHalfResultWorkflow, ExactSpinHalfSpectrum1DResultWorkflow,
+    ExactSpinHalfSpectrum1DWorkflow, ExactSpinHalfSpectrum2DResultWorkflow,
+    ExactSpinHalfSpectrum2DWorkflow, ExactSpinHalfWorkflow, SimulateExactSpinHalf,
+    SimulateExactSpinHalfResult,
 };
 
 /// Maximum number of spin-1/2 particles supported by the dense exact solver.
