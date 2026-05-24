@@ -3,6 +3,7 @@
 mod agilent;
 mod analysis_csv;
 mod analysis_json;
+mod auto;
 mod bruker;
 mod csv;
 mod csv_2d;
@@ -20,6 +21,10 @@ pub use analysis_csv::{CsvAnalysis1D, CsvAnalysis2D, write_analysis1d_csv, write
 pub use analysis_json::{
     JsonAnalysis1D, JsonAnalysis2D, read_analysis1d_json, read_analysis2d_json,
     write_analysis1d_json, write_analysis2d_json,
+};
+pub use auto::{
+    AutoSpectrum1DText, AutoSpectrum2DText, SpectrumTextFormat, detect_spectrum_text_format,
+    read_spectrum1d_text, read_spectrum2d_text,
 };
 pub use bruker::{
     BrukerFid1D, BrukerProcessed1D, BrukerProcessed2D, BrukerSer2D, read_bruker_fid_1d_dir,
