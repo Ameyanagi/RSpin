@@ -29,6 +29,10 @@ fn builders_create_prediction_payloads() -> anyhow::Result<()> {
                 .with_confidence(0.8)
                 .with_assignment("H1"),
         )
+        .with_signals_1d(vec![
+            PredictedSignal1D::new(Experiment::Proton1D, Nucleus::Hydrogen1, 1.2)
+                .with_assignment("H1"),
+        ])
         .with_correlation_2d(
             PredictedCorrelation2D::new(
                 Experiment::Hsqc,
@@ -39,6 +43,16 @@ fn builders_create_prediction_payloads() -> anyhow::Result<()> {
             )
             .with_assignment("H1-C1"),
         )
+        .with_correlations_2d(vec![
+            PredictedCorrelation2D::new(
+                Experiment::Hsqc,
+                Nucleus::Hydrogen1,
+                Nucleus::Carbon13,
+                1.2,
+                18.0,
+            )
+            .with_assignment("H1-C1"),
+        ])
         .with_provenance(PredictionProvenance::new("static-fixture").with_version("1"));
 
     prediction.validate()?;

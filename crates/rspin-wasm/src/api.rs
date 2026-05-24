@@ -3,6 +3,7 @@
 mod assignments;
 mod contours;
 mod csv_io;
+mod prediction;
 mod processing_1d;
 mod processing_2d;
 mod simulation;
@@ -20,10 +21,6 @@ use rspin_analysis::{
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::read_jcamp_dx_1d;
-use rspin_prediction::{
-    PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions, render_prediction_1d,
-    render_prediction_2d,
-};
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
 pub use assignments::{
@@ -34,6 +31,10 @@ pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
     write_spectrum_2d_csv_json,
+};
+pub use prediction::{
+    predict_molecule_with_element_rules_json, render_prediction_1d_json, render_prediction_2d_json,
+    validate_prediction_json,
 };
 pub use processing_1d::{
     abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
@@ -282,41 +283,6 @@ pub fn generate_spectrum_matrix_2d_json(spectra_json: &str, options_json: &str) 
     let options: MatrixGeneration2DOptions = from_json(options_json)?;
     let matrix = generate_spectrum_matrix_2d(&spectra, options)?;
     to_json(&matrix)
-}
-
-/// Validates serialized prediction JSON and returns normalized JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, validation, or serialization fails.
-pub fn validate_prediction_json(prediction_json: &str) -> Result<String> {
-    let prediction: PredictionSet = from_json(prediction_json)?;
-    prediction.validate()?;
-    to_json(&prediction)
-}
-
-/// Renders serialized one-dimensional prediction JSON into `Spectrum1D` JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, validation, rendering, or serialization fails.
-pub fn render_prediction_1d_json(prediction_json: &str, options_json: &str) -> Result<String> {
-    let prediction: PredictionSet = from_json(prediction_json)?;
-    let options: PredictionSpectrumOptions = from_json(options_json)?;
-    let spectrum = render_prediction_1d(&prediction, &options)?;
-    to_json(&spectrum)
-}
-
-/// Renders serialized two-dimensional prediction JSON into `Spectrum2D` JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, validation, rendering, or serialization fails.
-pub fn render_prediction_2d_json(prediction_json: &str, options_json: &str) -> Result<String> {
-    let prediction: PredictionSet = from_json(prediction_json)?;
-    let options: PredictionSpectrum2DOptions = from_json(options_json)?;
-    let spectrum = render_prediction_2d(&prediction, &options)?;
-    to_json(&spectrum)
 }
 
 fn from_json<T: DeserializeOwned>(input: &str) -> Result<T> {

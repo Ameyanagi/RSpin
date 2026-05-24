@@ -35,9 +35,10 @@ pub use io::{
     write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 pub use prediction::{
-    Experiment, PredictedCorrelation2D, PredictedSignal1D, PredictionLineShape,
-    PredictionProvenance, PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
-    Predictor, StaticPrediction, render_prediction_1d, render_prediction_2d,
+    ElementShiftPredictor, ElementShiftRule, Experiment, PredictedCorrelation2D, PredictedSignal1D,
+    PredictionLineShape, PredictionProvenance, PredictionSet, PredictionSpectrum2DOptions,
+    PredictionSpectrumOptions, Predictor, StaticPrediction, predict_molecule_with_rules,
+    render_prediction_1d, render_prediction_2d,
 };
 pub use processing::{
     Abs1D, Abs2D, AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection,
@@ -74,10 +75,11 @@ pub mod prelude {
         Abs1D, Abs2D, AlignmentWindow, AnnotationTarget, AssignedAtom, Assignment, AssignmentSet,
         AssignmentTarget, Atom, AutoPhaseOptions, Axis, BaselineMethod, BilinearIntegrator2D, Bond,
         BondOrder, Crop1D, Crop2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange,
-        DetectedZone, ExactSpectrumOptions, ExactSpinOptions, ExactTransition, Experiment,
-        FftDirection, Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling,
-        JCouplingGraph, LineShape, MatrixGeneration2DOptions, MatrixGenerationOptions, Metadata,
-        Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignmentOptions,
+        DetectedZone, ElementShiftPredictor, ElementShiftRule, ExactSpectrumOptions,
+        ExactSpinOptions, ExactTransition, Experiment, FftDirection, Integral, Integral2D,
+        IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape,
+        MatrixGeneration2DOptions, MatrixGenerationOptions, Metadata, Molecule,
+        MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignmentOptions,
         PeakPickOptions, PeakPolarity, PredictionLineShape, PredictionSet,
         PredictionSpectrum2DOptions, PredictionSpectrumOptions, ProcessSpectrum1D,
         ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D, ProcessingRecipe1D,
@@ -92,11 +94,12 @@ pub mod prelude {
         crop_2d, decompose_exact_spin_half_1d, detect_multiplets, detect_ranges, detect_zones,
         exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
         generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, normalize_max_abs,
-        pick_peaks, read_jcamp_dx_1d, read_spectrum1d_csv, read_spectrum1d_json,
-        read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d, render_prediction_2d,
-        resample_1d, resample_2d, scale_intensity, simulate_exact_spin_half_1d, slice_x_at_y,
-        slice_y_at_x, subtract_baseline, summarize_signals_2d, write_jcamp_dx_1d,
-        write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
+        pick_peaks, predict_molecule_with_rules, read_jcamp_dx_1d, read_spectrum1d_csv,
+        read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d,
+        render_prediction_2d, resample_1d, resample_2d, scale_intensity,
+        simulate_exact_spin_half_1d, slice_x_at_y, slice_y_at_x, subtract_baseline,
+        summarize_signals_2d, write_jcamp_dx_1d, write_spectrum1d_csv, write_spectrum1d_json,
+        write_spectrum2d_csv, write_spectrum2d_json,
     };
 }
 
@@ -133,6 +136,18 @@ mod tests {
     fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
         let spectrum = read_spectrum1d_csv("x,intensity\n1,2\n2,4\n")?;
         assert_eq!(spectrum.len(), 2);
+
+        let molecule = Molecule::new("methane").with_atom(Atom::new("H1", "H"));
+        let prediction = predict_molecule_with_rules(
+            &molecule,
+            &ElementShiftPredictor::new().with_rule(ElementShiftRule::new(
+                "H",
+                Experiment::Proton1D,
+                Nucleus::Hydrogen1,
+                0.9,
+            )),
+        )?;
+        assert_eq!(prediction.signals_1d.len(), 1);
 
         let system = SpinHalfSystem::new().with_spin(1.0);
         let transitions = exact_spin_half_transitions(

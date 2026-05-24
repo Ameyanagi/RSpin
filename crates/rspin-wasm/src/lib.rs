@@ -26,16 +26,17 @@ pub use api::{
     magnitude_spectrum_1d_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
     offset_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, phase_spectrum_1d_json,
-    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
-    project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
-    resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
-    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, slice_spectrum_2d_x_at_y_index_json,
-    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
-    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
-    summarize_signals_2d_json, validate_assignment_set_json, validate_j_coupling_graph_json,
-    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
-    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    phase_spectrum_2d_json, pick_peaks_json, predict_molecule_with_element_rules_json,
+    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
+    render_prediction_2d_json, resample_spectrum_1d_json, resample_spectrum_2d_json,
+    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
+    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
+    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
+    validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
+    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
+    zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -332,6 +333,21 @@ pub fn decompose_exact_spin_half_spectrum(
 #[wasm_bindgen(js_name = validatePrediction)]
 pub fn validate_prediction(prediction_json: &str) -> std::result::Result<String, JsValue> {
     validate_prediction_json(prediction_json).map_err(|error| js_error(&error))
+}
+
+/// Predicts molecule signals with serialized element shift rules.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, prediction,
+/// validation, or serialization fails.
+#[wasm_bindgen(js_name = predictMoleculeWithElementRules)]
+pub fn predict_molecule_with_element_rules(
+    molecule_json: &str,
+    predictor_json: &str,
+) -> std::result::Result<String, JsValue> {
+    predict_molecule_with_element_rules_json(molecule_json, predictor_json)
+        .map_err(|error| js_error(&error))
 }
 
 /// Renders a serialized one-dimensional prediction as a spectrum.

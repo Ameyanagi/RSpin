@@ -244,10 +244,24 @@ impl PredictionSet {
         self
     }
 
+    /// Replaces all one-dimensional predicted signals.
+    #[must_use]
+    pub fn with_signals_1d(mut self, signals: Vec<PredictedSignal1D>) -> Self {
+        self.signals_1d = signals;
+        self
+    }
+
     /// Adds a two-dimensional predicted correlation.
     #[must_use]
     pub fn with_correlation_2d(mut self, correlation: PredictedCorrelation2D) -> Self {
         self.correlations_2d.push(correlation);
+        self
+    }
+
+    /// Replaces all two-dimensional predicted correlations.
+    #[must_use]
+    pub fn with_correlations_2d(mut self, correlations: Vec<PredictedCorrelation2D>) -> Self {
+        self.correlations_2d = correlations;
         self
     }
 
