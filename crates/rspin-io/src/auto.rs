@@ -8,9 +8,9 @@ use crate::{
     SpectrumPathReader, SpectrumReader, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
     read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
     read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
-    read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file, read_nmrml_1d_str,
-    read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv,
-    read_spectrum2d_json,
+    read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
+    read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json,
+    read_spectrum2d_csv, read_spectrum2d_json,
 };
 
 mod bytes;
@@ -129,6 +129,8 @@ pub enum Spectrum2DPathFormat {
     Json,
     /// Text payload detected as nmrML.
     NmrMl,
+    /// Text payload detected as JCAMP-DX.
+    JcampDx,
     /// Text payload detected as CSV.
     Csv,
     /// JEOL Delta `.jdf` file.
@@ -150,6 +152,7 @@ impl Spectrum2DPathFormat {
         match self {
             Self::Json => "json",
             Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
             Self::Csv => "csv",
             Self::JeolJdf => "jeol_jdf",
             Self::BrukerProcessed => "bruker_processed",
@@ -492,12 +495,12 @@ pub fn read_spectrum1d_text_as(input: &str, format: SpectrumTextFormat) -> Resul
     }
 }
 
-/// Reads a two-dimensional spectrum from JSON, nmrML, or CSV text.
+/// Reads a two-dimensional spectrum from JSON, nmrML, JCAMP-DX, or CSV text.
 ///
 /// # Errors
 ///
 /// Returns an error when the format cannot be detected, the selected parser
-/// rejects the payload, or the payload is a one-dimensional-only format.
+/// rejects the payload.
 pub fn read_spectrum2d_text(input: &str) -> Result<Spectrum2D> {
     read_spectrum2d_text_as(input, detect_spectrum_text_format(input)?)
 }
@@ -506,16 +509,13 @@ pub fn read_spectrum2d_text(input: &str) -> Result<Spectrum2D> {
 ///
 /// # Errors
 ///
-/// Returns an error when the selected parser rejects the payload, or when the
-/// selected format is one-dimensional-only.
+/// Returns an error when the selected parser rejects the payload.
 pub fn read_spectrum2d_text_as(input: &str, format: SpectrumTextFormat) -> Result<Spectrum2D> {
     match format {
         SpectrumTextFormat::Json => read_spectrum2d_json(input),
         SpectrumTextFormat::NmrMl => read_nmrml_2d_str(input),
         SpectrumTextFormat::Csv => read_spectrum2d_csv(input),
-        SpectrumTextFormat::JcampDx => Err(RSpinError::Unsupported {
-            feature: "two-dimensional JCAMP-DX text reader",
-        }),
+        SpectrumTextFormat::JcampDx => read_jcamp_dx_2d(input),
     }
 }
 
@@ -611,18 +611,16 @@ pub fn detect_spectrum2d_path_format(path: impl AsRef<Path>) -> Result<Spectrum2
     match text_format_from_path(path)? {
         SpectrumTextFormat::Json => Ok(Spectrum2DPathFormat::Json),
         SpectrumTextFormat::NmrMl => Ok(Spectrum2DPathFormat::NmrMl),
+        SpectrumTextFormat::JcampDx => Ok(Spectrum2DPathFormat::JcampDx),
         SpectrumTextFormat::Csv => Ok(Spectrum2DPathFormat::Csv),
-        SpectrumTextFormat::JcampDx => Err(RSpinError::Unsupported {
-            feature: "two-dimensional JCAMP-DX path reader",
-        }),
     }
 }
 
 /// Parses a two-dimensional path format name.
 ///
-/// Accepted names include `json`, `nmrml`, `xml`, `csv`, `jeol_jdf`, `jdf`,
-/// `bruker_processed`, `bruker_ser`, `agilent_processed`, `agilent_fid`,
-/// `varian_processed`, and `varian_fid`.
+/// Accepted names include `json`, `nmrml`, `xml`, `jcamp_dx`, `jcamp`, `jdx`,
+/// `dx`, `csv`, `jeol_jdf`, `jdf`, `bruker_processed`, `bruker_ser`,
+/// `agilent_processed`, `agilent_fid`, `varian_processed`, and `varian_fid`.
 ///
 /// # Errors
 ///
@@ -632,6 +630,7 @@ pub fn parse_spectrum2d_path_format(input: &str) -> Result<Spectrum2DPathFormat>
     match normalized_format_name(input).as_str() {
         "json" => Ok(Spectrum2DPathFormat::Json),
         "nmrml" | "xml" => Ok(Spectrum2DPathFormat::NmrMl),
+        "jcampdx" | "jcamp" | "jdx" | "dx" => Ok(Spectrum2DPathFormat::JcampDx),
         "csv" => Ok(Spectrum2DPathFormat::Csv),
         "jeoljdf" | "jeol" | "jdf" => Ok(Spectrum2DPathFormat::JeolJdf),
         "brukerprocessed" | "brukerpdata" | "bruker2rr" => {
@@ -803,6 +802,7 @@ pub fn read_spectrum2d_path_as(
     match format {
         Spectrum2DPathFormat::Json => read_spectrum2d_json(&read_text_file(path)?),
         Spectrum2DPathFormat::NmrMl => read_nmrml_2d_str(&read_text_file(path)?),
+        Spectrum2DPathFormat::JcampDx => read_jcamp_dx_2d(&read_text_file(path)?),
         Spectrum2DPathFormat::Csv => read_spectrum2d_csv(&read_text_file(path)?),
         Spectrum2DPathFormat::JeolJdf => read_jeol_jdf_2d_file(path),
         Spectrum2DPathFormat::BrukerProcessed => read_bruker_processed_2d_dir(path),
@@ -1100,9 +1100,14 @@ mod tests {
             Spectrum2DPathFormat::AgilentFid
         );
         assert_eq!(
+            parse_spectrum2d_path_format("jcamp_dx")?,
+            Spectrum2DPathFormat::JcampDx
+        );
+        assert_eq!(
             Spectrum2DPathFormat::AgilentProcessed.as_str(),
             "agilent_processed"
         );
+        assert_eq!(Spectrum2DPathFormat::JcampDx.as_str(), "jcamp_dx");
 
         assert_eq!(
             "jdx".parse::<Spectrum1DWritePathFormat>()?,
@@ -1114,10 +1119,6 @@ mod tests {
         );
         assert_eq!(Spectrum1DWritePathFormat::Csv.to_string(), "csv");
         assert_eq!(Spectrum2DWritePathFormat::NmrMl.as_str(), "nmrml");
-
-        let error = parse_spectrum2d_path_format("jcamp_dx")
-            .expect_err("2D JCAMP-DX path format should not parse");
-        assert!(matches!(error, RSpinError::Unsupported { .. }));
 
         Ok(())
     }
@@ -1168,9 +1169,35 @@ mod tests {
             two
         );
 
-        let error = read_spectrum2d_text_as("##TITLE=demo\n", SpectrumTextFormat::JcampDx)
-            .expect_err("2D JCAMP-DX text routing should fail");
-        assert!(matches!(error, RSpinError::Unsupported { .. }));
+        let jcamp = "\
+##TITLE=explicit two jcamp
+##UNITS=PPM,PPM,ARBITRARY UNITS
+##FIRST=1,10,0
+##LAST=0,11,0
+##VAR_DIM=2,2,2
+##PAGE=N=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 1 2
+##PAGE=N=2
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 3 4
+##END=
+";
+        let parsed_jcamp = read_spectrum2d_text_as(jcamp, SpectrumTextFormat::JcampDx)?;
+        assert_eq!(
+            parsed_jcamp.metadata.name.as_deref(),
+            Some("explicit two jcamp")
+        );
+        assert_eq!(parsed_jcamp.shape(), (2, 2));
+        assert_eq!(parsed_jcamp.z, vec![1.0, 2.0, 3.0, 4.0]);
+
+        let two_jcamp_path = root.join("two.jdx");
+        fs::write(&two_jcamp_path, jcamp)?;
+        assert_eq!(
+            detect_spectrum2d_path_format(&two_jcamp_path)?,
+            Spectrum2DPathFormat::JcampDx
+        );
+        assert_eq!(read_spectrum2d_path(&two_jcamp_path)?.z, parsed_jcamp.z);
 
         remove_dir(root)?;
         Ok(())
@@ -1252,10 +1279,27 @@ mod tests {
     }
 
     #[test]
-    fn rejects_jcamp_as_2d_text() {
-        let error = read_spectrum2d_text("##TITLE=demo\n##XYDATA=(X++(Y..Y))\n")
-            .expect_err("2D JCAMP text is not supported");
-        assert!(matches!(error, RSpinError::Unsupported { .. }));
+    fn reads_jcamp_2d_text() -> Result<()> {
+        let input = "\
+##TITLE=auto two jcamp
+##FIRSTX=1
+##LASTX=0
+##FIRSTY=10
+##LASTY=11
+##VAR_DIM=2,2,2
+##PAGE=N=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 1 2
+##PAGE=N=2
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 3 4
+##END=
+";
+        let spectrum = read_spectrum2d_text(input)?;
+        assert_eq!(spectrum.metadata.name.as_deref(), Some("auto two jcamp"));
+        assert_eq!(spectrum.shape(), (2, 2));
+        assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
+        Ok(())
     }
 
     #[test]

@@ -221,10 +221,35 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     assert_eq!(format!("{agilent_2d_reader:?}"), "AgilentFid2D");
     let jcamp_reader = JcampDx;
     assert_eq!(format!("{jcamp_reader:?}"), "JcampDx");
+    let jcamp_2d_reader = JcampDx2D;
+    assert_eq!(format!("{jcamp_2d_reader:?}"), "JcampDx2D");
 
     let jcamp_version = parse_jcamp_dx_version("5.00")?;
     assert_eq!(jcamp_version.major, 5);
     assert!(jcamp_version.is_supported_by_current_reader());
+    let jcamp_2d = read_jcamp_dx_2d(
+        "\
+##TITLE=prelude 2d jcamp
+##FIRSTX=1
+##LASTX=0
+##FIRSTY=10
+##LASTY=11
+##VAR_DIM=2,2,2
+##PAGE=N=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 1 2
+##PAGE=N=2
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 3 4
+##END=
+",
+    )?;
+    assert_eq!(jcamp_2d.shape(), (2, 2));
+    assert_eq!(jcamp_2d.z, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(
+        parse_spectrum2d_path_format("jdx")?,
+        Spectrum2DPathFormat::JcampDx
+    );
     let agilent_info = inspect_agilent_procpar("acqdim 7 1 32767 0 0 2 1 0 1 64\n1 2\n0\n")?;
     assert_eq!(agilent_info.acquisition_dimension, Some(2));
     assert!(agilent_info.is_supported_by_current_readers());

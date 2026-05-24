@@ -10,7 +10,7 @@ use crate::{
     parse_agilent_fid_1d_bytes_json, parse_agilent_fid_2d_bytes_json,
     parse_agilent_processed_1d_bytes_json, parse_agilent_processed_2d_bytes_json,
     parse_bruker_fid_1d_bytes_json, parse_bruker_processed_1d_bytes_json,
-    parse_bruker_processed_2d_bytes_json, parse_bruker_ser_2d_bytes_json,
+    parse_bruker_processed_2d_bytes_json, parse_bruker_ser_2d_bytes_json, parse_jcamp_dx_2d_json,
     parse_jcamp_dx_version_json, parse_jeol_jdf_1d_bytes_json, parse_jeol_jdf_2d_bytes_json,
     parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
     parse_nmrml_version_json, parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json,
@@ -40,6 +40,16 @@ pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = parseJcampDxVersion)]
 pub fn parse_jcamp_dx_version(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_version_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses JCAMP-DX text into serialized two-dimensional spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseJcampDx2d)]
+pub fn parse_jcamp_dx_2d(input: &str) -> std::result::Result<String, JsValue> {
+    parse_jcamp_dx_2d_json(input).map_err(|error| js_error(&error))
 }
 
 /// Parses an nmrML version label into serialized metadata JSON.

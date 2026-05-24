@@ -59,6 +59,35 @@ fn writes_jcamp_from_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn parses_jcamp_2d_to_json() -> anyhow::Result<()> {
+    let json = parse_jcamp_dx_2d_json(
+        "\
+##TITLE=wasm jcamp 2d
+##UNITS=PPM,PPM,ARBITRARY UNITS
+##FACTOR=1,1,0.5
+##FIRST=1,10,0
+##LAST=0,11,0
+##VAR_DIM=2,2,2
+##PAGE=N=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 2 4
+##PAGE=N=2
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 6 8
+##END=
+",
+    )?;
+    let spectrum = spectrum2d_from_json(&json)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("wasm jcamp 2d"));
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.values, vec![1.0, 0.0]);
+    assert_eq!(spectrum.y.values, vec![10.0, 11.0]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
+    Ok(())
+}
+
+#[test]
 fn writes_spectrum_text_by_format_json() -> anyhow::Result<()> {
     let spectrum = Spectrum1D::new(
         Axis::linear_ppm(10.0, 8.0, 3)?,
@@ -726,9 +755,23 @@ x,intensity
     let parsed_2d = spectrum2d_from_json(&parse_spectrum_2d_text_as_json(&json_2d, "json")?)?;
     assert_eq!(parsed_2d, spectrum_2d);
 
-    let error = parse_spectrum_2d_text_as_json("##TITLE=demo\n", "jdx")
-        .expect_err("2D JCAMP-DX explicit parse should fail");
-    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    let jcamp_2d = "\
+##TITLE=explicit two jcamp
+##FIRSTX=1
+##LASTX=0
+##FIRSTY=10
+##LASTY=11
+##VAR_DIM=2,2,2
+##PAGE=N=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 1 2
+##PAGE=N=2
+##DATA TABLE=(X++(Y..Y)), XYDATA
+1 3 4
+##END=
+";
+    let parsed_jcamp_2d = spectrum2d_from_json(&parse_spectrum_2d_text_as_json(jcamp_2d, "jdx")?)?;
+    assert_eq!(parsed_jcamp_2d.z, vec![1.0, 2.0, 3.0, 4.0]);
     Ok(())
 }
 

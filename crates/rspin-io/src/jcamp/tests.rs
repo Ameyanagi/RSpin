@@ -238,6 +238,86 @@ fn reads_numeric_data_table_real_and_imaginary_pages() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_two_dimensional_ntuple_pages() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=two dimensional
+##JCAMP-DX=5.00
+##OBSERVE NUCLEUS=1H
+##OBSERVE FREQUENCY=600
+##UNITS=PPM, PPM, ARBITRARY UNITS
+##FACTOR=1,0.5,2
+##FIRST=10,200,0
+##LAST=8,240,0
+##VAR_DIM=3,2,3
+##PAGE=F1=200
+##DATA TABLE=(X++(R..R)), XYDATA
+10 1 2
+9 3
+##PAGE=F1=240
+##DATA TABLE=(X++(R..R)), XYDATA
+10 4 5 6
+##END=
+";
+    let spectrum = read_jcamp_dx_2d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("two dimensional"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(600.0));
+    assert_eq!(spectrum.metadata.property("jcamp_dx.version"), Some("5.00"));
+    assert_eq!(spectrum.shape(), (3, 2));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.y.unit, Unit::Ppm);
+    assert_axis_close(&spectrum.x.values, &[10.0, 9.0, 8.0]);
+    assert_axis_close(&spectrum.y.values, &[100.0, 120.0]);
+    assert_eq!(spectrum.z, vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
+    Ok(())
+}
+
+#[test]
+fn reads_two_dimensional_pages_with_linear_indirect_axis() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=linear indirect
+##XUNITS=HZ
+##YUNITS=PPM
+##FIRSTX=0
+##LASTX=1
+##FIRSTY=10
+##LASTY=11
+##VAR_DIM=2,2,2
+##PAGE=N=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+0 1 2
+##PAGE=N=2
+##DATA TABLE=(X++(Y..Y)), XYDATA
+0 3 4
+##END=
+";
+    let spectrum = read_jcamp_dx_2d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("linear indirect"));
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.unit, Unit::Hertz);
+    assert_eq!(spectrum.y.unit, Unit::Ppm);
+    assert_axis_close(&spectrum.x.values, &[0.0, 1.0]);
+    assert_axis_close(&spectrum.y.values, &[10.0, 11.0]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
+    Ok(())
+}
+
+#[test]
+fn rejects_incomplete_two_dimensional_pages() {
+    let input = "\
+##VAR_DIM=3,1,3
+##PAGE=F1=1
+##DATA TABLE=(X++(Y..Y)), XYDATA
+0 1 2
+##END=
+";
+    let error = read_jcamp_dx_2d(input).expect_err("short 2D JCAMP page should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+}
+
+#[test]
 fn reads_asdf_sqz_xydata_values() -> anyhow::Result<()> {
     let input = "\
 ##TITLE=sqz compressed

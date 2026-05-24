@@ -1,4 +1,4 @@
-//! Minimal JCAMP-DX support for one-dimensional spectra.
+//! Minimal JCAMP-DX support for one- and two-dimensional spectra.
 
 use rspin_core::{Axis, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 use serde::{Deserialize, Serialize};
@@ -7,8 +7,10 @@ use crate::{SpectrumReader, SpectrumWriter};
 
 mod asdf;
 mod labels;
+mod two_d;
 mod writer;
 
+pub use two_d::{JcampDx2D, read_jcamp_dx_2d};
 pub use writer::write_jcamp_dx_1d;
 
 /// Reader and writer for a focused JCAMP-DX 1D subset.
