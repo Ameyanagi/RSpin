@@ -27,7 +27,7 @@ cargo test --workspace --all-features
 
 ## Examples
 
-- Processed-data PNG examples: `docs/examples/processed-data.md`
+- Processing and analysis PNG examples: `docs/examples/processed-data.md`
 - Public analysis fixture sources and workflow snippets:
   `docs/examples/public-analysis-fixtures.md`
 
