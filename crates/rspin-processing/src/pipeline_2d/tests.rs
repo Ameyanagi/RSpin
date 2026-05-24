@@ -56,6 +56,36 @@ fn borrowed_pipeline_leaves_original_2d_spectrum_unchanged() -> anyhow::Result<(
 }
 
 #[test]
+fn chains_from_fallible_2d_spectrum_result() -> anyhow::Result<()> {
+    let spectrum_result: rspin_core::Result<Spectrum2D> = Ok(demo_spectrum()?);
+    let processed = spectrum_result.process().scale(2.0).finish()?;
+
+    assert_eq!(processed.z, vec![2.0, -4.0, 6.0, 8.0, -10.0, 12.0]);
+    assert_eq!(processed.processing.len(), 1);
+    assert_eq!(processed.processing[0].operation, "scale_2d");
+    Ok(())
+}
+
+#[test]
+fn result_2d_pipeline_preserves_initial_error() {
+    let spectrum_result: rspin_core::Result<Spectrum2D> = Err(RSpinError::InvalidSpectrum {
+        message: "initial 2d failure".to_owned(),
+    });
+    let error = spectrum_result
+        .process()
+        .scale(2.0)
+        .finish()
+        .expect_err("initial error should be preserved");
+
+    assert_eq!(
+        error,
+        RSpinError::InvalidSpectrum {
+            message: "initial 2d failure".to_owned()
+        }
+    );
+}
+
+#[test]
 fn terminal_projection_includes_prior_processing() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let projection = spectrum

@@ -197,6 +197,12 @@ impl ProcessSpectrum1D for &Spectrum1D {
     }
 }
 
+impl ProcessSpectrum1D for Result<Spectrum1D> {
+    fn process(self) -> Spectrum1DPipeline {
+        Spectrum1DPipeline::from_result(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use rspin_core::{Axis, Metadata, RSpinError, Unit};
@@ -236,6 +242,36 @@ mod tests {
         assert_eq!(spectrum.x.values, vec![0.0, 1.0, 2.0]);
         assert_eq!(processed.x.values, vec![1.0, 2.0, 3.0]);
         Ok(())
+    }
+
+    #[test]
+    fn chains_from_fallible_spectrum_result() -> anyhow::Result<()> {
+        let spectrum_result: rspin_core::Result<Spectrum1D> = Ok(demo_spectrum()?);
+        let processed = spectrum_result.process().scale(2.0).finish()?;
+
+        assert_eq!(processed.intensities, vec![2.0, -2.0, 6.0]);
+        assert_eq!(processed.processing.len(), 1);
+        assert_eq!(processed.processing[0].operation, "scale_intensity");
+        Ok(())
+    }
+
+    #[test]
+    fn result_pipeline_preserves_initial_error() {
+        let spectrum_result: rspin_core::Result<Spectrum1D> = Err(RSpinError::InvalidSpectrum {
+            message: "initial failure".to_owned(),
+        });
+        let error = spectrum_result
+            .process()
+            .scale(2.0)
+            .finish()
+            .expect_err("initial error should be preserved");
+
+        assert_eq!(
+            error,
+            RSpinError::InvalidSpectrum {
+                message: "initial failure".to_owned()
+            }
+        );
     }
 
     #[test]

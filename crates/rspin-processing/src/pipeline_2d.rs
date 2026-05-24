@@ -253,5 +253,11 @@ impl ProcessSpectrum2D for &Spectrum2D {
     }
 }
 
+impl ProcessSpectrum2D for Result<Spectrum2D> {
+    fn process(self) -> Spectrum2DPipeline {
+        Spectrum2DPipeline::from_result(self)
+    }
+}
+
 #[cfg(test)]
 mod tests;
