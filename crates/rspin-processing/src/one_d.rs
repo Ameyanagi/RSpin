@@ -12,6 +12,14 @@ pub struct ScaleIntensity {
     pub factor: f64,
 }
 
+impl ScaleIntensity {
+    /// Creates a scaling step.
+    #[must_use]
+    pub fn new(factor: f64) -> Self {
+        Self { factor }
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for ScaleIntensity {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         scale_intensity(spectrum, self.factor)
@@ -25,6 +33,14 @@ pub struct OffsetIntensity {
     pub offset: f64,
 }
 
+impl OffsetIntensity {
+    /// Creates an intensity-offset step.
+    #[must_use]
+    pub fn new(offset: f64) -> Self {
+        Self { offset }
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for OffsetIntensity {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         offset_intensity(spectrum, self.offset)
@@ -34,6 +50,14 @@ impl ProcessingStep<Spectrum1D> for OffsetIntensity {
 /// Normalizes intensities by their maximum absolute value.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NormalizeMaxAbs;
+
+impl NormalizeMaxAbs {
+    /// Creates a max-absolute normalization step.
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 impl ProcessingStep<Spectrum1D> for NormalizeMaxAbs {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
@@ -90,6 +114,14 @@ pub struct ShiftAxis {
     pub delta: f64,
 }
 
+impl ShiftAxis {
+    /// Creates an axis-shift step.
+    #[must_use]
+    pub fn new(delta: f64) -> Self {
+        Self { delta }
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for ShiftAxis {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         shift_axis(spectrum, self.delta)
@@ -101,6 +133,14 @@ impl ProcessingStep<Spectrum1D> for ShiftAxis {
 pub struct ZeroFill {
     /// Desired total point count.
     pub target_len: usize,
+}
+
+impl ZeroFill {
+    /// Creates a one-dimensional zero-fill step.
+    #[must_use]
+    pub fn new(target_len: usize) -> Self {
+        Self { target_len }
+    }
 }
 
 impl ProcessingStep<Spectrum1D> for ZeroFill {

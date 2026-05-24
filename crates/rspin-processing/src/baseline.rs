@@ -184,6 +184,21 @@ pub struct SubtractBaseline {
     pub method: BaselineMethod,
 }
 
+impl SubtractBaseline {
+    /// Creates a baseline-subtraction processing step.
+    #[must_use]
+    pub fn new(method: BaselineMethod) -> Self {
+        Self { method }
+    }
+
+    /// Returns this step with a different baseline method.
+    #[must_use]
+    pub fn with_method(mut self, method: BaselineMethod) -> Self {
+        self.method = method;
+        self
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for SubtractBaseline {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         subtract_baseline(spectrum, self.method)

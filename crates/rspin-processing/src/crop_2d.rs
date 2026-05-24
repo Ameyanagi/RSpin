@@ -18,6 +18,19 @@ pub struct Crop2D {
     pub y_to: f64,
 }
 
+impl Crop2D {
+    /// Creates a two-dimensional crop step.
+    #[must_use]
+    pub fn new(x_from: f64, x_to: f64, y_from: f64, y_to: f64) -> Self {
+        Self {
+            x_from,
+            x_to,
+            y_from,
+            y_to,
+        }
+    }
+}
+
 impl ProcessingStep<Spectrum2D> for Crop2D {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         crop_2d(spectrum, self.x_from, self.x_to, self.y_from, self.y_to)

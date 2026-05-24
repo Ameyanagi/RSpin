@@ -6,6 +6,8 @@ mod apodization_2d;
 mod auto_phase;
 mod auto_phase_2d;
 mod baseline;
+#[cfg(test)]
+mod builder_tests;
 mod contours;
 mod crop_1d;
 mod crop_2d;

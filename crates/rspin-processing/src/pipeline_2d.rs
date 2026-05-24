@@ -65,13 +65,13 @@ impl Spectrum2DPipeline {
     /// Multiplies all intensities by `factor`.
     #[must_use]
     pub fn scale(self, factor: f64) -> Self {
-        self.then(Scale2D { factor })
+        self.then(Scale2D::new(factor))
     }
 
     /// Normalizes intensities by their maximum absolute value.
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
-        self.then(Normalize2DMaxAbs)
+        self.then(Normalize2DMaxAbs::new())
     }
 
     /// Normalizes real and imaginary values by signed bilinear volume.
@@ -89,27 +89,19 @@ impl Spectrum2DPipeline {
     /// Applies component-wise absolute value to real and imaginary matrices.
     #[must_use]
     pub fn absolute_value(self) -> Self {
-        self.then(Abs2D)
+        self.then(Abs2D::new())
     }
 
     /// Appends zeroes in x and y until the requested shape is reached.
     #[must_use]
     pub fn zero_fill(self, target_width: usize, target_height: usize) -> Self {
-        self.then(ZeroFill2D {
-            target_x_len: target_width,
-            target_y_len: target_height,
-        })
+        self.then(ZeroFill2D::new(target_width, target_height))
     }
 
     /// Keeps points inside inclusive x and y coordinate windows.
     #[must_use]
     pub fn crop(self, x_from: f64, x_to: f64, y_from: f64, y_to: f64) -> Self {
-        self.then(Crop2D {
-            x_from,
-            x_to,
-            y_from,
-            y_to,
-        })
+        self.then(Crop2D::new(x_from, x_to, y_from, y_to))
     }
 
     /// Bilinearly resamples real and imaginary matrices onto target axes.
@@ -133,12 +125,12 @@ impl Spectrum2DPipeline {
         x_dwell_time_s: f64,
         y_dwell_time_s: f64,
     ) -> Self {
-        self.then(ExponentialApodization2D {
+        self.then(ExponentialApodization2D::new(
             x_line_broadening_hz,
             y_line_broadening_hz,
             x_dwell_time_s,
             y_dwell_time_s,
-        })
+        ))
     }
 
     /// Applies separable Gaussian apodization.
@@ -150,12 +142,12 @@ impl Spectrum2DPipeline {
         x_dwell_time_s: f64,
         y_dwell_time_s: f64,
     ) -> Self {
-        self.then(GaussianApodization2D {
+        self.then(GaussianApodization2D::new(
             x_gaussian_broadening_hz,
             y_gaussian_broadening_hz,
             x_dwell_time_s,
             y_dwell_time_s,
-        })
+        ))
     }
 
     /// Applies separable sine-bell apodization.
@@ -169,20 +161,20 @@ impl Spectrum2DPipeline {
         y_end_angle_deg: f64,
         y_exponent: f64,
     ) -> Self {
-        self.then(SineBellApodization2D {
+        self.then(SineBellApodization2D::new(
             x_start_angle_deg,
             x_end_angle_deg,
             x_exponent,
             y_start_angle_deg,
             y_end_angle_deg,
             y_exponent,
-        })
+        ))
     }
 
     /// Applies a full two-dimensional FFT or inverse FFT.
     #[must_use]
     pub fn fft(self, direction: FftDirection) -> Self {
-        self.then(Fft2D { direction })
+        self.then(Fft2D::new(direction))
     }
 
     /// Applies a full two-dimensional phase correction.

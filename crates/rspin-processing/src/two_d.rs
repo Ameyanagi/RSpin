@@ -28,6 +28,14 @@ pub struct Scale2D {
     pub factor: f64,
 }
 
+impl Scale2D {
+    /// Creates a two-dimensional scaling step.
+    #[must_use]
+    pub fn new(factor: f64) -> Self {
+        Self { factor }
+    }
+}
+
 impl ProcessingStep<Spectrum2D> for Scale2D {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         scale_2d(spectrum, self.factor)
@@ -37,6 +45,14 @@ impl ProcessingStep<Spectrum2D> for Scale2D {
 /// Normalizes 2D intensities by their maximum absolute value.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Normalize2DMaxAbs;
+
+impl Normalize2DMaxAbs {
+    /// Creates a two-dimensional max-absolute normalization step.
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 impl ProcessingStep<Spectrum2D> for Normalize2DMaxAbs {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {

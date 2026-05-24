@@ -9,6 +9,14 @@ use crate::ProcessingStep;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Abs1D;
 
+impl Abs1D {
+    /// Creates an absolute-value processing step.
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for Abs1D {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         abs_1d(spectrum)

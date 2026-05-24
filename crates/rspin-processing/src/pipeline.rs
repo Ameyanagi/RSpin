@@ -64,19 +64,19 @@ impl Spectrum1DPipeline {
     /// Multiplies all real and imaginary intensities by `factor`.
     #[must_use]
     pub fn scale(self, factor: f64) -> Self {
-        self.then(ScaleIntensity { factor })
+        self.then(ScaleIntensity::new(factor))
     }
 
     /// Adds `offset` to all real intensities.
     #[must_use]
     pub fn offset(self, offset: f64) -> Self {
-        self.then(OffsetIntensity { offset })
+        self.then(OffsetIntensity::new(offset))
     }
 
     /// Normalizes real intensities by their maximum absolute value.
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
-        self.then(NormalizeMaxAbs)
+        self.then(NormalizeMaxAbs::new())
     }
 
     /// Normalizes real and imaginary intensities by signed trapezoidal area.
@@ -94,25 +94,25 @@ impl Spectrum1DPipeline {
     /// Applies component-wise absolute value to real and imaginary channels.
     #[must_use]
     pub fn absolute_value(self) -> Self {
-        self.then(Abs1D)
+        self.then(Abs1D::new())
     }
 
     /// Shifts the x-axis values by `delta`.
     #[must_use]
     pub fn shift_axis(self, delta: f64) -> Self {
-        self.then(ShiftAxis { delta })
+        self.then(ShiftAxis::new(delta))
     }
 
     /// Appends zeroes until the spectrum reaches `target_len` points.
     #[must_use]
     pub fn zero_fill(self, target_len: usize) -> Self {
-        self.then(ZeroFill { target_len })
+        self.then(ZeroFill::new(target_len))
     }
 
     /// Keeps points whose x coordinates fall inside an inclusive window.
     #[must_use]
     pub fn crop(self, from: f64, to: f64) -> Self {
-        self.then(Crop1D { from, to })
+        self.then(Crop1D::new(from, to))
     }
 
     /// Linearly resamples real and imaginary channels onto `target_axis`.
@@ -130,19 +130,19 @@ impl Spectrum1DPipeline {
     /// Applies exponential apodization to real and imaginary channels.
     #[must_use]
     pub fn exponential_apodization(self, line_broadening_hz: f64, dwell_time_s: f64) -> Self {
-        self.then(ExponentialApodization {
+        self.then(ExponentialApodization::new(
             line_broadening_hz,
             dwell_time_s,
-        })
+        ))
     }
 
     /// Applies Gaussian apodization to real and imaginary channels.
     #[must_use]
     pub fn gaussian_apodization(self, gaussian_broadening_hz: f64, dwell_time_s: f64) -> Self {
-        self.then(GaussianApodization {
+        self.then(GaussianApodization::new(
             gaussian_broadening_hz,
             dwell_time_s,
-        })
+        ))
     }
 
     /// Applies sine-bell apodization to real and imaginary channels.
@@ -153,33 +153,33 @@ impl Spectrum1DPipeline {
         end_angle_deg: f64,
         exponent: f64,
     ) -> Self {
-        self.then(SineBellApodization {
+        self.then(SineBellApodization::new(
             start_angle_deg,
             end_angle_deg,
             exponent,
-        })
+        ))
     }
 
     /// Applies a forward or inverse FFT.
     #[must_use]
     pub fn fft(self, direction: FftDirection) -> Self {
-        self.then(Fft1D { direction })
+        self.then(Fft1D::new(direction))
     }
 
     /// Converts the spectrum to magnitude mode.
     #[must_use]
     pub fn magnitude(self) -> Self {
-        self.then(Magnitude)
+        self.then(Magnitude::new())
     }
 
     /// Applies manual zero- and first-order phase correction.
     #[must_use]
     pub fn phase(self, zero_order_deg: f64, first_order_deg: f64, pivot_fraction: f64) -> Self {
-        self.then(PhaseCorrection {
+        self.then(PhaseCorrection::from_degrees(
             zero_order_deg,
             first_order_deg,
             pivot_fraction,
-        })
+        ))
     }
 
     /// Applies automatic phase correction with default options.
@@ -203,7 +203,7 @@ impl Spectrum1DPipeline {
     /// Subtracts a fitted baseline using an explicit method.
     #[must_use]
     pub fn subtract_baseline_with(self, method: BaselineMethod) -> Self {
-        self.then(SubtractBaseline { method })
+        self.then(SubtractBaseline::new(method))
     }
 
     /// Returns the processed spectrum.

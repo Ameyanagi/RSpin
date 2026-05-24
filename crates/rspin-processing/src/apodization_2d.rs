@@ -20,6 +20,24 @@ pub struct ExponentialApodization2D {
     pub y_dwell_time_s: f64,
 }
 
+impl ExponentialApodization2D {
+    /// Creates a separable exponential apodization step.
+    #[must_use]
+    pub fn new(
+        x_line_broadening_hz: f64,
+        y_line_broadening_hz: f64,
+        x_dwell_time_s: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            x_line_broadening_hz,
+            y_line_broadening_hz,
+            x_dwell_time_s,
+            y_dwell_time_s,
+        }
+    }
+}
+
 impl ProcessingStep<Spectrum2D> for ExponentialApodization2D {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         exponential_apodization_2d(
@@ -43,6 +61,24 @@ pub struct GaussianApodization2D {
     pub x_dwell_time_s: f64,
     /// Y-dimension dwell time in seconds.
     pub y_dwell_time_s: f64,
+}
+
+impl GaussianApodization2D {
+    /// Creates a separable Gaussian apodization step.
+    #[must_use]
+    pub fn new(
+        x_gaussian_broadening_hz: f64,
+        y_gaussian_broadening_hz: f64,
+        x_dwell_time_s: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            x_gaussian_broadening_hz,
+            y_gaussian_broadening_hz,
+            x_dwell_time_s,
+            y_dwell_time_s,
+        }
+    }
 }
 
 impl ProcessingStep<Spectrum2D> for GaussianApodization2D {
@@ -72,6 +108,28 @@ pub struct SineBellApodization2D {
     pub y_end_angle_deg: f64,
     /// Y-dimension positive exponent.
     pub y_exponent: f64,
+}
+
+impl SineBellApodization2D {
+    /// Creates a separable sine-bell apodization step.
+    #[must_use]
+    pub fn new(
+        x_start_angle_deg: f64,
+        x_end_angle_deg: f64,
+        x_exponent: f64,
+        y_start_angle_deg: f64,
+        y_end_angle_deg: f64,
+        y_exponent: f64,
+    ) -> Self {
+        Self {
+            x_start_angle_deg,
+            x_end_angle_deg,
+            x_exponent,
+            y_start_angle_deg,
+            y_end_angle_deg,
+            y_exponent,
+        }
+    }
 }
 
 impl ProcessingStep<Spectrum2D> for SineBellApodization2D {

@@ -13,6 +13,26 @@ pub struct Fft2D {
     pub direction: FftDirection,
 }
 
+impl Fft2D {
+    /// Creates a two-dimensional FFT step.
+    #[must_use]
+    pub fn new(direction: FftDirection) -> Self {
+        Self { direction }
+    }
+
+    /// Creates a forward 2D FFT step.
+    #[must_use]
+    pub fn forward() -> Self {
+        Self::new(FftDirection::Forward)
+    }
+
+    /// Creates an inverse 2D FFT step.
+    #[must_use]
+    pub fn inverse() -> Self {
+        Self::new(FftDirection::Inverse)
+    }
+}
+
 impl ProcessingStep<Spectrum2D> for Fft2D {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         fft_2d(spectrum, self.direction)

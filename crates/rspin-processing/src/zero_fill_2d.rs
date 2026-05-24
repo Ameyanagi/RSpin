@@ -14,6 +14,17 @@ pub struct ZeroFill2D {
     pub target_y_len: usize,
 }
 
+impl ZeroFill2D {
+    /// Creates a two-dimensional zero-fill step.
+    #[must_use]
+    pub fn new(target_width: usize, target_height: usize) -> Self {
+        Self {
+            target_x_len: target_width,
+            target_y_len: target_height,
+        }
+    }
+}
+
 impl ProcessingStep<Spectrum2D> for ZeroFill2D {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         zero_fill_2d(spectrum, self.target_x_len, self.target_y_len)

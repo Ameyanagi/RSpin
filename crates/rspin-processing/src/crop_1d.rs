@@ -14,6 +14,14 @@ pub struct Crop1D {
     pub to: f64,
 }
 
+impl Crop1D {
+    /// Creates a one-dimensional crop step.
+    #[must_use]
+    pub fn new(from: f64, to: f64) -> Self {
+        Self { from, to }
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for Crop1D {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         crop_1d(spectrum, self.from, self.to)

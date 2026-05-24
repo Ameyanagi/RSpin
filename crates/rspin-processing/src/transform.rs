@@ -17,6 +17,17 @@ pub struct ExponentialApodization {
     pub dwell_time_s: f64,
 }
 
+impl ExponentialApodization {
+    /// Creates an exponential apodization step.
+    #[must_use]
+    pub fn new(line_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        Self {
+            line_broadening_hz,
+            dwell_time_s,
+        }
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for ExponentialApodization {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         exponential_apodization(spectrum, self.line_broadening_hz, self.dwell_time_s)
@@ -30,6 +41,17 @@ pub struct GaussianApodization {
     pub gaussian_broadening_hz: f64,
     /// Dwell time in seconds.
     pub dwell_time_s: f64,
+}
+
+impl GaussianApodization {
+    /// Creates a Gaussian apodization step.
+    #[must_use]
+    pub fn new(gaussian_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        Self {
+            gaussian_broadening_hz,
+            dwell_time_s,
+        }
+    }
 }
 
 impl ProcessingStep<Spectrum1D> for GaussianApodization {
@@ -49,6 +71,18 @@ pub struct SineBellApodization {
     pub exponent: f64,
 }
 
+impl SineBellApodization {
+    /// Creates a sine-bell apodization step.
+    #[must_use]
+    pub fn new(start_angle_deg: f64, end_angle_deg: f64, exponent: f64) -> Self {
+        Self {
+            start_angle_deg,
+            end_angle_deg,
+            exponent,
+        }
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for SineBellApodization {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         sine_bell_apodization(
@@ -63,6 +97,14 @@ impl ProcessingStep<Spectrum1D> for SineBellApodization {
 /// Converts a complex spectrum to magnitude mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Magnitude;
+
+impl Magnitude {
+    /// Creates a magnitude-mode processing step.
+    #[must_use]
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 impl ProcessingStep<Spectrum1D> for Magnitude {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
@@ -87,6 +129,26 @@ pub struct Fft1D {
     pub direction: FftDirection,
 }
 
+impl Fft1D {
+    /// Creates a one-dimensional FFT step.
+    #[must_use]
+    pub fn new(direction: FftDirection) -> Self {
+        Self { direction }
+    }
+
+    /// Creates a forward FFT step.
+    #[must_use]
+    pub fn forward() -> Self {
+        Self::new(FftDirection::Forward)
+    }
+
+    /// Creates an inverse FFT step.
+    #[must_use]
+    pub fn inverse() -> Self {
+        Self::new(FftDirection::Inverse)
+    }
+}
+
 impl ProcessingStep<Spectrum1D> for Fft1D {
     fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
         fft_1d(spectrum, self.direction)
@@ -102,6 +164,55 @@ pub struct PhaseCorrection {
     pub first_order_deg: f64,
     /// Pivot position as a fraction of the index range, typically in `[0, 1]`.
     pub pivot_fraction: f64,
+}
+
+impl Default for PhaseCorrection {
+    fn default() -> Self {
+        Self {
+            zero_order_deg: 0.0,
+            first_order_deg: 0.0,
+            pivot_fraction: 0.5,
+        }
+    }
+}
+
+impl PhaseCorrection {
+    /// Creates a no-op phase correction step.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Creates a phase correction step from explicit zero- and first-order phases.
+    #[must_use]
+    pub fn from_degrees(zero_order_deg: f64, first_order_deg: f64, pivot_fraction: f64) -> Self {
+        Self {
+            zero_order_deg,
+            first_order_deg,
+            pivot_fraction,
+        }
+    }
+
+    /// Returns this step with a zero-order phase.
+    #[must_use]
+    pub fn zero_order(mut self, zero_order_deg: f64) -> Self {
+        self.zero_order_deg = zero_order_deg;
+        self
+    }
+
+    /// Returns this step with a first-order phase.
+    #[must_use]
+    pub fn first_order(mut self, first_order_deg: f64) -> Self {
+        self.first_order_deg = first_order_deg;
+        self
+    }
+
+    /// Returns this step with a pivot fraction.
+    #[must_use]
+    pub fn pivot_fraction(mut self, pivot_fraction: f64) -> Self {
+        self.pivot_fraction = pivot_fraction;
+        self
+    }
 }
 
 impl ProcessingStep<Spectrum1D> for PhaseCorrection {
