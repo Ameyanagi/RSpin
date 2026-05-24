@@ -1,6 +1,6 @@
 //! Text spectrum writer helpers used by auto IO.
 
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
@@ -9,7 +9,7 @@ use crate::{
     write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 
-use super::{Spectrum1DWritePathFormat, Spectrum2DWritePathFormat};
+use super::{Spectrum1DWritePathFormat, Spectrum2DWritePathFormat, normalized_format_name};
 
 /// Text export formats supported for one-dimensional spectra.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,6 +22,25 @@ pub enum Spectrum1DWriteFormat {
     JcampDx,
     /// `RSpin` CSV payload.
     Csv,
+}
+
+impl Spectrum1DWriteFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
+            Self::Csv => "csv",
+        }
+    }
+}
+
+impl fmt::Display for Spectrum1DWriteFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 impl FromStr for Spectrum1DWriteFormat {
@@ -52,6 +71,24 @@ pub enum Spectrum2DWriteFormat {
     NmrMl,
     /// `RSpin` CSV payload.
     Csv,
+}
+
+impl Spectrum2DWriteFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::Csv => "csv",
+        }
+    }
+}
+
+impl fmt::Display for Spectrum2DWriteFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
 }
 
 impl FromStr for Spectrum2DWriteFormat {
@@ -257,15 +294,6 @@ pub fn write_spectrum2d_text(
     }
 }
 
-fn normalized_format_name(input: &str) -> String {
-    input
-        .trim()
-        .chars()
-        .filter(|character| !matches!(character, '_' | '-' | ' ' | '.'))
-        .flat_map(char::to_lowercase)
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
@@ -289,6 +317,8 @@ mod tests {
             "nmrML".parse::<Spectrum1DWriteFormat>()?,
             Spectrum1DWriteFormat::NmrMl
         );
+        assert_eq!(Spectrum1DWriteFormat::JcampDx.as_str(), "jcamp_dx");
+        assert_eq!(Spectrum1DWriteFormat::NmrMl.to_string(), "nmrml");
 
         let json = Spectrum1DTextWriter::json().write_string(&spectrum)?;
         assert_eq!(read_spectrum1d_text(&json)?, spectrum);
@@ -328,6 +358,8 @@ mod tests {
             "csv".parse::<Spectrum2DWriteFormat>()?,
             Spectrum2DWriteFormat::Csv
         );
+        assert_eq!(Spectrum2DWriteFormat::NmrMl.as_str(), "nmrml");
+        assert_eq!(Spectrum2DWriteFormat::Csv.to_string(), "csv");
 
         let json = Spectrum2DTextWriter::json().write_string(&spectrum)?;
         assert_eq!(read_spectrum2d_text(&json)?, spectrum);

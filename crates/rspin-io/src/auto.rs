@@ -1,6 +1,6 @@
 //! Text spectrum format detection and convenience readers/writers.
 
-use std::{fs, path::Path};
+use std::{fmt, fs, path::Path, str::FromStr};
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
@@ -34,6 +34,33 @@ pub enum SpectrumTextFormat {
     Csv,
 }
 
+impl SpectrumTextFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
+            Self::Csv => "csv",
+        }
+    }
+}
+
+impl fmt::Display for SpectrumTextFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for SpectrumTextFormat {
+    type Err = RSpinError;
+
+    fn from_str(input: &str) -> Result<Self> {
+        parse_spectrum_text_format(input)
+    }
+}
+
 /// Filesystem formats supported by the one-dimensional auto reader.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spectrum1DPathFormat {
@@ -57,6 +84,38 @@ pub enum Spectrum1DPathFormat {
     AgilentFid,
 }
 
+impl Spectrum1DPathFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
+            Self::Csv => "csv",
+            Self::JeolJdf => "jeol_jdf",
+            Self::BrukerProcessed => "bruker_processed",
+            Self::BrukerFid => "bruker_fid",
+            Self::AgilentProcessed => "agilent_processed",
+            Self::AgilentFid => "agilent_fid",
+        }
+    }
+}
+
+impl fmt::Display for Spectrum1DPathFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Spectrum1DPathFormat {
+    type Err = RSpinError;
+
+    fn from_str(input: &str) -> Result<Self> {
+        parse_spectrum1d_path_format(input)
+    }
+}
+
 /// Filesystem formats supported by the two-dimensional auto reader.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spectrum2DPathFormat {
@@ -78,6 +137,37 @@ pub enum Spectrum2DPathFormat {
     AgilentFid,
 }
 
+impl Spectrum2DPathFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::Csv => "csv",
+            Self::JeolJdf => "jeol_jdf",
+            Self::BrukerProcessed => "bruker_processed",
+            Self::BrukerSer => "bruker_ser",
+            Self::AgilentProcessed => "agilent_processed",
+            Self::AgilentFid => "agilent_fid",
+        }
+    }
+}
+
+impl fmt::Display for Spectrum2DPathFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Spectrum2DPathFormat {
+    type Err = RSpinError;
+
+    fn from_str(input: &str) -> Result<Self> {
+        parse_spectrum2d_path_format(input)
+    }
+}
+
 /// Filesystem text formats supported by the one-dimensional auto writer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spectrum1DWritePathFormat {
@@ -91,6 +181,33 @@ pub enum Spectrum1DWritePathFormat {
     Csv,
 }
 
+impl Spectrum1DWritePathFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::JcampDx => "jcamp_dx",
+            Self::Csv => "csv",
+        }
+    }
+}
+
+impl fmt::Display for Spectrum1DWritePathFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Spectrum1DWritePathFormat {
+    type Err = RSpinError;
+
+    fn from_str(input: &str) -> Result<Self> {
+        parse_spectrum1d_write_path_format(input)
+    }
+}
+
 /// Filesystem text formats supported by the two-dimensional auto writer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spectrum2DWritePathFormat {
@@ -100,6 +217,32 @@ pub enum Spectrum2DWritePathFormat {
     NmrMl,
     /// `RSpin` CSV payload.
     Csv,
+}
+
+impl Spectrum2DWritePathFormat {
+    /// Returns the canonical snake-case format name.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            Self::NmrMl => "nmrml",
+            Self::Csv => "csv",
+        }
+    }
+}
+
+impl fmt::Display for Spectrum2DWritePathFormat {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Spectrum2DWritePathFormat {
+    type Err = RSpinError;
+
+    fn from_str(input: &str) -> Result<Self> {
+        parse_spectrum2d_write_path_format(input)
+    }
 }
 
 /// Auto-detecting reader for one-dimensional text spectra.
@@ -242,6 +385,27 @@ pub fn detect_spectrum_text_format(input: &str) -> Result<SpectrumTextFormat> {
     })
 }
 
+/// Parses a text spectrum format name.
+///
+/// Accepted names include `json`, `nmrml`, `xml`, `jcamp_dx`, `jcamp`, `jdx`,
+/// `dx`, and `csv`.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when `input` is not a supported text
+/// spectrum format name.
+pub fn parse_spectrum_text_format(input: &str) -> Result<SpectrumTextFormat> {
+    match normalized_format_name(input).as_str() {
+        "json" => Ok(SpectrumTextFormat::Json),
+        "nmrml" | "xml" => Ok(SpectrumTextFormat::NmrMl),
+        "jcampdx" | "jcamp" | "jdx" | "dx" => Ok(SpectrumTextFormat::JcampDx),
+        "csv" => Ok(SpectrumTextFormat::Csv),
+        _ => Err(RSpinError::Unsupported {
+            feature: "text spectrum format name",
+        }),
+    }
+}
+
 /// Reads a one-dimensional spectrum from JSON, nmrML, JCAMP-DX, or CSV text.
 ///
 /// # Errors
@@ -308,6 +472,35 @@ pub fn detect_spectrum1d_path_format(path: impl AsRef<Path>) -> Result<Spectrum1
     }
 }
 
+/// Parses a one-dimensional path format name.
+///
+/// Accepted names include text format names plus `jeol_jdf`, `jdf`,
+/// `bruker_processed`, `bruker_fid`, `agilent_processed`, `agilent_fid`,
+/// `varian_processed`, and `varian_fid`.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when `input` is not a supported
+/// one-dimensional path format name.
+pub fn parse_spectrum1d_path_format(input: &str) -> Result<Spectrum1DPathFormat> {
+    match normalized_format_name(input).as_str() {
+        "json" => Ok(Spectrum1DPathFormat::Json),
+        "nmrml" | "xml" => Ok(Spectrum1DPathFormat::NmrMl),
+        "jcampdx" | "jcamp" | "jdx" | "dx" => Ok(Spectrum1DPathFormat::JcampDx),
+        "csv" => Ok(Spectrum1DPathFormat::Csv),
+        "jeoljdf" | "jeol" | "jdf" => Ok(Spectrum1DPathFormat::JeolJdf),
+        "brukerprocessed" | "brukerpdata" | "bruker1r" => Ok(Spectrum1DPathFormat::BrukerProcessed),
+        "brukerfid" | "brukerraw" => Ok(Spectrum1DPathFormat::BrukerFid),
+        "agilentprocessed" | "varianprocessed" | "agilentphasefile" | "varianphasefile" => {
+            Ok(Spectrum1DPathFormat::AgilentProcessed)
+        }
+        "agilentfid" | "varianfid" => Ok(Spectrum1DPathFormat::AgilentFid),
+        _ => Err(RSpinError::Unsupported {
+            feature: "one-dimensional spectrum path format name",
+        }),
+    }
+}
+
 /// Detects a supported two-dimensional spectrum format from a filesystem path.
 ///
 /// # Errors
@@ -344,6 +537,36 @@ pub fn detect_spectrum2d_path_format(path: impl AsRef<Path>) -> Result<Spectrum2
     }
 }
 
+/// Parses a two-dimensional path format name.
+///
+/// Accepted names include `json`, `nmrml`, `xml`, `csv`, `jeol_jdf`, `jdf`,
+/// `bruker_processed`, `bruker_ser`, `agilent_processed`, `agilent_fid`,
+/// `varian_processed`, and `varian_fid`.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when `input` is not a supported
+/// two-dimensional path format name.
+pub fn parse_spectrum2d_path_format(input: &str) -> Result<Spectrum2DPathFormat> {
+    match normalized_format_name(input).as_str() {
+        "json" => Ok(Spectrum2DPathFormat::Json),
+        "nmrml" | "xml" => Ok(Spectrum2DPathFormat::NmrMl),
+        "csv" => Ok(Spectrum2DPathFormat::Csv),
+        "jeoljdf" | "jeol" | "jdf" => Ok(Spectrum2DPathFormat::JeolJdf),
+        "brukerprocessed" | "brukerpdata" | "bruker2rr" => {
+            Ok(Spectrum2DPathFormat::BrukerProcessed)
+        }
+        "brukerser" | "ser" | "brukerraw" => Ok(Spectrum2DPathFormat::BrukerSer),
+        "agilentprocessed" | "varianprocessed" | "agilentphasefile" | "varianphasefile" => {
+            Ok(Spectrum2DPathFormat::AgilentProcessed)
+        }
+        "agilentfid" | "varianfid" => Ok(Spectrum2DPathFormat::AgilentFid),
+        _ => Err(RSpinError::Unsupported {
+            feature: "two-dimensional spectrum path format name",
+        }),
+    }
+}
+
 /// Detects the one-dimensional text writer format selected by a destination path.
 ///
 /// Unlike reader detection, writer detection uses only the path extension and
@@ -374,6 +597,27 @@ pub fn detect_spectrum1d_write_path_format(
     })
 }
 
+/// Parses a one-dimensional path writer format name.
+///
+/// Accepted names include `json`, `nmrml`, `xml`, `jcamp_dx`, `jcamp`, `jdx`,
+/// `dx`, and `csv`.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when `input` is not a supported
+/// one-dimensional path writer format name.
+pub fn parse_spectrum1d_write_path_format(input: &str) -> Result<Spectrum1DWritePathFormat> {
+    match normalized_format_name(input).as_str() {
+        "json" => Ok(Spectrum1DWritePathFormat::Json),
+        "nmrml" | "xml" => Ok(Spectrum1DWritePathFormat::NmrMl),
+        "jcampdx" | "jcamp" | "jdx" | "dx" => Ok(Spectrum1DWritePathFormat::JcampDx),
+        "csv" => Ok(Spectrum1DWritePathFormat::Csv),
+        _ => Err(RSpinError::Unsupported {
+            feature: "one-dimensional spectrum path writer format name",
+        }),
+    }
+}
+
 /// Detects the two-dimensional text writer format selected by a destination path.
 ///
 /// Unlike reader detection, writer detection uses only the path extension and
@@ -399,6 +643,25 @@ pub fn detect_spectrum2d_write_path_format(
     Err(RSpinError::Unsupported {
         feature: "two-dimensional spectrum path writer format",
     })
+}
+
+/// Parses a two-dimensional path writer format name.
+///
+/// Accepted names include `json`, `nmrml`, `xml`, and `csv`.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when `input` is not a supported
+/// two-dimensional path writer format name.
+pub fn parse_spectrum2d_write_path_format(input: &str) -> Result<Spectrum2DWritePathFormat> {
+    match normalized_format_name(input).as_str() {
+        "json" => Ok(Spectrum2DWritePathFormat::Json),
+        "nmrml" | "xml" => Ok(Spectrum2DWritePathFormat::NmrMl),
+        "csv" => Ok(Spectrum2DWritePathFormat::Csv),
+        _ => Err(RSpinError::Unsupported {
+            feature: "two-dimensional spectrum path writer format name",
+        }),
+    }
 }
 
 /// Reads a one-dimensional spectrum from an auto-detected path.
@@ -494,6 +757,15 @@ fn contains_ascii_case_insensitive(input: &str, needle: &str) -> bool {
         .as_bytes()
         .windows(needle.len())
         .any(|window| window.eq_ignore_ascii_case(needle))
+}
+
+fn normalized_format_name(input: &str) -> String {
+    input
+        .trim()
+        .chars()
+        .filter(|character| !matches!(character, '_' | '-' | ' ' | '.'))
+        .flat_map(char::to_lowercase)
+        .collect()
 }
 
 fn text_format_from_path(path: &Path) -> Result<SpectrumTextFormat> {
@@ -658,6 +930,60 @@ mod tests {
             detect_spectrum_text_format("# name=demo\nx,intensity\n0,1\n")?,
             SpectrumTextFormat::Csv
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_and_displays_format_names() -> Result<()> {
+        assert_eq!(
+            "JSON".parse::<SpectrumTextFormat>()?,
+            SpectrumTextFormat::Json
+        );
+        assert_eq!(
+            parse_spectrum_text_format("jcamp-dx")?,
+            SpectrumTextFormat::JcampDx
+        );
+        assert_eq!(SpectrumTextFormat::JcampDx.as_str(), "jcamp_dx");
+        assert_eq!(SpectrumTextFormat::NmrMl.to_string(), "nmrml");
+
+        assert_eq!(
+            "bruker-pdata".parse::<Spectrum1DPathFormat>()?,
+            Spectrum1DPathFormat::BrukerProcessed
+        );
+        assert_eq!(
+            parse_spectrum1d_path_format("varian phasefile")?,
+            Spectrum1DPathFormat::AgilentProcessed
+        );
+        assert_eq!(Spectrum1DPathFormat::JeolJdf.to_string(), "jeol_jdf");
+
+        assert_eq!(
+            "ser".parse::<Spectrum2DPathFormat>()?,
+            Spectrum2DPathFormat::BrukerSer
+        );
+        assert_eq!(
+            parse_spectrum2d_path_format("agilent_fid")?,
+            Spectrum2DPathFormat::AgilentFid
+        );
+        assert_eq!(
+            Spectrum2DPathFormat::AgilentProcessed.as_str(),
+            "agilent_processed"
+        );
+
+        assert_eq!(
+            "jdx".parse::<Spectrum1DWritePathFormat>()?,
+            Spectrum1DWritePathFormat::JcampDx
+        );
+        assert_eq!(
+            parse_spectrum2d_write_path_format("xml")?,
+            Spectrum2DWritePathFormat::NmrMl
+        );
+        assert_eq!(Spectrum1DWritePathFormat::Csv.to_string(), "csv");
+        assert_eq!(Spectrum2DWritePathFormat::NmrMl.as_str(), "nmrml");
+
+        let error = parse_spectrum2d_path_format("jcamp_dx")
+            .expect_err("2D JCAMP-DX path format should not parse");
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
+
         Ok(())
     }
 

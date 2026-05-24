@@ -48,8 +48,10 @@ pub use auto::{
     Spectrum2DWriteFormat, Spectrum2DWritePathFormat, SpectrumTextFormat,
     detect_spectrum_text_format, detect_spectrum1d_path_format,
     detect_spectrum1d_write_path_format, detect_spectrum2d_path_format,
-    detect_spectrum2d_write_path_format, parse_spectrum1d_write_format,
-    parse_spectrum2d_write_format, read_spectrum1d_path, read_spectrum1d_text,
+    detect_spectrum2d_write_path_format, parse_spectrum_text_format, parse_spectrum1d_path_format,
+    parse_spectrum1d_write_format, parse_spectrum1d_write_path_format,
+    parse_spectrum2d_path_format, parse_spectrum2d_write_format,
+    parse_spectrum2d_write_path_format, read_spectrum1d_path, read_spectrum1d_text,
     read_spectrum2d_path, read_spectrum2d_text, write_spectrum1d_path, write_spectrum1d_text,
     write_spectrum2d_path, write_spectrum2d_text,
 };
