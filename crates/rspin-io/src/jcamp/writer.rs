@@ -59,15 +59,19 @@ pub fn write_jcamp_dx_1d(spectrum: &Spectrum1D) -> Result<String> {
             &format_float(frequency_mhz),
         );
     }
-    push_label(&mut output, "XUNITS", unit_label(spectrum.x.unit));
-    push_label(&mut output, "YUNITS", "ARBITRARY UNITS");
-    push_label(&mut output, "FIRSTX", &format_float(first_x));
-    push_label(&mut output, "LASTX", &format_float(last_x));
-    push_label(&mut output, "NPOINTS", &spectrum.len().to_string());
-    if has_uniform_spacing(&spectrum.x.values) {
-        write_xydata_block(&mut output, spectrum);
+    if spectrum.imaginary.is_some() {
+        write_complex_data_tables(&mut output, spectrum, first_x, last_x)?;
     } else {
-        write_xypoints_block(&mut output, spectrum);
+        push_label(&mut output, "XUNITS", unit_label(spectrum.x.unit));
+        push_label(&mut output, "YUNITS", "ARBITRARY UNITS");
+        push_label(&mut output, "FIRSTX", &format_float(first_x));
+        push_label(&mut output, "LASTX", &format_float(last_x));
+        push_label(&mut output, "NPOINTS", &spectrum.len().to_string());
+        if has_uniform_spacing(&spectrum.x.values) {
+            write_xydata_block(&mut output, spectrum);
+        } else {
+            write_xypoints_block(&mut output, spectrum);
+        }
     }
     output.push_str("##END=\n");
 
@@ -80,6 +84,20 @@ fn validate_finite_spectrum(spectrum: &Spectrum1D) -> Result<()> {
     {
         return Err(RSpinError::NonFinite { field: "spectrum" });
     }
+    if let Some(imaginary) = spectrum.imaginary.as_deref() {
+        if imaginary.len() != spectrum.len() {
+            return Err(RSpinError::InvalidSpectrum {
+                message: format!(
+                    "imaginary data has {} points but intensities have {} points",
+                    imaginary.len(),
+                    spectrum.len()
+                ),
+            });
+        }
+        if !imaginary.iter().all(|value| value.is_finite()) {
+            return Err(RSpinError::NonFinite { field: "imaginary" });
+        }
+    }
     if !spectrum.metadata.frequency_mhz.is_none_or(f64::is_finite) {
         return Err(RSpinError::NonFinite {
             field: "frequency_mhz",
@@ -91,6 +109,92 @@ fn validate_finite_spectrum(spectrum: &Spectrum1D) -> Result<()> {
         });
     }
     Ok(())
+}
+
+fn write_complex_data_tables(
+    output: &mut String,
+    spectrum: &Spectrum1D,
+    first_x: f64,
+    last_x: f64,
+) -> Result<()> {
+    if !has_uniform_spacing(&spectrum.x.values) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "complex JCAMP-DX export requires a uniform x axis".to_owned(),
+        });
+    }
+
+    let imaginary = spectrum
+        .imaginary
+        .as_deref()
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "missing imaginary data for complex JCAMP-DX export".to_owned(),
+        })?;
+    let first_real = data_endpoint("first real value", &spectrum.intensities, Endpoint::First)?;
+    let last_real = data_endpoint("last real value", &spectrum.intensities, Endpoint::Last)?;
+    let first_imaginary = data_endpoint("first imaginary value", imaginary, Endpoint::First)?;
+    let last_imaginary = data_endpoint("last imaginary value", imaginary, Endpoint::Last)?;
+
+    push_label(output, "DATA CLASS", "NTUPLES");
+    push_label(output, "NPOINTS", &spectrum.len().to_string());
+    push_label(
+        output,
+        "UNITS",
+        &format!(
+            "{}, ARBITRARY UNITS, ARBITRARY UNITS",
+            unit_label(spectrum.x.unit)
+        ),
+    );
+    push_label(output, "FACTOR", "1, 1, 1");
+    push_label(
+        output,
+        "FIRST",
+        &format!(
+            "{}, {}, {}",
+            format_float(first_x),
+            format_float(first_real),
+            format_float(first_imaginary)
+        ),
+    );
+    push_label(
+        output,
+        "LAST",
+        &format!(
+            "{}, {}, {}",
+            format_float(last_x),
+            format_float(last_real),
+            format_float(last_imaginary)
+        ),
+    );
+    write_data_table_page(
+        output,
+        "N=1",
+        "R",
+        &spectrum.x.values,
+        &spectrum.intensities,
+    );
+    write_data_table_page(output, "N=2", "I", &spectrum.x.values, imaginary);
+    Ok(())
+}
+
+fn write_data_table_page(
+    output: &mut String,
+    page: &str,
+    channel: &str,
+    x_values: &[f64],
+    values: &[f64],
+) {
+    push_label(output, "PAGE", page);
+    push_label(
+        output,
+        "DATA TABLE",
+        &format!("(X++({channel}..{channel})), XYDATA"),
+    );
+    for (x_value, value) in x_values.iter().copied().zip(values.iter().copied()) {
+        output.push_str(&format_float(x_value));
+        output.push(' ');
+        output.push_str(&format_float(value));
+        output.push('\n');
+    }
 }
 
 fn write_xydata_block(output: &mut String, spectrum: &Spectrum1D) {
@@ -111,6 +215,22 @@ fn write_xypoints_block(output: &mut String, spectrum: &Spectrum1D) {
         output.push_str(&format_float(intensity));
         output.push('\n');
     }
+}
+
+#[derive(Clone, Copy)]
+enum Endpoint {
+    First,
+    Last,
+}
+
+fn data_endpoint(field: &'static str, values: &[f64], endpoint: Endpoint) -> Result<f64> {
+    let value = match endpoint {
+        Endpoint::First => values.first().copied(),
+        Endpoint::Last => values.last().copied(),
+    };
+    value.ok_or_else(|| RSpinError::InvalidSpectrum {
+        message: format!("missing {field}"),
+    })
 }
 
 fn has_uniform_spacing(values: &[f64]) -> bool {

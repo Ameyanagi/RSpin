@@ -281,6 +281,47 @@ fn writes_sample_metadata_labels() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_complex_data_tables_for_uniform_axis() -> anyhow::Result<()> {
+    let x = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let metadata = Metadata::named("complex fid").with_nucleus(Nucleus::Hydrogen1);
+    let spectrum = Spectrum1D::new_complex(
+        x,
+        vec![2.0, 4.0, 6.0, 8.0],
+        Some(vec![1.0, 3.0, 5.0, 7.0]),
+        metadata,
+    )?;
+
+    let text = write_jcamp_dx_1d(&spectrum)?;
+
+    assert!(text.contains("##DATA CLASS=NTUPLES"));
+    assert!(text.contains("##DATA TABLE=(X++(R..R)), XYDATA"));
+    assert!(text.contains("##DATA TABLE=(X++(I..I)), XYDATA"));
+    let parsed = read_jcamp_dx_1d(&text)?;
+    assert_eq!(parsed.metadata.name.as_deref(), Some("complex fid"));
+    assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(parsed.x.unit, Unit::Seconds);
+    assert_axis_close(&parsed.x.values, &spectrum.x.values);
+    assert_eq!(parsed.intensities, spectrum.intensities);
+    assert_eq!(parsed.imaginary, spectrum.imaginary);
+    Ok(())
+}
+
+#[test]
+fn rejects_complex_non_uniform_jcamp_export() -> anyhow::Result<()> {
+    let x = Axis::new("time", Unit::Seconds, vec![0.0, 0.1, 0.25])?;
+    let spectrum = Spectrum1D::new_complex(
+        x,
+        vec![2.0, 4.0, 6.0],
+        Some(vec![1.0, 3.0, 5.0]),
+        Metadata::named("complex nonlinear"),
+    )?;
+
+    let error = write_jcamp_dx_1d(&spectrum).expect_err("non-uniform complex export should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
 fn rejects_non_finite_writer_metadata() -> anyhow::Result<()> {
     let x = Axis::linear("shift", Unit::Ppm, 1.0, 2.0, 2)?;
     let spectrum = Spectrum1D::new(
