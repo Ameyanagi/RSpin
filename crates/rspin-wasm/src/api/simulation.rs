@@ -3,9 +3,10 @@
 use rspin_core::Result;
 use rspin_io::{
     read_exact_spectrum_2d_options_json, read_exact_spectrum_options_json,
-    read_exact_spin_options_json, read_spin_half_system_json, write_exact_decomposition_1d_json,
-    write_exact_decomposition_2d_json, write_exact_spectrum_2d_options_json,
-    write_exact_spectrum_options_json, write_exact_spin_options_json, write_exact_transitions_json,
+    read_exact_spin_options_json, read_exact_transitions_json, read_spin_half_system_json,
+    write_exact_decomposition_1d_json, write_exact_decomposition_2d_json,
+    write_exact_spectrum_2d_options_json, write_exact_spectrum_options_json,
+    write_exact_spin_options_json, write_exact_transitions_csv, write_exact_transitions_json,
     write_spin_half_system_json,
 };
 use rspin_simulation::{
@@ -72,6 +73,16 @@ pub fn simulate_exact_spin_half_transitions_json(
     let options = read_exact_spin_options_json(options_json)?;
     let transitions = exact_spin_half_transitions(&system, &options)?;
     write_exact_transitions_json(&transitions)
+}
+
+/// Converts serialized exact transition JSON to CSV.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or CSV serialization fails.
+pub fn write_exact_transitions_csv_json(transitions_json: &str) -> Result<String> {
+    let transitions = read_exact_transitions_json(transitions_json)?;
+    write_exact_transitions_csv(&transitions)
 }
 
 /// Simulates an exact spin-1/2 system into serialized `Spectrum1D` JSON.

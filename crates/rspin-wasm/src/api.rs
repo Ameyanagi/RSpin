@@ -99,7 +99,7 @@ pub use simulation::{
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json, validate_exact_spectrum_2d_options_json,
     validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
-    validate_exact_spin_options_json,
+    validate_exact_spin_options_json, write_exact_transitions_csv_json,
 };
 pub use workflow::{analyze_spectrum_1d_json, analyze_spectrum_2d_json};
 
