@@ -225,6 +225,9 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     let jcamp_version = parse_jcamp_dx_version("5.00")?;
     assert_eq!(jcamp_version.major, 5);
     assert!(jcamp_version.is_supported_by_current_reader());
+    let bruker_info = inspect_bruker_parameter_file("##JCAMPDX= 5.00\n##DATATYPE= Parameters\n")?;
+    assert_eq!(bruker_info.data_type.as_deref(), Some("Parameters"));
+    assert!(bruker_info.is_supported_by_current_readers());
     Ok(())
 }
 

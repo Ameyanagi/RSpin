@@ -14,8 +14,8 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 use crate::SpectrumPathReader;
 
 use super::{
-    optional_f64, optional_i32, parse_parameter_file, prefixed_parameter_properties, read_text,
-    required_usize, text_parameter,
+    optional_f64, optional_i32, parse_parameter_file_for_reader, prefixed_parameter_properties,
+    read_text, required_usize, text_parameter,
 };
 
 pub use two_d::{BrukerSer2D, read_bruker_ser_2d_dir};
@@ -58,7 +58,8 @@ impl SpectrumPathReader for BrukerFid1D {
 /// odd-length, or unsupported.
 pub fn read_bruker_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     let dataset_dir = locate_dataset_dir(path.as_ref());
-    let acqus = parse_parameter_file(&read_text(&dataset_dir.join("acqus"), "Bruker acqus")?);
+    let acqus =
+        parse_parameter_file_for_reader(&read_text(&dataset_dir.join("acqus"), "Bruker acqus")?)?;
     let values = read_raw_i32_values(&dataset_dir.join("fid"), &acqus)?;
     if values.len() % 2 != 0 {
         return Err(RSpinError::InvalidSpectrum {

@@ -126,6 +126,28 @@ fn rejects_unsupported_processed_data_type() -> anyhow::Result<()> {
 }
 
 #[test]
+fn rejects_unsupported_processed_parameter_version() -> anyhow::Result<()> {
+    let root = synthetic_dataset("unsupported-version")?;
+    write_processed_dir(
+        &root,
+        "\
+##JCAMPDX= 6.00
+##$SI= 1
+##$DTYPP= 0
+",
+        &[1],
+        ByteOrder::Little,
+    )?;
+
+    let error = read_bruker_processed_1d_dir(&root)
+        .expect_err("unsupported Bruker parameter version should fail");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn rejects_truncated_processed_1d_imaginary_plane() -> anyhow::Result<()> {
     let root = synthetic_dataset("truncated-1i")?;
     write_processed_dir(

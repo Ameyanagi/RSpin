@@ -7,8 +7,8 @@ use rspin_core::{RSpinError, Result, Spectrum2D};
 use crate::SpectrumPathReader;
 
 use super::{
-    build_axis, build_metadata, parse_parameter_file, read_acqus, read_processed_i32_data,
-    read_text, read_title, required_usize,
+    build_axis, build_metadata, parse_parameter_file_for_reader, read_acqus,
+    read_processed_i32_data, read_text, read_title, required_usize,
 };
 
 /// Reader for Bruker processed two-dimensional datasets.
@@ -50,9 +50,11 @@ pub fn read_bruker_processed_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D
     let input_path = path.as_ref();
     let processed_dir = locate_processed_2d_dir(input_path);
     let direct_parameters =
-        parse_parameter_file(&read_text(&processed_dir.join("procs"), "Bruker procs")?);
-    let indirect_parameters =
-        parse_parameter_file(&read_text(&processed_dir.join("proc2s"), "Bruker proc2s")?);
+        parse_parameter_file_for_reader(&read_text(&processed_dir.join("procs"), "Bruker procs")?)?;
+    let indirect_parameters = parse_parameter_file_for_reader(&read_text(
+        &processed_dir.join("proc2s"),
+        "Bruker proc2s",
+    )?)?;
     let acqus = read_acqus(input_path, &processed_dir)?;
     let title = read_title(&processed_dir)?;
 

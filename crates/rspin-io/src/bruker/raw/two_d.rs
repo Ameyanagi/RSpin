@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, fs, path::Path};
 use rspin_core::{Axis, RSpinError, Result, Spectrum2D, Unit};
 
 use crate::SpectrumPathReader;
-use crate::bruker::{optional_i32, parse_parameter_file, read_text, required_usize};
+use crate::bruker::{optional_i32, parse_parameter_file_for_reader, read_text, required_usize};
 
 use super::{
     build_raw_axis, build_raw_metadata, byte_order, decode_i32_chunk, ensure_i32_data,
@@ -52,9 +52,9 @@ impl SpectrumPathReader for BrukerSer2D {
 pub fn read_bruker_ser_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     let dataset_dir = locate_dataset_dir(path.as_ref());
     let direct_parameters =
-        parse_parameter_file(&read_text(&dataset_dir.join("acqus"), "Bruker acqus")?);
+        parse_parameter_file_for_reader(&read_text(&dataset_dir.join("acqus"), "Bruker acqus")?)?;
     let indirect_parameters =
-        parse_parameter_file(&read_text(&dataset_dir.join("acqu2s"), "Bruker acqu2s")?);
+        parse_parameter_file_for_reader(&read_text(&dataset_dir.join("acqu2s"), "Bruker acqu2s")?)?;
     let (z, imaginary, x_count, y_count) =
         read_ser_values(&dataset_dir.join("ser"), &direct_parameters)?;
     validate_indirect_count(y_count, &indirect_parameters)?;

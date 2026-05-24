@@ -8,14 +8,60 @@ use std::{
 };
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use serde::{Deserialize, Serialize};
 
-use crate::SpectrumPathReader;
+use crate::{JcampDxVersion, SpectrumPathReader, parse_jcamp_dx_version};
 
 mod processed_2d;
 mod raw;
 
 pub use processed_2d::{BrukerProcessed2D, read_bruker_processed_2d_dir};
 pub use raw::{BrukerFid1D, BrukerSer2D, read_bruker_fid_1d_dir, read_bruker_ser_2d_dir};
+
+/// Root metadata from a Bruker JCAMP-DX-style parameter file.
+///
+/// Bruker parameter files such as `acqus`, `acqu2s`, `procs`, and `proc2s`
+/// often carry a `##JCAMPDX=` label alongside Bruker-specific `##$...`
+/// parameters. `RSpin` exposes the parsed version so callers can inspect format
+/// routing decisions before reading binary data.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BrukerParameterFileInfo {
+    /// Parsed `##JCAMPDX=` label, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jcamp_dx_version: Option<JcampDxVersion>,
+    /// Raw `##DATATYPE=` label, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_type: Option<String>,
+    /// Raw `##ORIGIN=` label, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
+    /// Raw `##OWNER=` label, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+}
+
+impl BrukerParameterFileInfo {
+    /// Returns true when all parsed format versions are supported by current readers.
+    #[must_use]
+    pub fn is_supported_by_current_readers(&self) -> bool {
+        self.jcamp_dx_version
+            .as_ref()
+            .is_none_or(JcampDxVersion::is_supported_by_current_reader)
+    }
+
+    /// Validates that parsed format versions are supported by current readers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-feature error when a parameter file declares a
+    /// future or otherwise unsupported JCAMP-DX major version.
+    pub fn validate_supported_by_current_readers(&self) -> Result<()> {
+        match self.jcamp_dx_version.as_ref() {
+            Some(version) => version.validate_supported_by_current_reader(),
+            None => Ok(()),
+        }
+    }
+}
 
 /// Reader for Bruker processed one-dimensional datasets.
 ///
@@ -59,7 +105,7 @@ pub fn read_bruker_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D
     let procs_path = processed_dir.join("procs");
     let data_path = processed_dir.join("1r");
 
-    let procs = parse_parameter_file(&read_text(&procs_path, "Bruker procs")?);
+    let procs = parse_parameter_file_for_reader(&read_text(&procs_path, "Bruker procs")?)?;
     let acqus = read_acqus(input_path, &processed_dir)?;
     let title = read_title(&processed_dir)?;
 
@@ -98,7 +144,8 @@ fn read_optional_parameters(
     description: &'static str,
 ) -> Result<Option<BTreeMap<String, String>>> {
     if path.is_file() {
-        read_text(path, description).map(|text| Some(parse_parameter_file(&text)))
+        read_text(path, description)
+            .and_then(|text| parse_parameter_file_for_reader(&text).map(Some))
     } else {
         Ok(None)
     }
@@ -126,6 +173,35 @@ fn parse_parameter_file(input: &str) -> BTreeMap<String, String> {
         parameters.insert(normalized_key(key), clean_value(value));
     }
     parameters
+}
+
+/// Inspects root metadata from a Bruker parameter file.
+///
+/// # Errors
+///
+/// Returns an error when a declared `JCAMPDX` version label is malformed.
+pub fn inspect_bruker_parameter_file(input: &str) -> Result<BrukerParameterFileInfo> {
+    let parameters = parse_parameter_file(input);
+    parameter_file_info(&parameters)
+}
+
+pub(super) fn parse_parameter_file_for_reader(input: &str) -> Result<BTreeMap<String, String>> {
+    let parameters = parse_parameter_file(input);
+    parameter_file_info(&parameters)?.validate_supported_by_current_readers()?;
+    Ok(parameters)
+}
+
+fn parameter_file_info(parameters: &BTreeMap<String, String>) -> Result<BrukerParameterFileInfo> {
+    let jcamp_dx_version = match text_parameter(parameters, "JCAMPDX") {
+        Some(value) => Some(parse_jcamp_dx_version(&value)?),
+        None => None,
+    };
+    Ok(BrukerParameterFileInfo {
+        jcamp_dx_version,
+        data_type: text_parameter(parameters, "DATATYPE"),
+        origin: text_parameter(parameters, "ORIGIN"),
+        owner: text_parameter(parameters, "OWNER"),
+    })
 }
 
 fn parse_parameter_line(line: &str) -> Option<(&str, &str)> {

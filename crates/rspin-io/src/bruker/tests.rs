@@ -116,3 +116,51 @@ fn assert_close(actual: f64, expected: f64) {
         "{actual} != {expected}"
     );
 }
+
+#[test]
+fn inspects_bruker_parameter_file_versions() -> anyhow::Result<()> {
+    let info = inspect_bruker_parameter_file(
+        "\
+##TITLE= Bruker Parameters
+##JCAMPDX= 5.00
+##DATATYPE= Parameter Values
+##ORIGIN= fixture
+##OWNER= local
+##$TD= 4
+",
+    )?;
+
+    let version = info
+        .jcamp_dx_version
+        .as_ref()
+        .ok_or_else(|| RSpinError::Parse {
+            format: "Bruker",
+            message: "missing inspected Bruker JCAMPDX version".to_owned(),
+        })?;
+    assert_eq!(version.raw, "5.00");
+    assert_eq!(version.major, 5);
+    assert_eq!(info.data_type.as_deref(), Some("Parameter Values"));
+    assert_eq!(info.origin.as_deref(), Some("fixture"));
+    assert_eq!(info.owner.as_deref(), Some("local"));
+    assert!(info.is_supported_by_current_readers());
+    Ok(())
+}
+
+#[test]
+fn preserves_future_bruker_parameter_versions_for_routing() -> anyhow::Result<()> {
+    let info = inspect_bruker_parameter_file("##JCAMPDX= 6.00\n##$TD= 4\n")?;
+
+    assert!(!info.is_supported_by_current_readers());
+    let error = info
+        .validate_supported_by_current_readers()
+        .expect_err("future Bruker parameter version should be rejected");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_malformed_bruker_parameter_versions() {
+    let error = inspect_bruker_parameter_file("##JCAMPDX= release\n")
+        .expect_err("malformed Bruker parameter version should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+}
