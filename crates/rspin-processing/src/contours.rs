@@ -1,9 +1,10 @@
 //! Two-dimensional contour extraction.
 
 use rspin_core::{RSpinError, Result, Spectrum2D};
+use serde::{Deserialize, Serialize};
 
 /// Point on an extracted contour.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContourPoint {
     /// X coordinate.
     pub x: f64,
@@ -12,7 +13,7 @@ pub struct ContourPoint {
 }
 
 /// Line segment belonging to one contour level.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContourSegment {
     /// Contour level.
     pub level: f64,
@@ -27,7 +28,7 @@ pub struct ContourSegment {
 }
 
 /// Extracted contour segments for one level.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ContourSet {
     /// Contour level.
     pub level: f64,

@@ -1,5 +1,6 @@
 //! JSON-oriented API helpers for WASM bindings.
 
+mod contours;
 mod csv_io;
 mod processing_2d;
 
@@ -21,6 +22,7 @@ use rspin_simulation::{
     simulate_multiplet_1d,
 };
 
+pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
     write_spectrum_2d_csv_json,
