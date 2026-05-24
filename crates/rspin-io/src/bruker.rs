@@ -9,8 +9,10 @@ use std::{
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
+mod processed_2d;
 mod raw;
 
+pub use processed_2d::{BrukerProcessed2D, read_bruker_processed_2d_dir};
 pub use raw::{BrukerFid1D, BrukerSer2D, read_bruker_fid_1d_dir, read_bruker_ser_2d_dir};
 
 /// Reader for Bruker processed one-dimensional datasets.
