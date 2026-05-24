@@ -8,6 +8,7 @@ use super::*;
 
 mod agilent;
 mod assignments;
+mod bruker;
 mod buckets;
 mod clustering;
 mod consensus;

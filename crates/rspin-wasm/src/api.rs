@@ -31,13 +31,14 @@ use rspin_io::{
     parse_jcamp_dx_version, parse_spectrum_text_format, parse_spectrum1d_write_format,
     parse_spectrum2d_write_format, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
     read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
-    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
-    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
-    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
-    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_json,
-    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
-    write_j_coupling_graph_json, write_jcamp_dx_1d, write_nmredata_record,
-    write_nmredata_record_json, write_nmredata_records,
+    read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes,
+    read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes,
+    read_jeol_jdf_2d_bytes, read_nmredata_record_json, read_nmredata_records_json,
+    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text,
+    read_spectrum1d_text_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
+    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d,
+    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum1d_json, write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
 };
@@ -165,6 +166,59 @@ pub fn parse_agilent_processed_2d_bytes_json(
     phasefile_bytes: &[u8],
 ) -> Result<String> {
     let spectrum = read_agilent_processed_2d_bytes(procpar, phasefile_bytes)?;
+    spectrum2d_to_json(&spectrum)
+}
+
+/// Parses Bruker processed one-dimensional `1r` bytes into serialized
+/// `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_bruker_processed_1d_bytes_json(procs: &str, real_bytes: &[u8]) -> Result<String> {
+    let spectrum = read_bruker_processed_1d_bytes(procs, real_bytes)?;
+    spectrum1d_to_json(&spectrum)
+}
+
+/// Parses Bruker raw one-dimensional `fid` bytes into serialized `Spectrum1D`
+/// JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_bruker_fid_1d_bytes_json(acqus: &str, fid_bytes: &[u8]) -> Result<String> {
+    let spectrum = read_bruker_fid_1d_bytes(acqus, fid_bytes)?;
+    spectrum1d_to_json(&spectrum)
+}
+
+/// Parses Bruker processed two-dimensional `2rr` bytes into serialized
+/// `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_bruker_processed_2d_bytes_json(
+    direct_parameters: &str,
+    indirect_parameters: &str,
+    real_bytes: &[u8],
+) -> Result<String> {
+    let spectrum =
+        read_bruker_processed_2d_bytes(direct_parameters, indirect_parameters, real_bytes)?;
+    spectrum2d_to_json(&spectrum)
+}
+
+/// Parses Bruker raw two-dimensional `ser` bytes into serialized `Spectrum2D`
+/// JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_bruker_ser_2d_bytes_json(
+    direct_parameters: &str,
+    indirect_parameters: &str,
+    ser_bytes: &[u8],
+) -> Result<String> {
+    let spectrum = read_bruker_ser_2d_bytes(direct_parameters, indirect_parameters, ser_bytes)?;
     spectrum2d_to_json(&spectrum)
 }
 
