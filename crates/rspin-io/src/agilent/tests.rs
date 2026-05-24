@@ -173,6 +173,78 @@ sw 1 1 5 5 5 2 1 8203 1 64
 }
 
 #[test]
+fn reads_raw_fid_bytes_without_dataset_path() -> anyhow::Result<()> {
+    let one_d_root = synthetic_dataset("bytes-1d")?;
+    write_procpar(
+        &one_d_root,
+        "\
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"H1\"
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 250
+0
+",
+    )?;
+    write_fid(
+        &one_d_root,
+        EndianForTest::Little,
+        DataForTest::F32(&[0.5, -0.25, 1.5, -2.5]),
+        1,
+        1,
+    )?;
+
+    let one_d = read_agilent_fid_1d_bytes(
+        &fs::read_to_string(one_d_root.join("procpar"))?,
+        &fs::read(one_d_root.join("fid"))?,
+    )?;
+
+    assert_eq!(one_d.x.unit, Unit::Seconds);
+    assert_eq!(one_d.x.values, vec![0.0, 0.004]);
+    assert_eq!(one_d.intensities, vec![0.5, 1.5]);
+    assert_eq!(one_d.imaginary, Some(vec![-0.25, -2.5]));
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let two_d_root = synthetic_dataset("bytes-2d")?;
+    write_procpar(
+        &two_d_root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 200
+0
+",
+    )?;
+    write_fid(
+        &two_d_root,
+        EndianForTest::Big,
+        DataForTest::I16(&[1, -1, 2, -2, 3, -3, 4, -4]),
+        2,
+        1,
+    )?;
+
+    let two_d = read_agilent_fid_2d_bytes(
+        &fs::read_to_string(two_d_root.join("procpar"))?,
+        &fs::read(two_d_root.join("fid"))?,
+    )?;
+
+    assert_eq!(two_d.shape(), (2, 2));
+    assert_eq!(two_d.x.values, vec![0.0, 0.001]);
+    assert_eq!(two_d.y.values, vec![0.0, 0.005]);
+    assert_eq!(two_d.z, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(two_d.imaginary, Some(vec![-1.0, -2.0, -3.0, -4.0]));
+
+    remove_dir(one_d_root)?;
+    remove_dir(two_d_root)?;
+    Ok(())
+}
+
+#[test]
 fn reads_big_endian_i32_processed_phasefile() -> anyhow::Result<()> {
     let root = synthetic_dataset("processed-phasefile")?;
     write_procpar(
@@ -211,6 +283,81 @@ comment 2 2 32 0 0 2 1 0 1 64
     assert_eq!(spectrum.metadata.name.as_deref(), Some("processed demo"));
 
     remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn reads_processed_phasefile_bytes_without_dataset_path() -> anyhow::Result<()> {
+    let one_d_root = synthetic_dataset("processed-bytes-1d")?;
+    write_procpar(
+        &one_d_root,
+        "\
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+rfl 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 750
+0
+rfp 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 250
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 500
+0
+",
+    )?;
+    write_phasefile(
+        &one_d_root,
+        EndianForTest::Big,
+        DataForTest::I32(&[10, 20, -5]),
+    )?;
+
+    let one_d = read_agilent_processed_1d_bytes(
+        &fs::read_to_string(one_d_root.join("procpar"))?,
+        &fs::read(one_d_root.join("datdir/phasefile"))?,
+    )?;
+
+    assert_eq!(one_d.x.unit, Unit::Ppm);
+    assert_eq!(one_d.x.values, vec![1.0, 0.0, -1.0]);
+    assert_eq!(one_d.intensities, vec![10.0, 20.0, -5.0]);
+
+    let two_d_root = synthetic_dataset("processed-bytes-2d")?;
+    write_procpar(
+        &two_d_root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 200
+0
+",
+    )?;
+    write_phasefile_matrix(
+        &two_d_root,
+        EndianForTest::Little,
+        DataForTest::F32(&[1.0, 2.0, 3.0, 4.0]),
+        2,
+        1,
+    )?;
+
+    let two_d = read_agilent_processed_2d_bytes(
+        &fs::read_to_string(two_d_root.join("procpar"))?,
+        &fs::read(two_d_root.join("datdir/phasefile"))?,
+    )?;
+
+    assert_eq!(two_d.shape(), (2, 2));
+    assert_eq!(two_d.x.unit, Unit::Hertz);
+    assert_eq!(two_d.x.values, vec![500.0, -500.0]);
+    assert_eq!(two_d.y.unit, Unit::Hertz);
+    assert_eq!(two_d.y.values, vec![100.0, -100.0]);
+    assert_eq!(two_d.z, vec![1.0, 2.0, 3.0, 4.0]);
+
+    remove_dir(one_d_root)?;
+    remove_dir(two_d_root)?;
     Ok(())
 }
 

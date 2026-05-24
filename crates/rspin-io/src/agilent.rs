@@ -117,14 +117,27 @@ impl SpectrumPathReader for AgilentFid1D {
 /// unsupported data representation.
 pub fn read_agilent_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     let dataset_dir = locate_dataset_dir(path.as_ref());
-    let procpar =
-        parse_procpar_for_reader(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?)?;
+    let procpar_text = read_text(&dataset_dir.join("procpar"), "Agilent procpar")?;
     let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
         format: "Agilent",
         message: format!("failed to read fid: {error}"),
     })?;
 
-    let (real, imaginary) = read_fid_values(&fid_bytes)?;
+    read_agilent_fid_1d_bytes(&procpar_text, &fid_bytes)
+}
+
+/// Reads a raw one-dimensional FID from Agilent/Varian `procpar` text and FID bytes.
+///
+/// This byte-oriented API is useful for callers such as WASM front ends that
+/// receive uploaded files without a native directory tree.
+///
+/// # Errors
+///
+/// Returns an error when the `procpar` text is malformed, declares an
+/// unsupported acquisition, or the FID bytes are malformed or unsupported.
+pub fn read_agilent_fid_1d_bytes(procpar: &str, fid_bytes: &[u8]) -> Result<Spectrum1D> {
+    let procpar = parse_procpar_for_reader(procpar)?;
+    let (real, imaginary) = read_fid_values(fid_bytes)?;
     let axis = build_axis(real.len(), &procpar)?;
     let metadata = build_metadata(&procpar);
     Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
@@ -173,7 +186,7 @@ pub fn read_agilent_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1
     let path = path.as_ref();
     let phasefile_path = locate_phasefile_path(path)?;
     let procpar_path = locate_procpar_path(path, &phasefile_path)?;
-    let procpar = parse_procpar_for_reader(&read_text(&procpar_path, "Agilent procpar")?)?;
+    let procpar_text = read_text(&procpar_path, "Agilent procpar")?;
     let phasefile_bytes = fs::read(&phasefile_path).map_err(|error| RSpinError::Parse {
         format: "Agilent",
         message: format!(
@@ -182,7 +195,22 @@ pub fn read_agilent_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1
         ),
     })?;
 
-    let (real, imaginary) = read_phasefile_values(&phasefile_bytes)?;
+    read_agilent_processed_1d_bytes(&procpar_text, &phasefile_bytes)
+}
+
+/// Reads a processed one-dimensional spectrum from Agilent/Varian `procpar`
+/// text and `phasefile` bytes.
+///
+/// # Errors
+///
+/// Returns an error when the `procpar` text is malformed, declares an
+/// unsupported acquisition, or the phasefile bytes are malformed or unsupported.
+pub fn read_agilent_processed_1d_bytes(
+    procpar: &str,
+    phasefile_bytes: &[u8],
+) -> Result<Spectrum1D> {
+    let procpar = parse_procpar_for_reader(procpar)?;
+    let (real, imaginary) = read_phasefile_values(phasefile_bytes)?;
     let axis = build_processed_axis(real.len(), &procpar)?;
     let metadata = build_metadata(&procpar);
     Spectrum1D::new_complex(axis, real, imaginary, metadata)
@@ -227,15 +255,26 @@ impl SpectrumPathReader for AgilentFid2D {
 /// two-dimensional acquisition, or uses an unsupported data representation.
 pub fn read_agilent_fid_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     let dataset_dir = locate_dataset_dir(path.as_ref());
-    let procpar =
-        parse_procpar_for_reader(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?)?;
-    validate_2d_procpar(&procpar)?;
+    let procpar_text = read_text(&dataset_dir.join("procpar"), "Agilent procpar")?;
     let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
         format: "Agilent",
         message: format!("failed to read fid: {error}"),
     })?;
 
-    let (z, imaginary, x_count, y_count) = read_fid_matrix_values(&fid_bytes)?;
+    read_agilent_fid_2d_bytes(&procpar_text, &fid_bytes)
+}
+
+/// Reads a raw two-dimensional FID from Agilent/Varian `procpar` text and FID bytes.
+///
+/// # Errors
+///
+/// Returns an error when the `procpar` text is malformed, does not describe a
+/// supported two-dimensional acquisition, or the FID bytes are malformed or
+/// unsupported.
+pub fn read_agilent_fid_2d_bytes(procpar: &str, fid_bytes: &[u8]) -> Result<Spectrum2D> {
+    let procpar = parse_procpar_for_reader(procpar)?;
+    validate_2d_procpar(&procpar)?;
+    let (z, imaginary, x_count, y_count) = read_fid_matrix_values(fid_bytes)?;
     let x = build_axis(x_count, &procpar)?;
     let y = build_indirect_axis(y_count, &procpar)?;
     let metadata = build_metadata(&procpar);
@@ -285,8 +324,7 @@ pub fn read_agilent_processed_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2
     let path = path.as_ref();
     let phasefile_path = locate_phasefile_path(path)?;
     let procpar_path = locate_procpar_path(path, &phasefile_path)?;
-    let procpar = parse_procpar_for_reader(&read_text(&procpar_path, "Agilent procpar")?)?;
-    validate_2d_procpar(&procpar)?;
+    let procpar_text = read_text(&procpar_path, "Agilent procpar")?;
     let phasefile_bytes = fs::read(&phasefile_path).map_err(|error| RSpinError::Parse {
         format: "Agilent",
         message: format!(
@@ -295,7 +333,24 @@ pub fn read_agilent_processed_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2
         ),
     })?;
 
-    let matrix = read_phasefile_matrix_values(&phasefile_bytes)?;
+    read_agilent_processed_2d_bytes(&procpar_text, &phasefile_bytes)
+}
+
+/// Reads a processed two-dimensional spectrum from Agilent/Varian `procpar`
+/// text and `phasefile` bytes.
+///
+/// # Errors
+///
+/// Returns an error when the `procpar` text is malformed, does not describe a
+/// supported two-dimensional acquisition, or the phasefile bytes are malformed
+/// or unsupported.
+pub fn read_agilent_processed_2d_bytes(
+    procpar: &str,
+    phasefile_bytes: &[u8],
+) -> Result<Spectrum2D> {
+    let procpar = parse_procpar_for_reader(procpar)?;
+    validate_2d_procpar(&procpar)?;
+    let matrix = read_phasefile_matrix_values(phasefile_bytes)?;
     let x = build_processed_axis_with(real_axis_parameters(), matrix.x_count, &procpar)?;
     let y = build_processed_axis_with(indirect_axis_parameters(), matrix.y_count, &procpar)?;
     let metadata = build_metadata(&procpar);

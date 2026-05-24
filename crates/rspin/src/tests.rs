@@ -228,6 +228,9 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     let agilent_info = inspect_agilent_procpar("acqdim 7 1 32767 0 0 2 1 0 1 64\n1 2\n0\n")?;
     assert_eq!(agilent_info.acquisition_dimension, Some(2));
     assert!(agilent_info.is_supported_by_current_readers());
+    let agilent_error = read_agilent_fid_1d_bytes("", b"not fid")
+        .expect_err("invalid Agilent FID bytes should fail");
+    assert!(matches!(agilent_error, RSpinError::Parse { .. }));
     let bruker_info = inspect_bruker_parameter_file("##JCAMPDX= 5.00\n##DATATYPE= Parameters\n")?;
     assert_eq!(bruker_info.data_type.as_deref(), Some("Parameters"));
     assert!(bruker_info.is_supported_by_current_readers());
