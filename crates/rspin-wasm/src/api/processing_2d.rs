@@ -6,7 +6,7 @@ use rspin_core::{Result, Spectrum2D};
 use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, auto_phase_correct_2d,
     crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y, scale_2d,
-    slice_x_at_y_index, slice_y_at_x_index, zero_fill_2d,
+    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, to_json};
@@ -146,6 +146,17 @@ pub fn slice_spectrum_2d_x_at_y_index_json(spectrum_json: &str, y_index: usize) 
     to_json(&slice)
 }
 
+/// Extracts the x-axis row nearest `y` from serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn slice_spectrum_2d_x_at_y_json(spectrum_json: &str, y: f64) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let slice = slice_x_at_y(&spectrum, y)?;
+    to_json(&slice)
+}
+
 /// Extracts a y-axis column from serialized `Spectrum2D` JSON.
 ///
 /// # Errors
@@ -154,6 +165,17 @@ pub fn slice_spectrum_2d_x_at_y_index_json(spectrum_json: &str, y_index: usize) 
 pub fn slice_spectrum_2d_y_at_x_index_json(spectrum_json: &str, x_index: usize) -> Result<String> {
     let spectrum: Spectrum2D = from_json(spectrum_json)?;
     let slice = slice_y_at_x_index(&spectrum, x_index)?;
+    to_json(&slice)
+}
+
+/// Extracts the y-axis column nearest `x` from serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn slice_spectrum_2d_y_at_x_json(spectrum_json: &str, x: f64) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let slice = slice_y_at_x(&spectrum, x)?;
     to_json(&slice)
 }
 

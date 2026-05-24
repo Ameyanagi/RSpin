@@ -41,6 +41,6 @@ pub use transform::{
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{
     Normalize2DMaxAbs, ProjectionMode, Scale2D, normalize_2d_max_abs, project_x, project_y,
-    scale_2d, slice_x_at_y_index, slice_y_at_x_index,
+    scale_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
 };
 pub use zero_fill_2d::{ZeroFill2D, zero_fill_2d};

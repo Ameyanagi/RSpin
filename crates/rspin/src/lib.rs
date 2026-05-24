@@ -46,8 +46,8 @@ pub use processing::{
     contour_segments, crop_1d, crop_2d, exponential_apodization, exponential_apodization_2d,
     extract_contours, fft_1d, fft_2d, fit_baseline, magnitude_spectrum, normalize_2d_max_abs,
     normalize_max_abs, offset_intensity, phase_correct, phase_correct_2d, project_x, project_y,
-    scale_2d, scale_intensity, shift_axis, slice_x_at_y_index, slice_y_at_x_index,
-    subtract_baseline, zero_fill, zero_fill_2d,
+    scale_2d, scale_intensity, shift_axis, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
+    slice_y_at_x_index, subtract_baseline, zero_fill, zero_fill_2d,
 };
 pub use simulation::{
     ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactSpinOptions, ExactTransition,
@@ -77,9 +77,9 @@ pub mod prelude {
         detect_multiplets, detect_ranges, detect_zones, exact_spin_half_transitions,
         extract_contours, integrate_region, normalize_max_abs, pick_peaks, read_jcamp_dx_1d,
         read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json,
-        render_prediction_1d, scale_intensity, simulate_exact_spin_half_1d, subtract_baseline,
-        write_jcamp_dx_1d, write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv,
-        write_spectrum2d_json,
+        render_prediction_1d, scale_intensity, simulate_exact_spin_half_1d, slice_x_at_y,
+        slice_y_at_x, subtract_baseline, write_jcamp_dx_1d, write_spectrum1d_csv,
+        write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
     };
 }
 

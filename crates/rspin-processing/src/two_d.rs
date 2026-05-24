@@ -174,6 +174,34 @@ pub fn project_y(spectrum: &Spectrum2D, mode: ProjectionMode) -> Result<Spectrum
 ///
 /// Returns an error when `y_index` is out of bounds.
 pub fn slice_x_at_y_index(spectrum: &Spectrum2D, y_index: usize) -> Result<Spectrum1D> {
+    slice_x_at_y_index_with_record(
+        spectrum,
+        y_index,
+        ProcessingRecord::new("slice_x_at_y_index").with_details(format!("y_index={y_index}")),
+    )
+}
+
+/// Extracts the row nearest `y` as a one-dimensional spectrum over x.
+///
+/// # Errors
+///
+/// Returns an error when `y` is not finite.
+pub fn slice_x_at_y(spectrum: &Spectrum2D, y: f64) -> Result<Spectrum1D> {
+    let y_index = nearest_axis_index(&spectrum.y.values, y, "y coordinate")?;
+    let selected_y = spectrum.y.values[y_index];
+    slice_x_at_y_index_with_record(
+        spectrum,
+        y_index,
+        ProcessingRecord::new("slice_x_at_y")
+            .with_details(format!("y={y},y_index={y_index},selected_y={selected_y}")),
+    )
+}
+
+fn slice_x_at_y_index_with_record(
+    spectrum: &Spectrum2D,
+    y_index: usize,
+    record: ProcessingRecord,
+) -> Result<Spectrum1D> {
     let (width, height) = spectrum.shape();
     if y_index >= height {
         return Err(RSpinError::InvalidSpectrum {
@@ -190,7 +218,7 @@ pub fn slice_x_at_y_index(spectrum: &Spectrum2D, y_index: usize) -> Result<Spect
             .imaginary
             .as_ref()
             .map(|imaginary| imaginary[row_start..row_end].to_vec()),
-        ProcessingRecord::new("slice_x_at_y_index").with_details(format!("y_index={y_index}")),
+        record,
     )
 }
 
@@ -200,6 +228,34 @@ pub fn slice_x_at_y_index(spectrum: &Spectrum2D, y_index: usize) -> Result<Spect
 ///
 /// Returns an error when `x_index` is out of bounds.
 pub fn slice_y_at_x_index(spectrum: &Spectrum2D, x_index: usize) -> Result<Spectrum1D> {
+    slice_y_at_x_index_with_record(
+        spectrum,
+        x_index,
+        ProcessingRecord::new("slice_y_at_x_index").with_details(format!("x_index={x_index}")),
+    )
+}
+
+/// Extracts the column nearest `x` as a one-dimensional spectrum over y.
+///
+/// # Errors
+///
+/// Returns an error when `x` is not finite.
+pub fn slice_y_at_x(spectrum: &Spectrum2D, x: f64) -> Result<Spectrum1D> {
+    let x_index = nearest_axis_index(&spectrum.x.values, x, "x coordinate")?;
+    let selected_x = spectrum.x.values[x_index];
+    slice_y_at_x_index_with_record(
+        spectrum,
+        x_index,
+        ProcessingRecord::new("slice_y_at_x")
+            .with_details(format!("x={x},x_index={x_index},selected_x={selected_x}")),
+    )
+}
+
+fn slice_y_at_x_index_with_record(
+    spectrum: &Spectrum2D,
+    x_index: usize,
+    record: ProcessingRecord,
+) -> Result<Spectrum1D> {
     let (width, height) = spectrum.shape();
     if x_index >= width {
         return Err(RSpinError::InvalidSpectrum {
@@ -222,7 +278,7 @@ pub fn slice_y_at_x_index(spectrum: &Spectrum2D, x_index: usize) -> Result<Spect
         spectrum.y.clone(),
         values,
         imaginary_values,
-        ProcessingRecord::new("slice_y_at_x_index").with_details(format!("x_index={x_index}")),
+        record,
     )
 }
 
@@ -279,6 +335,28 @@ fn divisor(value: usize) -> Result<f64> {
         message: "2D dimension is too large to reduce".to_owned(),
     })?;
     Ok(f64::from(value))
+}
+
+fn nearest_axis_index(values: &[f64], coordinate: f64, field: &'static str) -> Result<usize> {
+    ensure_finite(field, coordinate)?;
+    let first = match values.first() {
+        Some(value) => *value,
+        None => {
+            return Err(RSpinError::InvalidAxis {
+                message: "axis must contain at least one point".to_owned(),
+            });
+        }
+    };
+    let mut nearest_index = 0;
+    let mut nearest_distance = (first - coordinate).abs();
+    for (index, value) in values.iter().copied().enumerate().skip(1) {
+        let distance = (value - coordinate).abs();
+        if distance < nearest_distance {
+            nearest_index = index;
+            nearest_distance = distance;
+        }
+    }
+    Ok(nearest_index)
 }
 
 fn derived_1d(

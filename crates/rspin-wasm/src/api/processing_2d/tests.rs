@@ -120,7 +120,22 @@ fn projects_and_slices_2d_spectrum_json() -> anyhow::Result<()> {
     let x_slice: Spectrum1D = from_json(&x_slice_json)?;
     assert_vec_close(&x_slice.intensities, &[4.0, 5.0, 6.0]);
 
+    let x_slice_json = slice_spectrum_2d_x_at_y_json(&spectrum_json, 0.6)?;
+    let x_slice: Spectrum1D = from_json(&x_slice_json)?;
+    assert_vec_close(&x_slice.intensities, &[4.0, 5.0, 6.0]);
+    assert_eq!(
+        x_slice
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("slice_x_at_y")
+    );
+
     let y_slice_json = slice_spectrum_2d_y_at_x_index_json(&spectrum_json, 2)?;
+    let y_slice: Spectrum1D = from_json(&y_slice_json)?;
+    assert_vec_close(&y_slice.intensities, &[3.0, 6.0]);
+
+    let y_slice_json = slice_spectrum_2d_y_at_x_json(&spectrum_json, 1.6)?;
     let y_slice: Spectrum1D = from_json(&y_slice_json)?;
     assert_vec_close(&y_slice.intensities, &[3.0, 6.0]);
     Ok(())

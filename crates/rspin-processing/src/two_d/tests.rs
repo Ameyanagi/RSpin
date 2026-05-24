@@ -99,10 +99,49 @@ fn extracts_complex_row_and_column_slices() -> anyhow::Result<()> {
 }
 
 #[test]
+fn extracts_nearest_coordinate_slices() -> anyhow::Result<()> {
+    let spectrum = demo_complex_spectrum()?;
+    let row = slice_x_at_y(&spectrum, 10.6)?;
+    let column = slice_y_at_x(&spectrum, 1.6)?;
+
+    assert_eq!(row.intensities, vec![4.0, -5.0, 6.0]);
+    assert_eq!(row.x.values, spectrum.x.values);
+    assert_eq!(
+        row.processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("slice_x_at_y")
+    );
+    assert_eq!(column.intensities, vec![3.0, 6.0]);
+    assert_eq!(column.x.values, spectrum.y.values);
+    assert_eq!(
+        column
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("slice_y_at_x")
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_out_of_bounds_slice() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let error = slice_y_at_x_index(&spectrum, 3).expect_err("x index should be out of bounds");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_non_finite_coordinate_slice() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let error = slice_x_at_y(&spectrum, f64::NAN).expect_err("non-finite y should fail");
+    assert!(matches!(
+        error,
+        RSpinError::NonFinite {
+            field: "y coordinate"
+        }
+    ));
     Ok(())
 }
 
