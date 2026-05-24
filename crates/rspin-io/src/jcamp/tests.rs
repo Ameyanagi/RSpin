@@ -97,6 +97,35 @@ fn reads_peak_table_as_explicit_points() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_numeric_data_table_real_and_imaginary_pages() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=ntuple fid
+##NPOINTS=4
+##UNITS=SECONDS,ARBITRARY UNITS,ARBITRARY UNITS
+##FACTOR=0.1,2,3
+##FIRST=0,1,5,1
+##LAST=0.3,4,8,2
+##PAGE=N=1
+##DATA TABLE=(X++(R..R)), XYDATA
+0 1 2
+2 3 4
+##PAGE=N=2
+##DATATABLE=(X++(I..I)), XYDATA
+0 5 6
+2 7 8
+##END
+";
+    let spectrum = read_jcamp_dx_1d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("ntuple fid"));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_axis_close(&spectrum.x.values, &[0.0, 0.1, 0.2, 0.3]);
+    assert_eq!(spectrum.intensities, vec![2.0, 4.0, 6.0, 8.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![15.0, 18.0, 21.0, 24.0]));
+    Ok(())
+}
+
+#[test]
 fn rejects_odd_xypoints_values() {
     let input = "\
 ##XYPOINTS=(XY..XY)

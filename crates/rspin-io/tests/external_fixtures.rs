@@ -46,6 +46,24 @@ fn parses_external_jcamp_baseline_fixture_when_available() -> anyhow::Result<()>
     Ok(())
 }
 
+#[test]
+fn parses_external_jcamp_numeric_data_table_fixture_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("unpacked/jcamp-data-test-2.5.0/data/nmr/nanalysis/1h.jdx");
+    require_fixture(&fixture)?;
+
+    let input = fs::read_to_string(&fixture)?;
+    let spectrum = read_jcamp_dx_1d(&input)?;
+
+    assert_eq!(spectrum.len(), 2048);
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert!(spectrum.imaginary.is_some());
+    assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
+    Ok(())
+}
+
 fn external_testdata_root() -> Option<PathBuf> {
     env::var_os("RSPIN_EXTERNAL_TESTDATA")
         .filter(|value| !value.is_empty())
