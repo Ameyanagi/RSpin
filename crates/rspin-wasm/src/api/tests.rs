@@ -279,6 +279,32 @@ fn integrates_2d_region_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn generates_spectrum_matrix_1d_json() -> anyhow::Result<()> {
+    let spectra_json = to_json(&vec![
+        Spectrum1D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, 2.0, 3.0],
+            Metadata::named("a"),
+        )?,
+        Spectrum1D::new(
+            Axis::linear("x", Unit::Ppm, 0.0, 2.0, 2)?,
+            vec![10.0, 14.0],
+            Metadata::named("b b"),
+        )?,
+    ])?;
+    let matrix_json = generate_spectrum_matrix_1d_json(
+        &spectra_json,
+        r#"{"target_axis":null,"outside_value":0.0}"#,
+    )?;
+    let matrix: rspin_analysis::SpectrumMatrix1D = from_json(&matrix_json)?;
+
+    assert_eq!(matrix.shape(), (2, 3));
+    assert_eq!(matrix.row_ids, vec!["0:a", "1:b_b"]);
+    assert_eq!(matrix.values, vec![1.0, 2.0, 3.0, 10.0, 12.0, 14.0]);
+    Ok(())
+}
+
+#[test]
 fn simulates_first_order_json() -> anyhow::Result<()> {
     let spectrum_json = simulate_first_order_multiplet_json(
         r#"{"center_ppm":7.0,"area":1.0,"couplings":[{"j_hz":8.0,"equivalent_spins":1}]}"#,

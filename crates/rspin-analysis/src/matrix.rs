@@ -23,6 +23,33 @@ impl Default for MatrixGenerationOptions {
 }
 
 impl MatrixGenerationOptions {
+    /// Creates default matrix generation options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the target axis used for every generated row.
+    #[must_use]
+    pub fn with_target_axis(mut self, axis: Axis) -> Self {
+        self.target_axis = Some(axis);
+        self
+    }
+
+    /// Uses the first input spectrum axis as the target axis.
+    #[must_use]
+    pub fn without_target_axis(mut self) -> Self {
+        self.target_axis = None;
+        self
+    }
+
+    /// Sets the value used outside each source spectrum axis domain.
+    #[must_use]
+    pub fn with_outside_value(mut self, outside_value: f64) -> Self {
+        self.outside_value = outside_value;
+        self
+    }
+
     fn validate(&self) -> Result<()> {
         if !self.outside_value.is_finite() {
             return Err(RSpinError::NonFinite {

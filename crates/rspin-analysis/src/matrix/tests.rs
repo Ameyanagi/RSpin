@@ -23,13 +23,25 @@ fn supports_explicit_axis_and_outside_value() -> anyhow::Result<()> {
     let spectrum = spectrum("sample", &[0.0, 2.0], &[1.0, 5.0])?;
     let matrix = generate_spectrum_matrix_1d(
         &[spectrum],
-        MatrixGenerationOptions {
-            target_axis: Some(Axis::linear("x", Unit::Ppm, -1.0, 3.0, 5)?),
-            outside_value: -1.0,
-        },
+        MatrixGenerationOptions::new()
+            .with_target_axis(Axis::linear("x", Unit::Ppm, -1.0, 3.0, 5)?)
+            .with_outside_value(-1.0),
     )?;
 
     assert_eq!(matrix.values, vec![-1.0, 1.0, 3.0, 5.0, -1.0]);
+    Ok(())
+}
+
+#[test]
+fn builder_can_clear_explicit_axis() -> anyhow::Result<()> {
+    let spectrum = spectrum("sample", &[0.0, 2.0], &[1.0, 5.0])?;
+    let options = MatrixGenerationOptions::new()
+        .with_target_axis(Axis::linear("x", Unit::Ppm, -1.0, 3.0, 5)?)
+        .without_target_axis();
+    let matrix = generate_spectrum_matrix_1d(&[spectrum], options)?;
+
+    assert_eq!(matrix.axis.values, vec![0.0, 2.0]);
+    assert_eq!(matrix.values, vec![1.0, 5.0]);
     Ok(())
 }
 
