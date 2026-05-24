@@ -6,6 +6,7 @@ mod clustering;
 mod consensus;
 mod contours;
 mod csv_io;
+mod matrix;
 mod pairwise;
 mod pca;
 mod prediction;
@@ -17,11 +18,9 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
     AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion,
-    IntegralRegion2D, JCouplingGraph, MatrixGeneration2DOptions, MatrixGenerationOptions,
-    MultipletDetectionOptions, PeakAlignmentOptions, PeakOptimizationOptions, PeakPickOptions,
-    RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions,
-    align_spectra_by_peak_to_matrix, detect_multiplets, detect_ranges, detect_zones,
-    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
+    IntegralRegion2D, JCouplingGraph, MultipletDetectionOptions, PeakOptimizationOptions,
+    PeakPickOptions, RangeDetectionOptions, SignalSummary2DOptions, SignalSummaryOptions,
+    ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones, integrate_region,
     integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
     summarize_signals_2d,
 };
@@ -49,6 +48,10 @@ pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
     write_spectrum_2d_csv_json,
+};
+pub use matrix::{
+    align_spectra_by_peak_to_matrix_1d_json, align_spectra_by_zone_to_matrix_2d_json,
+    generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
 };
 pub use pairwise::{
     pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
@@ -286,48 +289,6 @@ pub fn integrate_region_2d_json(spectrum_json: &str, region_json: &str) -> Resul
     let region: IntegralRegion2D = from_json(region_json)?;
     let integral = integrate_region_2d(&spectrum, region)?;
     to_json(&integral)
-}
-
-/// Generates a row-major matrix from serialized `Spectrum1D` JSON values.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, analysis, or serialization fails.
-pub fn generate_spectrum_matrix_1d_json(spectra_json: &str, options_json: &str) -> Result<String> {
-    let spectra: Vec<Spectrum1D> = from_json(spectra_json)?;
-    let options: MatrixGenerationOptions = from_json(options_json)?;
-    let matrix = generate_spectrum_matrix_1d(&spectra, options)?;
-    to_json(&matrix)
-}
-
-/// Aligns serialized `Spectrum1D` JSON values by peak and generates a matrix.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, alignment, matrix generation, or
-/// serialization fails.
-pub fn align_spectra_by_peak_to_matrix_1d_json(
-    spectra_json: &str,
-    alignment_options_json: &str,
-    matrix_options_json: &str,
-) -> Result<String> {
-    let spectra: Vec<Spectrum1D> = from_json(spectra_json)?;
-    let alignment_options: PeakAlignmentOptions = from_json(alignment_options_json)?;
-    let matrix_options: MatrixGenerationOptions = from_json(matrix_options_json)?;
-    let result = align_spectra_by_peak_to_matrix(&spectra, alignment_options, matrix_options)?;
-    to_json(&result)
-}
-
-/// Generates a layer-major matrix from serialized `Spectrum2D` JSON values.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, analysis, or serialization fails.
-pub fn generate_spectrum_matrix_2d_json(spectra_json: &str, options_json: &str) -> Result<String> {
-    let spectra: Vec<Spectrum2D> = from_json(spectra_json)?;
-    let options: MatrixGeneration2DOptions = from_json(options_json)?;
-    let matrix = generate_spectrum_matrix_2d(&spectra, options)?;
-    to_json(&matrix)
 }
 
 fn from_json<T: DeserializeOwned>(input: &str) -> Result<T> {

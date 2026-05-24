@@ -11,24 +11,26 @@ use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
 
 pub use analysis::{
-    align_spectra_by_peak_to_matrix_1d, bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d,
-    bucket_spectrum_2d, cluster_bucket_matrix_1d, cluster_bucket_matrix_2d,
-    cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d, cut_cluster_result_at_distance,
-    cut_cluster_result_to_count, detect_consensus_peaks_1d, detect_consensus_ranges_1d,
-    detect_consensus_zones_2d, detect_ranges_1d, detect_zones_2d, pairwise_bucket_matrix_1d,
-    pairwise_bucket_matrix_2d, pairwise_spectrum_matrix_1d, pairwise_spectrum_matrix_2d,
-    pca_bucket_matrix_1d, pca_bucket_matrix_2d, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
+    align_spectra_by_peak_to_matrix_1d, align_spectra_by_zone_to_matrix_2d, bucket_spectra_1d,
+    bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d, cluster_bucket_matrix_1d,
+    cluster_bucket_matrix_2d, cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d,
+    cut_cluster_result_at_distance, cut_cluster_result_to_count, detect_consensus_peaks_1d,
+    detect_consensus_ranges_1d, detect_consensus_zones_2d, detect_ranges_1d, detect_zones_2d,
+    pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d, pairwise_spectrum_matrix_1d,
+    pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d, pca_bucket_matrix_2d,
+    pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
 };
 #[cfg(feature = "first-order")]
 pub use api::simulate_first_order_multiplet_json;
 pub use api::{
     abs_spectrum_1d_json, abs_spectrum_2d_json, align_spectra_by_peak_to_matrix_1d_json,
-    annotate_spectrum_1d_with_assignments_json, annotate_spectrum_2d_with_assignments_json,
-    apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
-    apply_processing_recipe_2d_json, apply_processing_recipe_2d_until_json,
-    auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json, bucket_spectra_1d_json,
-    bucket_spectra_2d_json, bucket_spectrum_1d_json, bucket_spectrum_2d_json,
-    cluster_bucket_matrix_1d_json, cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
+    align_spectra_by_zone_to_matrix_2d_json, annotate_spectrum_1d_with_assignments_json,
+    annotate_spectrum_2d_with_assignments_json, apply_processing_recipe_1d_json,
+    apply_processing_recipe_1d_until_json, apply_processing_recipe_2d_json,
+    apply_processing_recipe_2d_until_json, auto_phase_spectrum_1d_json,
+    auto_phase_spectrum_2d_json, bucket_spectra_1d_json, bucket_spectra_2d_json,
+    bucket_spectrum_1d_json, bucket_spectrum_2d_json, cluster_bucket_matrix_1d_json,
+    cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
     cluster_spectrum_matrix_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
     cut_cluster_result_at_distance_json, cut_cluster_result_to_count_json,
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,

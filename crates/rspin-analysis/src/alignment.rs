@@ -9,6 +9,13 @@ use crate::{
     pick_peaks,
 };
 
+mod two_d;
+
+pub use two_d::{
+    Spectrum2DAlignmentShift, ZoneAlignedMatrix2D, ZoneAlignmentOptions, ZoneAlignmentResult2D,
+    align_spectra_by_zone, align_spectra_by_zone_to_matrix,
+};
+
 /// Optional coordinate window used for alignment peak selection.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AlignmentWindow {

@@ -21,7 +21,9 @@ mod zones;
 
 pub use alignment::{
     AlignmentWindow, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakAlignmentResult1D,
-    SpectrumAlignmentShift, align_spectra_by_peak, align_spectra_by_peak_to_matrix,
+    Spectrum2DAlignmentShift, SpectrumAlignmentShift, ZoneAlignedMatrix2D, ZoneAlignmentOptions,
+    ZoneAlignmentResult2D, align_spectra_by_peak, align_spectra_by_peak_to_matrix,
+    align_spectra_by_zone, align_spectra_by_zone_to_matrix,
 };
 pub use assignments::{
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,
