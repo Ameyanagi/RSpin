@@ -196,6 +196,17 @@ pub fn nmredata_1d_signals_to_assignment_set_json(
     to_json(&assignments)
 }
 
+/// Converts `NMReDATA` 2D signal labels into serialized [`AssignmentSet`] JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, conversion, or serialization fails.
+pub fn nmredata_2d_signals_to_assignment_set_json(record_json: &str) -> Result<String> {
+    let record: NmreDataRecord = from_json(record_json)?;
+    let assignments = record.to_2d_signal_assignment_set()?;
+    to_json(&assignments)
+}
+
 /// Converts `NMReDATA` record JSON into serialized [`JCouplingGraph`] JSON.
 ///
 /// # Errors

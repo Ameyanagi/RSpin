@@ -305,6 +305,10 @@ H1, Hcombo, 7.0
 4.200, L=H1
 3.900-3.800, L=H2, H3
 2.000, orphan
+
+>  <NMREDATA_2D_13C_1J_1H>
+H1/C1, I=1.2
+Hcombo/C2, I=2.4
 ",
     )?;
 
@@ -372,6 +376,27 @@ H1, Hcombo, 7.0
     assert_eq!(
         signal_assignments["assignments"][2]["atoms"][0]["id"],
         "orphan"
+    );
+
+    let signal_assignments_2d_json = nmredata_2d_signals_to_assignment_set_json(&record_json)?;
+    let signal_assignments_2d: serde_json::Value = from_json(&signal_assignments_2d_json)?;
+    assert_eq!(
+        signal_assignments_2d["assignments"]
+            .as_array()
+            .map(Vec::len),
+        Some(2)
+    );
+    assert_eq!(
+        signal_assignments_2d["assignments"][0]["target"]["Zone2D"]["id"],
+        "nmredata:2d-signal:0:H1:C1"
+    );
+    assert_eq!(
+        signal_assignments_2d["assignments"][0]["atoms"][0]["nucleus"],
+        "Hydrogen1"
+    );
+    assert_eq!(
+        signal_assignments_2d["assignments"][0]["atoms"][1]["nucleus"],
+        "Carbon13"
     );
     Ok(())
 }
