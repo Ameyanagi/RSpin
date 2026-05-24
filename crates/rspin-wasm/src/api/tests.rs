@@ -211,6 +211,75 @@ Spectrum_Location=file:./nmr/10
 }
 
 #[test]
+fn writes_nmredata_from_json() -> anyhow::Result<()> {
+    let json = parse_nmredata_json(
+        r"
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+",
+    )?;
+
+    let text = write_nmredata_json(&json)?;
+    assert!(text.contains(">  <NMREDATA_VERSION>"));
+    assert!(text.contains("H1, 4.200, H1"));
+
+    let reparsed_json = parse_nmredata_json(&text)?;
+    let reparsed: serde_json::Value = from_json(&reparsed_json)?;
+    assert_eq!(reparsed["version"]["raw"], "1.1");
+    assert_eq!(reparsed["assignments"][0]["label"], "H1");
+    Ok(())
+}
+
+#[test]
+fn writes_nmredata_records_from_json() -> anyhow::Result<()> {
+    let first = parse_nmredata_json(
+        r"
+>  <NMREDATA_VERSION>
+1.0
+",
+    )?;
+    let second = parse_nmredata_json(
+        r"
+>  <NMREDATA_VERSION>
+1.1
+",
+    )?;
+    let first_value: serde_json::Value = from_json(&first)?;
+    let second_value: serde_json::Value = from_json(&second)?;
+    let records_json = serde_json::to_string(&vec![first_value, second_value])?;
+
+    let text = write_nmredata_records_json(&records_json)?;
+    assert_eq!(text.matches("$$$$").count(), 2);
+    let reparsed = rspin_io::read_nmredata_records_str(&text)?;
+    assert_eq!(
+        reparsed[0]
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.0")
+    );
+    assert_eq!(
+        reparsed[1]
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.1")
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_nmredata_json_write() {
+    let error = write_nmredata_json(r#"{"tags":[{"name":"","values":["value"]}]}"#)
+        .expect_err("empty SDF tag name should fail");
+
+    assert!(matches!(error, RSpinError::Parse { .. }));
+}
+
+#[test]
 fn rejects_invalid_nmredata_json_parse() {
     let error = parse_nmredata_json(
         r"
