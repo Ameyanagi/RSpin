@@ -1,5 +1,7 @@
 //! JSON-oriented API helpers for WASM bindings.
 
+mod processing_2d;
+
 use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
@@ -16,6 +18,13 @@ use rspin_simulation::{
     ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
     decompose_exact_spin_half_1d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
     simulate_multiplet_1d,
+};
+
+pub use processing_2d::{
+    auto_phase_spectrum_2d_json, fft_spectrum_2d_json, normalize_spectrum_2d_json,
+    phase_spectrum_2d_json, project_spectrum_2d_x_json, project_spectrum_2d_y_json,
+    scale_spectrum_2d_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_y_at_x_index_json, zero_fill_spectrum_2d_json,
 };
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.
