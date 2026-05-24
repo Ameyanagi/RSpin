@@ -26,8 +26,9 @@ pub use agilent::{
 };
 pub use analysis_csv::{CsvAnalysis1D, CsvAnalysis2D, write_analysis1d_csv, write_analysis2d_csv};
 pub use analysis_json::{
-    JsonAnalysis1D, JsonAnalysis2D, read_analysis1d_json, read_analysis2d_json,
-    write_analysis1d_json, write_analysis2d_json,
+    ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION, JsonAnalysis1D,
+    JsonAnalysis2D, read_analysis1d_json, read_analysis2d_json, write_analysis1d_json,
+    write_analysis2d_json,
 };
 pub use auto::{
     AutoSpectrum1DPath, AutoSpectrum1DPathWriter, AutoSpectrum1DText, AutoSpectrum2DPath,

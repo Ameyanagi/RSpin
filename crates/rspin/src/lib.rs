@@ -51,7 +51,8 @@ pub use core::{
     RSpinError, Result, Spectrum1D, Spectrum2D, SpectrumAnnotation, Unit, atoms_from_formula,
 };
 pub use io::{
-    AgilentFid1D, AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D, AutoSpectrum1DPath,
+    ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION, AgilentFid1D,
+    AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D, AutoSpectrum1DPath,
     AutoSpectrum1DPathWriter, AutoSpectrum1DText, AutoSpectrum2DPath, AutoSpectrum2DPathWriter,
     AutoSpectrum2DText, BrukerFid1D, BrukerProcessed1D, BrukerProcessed2D, BrukerSer2D,
     CsvAnalysis1D, CsvAnalysis2D, CsvSpectrum1D, CsvSpectrum2D, JcampDx, JeolJdf1D, JeolJdf2D,
@@ -136,8 +137,9 @@ pub use workflow::{AnalyzeProcessedSpectrum1D, AnalyzeProcessedSpectrum2D};
 /// simulation APIs.
 pub mod prelude {
     pub use crate::{
-        Abs1D, Abs2D, AgilentFid1D, AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D,
-        AlignmentWindow, AnalyzeProcessedSpectrum1D, AnalyzeProcessedSpectrum2D, AnalyzeSpectrum1D,
+        ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION, Abs1D, Abs2D,
+        AgilentFid1D, AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D, AlignmentWindow,
+        AnalyzeProcessedSpectrum1D, AnalyzeProcessedSpectrum2D, AnalyzeSpectrum1D,
         AnalyzeSpectrum1DResult, AnalyzeSpectrum2D, AnalyzeSpectrum2DResult, AnnotationTarget,
         AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, Atom, AutoPhaseOptions,
         AutoSpectrum1DPath, AutoSpectrum1DPathWriter, AutoSpectrum1DText, AutoSpectrum2DPath,

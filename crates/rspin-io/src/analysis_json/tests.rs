@@ -5,8 +5,9 @@ use rspin_analysis::{
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
 
 use crate::{
-    JsonAnalysis1D, JsonAnalysis2D, SpectrumReader, SpectrumWriter, read_analysis1d_json,
-    read_analysis2d_json, write_analysis1d_json, write_analysis2d_json,
+    ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION, JsonAnalysis1D,
+    JsonAnalysis2D, SpectrumReader, SpectrumWriter, read_analysis1d_json, read_analysis2d_json,
+    write_analysis1d_json, write_analysis2d_json,
 };
 
 #[test]
@@ -25,7 +26,9 @@ fn round_trips_one_dimensional_analysis_json() -> anyhow::Result<()> {
     let text = write_analysis1d_json(&analysis)?;
     let parsed = read_analysis1d_json(&text)?;
 
-    assert!(text.contains("peaks"));
+    assert!(text.contains(&format!("\"format\":\"{ANALYSIS_1D_JSON_FORMAT}\"")));
+    assert!(text.contains(&format!("\"version\":{ANALYSIS_JSON_VERSION}")));
+    assert!(text.contains("\"analysis\""));
     assert_eq!(parsed, analysis);
 
     let codec = JsonAnalysis1D;
@@ -58,7 +61,9 @@ fn round_trips_two_dimensional_analysis_json() -> anyhow::Result<()> {
     let text = write_analysis2d_json(&analysis)?;
     let parsed = read_analysis2d_json(&text)?;
 
-    assert!(text.contains("zones"));
+    assert!(text.contains(&format!("\"format\":\"{ANALYSIS_2D_JSON_FORMAT}\"")));
+    assert!(text.contains(&format!("\"version\":{ANALYSIS_JSON_VERSION}")));
+    assert!(text.contains("\"analysis\""));
     assert_eq!(parsed, analysis);
 
     let codec = JsonAnalysis2D;
@@ -69,5 +74,29 @@ fn round_trips_two_dimensional_analysis_json() -> anyhow::Result<()> {
 #[test]
 fn rejects_invalid_analysis_json() {
     let error = read_analysis1d_json("{").expect_err("invalid JSON should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+}
+
+#[test]
+fn rejects_unsupported_analysis_json_version() {
+    let error = read_analysis1d_json(
+        r#"{"format":"rspin.analysis_1d","version":99,"analysis":{"peaks":[],"ranges":[],"multiplets":[],"signals":[]}}"#,
+    )
+    .expect_err("unsupported analysis JSON version should fail");
+    assert_eq!(
+        error,
+        RSpinError::Unsupported {
+            feature: "analysis JSON version"
+        }
+    );
+}
+
+#[test]
+fn rejects_wrong_analysis_json_format() {
+    let error = read_analysis1d_json(
+        r#"{"format":"rspin.analysis_2d","version":1,"analysis":{"zones":[],"signals":[]}}"#,
+    )
+    .expect_err("wrong analysis JSON format should fail");
+
     assert!(matches!(error, RSpinError::Parse { .. }));
 }
