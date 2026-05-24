@@ -148,6 +148,47 @@ fn reads_numeric_data_table_real_and_imaginary_pages() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_asdf_sqz_xydata_values() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=sqz compressed
+##XUNITS=PPM
+##FIRSTX=0
+##LASTX=1
+##NPOINTS=2
+##XYDATA=(X++(Y..Y))
+0E3F4
+##END=
+";
+    let spectrum = read_jcamp_dx_1d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("sqz compressed"));
+    assert_eq!(spectrum.intensities, vec![53.0, 64.0]);
+    Ok(())
+}
+
+#[test]
+fn reads_asdf_difdup_xydata_values() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=difdup compressed
+##XUNITS=PPM
+##FIRSTX=0
+##LASTX=9
+##NPOINTS=10
+##XYDATA=(X++(Y..Y))
+0 1JT%jX
+##END=
+";
+    let spectrum = read_jcamp_dx_1d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("difdup compressed"));
+    assert_eq!(
+        spectrum.intensities,
+        vec![1.0, 2.0, 3.0, 3.0, 2.0, 1.0, 0.0, -1.0, -2.0, -3.0]
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_odd_xypoints_values() {
     let input = "\
 ##XYPOINTS=(XY..XY)

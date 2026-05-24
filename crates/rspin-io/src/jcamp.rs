@@ -6,6 +6,7 @@ use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
 use crate::{SpectrumReader, SpectrumWriter};
 
+mod asdf;
 mod writer;
 
 pub use writer::write_jcamp_dx_1d;
@@ -59,11 +60,11 @@ enum Channel {
 
 /// Reads a one-dimensional spectrum from a JCAMP-DX string.
 ///
-/// This parser targets numeric `XYDATA=(X++(Y..Y))`, `XYPOINTS=(XY..XY)`,
-/// `PEAK TABLE=(XY..XY)`, and numeric NTUPLES `DATA TABLE` real/imaginary
-/// pages. It applies JCAMP scaling factors to tabulated ordinates, and to
-/// explicit `XYPOINTS`/peak-table abscissae. Richer compressed variants are
-/// left for later format modules.
+/// This parser targets numeric or ASDF-compressed `XYDATA=(X++(Y..Y))`,
+/// `XYPOINTS=(XY..XY)`, `PEAK TABLE=(XY..XY)`, and numeric or
+/// ASDF-compressed NTUPLES `DATA TABLE` real/imaginary pages. It applies JCAMP
+/// scaling factors to tabulated ordinates, and to explicit `XYPOINTS`/peak-table
+/// abscissae.
 ///
 /// # Errors
 ///
@@ -263,7 +264,7 @@ fn normalized_key(key: &str) -> String {
 }
 
 fn parse_xydata_line(line: &str, intensities: &mut Vec<f64>) -> Result<()> {
-    let values = parse_numeric_tokens("XYDATA", line)?;
+    let values = asdf::decode_values("XYDATA", line)?;
 
     if values.len() > 1 {
         intensities.extend(values.into_iter().skip(1));

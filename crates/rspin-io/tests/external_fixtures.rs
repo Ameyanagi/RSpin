@@ -81,6 +81,23 @@ fn parses_external_jcamp_decimal_count_fixture_when_available() -> anyhow::Resul
     Ok(())
 }
 
+#[test]
+fn parses_external_jcamp_asdf_fixture_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("unpacked/jcamp-data-test-2.5.0/data/nmr/jeol/1h.dx");
+    require_fixture(&fixture)?;
+
+    let input = fs::read_to_string(&fixture)?;
+    let spectrum = read_jcamp_dx_1d(&input)?;
+
+    assert_eq!(spectrum.len(), 16_384);
+    assert_eq!(spectrum.x.unit, Unit::Hertz);
+    assert!(spectrum.intensities.iter().any(|value| *value > 1.0));
+    Ok(())
+}
+
 fn external_testdata_root() -> Option<PathBuf> {
     env::var_os("RSPIN_EXTERNAL_TESTDATA")
         .filter(|value| !value.is_empty())
