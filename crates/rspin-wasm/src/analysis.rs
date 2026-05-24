@@ -7,8 +7,8 @@ use crate::{
     bucket_spectrum_1d_json, bucket_spectrum_2d_json, cluster_bucket_matrix_1d_json,
     cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
     cluster_spectrum_matrix_2d_json, cut_cluster_result_at_distance_json,
-    cut_cluster_result_to_count_json, detect_ranges_json, detect_zones_json, js_error,
-    pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
+    cut_cluster_result_to_count_json, detect_consensus_peaks_1d_json, detect_ranges_json,
+    detect_zones_json, js_error, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
     pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, pca_bucket_matrix_1d_json,
     pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
 };
@@ -199,6 +199,20 @@ pub fn cut_cluster_result_at_distance(
     max_distance: f64,
 ) -> std::result::Result<String, JsValue> {
     cut_cluster_result_at_distance_json(result_json, max_distance).map_err(|error| js_error(&error))
+}
+
+/// Detects consensus peaks across one-dimensional spectra.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, peak detection,
+/// grouping, or serialization fails.
+#[wasm_bindgen(js_name = detectConsensusPeaks1d)]
+pub fn detect_consensus_peaks_1d(
+    spectra_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    detect_consensus_peaks_1d_json(spectra_json, options_json).map_err(|error| js_error(&error))
 }
 
 /// Runs PCA on a one-dimensional spectrum matrix.

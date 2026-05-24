@@ -5,6 +5,7 @@ use super::*;
 mod assignments;
 mod buckets;
 mod clustering;
+mod consensus;
 mod matrix;
 mod pairwise;
 mod pca;

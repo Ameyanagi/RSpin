@@ -4,6 +4,7 @@ mod alignment;
 mod assignments;
 mod buckets;
 mod clustering;
+mod consensus;
 mod couplings;
 mod integration;
 mod integration_2d;
@@ -33,6 +34,9 @@ pub use clustering::{
     ClusterMerge, MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult,
     MatrixClusteringOptions, MatrixLinkage, cluster_bucket_matrix_1d, cluster_bucket_matrix_2d,
     cluster_matrix, cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d,
+};
+pub use consensus::{
+    ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions, detect_consensus_peaks_1d,
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
