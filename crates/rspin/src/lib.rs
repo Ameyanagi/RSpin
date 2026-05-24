@@ -7,6 +7,8 @@ pub use rspin_prediction as prediction;
 pub use rspin_processing as processing;
 pub use rspin_simulation as simulation;
 
+mod workflow;
+
 pub use analysis::{
     AlignmentWindow, AnalyzeSpectrum1D, AnalyzeSpectrum1DResult, AnalyzeSpectrum2D,
     AnalyzeSpectrum2DResult, AssignedAtom, Assignment, AssignmentSet, AssignmentTarget,
@@ -107,6 +109,7 @@ pub use simulation::{
     SpinHalf, SpinHalfSystem, decompose_exact_spin_half_1d, decompose_exact_spin_half_2d,
     exact_spin_half_transitions, simulate_exact_spin_half_1d, simulate_exact_spin_half_2d,
 };
+pub use workflow::{AnalyzeProcessedSpectrum1D, AnalyzeProcessedSpectrum2D};
 
 /// Common imports for routine `RSpin` library workflows.
 ///
@@ -115,25 +118,25 @@ pub use simulation::{
 /// simulation APIs.
 pub mod prelude {
     pub use crate::{
-        Abs1D, Abs2D, AgilentFid1D, AgilentFid2D, AlignmentWindow, AnalyzeSpectrum1D,
-        AnalyzeSpectrum1DResult, AnalyzeSpectrum2D, AnalyzeSpectrum2DResult, AnnotationTarget,
-        AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, Atom, AutoPhaseOptions,
-        AutoSpectrum1DPath, AutoSpectrum1DText, AutoSpectrum2DPath, AutoSpectrum2DText, Axis,
-        BaselineMethod, BilinearIntegrator2D, Bond, BondCorrelationRule, BondOrder, BrukerFid1D,
-        BrukerProcessed1D, BrukerProcessed2D, BrukerSer2D, BucketMatrix1D, BucketMatrix2D,
-        BucketOptions1D, BucketOptions2D, ClusterMerge, ConsensusPeak1D, ConsensusPeakMember1D,
-        ConsensusPeakOptions, ConsensusRange1D, ConsensusRangeMember1D, ConsensusRangeOptions,
-        ConsensusZone2D, ConsensusZoneMember2D, ConsensusZoneOptions, Crop1D, Crop2D,
-        CsvAnalysis1D, CsvAnalysis2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet,
-        DetectedRange, DetectedZone, ElementShiftPredictor, ElementShiftRule,
-        ExactSpectrum2DOptions, ExactSpectrumOptions, ExactSpinHalfResultWorkflow,
-        ExactSpinHalfSpectrum1DResultWorkflow, ExactSpinHalfSpectrum1DWorkflow,
-        ExactSpinHalfSpectrum2DResultWorkflow, ExactSpinHalfSpectrum2DWorkflow,
-        ExactSpinHalfWorkflow, ExactSpinOptions, ExactSpinPair, ExactTransition, Experiment,
-        FftDirection, Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling,
-        JCouplingGraph, JeolJdf1D, JeolJdf2D, JsonAnalysis1D, JsonAnalysis2D,
-        JsonProcessingRecipe1D, JsonProcessingRecipe2D, LineShape, MatrixClusterCut,
-        MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
+        Abs1D, Abs2D, AgilentFid1D, AgilentFid2D, AlignmentWindow, AnalyzeProcessedSpectrum1D,
+        AnalyzeProcessedSpectrum2D, AnalyzeSpectrum1D, AnalyzeSpectrum1DResult, AnalyzeSpectrum2D,
+        AnalyzeSpectrum2DResult, AnnotationTarget, AssignedAtom, Assignment, AssignmentSet,
+        AssignmentTarget, Atom, AutoPhaseOptions, AutoSpectrum1DPath, AutoSpectrum1DText,
+        AutoSpectrum2DPath, AutoSpectrum2DText, Axis, BaselineMethod, BilinearIntegrator2D, Bond,
+        BondCorrelationRule, BondOrder, BrukerFid1D, BrukerProcessed1D, BrukerProcessed2D,
+        BrukerSer2D, BucketMatrix1D, BucketMatrix2D, BucketOptions1D, BucketOptions2D,
+        ClusterMerge, ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions,
+        ConsensusRange1D, ConsensusRangeMember1D, ConsensusRangeOptions, ConsensusZone2D,
+        ConsensusZoneMember2D, ConsensusZoneOptions, Crop1D, Crop2D, CsvAnalysis1D, CsvAnalysis2D,
+        CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange, DetectedZone,
+        ElementShiftPredictor, ElementShiftRule, ExactSpectrum2DOptions, ExactSpectrumOptions,
+        ExactSpinHalfResultWorkflow, ExactSpinHalfSpectrum1DResultWorkflow,
+        ExactSpinHalfSpectrum1DWorkflow, ExactSpinHalfSpectrum2DResultWorkflow,
+        ExactSpinHalfSpectrum2DWorkflow, ExactSpinHalfWorkflow, ExactSpinOptions, ExactSpinPair,
+        ExactTransition, Experiment, FftDirection, Integral, Integral2D, IntegralRegion,
+        IntegralRegion2D, JCoupling, JCouplingGraph, JeolJdf1D, JeolJdf2D, JsonAnalysis1D,
+        JsonAnalysis2D, JsonProcessingRecipe1D, JsonProcessingRecipe2D, LineShape,
+        MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
         MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric,
         MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult,
         MatrixScaling, Metadata, Molecule, MultipletDetectionOptions, MultipletKind,

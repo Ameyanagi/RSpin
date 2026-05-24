@@ -54,6 +54,41 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_processed_analysis_bridge() -> Result<()> {
+    let analysis = read_spectrum1d_csv("x,intensity\n0,0\n1,4\n2,0\n")?
+        .process()
+        .scale(0.5)
+        .analyze()
+        .with_peak_options(
+            PeakPickOptions::new()
+                .with_min_abs_intensity(1.0)
+                .with_min_prominence(1.0),
+        )
+        .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0))
+        .run()?;
+
+    assert_eq!(analysis.peaks.len(), 1);
+    assert_eq!(analysis.ranges.len(), 1);
+
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        Axis::linear_ppm(10.0, 11.0, 2)?,
+        vec![0.0, 4.0, 0.0, 0.0],
+        Metadata::named("processed zones"),
+    )?;
+    let analysis_2d = spectrum_2d
+        .process()
+        .scale(0.5)
+        .analyze()
+        .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0))
+        .run()?;
+
+    assert_eq!(analysis_2d.zones.len(), 1);
+    assert_eq!(analysis_2d.signals.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
     let agilent_2d_reader = AgilentFid2D;
     assert_eq!(format!("{agilent_2d_reader:?}"), "AgilentFid2D");
