@@ -1,5 +1,6 @@
 //! JSON-oriented API helpers for WASM bindings.
 
+mod csv_io;
 mod processing_2d;
 
 use serde::{Serialize, de::DeserializeOwned};
@@ -20,6 +21,10 @@ use rspin_simulation::{
     simulate_multiplet_1d,
 };
 
+pub use csv_io::{
+    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
+    write_spectrum_2d_csv_json,
+};
 pub use processing_2d::{
     auto_phase_spectrum_2d_json, fft_spectrum_2d_json, normalize_spectrum_2d_json,
     phase_spectrum_2d_json, project_spectrum_2d_x_json, project_spectrum_2d_y_json,

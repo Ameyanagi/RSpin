@@ -1,0 +1,48 @@
+//! WebAssembly bindings for spectrum IO workflows.
+
+use wasm_bindgen::prelude::*;
+
+use crate::{
+    js_error, parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
+    write_spectrum_2d_csv_json,
+};
+
+/// Parses one-dimensional CSV text into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseSpectrum1dCsv)]
+pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue> {
+    parse_spectrum_1d_csv_json(input).map_err(|error| js_error(&error))
+}
+
+/// Serializes one-dimensional spectrum JSON into CSV text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or CSV serialization fails.
+#[wasm_bindgen(js_name = writeSpectrum1dCsv)]
+pub fn write_spectrum_1d_csv(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    write_spectrum_1d_csv_json(spectrum_json).map_err(|error| js_error(&error))
+}
+
+/// Parses two-dimensional CSV text into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseSpectrum2dCsv)]
+pub fn parse_spectrum_2d_csv(input: &str) -> std::result::Result<String, JsValue> {
+    parse_spectrum_2d_csv_json(input).map_err(|error| js_error(&error))
+}
+
+/// Serializes two-dimensional spectrum JSON into CSV text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or CSV serialization fails.
+#[wasm_bindgen(js_name = writeSpectrum2dCsv)]
+pub fn write_spectrum_2d_csv(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    write_spectrum_2d_csv_json(spectrum_json).map_err(|error| js_error(&error))
+}

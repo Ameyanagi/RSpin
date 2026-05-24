@@ -2,6 +2,7 @@
 
 mod analysis;
 mod api;
+mod io;
 
 use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
@@ -12,13 +13,17 @@ pub use api::{
     decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
     detect_zones_json, fft_spectrum_2d_json, integrate_region_json, normalize_spectrum_1d_json,
     normalize_spectrum_2d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
-    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
-    project_spectrum_2d_y_json, render_prediction_1d_json, scale_spectrum_1d_json,
-    scale_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_y_at_x_index_json,
-    summarize_signals_1d_json, validate_j_coupling_graph_json, validate_prediction_json,
+    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, phase_spectrum_2d_json,
+    pick_peaks_json, project_spectrum_2d_x_json, project_spectrum_2d_y_json,
+    render_prediction_1d_json, scale_spectrum_1d_json, scale_spectrum_2d_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    simulate_first_order_multiplet_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_y_at_x_index_json, summarize_signals_1d_json, validate_j_coupling_graph_json,
+    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
     zero_fill_spectrum_2d_json,
+};
+pub use io::{
+    parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
