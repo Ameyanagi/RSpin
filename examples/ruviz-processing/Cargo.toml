@@ -10,7 +10,8 @@ publish = false
 
 [features]
 default = []
-ruviz = ["dep:ruviz"]
+ruviz = ["visualization-ruviz"]
+visualization-ruviz = ["dep:ruviz"]
 
 [dependencies]
 anyhow = "1.0"

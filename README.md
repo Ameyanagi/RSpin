@@ -30,6 +30,8 @@ cargo test --workspace --all-features
 - `external-baselines`: enables the optional Git-pinned `baselines` crate for
   additional baseline correction methods. It is off by default so the core
   library dependency graph stays small and reviewable.
+- `visualization-ruviz`: enables the standalone processed-data PNG example in
+  `examples/ruviz-processing`. It is not part of the main workspace defaults.
 
 ## License
 

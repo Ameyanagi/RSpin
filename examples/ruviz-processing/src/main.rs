@@ -1,17 +1,18 @@
-#[cfg(feature = "ruviz")]
+#[cfg(feature = "visualization-ruviz")]
 fn main() -> anyhow::Result<()> {
     ruviz_example::run()
 }
 
-#[cfg(not(feature = "ruviz"))]
+#[cfg(not(feature = "visualization-ruviz"))]
 fn main() {
     eprintln!(
-        "Enable the ruviz feature to generate PNGs: \
-         cargo run --manifest-path examples/ruviz-processing/Cargo.toml --features ruviz"
+        "Enable the visualization-ruviz feature to generate PNGs: \
+         cargo run --manifest-path examples/ruviz-processing/Cargo.toml \
+         --features visualization-ruviz"
     );
 }
 
-#[cfg(feature = "ruviz")]
+#[cfg(feature = "visualization-ruviz")]
 mod ruviz_example {
     use std::{
         fs,
