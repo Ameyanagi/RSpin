@@ -25,7 +25,7 @@ use rspin_analysis::{
     integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
     summarize_signals_2d,
 };
-use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
+use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
     NmreDataRecord, read_jcamp_dx_1d, read_nmredata_records_str, read_nmredata_str,
     read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum1d_json,
@@ -164,6 +164,36 @@ pub fn write_nmredata_json(record_json: &str) -> Result<String> {
 pub fn write_nmredata_records_json(records_json: &str) -> Result<String> {
     let records: Vec<NmreDataRecord> = from_json(records_json)?;
     write_nmredata_records(&records)
+}
+
+/// Converts `NMReDATA` record JSON into serialized [`AssignmentSet`] JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, nucleus parsing, conversion, or
+/// serialization fails.
+pub fn nmredata_assignments_to_assignment_set_json(
+    record_json: &str,
+    nucleus_label: &str,
+) -> Result<String> {
+    let record: NmreDataRecord = from_json(record_json)?;
+    let assignments = record.to_assignment_set(parse_nucleus_label(nucleus_label)?)?;
+    to_json(&assignments)
+}
+
+/// Converts `NMReDATA` record JSON into serialized [`JCouplingGraph`] JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, nucleus parsing, conversion, or
+/// serialization fails.
+pub fn nmredata_couplings_to_j_coupling_graph_json(
+    record_json: &str,
+    nucleus_label: &str,
+) -> Result<String> {
+    let record: NmreDataRecord = from_json(record_json)?;
+    let graph = record.to_j_coupling_graph(parse_nucleus_label(nucleus_label)?)?;
+    to_json(&graph)
 }
 
 /// Parses root-level nmrML document metadata into JSON.
@@ -437,6 +467,10 @@ fn spectrum1d_to_json(spectrum: &Spectrum1D) -> Result<String> {
 
 fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
     write_spectrum2d_json(spectrum)
+}
+
+fn parse_nucleus_label(label: &str) -> Result<Nucleus> {
+    label.parse()
 }
 
 #[derive(Clone, Copy, Debug, serde::Deserialize)]

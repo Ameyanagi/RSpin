@@ -291,6 +291,67 @@ $$$$
 }
 
 #[test]
+fn converts_nmredata_analysis_to_json() -> anyhow::Result<()> {
+    let record_json = parse_nmredata_json(
+        r"
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+Hcombo, 3.900, H2, H3
+
+>  <NMREDATA_J>
+H1, Hcombo, 7.0
+",
+    )?;
+
+    let assignments_json = nmredata_assignments_to_assignment_set_json(&record_json, "1H")?;
+    let assignments: serde_json::Value = from_json(&assignments_json)?;
+    assert_eq!(assignments["assignments"].as_array().map(Vec::len), Some(2));
+    assert_eq!(assignments["assignments"][0]["atoms"][0]["id"], "H1");
+    assert_eq!(
+        assignments["assignments"][1]["atoms"][1]["nucleus"],
+        "Hydrogen1"
+    );
+    assert_eq!(
+        assignments["assignments"][0]["target"]["Peak1D"]["index"],
+        0
+    );
+    assert_eq!(assignments["assignments"][0]["target"]["Peak1D"]["x"], 4.2);
+
+    let graph_json = nmredata_couplings_to_j_coupling_graph_json(&record_json, "1H")?;
+    let graph: serde_json::Value = from_json(&graph_json)?;
+    assert_eq!(graph["nodes"].as_array().map(Vec::len), Some(2));
+    assert_eq!(graph["nodes"][0]["id"], "H1");
+    assert_eq!(graph["couplings"].as_array().map(Vec::len), Some(1));
+    assert_eq!(graph["couplings"][0]["node_a"], "H1");
+    assert_eq!(graph["couplings"][0]["node_b"], "Hcombo");
+    assert_eq!(graph["couplings"][0]["j_hz"], 7.0);
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_nmredata_analysis_conversion_json() -> anyhow::Result<()> {
+    let record_json = parse_nmredata_json(
+        r"
+>  <NMREDATA_J>
+H1, H2, 7.0
+H2, H1, 7.0
+",
+    )?;
+
+    let duplicate_error = nmredata_couplings_to_j_coupling_graph_json(&record_json, "1H")
+        .expect_err("duplicate coupling pairs should fail");
+    assert!(matches!(
+        duplicate_error,
+        RSpinError::InvalidAssignment { .. }
+    ));
+
+    let nucleus_error = nmredata_assignments_to_assignment_set_json(&record_json, " ")
+        .expect_err("empty nucleus labels should fail");
+    assert!(matches!(nucleus_error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_nmredata_json_write() {
     let error = write_nmredata_json(r#"{"tags":[{"name":"","values":["value"]}]}"#)
         .expect_err("empty SDF tag name should fail");
