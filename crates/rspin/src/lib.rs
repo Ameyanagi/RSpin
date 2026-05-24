@@ -12,8 +12,8 @@ pub use analysis::{
     BilinearIntegrator2D, BucketMatrix1D, BucketMatrix2D, BucketOptions1D, BucketOptions2D,
     ClusterMerge, CouplingNode, DetectedMultiplet, DetectedRange, DetectedZone,
     GapMultipletDetector, Integral, Integral2D, IntegralRegion, IntegralRegion2D, Integrator,
-    Integrator2D, JCoupling, JCouplingGraph, LocalExtremaPeakPicker, MatrixClusterMetric,
-    MatrixClusterResult, MatrixClusteringOptions, MatrixGeneration2DOptions,
+    Integrator2D, JCoupling, JCouplingGraph, LocalExtremaPeakPicker, MatrixClusterCut,
+    MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions, MatrixGeneration2DOptions,
     MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric, MatrixPairwiseOptions,
     MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult, MatrixScaling,
     MultipletDetectionOptions, MultipletDetector, MultipletKind, OptimizedPeak, Peak,
@@ -88,7 +88,7 @@ pub mod prelude {
         Crop1D, Crop2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange,
         DetectedZone, ElementShiftPredictor, ElementShiftRule, ExactSpectrumOptions,
         ExactSpinOptions, ExactTransition, Experiment, FftDirection, Integral, Integral2D,
-        IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape,
+        IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape, MatrixClusterCut,
         MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
         MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric,
         MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult,
@@ -242,6 +242,8 @@ mod tests {
             MatrixClusteringOptions::new().with_linkage(MatrixLinkage::Single),
         )?;
         assert_eq!(clusters.merges.len(), 2);
+        let cluster_cut = clusters.cut_to_cluster_count(2)?;
+        assert_eq!(cluster_cut.cluster_ids, vec![0, 0, 1]);
 
         let system = SpinHalfSystem::new().with_spin(1.0);
         let transitions = exact_spin_half_transitions(

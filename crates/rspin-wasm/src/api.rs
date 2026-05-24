@@ -38,7 +38,8 @@ pub use buckets::{
 };
 pub use clustering::{
     cluster_bucket_matrix_1d_json, cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
-    cluster_spectrum_matrix_2d_json,
+    cluster_spectrum_matrix_2d_json, cut_cluster_result_at_distance_json,
+    cut_cluster_result_to_count_json,
 };
 pub use contours::extract_contours_2d_json;
 pub use csv_io::{

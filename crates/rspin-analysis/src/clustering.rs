@@ -10,7 +10,8 @@ use crate::{
 mod model;
 
 pub use model::{
-    ClusterMerge, MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions, MatrixLinkage,
+    ClusterMerge, MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult,
+    MatrixClusteringOptions, MatrixLinkage,
 };
 
 /// Runs agglomerative hierarchical clustering on a row-major matrix.

@@ -6,7 +6,8 @@ use crate::{
     align_spectra_by_peak_to_matrix_1d_json, bucket_spectra_1d_json, bucket_spectra_2d_json,
     bucket_spectrum_1d_json, bucket_spectrum_2d_json, cluster_bucket_matrix_1d_json,
     cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
-    cluster_spectrum_matrix_2d_json, detect_ranges_json, detect_zones_json, js_error,
+    cluster_spectrum_matrix_2d_json, cut_cluster_result_at_distance_json,
+    cut_cluster_result_to_count_json, detect_ranges_json, detect_zones_json, js_error,
     pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
     pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, pca_bucket_matrix_1d_json,
     pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
@@ -170,6 +171,34 @@ pub fn cluster_bucket_matrix_2d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     cluster_bucket_matrix_2d_json(matrix_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Cuts a clustering result to a requested number of clusters.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, dendrogram cutting,
+/// or serialization fails.
+#[wasm_bindgen(js_name = cutClusterResultToCount)]
+pub fn cut_cluster_result_to_count(
+    result_json: &str,
+    cluster_count: usize,
+) -> std::result::Result<String, JsValue> {
+    cut_cluster_result_to_count_json(result_json, cluster_count).map_err(|error| js_error(&error))
+}
+
+/// Cuts a clustering result at a maximum linkage distance.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, dendrogram cutting,
+/// or serialization fails.
+#[wasm_bindgen(js_name = cutClusterResultAtDistance)]
+pub fn cut_cluster_result_at_distance(
+    result_json: &str,
+    max_distance: f64,
+) -> std::result::Result<String, JsValue> {
+    cut_cluster_result_at_distance_json(result_json, max_distance).map_err(|error| js_error(&error))
 }
 
 /// Runs PCA on a one-dimensional spectrum matrix.

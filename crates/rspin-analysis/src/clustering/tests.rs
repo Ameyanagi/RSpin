@@ -116,6 +116,34 @@ fn accepts_two_dimensional_matrix_flats() -> anyhow::Result<()> {
 }
 
 #[test]
+fn cuts_dendrogram_to_cluster_count_or_distance() -> anyhow::Result<()> {
+    let result = cluster_matrix(
+        &four_row_ids(),
+        &[0.0, 1.0, 10.0, 11.0],
+        4,
+        1,
+        MatrixClusteringOptions::new(),
+    )?;
+
+    let count_cut = result.cut_to_cluster_count(2)?;
+    assert_eq!(count_cut.row_count(), 4);
+    assert_eq!(count_cut.cluster_count, 2);
+    assert_eq!(count_cut.cluster_ids, vec![0, 0, 1, 1]);
+    assert_eq!(count_cut.cluster_id_at(2), Some(1));
+
+    let distance_cut = result.cut_at_distance(1.0)?;
+    assert_eq!(distance_cut.cluster_ids, vec![0, 0, 1, 1]);
+
+    let leaf_cut = result.cut_at_distance(0.5)?;
+    assert_eq!(leaf_cut.cluster_count, 4);
+    assert_eq!(leaf_cut.cluster_ids, vec![0, 1, 2, 3]);
+
+    let root_cut = result.cut_to_cluster_count(1)?;
+    assert_eq!(root_cut.cluster_ids, vec![0, 0, 0, 0]);
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_inputs() {
     let one_row_error = cluster_matrix(
         &[String::from("only")],
@@ -138,8 +166,70 @@ fn rejects_invalid_inputs() {
     assert!(matches!(non_finite_error, RSpinError::NonFinite { .. }));
 }
 
+#[test]
+fn rejects_invalid_cluster_cuts() -> anyhow::Result<()> {
+    let result = cluster_matrix(
+        &row_ids(),
+        &[0.0, 2.0, 5.0],
+        3,
+        1,
+        MatrixClusteringOptions::new(),
+    )?;
+
+    let zero_count_error = result
+        .cut_to_cluster_count(0)
+        .expect_err("zero clusters should fail");
+    assert!(matches!(
+        zero_count_error,
+        RSpinError::InvalidSpectrum { .. }
+    ));
+
+    let too_many_error = result
+        .cut_to_cluster_count(4)
+        .expect_err("too many clusters should fail");
+    assert!(matches!(too_many_error, RSpinError::InvalidSpectrum { .. }));
+
+    let non_finite_distance_error = result
+        .cut_at_distance(f64::NAN)
+        .expect_err("non-finite cut distance should fail");
+    assert!(matches!(
+        non_finite_distance_error,
+        RSpinError::NonFinite { .. }
+    ));
+
+    let malformed = MatrixClusterResult {
+        row_ids: row_ids(),
+        metric: MatrixClusterMetric::EuclideanDistance,
+        linkage: MatrixLinkage::Single,
+        merges: vec![ClusterMerge {
+            left: 0,
+            right: 1,
+            distance: 1.0,
+            size: 3,
+        }],
+    };
+    let malformed_error = malformed
+        .cut_to_cluster_count(2)
+        .expect_err("malformed merge should fail");
+    assert!(matches!(
+        malformed_error,
+        RSpinError::InvalidSpectrum { .. }
+    ));
+
+    Ok(())
+}
+
 fn row_ids() -> Vec<String> {
     vec!["a".to_owned(), "b".to_owned(), "c".to_owned()]
+}
+
+fn four_row_ids() -> Vec<String> {
+    vec![
+        "a".to_owned(),
+        "b".to_owned(),
+        "c".to_owned(),
+        "d".to_owned(),
+    ]
 }
 
 fn assert_close(actual: f64, expected: f64) {
