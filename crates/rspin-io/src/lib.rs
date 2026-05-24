@@ -49,8 +49,9 @@ pub use jeol::{
     read_jeol_jdf_2d_file,
 };
 pub use json::{
-    JsonSpectrum1D, JsonSpectrum2D, read_spectrum1d_json, read_spectrum2d_json,
-    write_spectrum1d_json, write_spectrum2d_json,
+    JsonSpectrum1D, JsonSpectrum2D, SPECTRUM_1D_JSON_FORMAT, SPECTRUM_2D_JSON_FORMAT,
+    SPECTRUM_JSON_VERSION, read_spectrum1d_json, read_spectrum2d_json, write_spectrum1d_json,
+    write_spectrum2d_json,
 };
 pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str};
 pub use nmrml_2d::{NmrMl2D, read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str};
