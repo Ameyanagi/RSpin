@@ -35,6 +35,73 @@ fn normalizes_2d_values() -> anyhow::Result<()> {
 }
 
 #[test]
+fn normalizes_2d_values_by_signed_volume() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![1.0, 1.0, 1.0, 1.0],
+        Metadata::default(),
+    )?;
+    let processed = Normalize2DVolume::new(4.0).apply(&spectrum)?;
+
+    assert!((spectrum_volume_2d(&processed, false)? - 4.0).abs() < 1.0e-12);
+    assert_vec_close(&processed.z, &[4.0, 4.0, 4.0, 4.0]);
+    assert_eq!(processed.processing[0].operation, "normalize_2d_volume");
+    assert_eq!(
+        processed.processing[0].details.as_deref(),
+        Some("target_volume=4,use_absolute_intensity=false")
+    );
+    Ok(())
+}
+
+#[test]
+fn normalizes_2d_values_by_absolute_volume_and_scales_imaginary() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new_complex(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![-1.0, 1.0, -1.0, 1.0],
+        Some(vec![0.5, -0.5, 1.0, -1.0]),
+        Metadata::default(),
+    )?;
+    let processed = Normalize2DVolume::absolute(2.0).apply(&spectrum)?;
+
+    assert!((spectrum_volume_2d(&processed, true)? - 2.0).abs() < 1.0e-12);
+    assert_vec_close(&processed.z, &[-2.0, 2.0, -2.0, 2.0]);
+    assert_eq!(require_imaginary_2d(&processed)?, &[1.0, -1.0, 2.0, -2.0]);
+    Ok(())
+}
+
+#[test]
+fn rejects_unusable_2d_volume_normalization_inputs() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![1.0, -1.0, -1.0, 1.0],
+        Metadata::default(),
+    )?;
+    let zero_volume_error =
+        normalize_2d_volume(&spectrum, 1.0, false).expect_err("zero signed volume should fail");
+    assert!(matches!(
+        zero_volume_error,
+        RSpinError::InvalidSpectrum { .. }
+    ));
+
+    let target_error =
+        normalize_2d_volume(&spectrum, 0.0, true).expect_err("zero target volume should fail");
+    assert!(matches!(target_error, RSpinError::InvalidSpectrum { .. }));
+
+    let short = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 0.0, 1)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![1.0, 1.0],
+        Metadata::default(),
+    )?;
+    let short_error = spectrum_volume_2d(&short, false).expect_err("short 2D spectrum should fail");
+    assert!(matches!(short_error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
 fn projects_x_and_y() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let x_projection = project_x(&spectrum, ProjectionMode::Sum)?;

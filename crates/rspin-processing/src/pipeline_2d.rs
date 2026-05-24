@@ -4,9 +4,9 @@ use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     Abs2D, AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
-    FftDirection, GaussianApodization2D, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep,
-    ProjectionMode, Resample2D, Scale2D, SineBellApodization2D, ZeroFill2D, project_x, project_y,
-    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
+    FftDirection, GaussianApodization2D, Normalize2DMaxAbs, Normalize2DVolume, PhaseCorrection2D,
+    ProcessingStep, ProjectionMode, Resample2D, Scale2D, SineBellApodization2D, ZeroFill2D,
+    project_x, project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -72,6 +72,18 @@ impl Spectrum2DPipeline {
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
         self.then(Normalize2DMaxAbs)
+    }
+
+    /// Normalizes real and imaginary values by signed bilinear volume.
+    #[must_use]
+    pub fn normalize_volume(self, target_volume: f64) -> Self {
+        self.then(Normalize2DVolume::new(target_volume))
+    }
+
+    /// Normalizes real and imaginary values by absolute bilinear volume.
+    #[must_use]
+    pub fn normalize_abs_volume(self, target_volume: f64) -> Self {
+        self.then(Normalize2DVolume::absolute(target_volume))
     }
 
     /// Applies component-wise absolute value to real and imaginary matrices.

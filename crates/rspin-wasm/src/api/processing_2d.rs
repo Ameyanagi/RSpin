@@ -8,8 +8,9 @@ use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, abs_2d,
     apply_processing_recipe_2d, apply_processing_recipe_2d_until, auto_phase_correct_2d, crop_2d,
     exponential_apodization_2d, fft_2d, gaussian_apodization_2d, normalize_2d_max_abs,
-    phase_correct_2d, project_x, project_y, resample_2d, scale_2d, sine_bell_apodization_2d,
-    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
+    normalize_2d_volume, phase_correct_2d, project_x, project_y, resample_2d, scale_2d,
+    sine_bell_apodization_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
+    zero_fill_2d,
 };
 
 use super::{from_json, spectrum1d_to_json, spectrum2d_from_json, spectrum2d_to_json, to_json};
@@ -33,6 +34,21 @@ pub fn scale_spectrum_2d_json(spectrum_json: &str, factor: f64) -> Result<String
 pub fn normalize_spectrum_2d_json(spectrum_json: &str) -> Result<String> {
     let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = normalize_2d_max_abs(&spectrum)?;
+    spectrum2d_to_json(&processed)
+}
+
+/// Normalizes serialized `Spectrum2D` JSON by bilinear volume.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn normalize_spectrum_2d_volume_json(
+    spectrum_json: &str,
+    target_volume: f64,
+    use_absolute_intensity: bool,
+) -> Result<String> {
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
+    let processed = normalize_2d_volume(&spectrum, target_volume, use_absolute_intensity)?;
     spectrum2d_to_json(&processed)
 }
 

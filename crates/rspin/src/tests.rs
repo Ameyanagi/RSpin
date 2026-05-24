@@ -39,10 +39,22 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
     let recipe_2d = ProcessingRecipe2D::new()
         .scale(2.0)
         .zero_fill(4, 4)
-        .normalize_max_abs();
+        .normalize_max_abs()
+        .normalize_abs_volume(2.0);
     let recipe_2d_json = write_processing_recipe_2d_json(&recipe_2d)?;
     assert!(recipe_2d_json.contains(PROCESSING_RECIPE_2D_FORMAT));
     assert_eq!(read_processing_recipe_2d_json(&recipe_2d_json)?, recipe_2d);
+
+    let normalized_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        vec![1.0, -1.0, 1.0, -1.0],
+        Metadata::named("2d volume"),
+    )?
+    .process()
+    .normalize_abs_volume(3.0)
+    .finish()?;
+    assert!((spectrum_volume_2d(&normalized_2d, true)? - 3.0).abs() < 1.0e-12);
 
     let baseline_corrected = Spectrum1D::new(
         Axis::linear_ppm(0.0, 3.0, 4)?,

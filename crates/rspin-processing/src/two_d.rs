@@ -42,6 +42,48 @@ impl ProcessingStep<Spectrum2D> for Normalize2DMaxAbs {
     }
 }
 
+/// Normalizes 2D intensities so their bilinear volume matches a target value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Normalize2DVolume {
+    /// Desired integrated volume after normalization.
+    pub target_volume: f64,
+    /// Use absolute real intensities when measuring the volume.
+    pub use_absolute_intensity: bool,
+}
+
+impl Normalize2DVolume {
+    /// Creates signed volume normalization.
+    #[must_use]
+    pub fn new(target_volume: f64) -> Self {
+        Self {
+            target_volume,
+            use_absolute_intensity: false,
+        }
+    }
+
+    /// Creates absolute volume normalization.
+    #[must_use]
+    pub fn absolute(target_volume: f64) -> Self {
+        Self {
+            target_volume,
+            use_absolute_intensity: true,
+        }
+    }
+
+    /// Sets whether absolute real intensities are used for the volume.
+    #[must_use]
+    pub fn with_absolute_intensity(mut self, use_absolute_intensity: bool) -> Self {
+        self.use_absolute_intensity = use_absolute_intensity;
+        self
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for Normalize2DVolume {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        normalize_2d_volume(spectrum, self.target_volume, self.use_absolute_intensity)
+    }
+}
+
 /// Multiplies all 2D intensities by `factor`.
 ///
 /// # Errors
@@ -50,14 +92,7 @@ impl ProcessingStep<Spectrum2D> for Normalize2DMaxAbs {
 pub fn scale_2d(spectrum: &Spectrum2D, factor: f64) -> Result<Spectrum2D> {
     ensure_finite("scale factor", factor)?;
     let mut processed = spectrum.clone();
-    processed.z = processed
-        .z
-        .into_iter()
-        .map(|value| value * factor)
-        .collect();
-    if let Some(imaginary) = processed.imaginary.take() {
-        processed.imaginary = Some(imaginary.into_iter().map(|value| value * factor).collect());
-    }
+    scale_2d_values(&mut processed, factor);
     Ok(recorded_2d(
         processed,
         ProcessingRecord::new("scale_2d").with_details(format!("factor={factor}")),
@@ -85,6 +120,109 @@ pub fn normalize_2d_max_abs(spectrum: &Spectrum2D) -> Result<Spectrum2D> {
     Ok(recorded_2d(
         processed,
         ProcessingRecord::new("normalize_2d_max_abs"),
+    ))
+}
+
+/// Integrates real values over the x/y axes with bilinear cell averaging.
+///
+/// When `use_absolute_intensity` is true, each real value is converted to its
+/// absolute value before integration. Axis direction does not change the sign of
+/// the volume.
+///
+/// # Errors
+///
+/// Returns an error when either axis has fewer than two points, the spectrum has
+/// no non-zero-area cells, or the computed volume is not finite.
+pub fn spectrum_volume_2d(spectrum: &Spectrum2D, use_absolute_intensity: bool) -> Result<f64> {
+    let (width, height) = spectrum.shape();
+    if width < 2 || height < 2 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "2D volume normalization requires at least two points on each axis".to_owned(),
+        });
+    }
+
+    let mut volume = 0.0;
+    let mut cell_count = 0_usize;
+    for y_index in 0..height - 1 {
+        let dy = (spectrum.y.values[y_index + 1] - spectrum.y.values[y_index]).abs();
+        if dy <= f64::EPSILON {
+            continue;
+        }
+        for x_index in 0..width - 1 {
+            let dx = (spectrum.x.values[x_index + 1] - spectrum.x.values[x_index]).abs();
+            if dx <= f64::EPSILON {
+                continue;
+            }
+            let top_left = matrix_value(spectrum, x_index, y_index, use_absolute_intensity);
+            let top_right = matrix_value(spectrum, x_index + 1, y_index, use_absolute_intensity);
+            let bottom_left = matrix_value(spectrum, x_index, y_index + 1, use_absolute_intensity);
+            let bottom_right =
+                matrix_value(spectrum, x_index + 1, y_index + 1, use_absolute_intensity);
+            volume += 0.25 * (top_left + top_right + bottom_left + bottom_right) * dx * dy;
+            cell_count += 1;
+        }
+    }
+
+    if cell_count == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "2D volume calculation requires at least one non-zero-area cell".to_owned(),
+        });
+    }
+    if !volume.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "spectrum volume",
+        });
+    }
+    Ok(volume)
+}
+
+/// Normalizes real and imaginary 2D values to a target bilinear volume.
+///
+/// The scale factor is computed from real values and then applied to both real
+/// and imaginary matrices.
+///
+/// # Errors
+///
+/// Returns an error when the target volume is not finite, the target volume is
+/// zero, the absolute target is negative, or the current volume cannot be used
+/// as a normalization denominator.
+pub fn normalize_2d_volume(
+    spectrum: &Spectrum2D,
+    target_volume: f64,
+    use_absolute_intensity: bool,
+) -> Result<Spectrum2D> {
+    ensure_finite("target volume", target_volume)?;
+    if target_volume == 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "target volume must be non-zero".to_owned(),
+        });
+    }
+    if use_absolute_intensity && target_volume <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "absolute volume normalization requires a positive target volume".to_owned(),
+        });
+    }
+
+    let current_volume = spectrum_volume_2d(spectrum, use_absolute_intensity)?;
+    if current_volume == 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "cannot normalize a 2D spectrum with zero integrated volume".to_owned(),
+        });
+    }
+    let factor = target_volume / current_volume;
+    if !factor.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "2D volume normalization factor",
+        });
+    }
+
+    let mut processed = spectrum.clone();
+    scale_2d_values(&mut processed, factor);
+    Ok(recorded_2d(
+        processed,
+        ProcessingRecord::new("normalize_2d_volume").with_details(format!(
+            "target_volume={target_volume},use_absolute_intensity={use_absolute_intensity}"
+        )),
     ))
 }
 
@@ -380,6 +518,31 @@ fn ensure_finite(field: &'static str, value: f64) -> Result<()> {
         return Err(RSpinError::NonFinite { field });
     }
     Ok(())
+}
+
+fn scale_2d_values(spectrum: &mut Spectrum2D, factor: f64) {
+    for value in &mut spectrum.z {
+        *value *= factor;
+    }
+    if let Some(imaginary) = &mut spectrum.imaginary {
+        for value in imaginary {
+            *value *= factor;
+        }
+    }
+}
+
+fn matrix_value(
+    spectrum: &Spectrum2D,
+    x_index: usize,
+    y_index: usize,
+    use_absolute_intensity: bool,
+) -> f64 {
+    let value = spectrum.z[y_index * spectrum.x.len() + x_index];
+    if use_absolute_intensity {
+        value.abs()
+    } else {
+        value
+    }
 }
 
 #[cfg(test)]

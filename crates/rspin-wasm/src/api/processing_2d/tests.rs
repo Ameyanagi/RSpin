@@ -23,6 +23,21 @@ fn scales_and_normalizes_2d_spectrum_json() -> anyhow::Result<()> {
             .map(|record| record.operation.as_str()),
         Some("normalize_2d_max_abs")
     );
+
+    let volume_normalized_json = normalize_spectrum_2d_volume_json(&spectrum_json, 5.0, true)?;
+    let volume_normalized = spectrum2d_from_json(&volume_normalized_json)?;
+    assert_vec_close(&volume_normalized.z, &[2.0, -4.0, 6.0, 8.0]);
+    assert_option_vec_close(
+        volume_normalized.imaginary.as_deref(),
+        &[1.0, -2.0, 3.0, 4.0],
+    );
+    assert_eq!(
+        volume_normalized
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("normalize_2d_volume")
+    );
     Ok(())
 }
 
@@ -213,15 +228,15 @@ fn applies_processing_recipe_2d_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
     let processed_json = apply_processing_recipe_2d_json(
         &spectrum_json,
-        r#"{"format":"rspin.processing_recipe_2d","version":1,"recipe":{"operations":[{"operation":"scale","factor":2.0},{"operation":"absolute_value"},{"operation":"zero_fill","target_x_len":3,"target_y_len":2},{"operation":"normalize_max_abs"}]}}"#,
+        r#"{"format":"rspin.processing_recipe_2d","version":1,"recipe":{"operations":[{"operation":"scale","factor":2.0},{"operation":"absolute_value"},{"operation":"zero_fill","target_x_len":3,"target_y_len":2},{"operation":"normalize_max_abs"},{"operation":"normalize_volume","target_volume":2.0,"use_absolute_intensity":true}]}}"#,
     )?;
     let processed = spectrum2d_from_json(&processed_json)?;
 
     assert_eq!(processed.shape(), (3, 2));
-    assert_vec_close(&processed.z, &[0.25, 0.5, 0.0, 0.75, 1.0, 0.0]);
+    assert_vec_close(&processed.z, &[0.5, 1.0, 0.0, 1.5, 2.0, 0.0]);
     assert_option_vec_close(
         processed.imaginary.as_deref(),
-        &[0.125, 0.25, 0.0, 0.375, 0.5, 0.0],
+        &[0.25, 0.5, 0.0, 0.75, 1.0, 0.0],
     );
     assert_eq!(
         processed
@@ -229,7 +244,13 @@ fn applies_processing_recipe_2d_json() -> anyhow::Result<()> {
             .iter()
             .map(|record| record.operation.as_str())
             .collect::<Vec<_>>(),
-        vec!["scale_2d", "abs_2d", "zero_fill_2d", "normalize_2d_max_abs"]
+        vec![
+            "scale_2d",
+            "abs_2d",
+            "zero_fill_2d",
+            "normalize_2d_max_abs",
+            "normalize_2d_volume"
+        ]
     );
     Ok(())
 }

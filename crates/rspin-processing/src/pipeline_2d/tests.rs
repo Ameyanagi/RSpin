@@ -63,6 +63,22 @@ fn borrowed_pipeline_leaves_original_2d_spectrum_unchanged() -> anyhow::Result<(
 }
 
 #[test]
+fn chains_2d_volume_normalization() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![1.0, -1.0, 1.0, -1.0],
+        Metadata::default(),
+    )?;
+    let processed = spectrum.process().normalize_abs_volume(2.0).finish()?;
+
+    assert_eq!(processed.z, vec![2.0, -2.0, 2.0, -2.0]);
+    assert_eq!(processed.processing.len(), 1);
+    assert_eq!(processed.processing[0].operation, "normalize_2d_volume");
+    Ok(())
+}
+
+#[test]
 fn chains_from_fallible_2d_spectrum_result() -> anyhow::Result<()> {
     let spectrum_result: rspin_core::Result<Spectrum2D> = Ok(demo_spectrum()?);
     let processed = spectrum_result.process().scale(2.0).finish()?;

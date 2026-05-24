@@ -7,7 +7,8 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 use crate::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingStep, abs_2d,
     auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d, gaussian_apodization_2d,
-    normalize_2d_max_abs, resample_2d, scale_2d, sine_bell_apodization_2d, zero_fill_2d,
+    normalize_2d_max_abs, normalize_2d_volume, resample_2d, scale_2d, sine_bell_apodization_2d,
+    zero_fill_2d,
 };
 
 /// A serializable two-dimensional processing operation.
@@ -21,6 +22,13 @@ pub enum ProcessingOperation2D {
     },
     /// Normalizes real intensities by their maximum absolute value.
     NormalizeMaxAbs,
+    /// Normalizes real and imaginary intensities by bilinear volume.
+    NormalizeVolume {
+        /// Desired integrated volume after normalization.
+        target_volume: f64,
+        /// Use absolute real intensities when measuring the volume.
+        use_absolute_intensity: bool,
+    },
     /// Applies component-wise absolute value to real and imaginary matrices.
     AbsoluteValue,
     /// Appends zeroes until the spectrum reaches the requested shape.
@@ -109,6 +117,10 @@ impl ProcessingStep<Spectrum2D> for ProcessingOperation2D {
         match self {
             Self::Scale { factor } => scale_2d(spectrum, *factor),
             Self::NormalizeMaxAbs => normalize_2d_max_abs(spectrum),
+            Self::NormalizeVolume {
+                target_volume,
+                use_absolute_intensity,
+            } => normalize_2d_volume(spectrum, *target_volume, *use_absolute_intensity),
             Self::AbsoluteValue => abs_2d(spectrum),
             Self::ZeroFill {
                 target_x_len,
@@ -264,6 +276,27 @@ impl ProcessingRecipe2D {
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
         self.with_operation(ProcessingOperation2D::NormalizeMaxAbs)
+    }
+
+    /// Appends a signed-volume normalization operation.
+    #[must_use]
+    pub fn normalize_volume(self, target_volume: f64) -> Self {
+        self.normalize_volume_with(target_volume, false)
+    }
+
+    /// Appends an absolute-volume normalization operation.
+    #[must_use]
+    pub fn normalize_abs_volume(self, target_volume: f64) -> Self {
+        self.normalize_volume_with(target_volume, true)
+    }
+
+    /// Appends a volume normalization operation with explicit volume mode.
+    #[must_use]
+    pub fn normalize_volume_with(self, target_volume: f64, use_absolute_intensity: bool) -> Self {
+        self.with_operation(ProcessingOperation2D::NormalizeVolume {
+            target_volume,
+            use_absolute_intensity,
+        })
     }
 
     /// Appends a component-wise absolute-value operation.
