@@ -2,6 +2,7 @@
 
 mod alignment;
 mod assignments;
+mod buckets;
 mod couplings;
 mod integration;
 mod integration_2d;
@@ -20,6 +21,9 @@ pub use alignment::{
 };
 pub use assignments::{
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,
+};
+pub use buckets::{
+    BucketMatrix1D, BucketOptions1D, SpectralBucket1D, bucket_spectra_1d, bucket_spectrum_1d,
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
