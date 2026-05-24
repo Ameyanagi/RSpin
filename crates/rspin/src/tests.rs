@@ -201,6 +201,47 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_nmredata_import() -> Result<()> {
+    let record = read_nmredata_str(
+        r"
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_ASSIGNMENT>
+H1, 4.200, H1
+
+>  <NMREDATA_1D_1H>
+Larmor=500.0
+4.200, L=H1
+",
+    )?;
+
+    assert_eq!(
+        record.version.as_ref().map(|version| version.major),
+        Some(1)
+    );
+    assert_eq!(record.assignments[0].label, "H1");
+    assert_eq!(
+        record.spectra[0].kind,
+        NmreDataSpectrumKind::OneD {
+            observed_label: "1H".to_owned(),
+            observed_nucleus: Some(Nucleus::Hydrogen1),
+        }
+    );
+    let larmor = record.spectra[0]
+        .larmor_mhz
+        .ok_or_else(|| RSpinError::InvalidMetadata {
+            message: "missing NMReDATA larmor".to_owned(),
+        })?;
+    assert!((larmor - 500.0).abs() < 1.0e-12);
+
+    let parsed_version = parse_nmredata_version("1.1")?;
+    assert_eq!(parsed_version.minor, Some(1));
+    assert_eq!(format!("{NmreData:?}"), "NmreData");
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_path_writer_exports() -> Result<()> {
     let path_writer_1d = AutoSpectrum1DPathWriter;
     let path_writer_2d = AutoSpectrum2DPathWriter;

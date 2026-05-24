@@ -11,6 +11,7 @@ mod csv_common;
 mod jcamp;
 mod jeol;
 mod json;
+mod nmredata;
 mod nmrml;
 mod nmrml_2d;
 mod nmrml_2d_writer;
@@ -52,6 +53,12 @@ pub use json::{
     JsonSpectrum1D, JsonSpectrum2D, SPECTRUM_1D_JSON_FORMAT, SPECTRUM_2D_JSON_FORMAT,
     SPECTRUM_JSON_VERSION, read_spectrum1d_json, read_spectrum2d_json, write_spectrum1d_json,
     write_spectrum2d_json,
+};
+pub use nmredata::{
+    NmreData, NmreDataAssignment, NmreDataCoupling, NmreDataRecord, NmreDataSignal1D,
+    NmreDataSignal2D, NmreDataSpectrum, NmreDataSpectrumKind, NmreDataTag, NmreDataVersion,
+    parse_nmredata_version, read_nmredata_bytes, read_nmredata_file, read_nmredata_records_str,
+    read_nmredata_str,
 };
 pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str};
 pub use nmrml_2d::{NmrMl2D, read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str};
