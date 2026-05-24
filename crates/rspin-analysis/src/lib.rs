@@ -17,6 +17,7 @@ mod peaks;
 mod ranges;
 mod signals;
 mod traits;
+mod workflow;
 mod zones;
 
 pub use alignment::{
@@ -75,6 +76,11 @@ pub use signals::{
 pub use traits::{
     Integrator, Integrator2D, MultipletDetector, PeakOptimizer, PeakPicker, RangeDetector,
     ZoneDetector,
+};
+pub use workflow::{
+    SpectrumAnalysis1D, SpectrumAnalysis1DOptions, SpectrumAnalysis2D, SpectrumAnalysis2DOptions,
+    analyze_assigned_spectrum_1d, analyze_assigned_spectrum_2d, analyze_spectrum_1d,
+    analyze_spectrum_2d,
 };
 pub use zones::{
     DetectedZone, ThresholdZoneDetector, ZoneConnectivity, ZoneDetectionOptions, detect_zones,

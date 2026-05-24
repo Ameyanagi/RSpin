@@ -13,6 +13,7 @@ mod prediction;
 mod processing_1d;
 mod processing_2d;
 mod simulation;
+mod workflow;
 
 use serde::{Serialize, de::DeserializeOwned};
 
@@ -87,6 +88,7 @@ pub use simulation::{
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json,
 };
+pub use workflow::{analyze_spectrum_1d_json, analyze_spectrum_2d_json};
 
 /// Parses JCAMP-DX text into serialized `Spectrum1D` JSON.
 ///

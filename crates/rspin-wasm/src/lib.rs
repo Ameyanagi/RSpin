@@ -4,8 +4,11 @@ mod analysis;
 mod api;
 mod contours;
 mod io;
+mod prediction;
 mod processing_1d;
 mod processing_2d;
+mod simulation;
+mod workflow;
 
 use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
@@ -24,13 +27,13 @@ pub use analysis::{
 pub use api::simulate_first_order_multiplet_json;
 pub use api::{
     abs_spectrum_1d_json, abs_spectrum_2d_json, align_spectra_by_peak_to_matrix_1d_json,
-    align_spectra_by_zone_to_matrix_2d_json, annotate_spectrum_1d_with_assignments_json,
-    annotate_spectrum_2d_with_assignments_json, apply_processing_recipe_1d_json,
-    apply_processing_recipe_1d_until_json, apply_processing_recipe_2d_json,
-    apply_processing_recipe_2d_until_json, auto_phase_spectrum_1d_json,
-    auto_phase_spectrum_2d_json, bucket_spectra_1d_json, bucket_spectra_2d_json,
-    bucket_spectrum_1d_json, bucket_spectrum_2d_json, cluster_bucket_matrix_1d_json,
-    cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
+    align_spectra_by_zone_to_matrix_2d_json, analyze_spectrum_1d_json, analyze_spectrum_2d_json,
+    annotate_spectrum_1d_with_assignments_json, annotate_spectrum_2d_with_assignments_json,
+    apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
+    apply_processing_recipe_2d_json, apply_processing_recipe_2d_until_json,
+    auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json, bucket_spectra_1d_json,
+    bucket_spectra_2d_json, bucket_spectrum_1d_json, bucket_spectrum_2d_json,
+    cluster_bucket_matrix_1d_json, cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
     cluster_spectrum_matrix_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
     cut_cluster_result_at_distance_json, cut_cluster_result_to_count_json,
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,
@@ -61,6 +64,10 @@ pub use contours::extract_contours_2d;
 pub use io::{
     parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
+pub use prediction::{
+    predict_molecule_with_element_rules, render_prediction_1d, render_prediction_2d,
+    validate_prediction,
+};
 pub use processing_1d::{
     abs_spectrum_1d, apply_processing_recipe_1d, apply_processing_recipe_1d_until,
     auto_phase_spectrum_1d, crop_spectrum_1d, exponential_apodization_spectrum_1d, fft_spectrum_1d,
@@ -75,6 +82,14 @@ pub use processing_2d::{
     scale_spectrum_2d, slice_spectrum_2d_x_at_y, slice_spectrum_2d_x_at_y_index,
     slice_spectrum_2d_y_at_x, slice_spectrum_2d_y_at_x_index, zero_fill_spectrum_2d,
 };
+#[cfg(feature = "first-order")]
+pub use simulation::simulate_first_order_multiplet;
+pub use simulation::{
+    decompose_exact_spin_half_spectrum, decompose_exact_spin_half_spectrum_2d,
+    simulate_exact_spin_half_spectrum, simulate_exact_spin_half_spectrum_2d,
+    simulate_exact_spin_half_transitions,
+};
+pub use workflow::{analyze_spectrum_1d, analyze_spectrum_2d};
 
 /// Parses JCAMP-DX text into a serialized one-dimensional spectrum.
 ///
@@ -280,151 +295,6 @@ pub fn generate_spectrum_matrix_2d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     generate_spectrum_matrix_2d_json(spectra_json, options_json).map_err(|error| js_error(&error))
-}
-
-/// Simulates a first-order multiplet as a serialized one-dimensional spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[cfg(feature = "first-order")]
-#[wasm_bindgen(js_name = simulateFirstOrderMultiplet)]
-pub fn simulate_first_order_multiplet(
-    multiplet_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    simulate_first_order_multiplet_json(multiplet_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Simulates exact spin-1/2 transitions as serialized JSON.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[wasm_bindgen(js_name = simulateExactSpinHalfTransitions)]
-pub fn simulate_exact_spin_half_transitions(
-    system_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    simulate_exact_spin_half_transitions_json(system_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Simulates an exact spin-1/2 system as a serialized one-dimensional spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[wasm_bindgen(js_name = simulateExactSpinHalfSpectrum)]
-pub fn simulate_exact_spin_half_spectrum(
-    system_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    simulate_exact_spin_half_spectrum_json(system_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Simulates exact spin-1/2 spectrum and per-transition contributions as JSON.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[wasm_bindgen(js_name = decomposeExactSpinHalfSpectrum)]
-pub fn decompose_exact_spin_half_spectrum(
-    system_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    decompose_exact_spin_half_spectrum_json(system_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Simulates an exact spin-1/2 system as a serialized two-dimensional spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[wasm_bindgen(js_name = simulateExactSpinHalfSpectrum2d)]
-pub fn simulate_exact_spin_half_spectrum_2d(
-    system_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    simulate_exact_spin_half_spectrum_2d_json(system_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Simulates exact spin-1/2 2D spectrum and contributions as JSON.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[wasm_bindgen(js_name = decomposeExactSpinHalfSpectrum2d)]
-pub fn decompose_exact_spin_half_spectrum_2d(
-    system_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    decompose_exact_spin_half_spectrum_2d_json(system_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Validates a serialized prediction payload and returns its normalized JSON.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, validation, or
-/// serialization fails.
-#[wasm_bindgen(js_name = validatePrediction)]
-pub fn validate_prediction(prediction_json: &str) -> std::result::Result<String, JsValue> {
-    validate_prediction_json(prediction_json).map_err(|error| js_error(&error))
-}
-
-/// Predicts molecule signals with serialized element shift rules.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, prediction,
-/// validation, or serialization fails.
-#[wasm_bindgen(js_name = predictMoleculeWithElementRules)]
-pub fn predict_molecule_with_element_rules(
-    molecule_json: &str,
-    predictor_json: &str,
-) -> std::result::Result<String, JsValue> {
-    predict_molecule_with_element_rules_json(molecule_json, predictor_json)
-        .map_err(|error| js_error(&error))
-}
-
-/// Renders a serialized one-dimensional prediction as a spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, validation,
-/// rendering, or serialization fails.
-#[wasm_bindgen(js_name = renderPrediction1d)]
-pub fn render_prediction_1d(
-    prediction_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    render_prediction_1d_json(prediction_json, options_json).map_err(|error| js_error(&error))
-}
-
-/// Renders a serialized two-dimensional prediction as a spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, validation,
-/// rendering, or serialization fails.
-#[wasm_bindgen(js_name = renderPrediction2d)]
-pub fn render_prediction_2d(
-    prediction_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    render_prediction_2d_json(prediction_json, options_json).map_err(|error| js_error(&error))
 }
 
 pub(crate) fn js_error(error: &RSpinError) -> JsValue {

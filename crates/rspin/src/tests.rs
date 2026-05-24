@@ -217,6 +217,39 @@ fn prelude_supports_consensus_workflows() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_simple_analysis_workflows() -> Result<()> {
+    let analysis = analyze_spectrum_1d(
+        &Spectrum1D::new(
+            Axis::linear_ppm(0.0, 4.0, 5)?,
+            vec![0.0, 2.0, 0.0, 1.5, 0.0],
+            Metadata::named("analysis-1d"),
+        )?,
+        SpectrumAnalysis1DOptions::new()
+            .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(1.0))
+            .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0)),
+    )?;
+
+    assert_eq!(analysis.peaks.len(), 2);
+    assert_eq!(analysis.ranges.len(), 2);
+    assert_eq!(analysis.signals.len(), 2);
+
+    let analysis_2d = analyze_spectrum_2d(
+        &Spectrum2D::new(
+            Axis::linear_ppm(0.0, 2.0, 3)?,
+            Axis::linear_ppm(0.0, 2.0, 3)?,
+            vec![2.0, 0.0, 0.0, 1.5, 0.0, -3.0, 0.0, 0.0, -4.0],
+            Metadata::named("analysis-2d"),
+        )?,
+        SpectrumAnalysis2DOptions::new()
+            .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(1.0)),
+    )?;
+
+    assert_eq!(analysis_2d.zones.len(), 2);
+    assert_eq!(analysis_2d.signals.len(), 2);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_consensus_zone_workflows() -> Result<()> {
     let consensus_zones = detect_consensus_zones_2d(
         &[

@@ -23,6 +23,28 @@ impl Default for SignalSummaryOptions {
     }
 }
 
+impl SignalSummaryOptions {
+    /// Creates default one-dimensional signal summary options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets whether ranges without attached multiplets should be emitted.
+    #[must_use]
+    pub fn with_include_empty_ranges(mut self, include_empty_ranges: bool) -> Self {
+        self.include_empty_ranges = include_empty_ranges;
+        self
+    }
+
+    /// Sets whether multiplets outside detected ranges should be emitted.
+    #[must_use]
+    pub fn with_include_orphan_multiplets(mut self, include_orphan_multiplets: bool) -> Self {
+        self.include_orphan_multiplets = include_orphan_multiplets;
+        self
+    }
+}
+
 /// A stable one-dimensional signal summary.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SignalSummary1D {

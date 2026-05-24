@@ -11,6 +11,7 @@ mod pairwise;
 mod pca;
 mod prediction;
 mod simulation;
+mod workflow;
 
 #[test]
 fn parses_jcamp_to_json() -> anyhow::Result<()> {

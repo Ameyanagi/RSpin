@@ -25,6 +25,12 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 ```
 
+## Examples
+
+- Processed-data PNG examples: `docs/examples/processed-data.md`
+- Public analysis fixture sources and workflow snippets:
+  `docs/examples/public-analysis-fixtures.md`
+
 ## Optional Features
 
 - `external-baselines`: enables the optional Git-pinned `baselines` crate for
