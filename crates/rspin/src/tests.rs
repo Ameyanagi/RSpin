@@ -237,6 +237,9 @@ Larmor=500.0
 
     let parsed_version = parse_nmredata_version("1.1")?;
     assert_eq!(parsed_version.minor, Some(1));
+    let nmredata_text = write_nmredata_record(&record)?;
+    let reparsed = read_nmredata_str(&nmredata_text)?;
+    assert!((reparsed.assignments[0].shift_ppm - 4.2).abs() < 1.0e-12);
     assert_eq!(format!("{NmreData:?}"), "NmreData");
     Ok(())
 }

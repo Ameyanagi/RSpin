@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use rspin_core::{Nucleus, RSpinError};
 
 use super::*;
@@ -151,6 +153,135 @@ $$$$
 }
 
 #[test]
+fn writes_and_reads_nmredata_records() -> anyhow::Result<()> {
+    let records = read_nmredata_records_str(
+        r"
+>  <NMREDATA_VERSION>
+1.0
+$$$$
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_FORMULA>
+C2H6O
+$$$$
+",
+    )?;
+
+    let output = write_nmredata_records(&records)?;
+    assert_eq!(output.matches("$$$$").count(), 2);
+
+    let reparsed = read_nmredata_records_str(&output)?;
+    assert_eq!(reparsed.len(), 2);
+    assert_eq!(
+        reparsed[0]
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.0")
+    );
+    assert_eq!(reparsed[1].formula.as_deref(), Some("C2H6O"));
+    Ok(())
+}
+
+#[test]
+fn writes_constructed_record_from_typed_fields() -> anyhow::Result<()> {
+    let mut id = BTreeMap::new();
+    id.insert("Name".to_owned(), "demo".to_owned());
+
+    let mut spectrum_attributes = BTreeMap::new();
+    spectrum_attributes.insert("Larmor".to_owned(), vec!["500.0".to_owned()]);
+
+    let record = NmreDataRecord {
+        version: Some(NmreDataVersion {
+            raw: "1.1".to_owned(),
+            major: 1,
+            minor: Some(1),
+            qualifier: None,
+        }),
+        level: Some(0),
+        id,
+        formula: Some("CH4".to_owned()),
+        assignments: vec![NmreDataAssignment {
+            label: "H,1".to_owned(),
+            shift_ppm: 4.2,
+            atom_refs: vec!["H1".to_owned()],
+            raw_line: String::new(),
+        }],
+        couplings: vec![NmreDataCoupling {
+            from_label: "H1".to_owned(),
+            to_label: "H2".to_owned(),
+            j_hz: 7.0,
+            raw_line: String::new(),
+        }],
+        spectra: vec![NmreDataSpectrum {
+            tag: "NMREDATA_1D_1H".to_owned(),
+            kind: NmreDataSpectrumKind::OneD {
+                observed_label: "1H".to_owned(),
+                observed_nucleus: Some(Nucleus::Hydrogen1),
+            },
+            attributes: spectrum_attributes,
+            larmor_mhz: Some(500.0),
+            spectrum_locations: Vec::new(),
+            signals_1d: vec![NmreDataSignal1D {
+                from_ppm: 4.2,
+                to_ppm: None,
+                attributes: BTreeMap::new(),
+                items: vec!["H1".to_owned()],
+                raw_line: String::new(),
+            }],
+            signals_2d: Vec::new(),
+        }],
+        ..NmreDataRecord::default()
+    };
+
+    let output = NmreData.write_string(&record)?;
+    assert!(output.contains(r#"<"H,1">, 4.2, H1"#));
+    let reparsed = read_nmredata_str(&output)?;
+    assert_eq!(
+        reparsed
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.1")
+    );
+    assert_eq!(reparsed.id.get("Name").map(String::as_str), Some("demo"));
+    assert_eq!(reparsed.assignments[0].label, "H,1");
+    assert_close(reparsed.couplings[0].j_hz, 7.0);
+    assert_some_close(reparsed.spectra[0].larmor_mhz, 500.0);
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_nmredata_writes() {
+    let empty_error =
+        write_nmredata_records(&[]).expect_err("empty NMReDATA record list should fail");
+    assert!(matches!(empty_error, RSpinError::Parse { .. }));
+
+    let invalid_tag = NmreDataRecord {
+        tags: vec![NmreDataTag {
+            name: String::new(),
+            values: vec!["value".to_owned()],
+        }],
+        ..NmreDataRecord::default()
+    };
+    let invalid_tag_error =
+        write_nmredata_record(&invalid_tag).expect_err("empty SDF tag name should fail");
+    assert!(matches!(invalid_tag_error, RSpinError::Parse { .. }));
+
+    let invalid_value = NmreDataRecord {
+        tags: vec![NmreDataTag {
+            name: "NMREDATA_VERSION".to_owned(),
+            values: vec!["1.1\n2.0".to_owned()],
+        }],
+        ..NmreDataRecord::default()
+    };
+    let invalid_value_error =
+        write_nmredata_record(&invalid_value).expect_err("embedded newlines should fail");
+    assert!(matches!(invalid_value_error, RSpinError::Parse { .. }));
+}
+
+#[test]
 fn parses_version_qualifier() -> anyhow::Result<()> {
     let version = parse_nmredata_version("1.1.rc1")?;
 
@@ -200,6 +331,35 @@ fn reads_bytes_and_file() -> anyhow::Result<()> {
     assert_eq!(
         from_file.version.as_ref().map(|version| version.minor),
         Some(Some(1))
+    );
+    std::fs::remove_file(path)?;
+    Ok(())
+}
+
+#[test]
+fn writes_nmredata_file() -> anyhow::Result<()> {
+    let record = read_nmredata_str(
+        r"
+>  <NMREDATA_VERSION>
+1.1
+",
+    )?;
+    let path = std::env::temp_dir().join(format!(
+        "rspin-nmredata-write-{}-{}.sdf",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_nanos()
+    ));
+
+    write_nmredata_file(&record, &path)?;
+    let from_file = read_nmredata_file(&path)?;
+    assert_eq!(
+        from_file
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.1")
     );
     std::fs::remove_file(path)?;
     Ok(())

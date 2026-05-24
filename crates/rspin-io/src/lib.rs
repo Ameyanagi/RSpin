@@ -58,7 +58,8 @@ pub use nmredata::{
     NmreData, NmreDataAssignment, NmreDataCoupling, NmreDataRecord, NmreDataSignal1D,
     NmreDataSignal2D, NmreDataSpectrum, NmreDataSpectrumKind, NmreDataTag, NmreDataVersion,
     parse_nmredata_version, read_nmredata_bytes, read_nmredata_file, read_nmredata_records_str,
-    read_nmredata_str,
+    read_nmredata_str, write_nmredata_file, write_nmredata_record, write_nmredata_records,
+    write_nmredata_records_file,
 };
 pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str};
 pub use nmrml_2d::{NmrMl2D, read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str};

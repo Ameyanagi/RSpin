@@ -5,6 +5,12 @@ use std::{collections::BTreeMap, fs, path::Path, str::FromStr};
 use rspin_core::{Nucleus, RSpinError, Result};
 use serde::{Deserialize, Serialize};
 
+mod writer;
+
+pub use writer::{
+    write_nmredata_file, write_nmredata_record, write_nmredata_records, write_nmredata_records_file,
+};
+
 const FORMAT: &str = "NMReDATA";
 
 /// Reader for `NMReDATA` SDF tag records.
@@ -50,6 +56,47 @@ impl NmreData {
     /// has malformed `NMReDATA` tags.
     pub fn read_bytes(self, bytes: &[u8]) -> Result<NmreDataRecord> {
         read_nmredata_bytes(bytes)
+    }
+
+    /// Writes one `NMReDATA` record as SDF text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the record contains invalid tag names or values.
+    pub fn write_string(self, record: &NmreDataRecord) -> Result<String> {
+        write_nmredata_record(record)
+    }
+
+    /// Writes multiple `NMReDATA` records as SDF text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the record list is empty or any record contains
+    /// invalid tag names or values.
+    pub fn write_records_string(self, records: &[NmreDataRecord]) -> Result<String> {
+        write_nmredata_records(records)
+    }
+
+    /// Writes one `NMReDATA` record to an SDF file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when serialization or filesystem writing fails.
+    pub fn write_file(self, record: &NmreDataRecord, path: impl AsRef<Path>) -> Result<()> {
+        write_nmredata_file(record, path)
+    }
+
+    /// Writes multiple `NMReDATA` records to an SDF file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when serialization or filesystem writing fails.
+    pub fn write_records_file(
+        self,
+        records: &[NmreDataRecord],
+        path: impl AsRef<Path>,
+    ) -> Result<()> {
+        write_nmredata_records_file(records, path)
     }
 }
 
