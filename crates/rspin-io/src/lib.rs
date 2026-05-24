@@ -10,6 +10,7 @@ mod csv_common;
 mod jcamp;
 mod jeol;
 mod json;
+mod nmrml;
 mod processing_json;
 mod traits;
 
@@ -34,6 +35,7 @@ pub use json::{
     JsonSpectrum1D, JsonSpectrum2D, read_spectrum1d_json, read_spectrum2d_json,
     write_spectrum1d_json, write_spectrum2d_json,
 };
+pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str};
 pub use processing_json::{
     JsonProcessingRecipe1D, JsonProcessingRecipe2D, read_processing_recipe_1d_json,
     read_processing_recipe_2d_json, write_processing_recipe_1d_json,

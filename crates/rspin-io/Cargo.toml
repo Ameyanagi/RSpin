@@ -7,6 +7,9 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
+base64.workspace = true
+flate2.workspace = true
+quick-xml.workspace = true
 rspin-analysis.workspace = true
 rspin-core.workspace = true
 rspin-processing.workspace = true

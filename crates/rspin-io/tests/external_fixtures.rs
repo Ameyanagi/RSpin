@@ -12,6 +12,7 @@ use rspin_core::{Nucleus, Unit};
 use rspin_io::{
     read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
     read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
+    read_nmrml_1d_file,
 };
 
 #[test]
@@ -244,6 +245,53 @@ fn parses_external_jeol_2d_jdf_when_available() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.z.iter().any(|value| value.abs() > 1.0e-12));
+    Ok(())
+}
+
+#[test]
+fn parses_external_nmrml_complex128_fixture_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("nmrml/examples/HMDB00005.nmrML");
+    require_fixture(&fixture)?;
+
+    let spectrum = read_nmrml_1d_file(&fixture)?;
+
+    assert_eq!(spectrum.len(), 32_768);
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_close(spectrum.x.values.first().copied(), Some(10.791_613_341_5));
+    assert_close(spectrum.x.values.last().copied(), Some(-1.219_962_947_1));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(599.4));
+    assert_close(spectrum.metadata.temperature_k, Some(299.15));
+    assert!(spectrum.intensities.iter().any(|value| value.abs() > 0.5));
+    Ok(())
+}
+
+#[test]
+fn parses_external_nmrml_compressed_float64_fixture_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("nmrml/examples/MMBBI_10M12-CE01-1a.nmrML");
+    require_fixture(&fixture)?;
+
+    let spectrum = read_nmrml_1d_file(&fixture)?;
+
+    assert_eq!(spectrum.len(), 32_768);
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_close(spectrum.x.values.first().copied(), Some(11.099_15));
+    assert_close(spectrum.x.values.last().copied(), Some(-0.901_812));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(500.16));
+    assert_close(spectrum.metadata.temperature_k, Some(300.0));
+    assert!(
+        spectrum
+            .intensities
+            .iter()
+            .any(|value| value.abs() > 1_000.0)
+    );
     Ok(())
 }
 
