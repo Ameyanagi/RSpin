@@ -7,11 +7,11 @@ use std::{
     str::FromStr,
 };
 
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
 
 mod procpar;
 
-use procpar::{first_f64, first_text, parse_procpar};
+use procpar::{first_f64, first_text, first_usize, parse_procpar};
 
 const FILE_HEADER_LEN: usize = 32;
 const BLOCK_HEADER_LEN: usize = 28;
@@ -58,6 +58,51 @@ pub fn read_agilent_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
 }
 
+/// Reader for Agilent/Varian raw two-dimensional FID directories.
+///
+/// The returned `Spectrum2D` preserves the acquired trace matrix. Each direct
+/// trace contributes real values to `z` and imaginary values to `imaginary`.
+/// Hypercomplex or arrayed indirect reconstruction is left to processing.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AgilentFid2D;
+
+impl AgilentFid2D {
+    /// Reads a raw two-dimensional FID from an Agilent/Varian dataset directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `fid` or `procpar` is missing, malformed, not a
+    /// two-dimensional acquisition, or stored in an unsupported numeric
+    /// representation.
+    pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_agilent_fid_2d_dir(path)
+    }
+}
+
+/// Reads a raw two-dimensional FID from an Agilent/Varian dataset directory.
+///
+/// The path may point to the dataset directory or directly to `fid`.
+///
+/// # Errors
+///
+/// Returns an error when the dataset is missing, malformed, not a supported
+/// two-dimensional acquisition, or uses an unsupported data representation.
+pub fn read_agilent_fid_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
+    let dataset_dir = locate_dataset_dir(path.as_ref());
+    let procpar = parse_procpar(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?);
+    validate_2d_procpar(&procpar)?;
+    let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!("failed to read fid: {error}"),
+    })?;
+
+    let (z, imaginary, x_count, y_count) = read_fid_matrix_values(&fid_bytes)?;
+    let x = build_axis(x_count, &procpar)?;
+    let y = build_indirect_axis(y_count, &procpar)?;
+    let metadata = build_metadata(&procpar);
+    Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
+}
+
 fn locate_dataset_dir(path: &Path) -> PathBuf {
     if path.is_file() {
         path.parent().map_or_else(PathBuf::new, Path::to_path_buf)
@@ -69,45 +114,80 @@ fn locate_dataset_dir(path: &Path) -> PathBuf {
 fn read_fid_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>)> {
     let header = FileHeader::parse(bytes)?;
     header.validate_1d()?;
+    let (real, imaginary, _, _) = read_complex_trace_matrix(bytes, &header)?;
+    Ok((real, imaginary))
+}
 
+fn read_fid_matrix_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
+    let header = FileHeader::parse(bytes)?;
+    header.validate_2d()?;
+    read_complex_trace_matrix(bytes, &header)
+}
+
+fn read_complex_trace_matrix(
+    bytes: &[u8],
+    header: &FileHeader,
+) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
+    header.validate_complex()?;
     let block_header_len = header
         .nbheaders
         .checked_mul(BLOCK_HEADER_LEN)
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "Agilent block header size overflow".to_owned(),
         })?;
-    let data_start = FILE_HEADER_LEN
-        .checked_add(block_header_len)
+    let x_count = header.np_values / 2;
+    let y_count = header.trace_count()?;
+    let matrix_len = x_count
+        .checked_mul(y_count)
         .ok_or_else(|| RSpinError::InvalidSpectrum {
-            message: "Agilent data offset overflow".to_owned(),
+            message: "Agilent FID matrix size overflow".to_owned(),
         })?;
-    let data_len =
-        header
-            .np_values
-            .checked_mul(header.ebytes)
-            .ok_or_else(|| RSpinError::InvalidSpectrum {
-                message: "Agilent trace size overflow".to_owned(),
-            })?;
-    let data_end = data_start
-        .checked_add(data_len)
-        .ok_or_else(|| RSpinError::InvalidSpectrum {
-            message: "Agilent data end overflow".to_owned(),
-        })?;
-    if bytes.len() < data_end {
-        return Err(RSpinError::Parse {
-            format: "Agilent",
-            message: format!("fid has {} bytes but {data_end} are required", bytes.len()),
-        });
-    }
+    let mut real = Vec::with_capacity(matrix_len);
+    let mut imaginary = Vec::with_capacity(matrix_len);
 
-    let values = decode_values(&bytes[data_start..data_end], &header)?;
-    let mut real = Vec::with_capacity(values.len() / 2);
-    let mut imaginary = Vec::with_capacity(values.len() / 2);
-    for pair in values.chunks_exact(2) {
-        real.push(pair[0]);
-        imaginary.push(pair[1]);
+    for block_index in 0..header.nblocks {
+        let block_start = FILE_HEADER_LEN
+            .checked_add(block_index.checked_mul(header.bbytes).ok_or_else(|| {
+                RSpinError::InvalidSpectrum {
+                    message: "Agilent block offset overflow".to_owned(),
+                }
+            })?)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent block offset overflow".to_owned(),
+            })?;
+        let data_start = block_start.checked_add(block_header_len).ok_or_else(|| {
+            RSpinError::InvalidSpectrum {
+                message: "Agilent block data offset overflow".to_owned(),
+            }
+        })?;
+        for trace_index in 0..header.ntraces {
+            let trace_start = data_start
+                .checked_add(trace_index.checked_mul(header.tbytes).ok_or_else(|| {
+                    RSpinError::InvalidSpectrum {
+                        message: "Agilent trace offset overflow".to_owned(),
+                    }
+                })?)
+                .ok_or_else(|| RSpinError::InvalidSpectrum {
+                    message: "Agilent trace offset overflow".to_owned(),
+                })?;
+            let trace_end = trace_start.checked_add(header.tbytes).ok_or_else(|| {
+                RSpinError::InvalidSpectrum {
+                    message: "Agilent trace end overflow".to_owned(),
+                }
+            })?;
+            let trace = bytes
+                .get(trace_start..trace_end)
+                .ok_or_else(|| RSpinError::Parse {
+                    format: "Agilent",
+                    message: format!(
+                        "fid has {} bytes but trace ending at {trace_end} is required",
+                        bytes.len()
+                    ),
+                })?;
+            append_complex_trace(trace, header, &mut real, &mut imaginary)?;
+        }
     }
-    Ok((real, imaginary))
+    Ok((real, imaginary, x_count, y_count))
 }
 
 #[derive(Clone, Copy)]
@@ -157,6 +237,9 @@ impl FileHeader {
     }
 
     fn is_plausible(self) -> bool {
+        let block_header_len = self.nbheaders.saturating_mul(BLOCK_HEADER_LEN);
+        let trace_bytes = self.ntraces.saturating_mul(self.tbytes);
+        let minimum_block_bytes = block_header_len.saturating_add(trace_bytes);
         self.nblocks > 0
             && self.ntraces > 0
             && self.np_values > 0
@@ -164,7 +247,7 @@ impl FileHeader {
             && matches!(self.ebytes, 2 | 4 | 8)
             && self.tbytes == self.np_values.saturating_mul(self.ebytes)
             && self.nbheaders > 0
-            && self.bbytes >= self.tbytes
+            && self.bbytes >= minimum_block_bytes
     }
 
     fn validate_1d(self) -> Result<()> {
@@ -173,9 +256,29 @@ impl FileHeader {
                 feature: "Agilent arrayed or multidimensional FID",
             });
         }
+        self.validate_complex()?;
+        Ok(())
+    }
+
+    fn validate_2d(self) -> Result<()> {
+        if self.trace_count()? <= 1 {
+            return Err(RSpinError::Unsupported {
+                feature: "Agilent one-dimensional FID in 2D reader",
+            });
+        }
+        self.validate_complex()?;
+        Ok(())
+    }
+
+    fn validate_complex(self) -> Result<()> {
         if self.status & (STATUS_COMPLEX | STATUS_COMPLEX_ALT) == 0 {
             return Err(RSpinError::Unsupported {
                 feature: "Agilent real-only FID",
+            });
+        }
+        if self.np_values % 2 != 0 {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "Agilent complex FID trace must contain an even value count".to_owned(),
             });
         }
         Ok(())
@@ -183,6 +286,14 @@ impl FileHeader {
 
     fn is_float(self) -> bool {
         self.status & STATUS_FLOAT != 0
+    }
+
+    fn trace_count(self) -> Result<usize> {
+        self.nblocks
+            .checked_mul(self.ntraces)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent FID trace count overflow".to_owned(),
+            })
     }
 }
 
@@ -230,52 +341,67 @@ impl Endian {
     }
 }
 
-fn decode_values(bytes: &[u8], header: &FileHeader) -> Result<Vec<f64>> {
-    let mut values = Vec::with_capacity(header.np_values);
-    for index in 0..header.np_values {
-        let offset =
-            index
-                .checked_mul(header.ebytes)
+fn append_complex_trace(
+    bytes: &[u8],
+    header: &FileHeader,
+    real: &mut Vec<f64>,
+    imaginary: &mut Vec<f64>,
+) -> Result<()> {
+    for pair_index in 0..(header.np_values / 2) {
+        let real_offset = pair_index
+            .checked_mul(2)
+            .and_then(|index| index.checked_mul(header.ebytes))
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent data offset overflow".to_owned(),
+            })?;
+        let imaginary_offset =
+            real_offset
+                .checked_add(header.ebytes)
                 .ok_or_else(|| RSpinError::InvalidSpectrum {
                     message: "Agilent data offset overflow".to_owned(),
                 })?;
-        let value = match (header.is_float(), header.ebytes) {
-            (false, 2) => f64::from(
-                header
-                    .endian
-                    .i16_at(bytes, offset)
-                    .ok_or_else(|| parse_error("truncated 16-bit integer data"))?,
-            ),
-            (false, 4) => f64::from(
-                header
-                    .endian
-                    .i32_at(bytes, offset)
-                    .ok_or_else(|| parse_error("truncated 32-bit integer data"))?,
-            ),
-            (true, 4) => f64::from(
-                header
-                    .endian
-                    .f32_at(bytes, offset)
-                    .ok_or_else(|| parse_error("truncated 32-bit float data"))?,
-            ),
-            (true, 8) => header
+        real.push(decode_value(bytes, header, real_offset)?);
+        imaginary.push(decode_value(bytes, header, imaginary_offset)?);
+    }
+    Ok(())
+}
+
+fn decode_value(bytes: &[u8], header: &FileHeader, offset: usize) -> Result<f64> {
+    let value = match (header.is_float(), header.ebytes) {
+        (false, 2) => f64::from(
+            header
                 .endian
-                .f64_at(bytes, offset)
-                .ok_or_else(|| parse_error("truncated 64-bit float data"))?,
-            _ => {
-                return Err(RSpinError::Unsupported {
-                    feature: "Agilent FID numeric representation",
-                });
-            }
-        };
-        if !value.is_finite() {
-            return Err(RSpinError::NonFinite {
-                field: "Agilent FID data",
+                .i16_at(bytes, offset)
+                .ok_or_else(|| parse_error("truncated 16-bit integer data"))?,
+        ),
+        (false, 4) => f64::from(
+            header
+                .endian
+                .i32_at(bytes, offset)
+                .ok_or_else(|| parse_error("truncated 32-bit integer data"))?,
+        ),
+        (true, 4) => f64::from(
+            header
+                .endian
+                .f32_at(bytes, offset)
+                .ok_or_else(|| parse_error("truncated 32-bit float data"))?,
+        ),
+        (true, 8) => header
+            .endian
+            .f64_at(bytes, offset)
+            .ok_or_else(|| parse_error("truncated 64-bit float data"))?,
+        _ => {
+            return Err(RSpinError::Unsupported {
+                feature: "Agilent FID numeric representation",
             });
         }
-        values.push(value);
+    };
+    if !value.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "Agilent FID data",
+        });
     }
-    Ok(values)
+    Ok(value)
 }
 
 fn build_axis(point_count: usize, parameters: &BTreeMap<String, Vec<String>>) -> Result<Axis> {
@@ -299,6 +425,33 @@ fn build_axis(point_count: usize, parameters: &BTreeMap<String, Vec<String>>) ->
     }
 }
 
+fn build_indirect_axis(
+    point_count: usize,
+    parameters: &BTreeMap<String, Vec<String>>,
+) -> Result<Axis> {
+    let is_arrayed = first_usize(parameters, "arrayelemts")?
+        .is_some_and(|array_elements| array_elements > 1)
+        || first_text(parameters, "array").is_some_and(|array| !array.is_empty());
+    match (first_f64(parameters, "sw1")?, is_arrayed) {
+        (Some(sw1), false) if sw1 > 0.0 => {
+            let end = if point_count <= 1 {
+                0.0
+            } else {
+                let segments =
+                    u32::try_from(point_count - 1).map_err(|_| RSpinError::InvalidAxis {
+                        message: "Agilent indirect point count is too large".to_owned(),
+                    })?;
+                f64::from(segments) / sw1
+            };
+            Axis::linear("indirect time", Unit::Seconds, 0.0, end, point_count)
+        }
+        _ => {
+            let end = u32::try_from(point_count.saturating_sub(1)).map_or(0.0, f64::from);
+            Axis::linear("indirect trace", Unit::Points, 0.0, end, point_count)
+        }
+    }
+}
+
 fn build_metadata(parameters: &BTreeMap<String, Vec<String>>) -> Metadata {
     let nucleus = first_text(parameters, "tn").and_then(|value| Nucleus::from_str(&value).ok());
     let frequency_mhz = first_f64(parameters, "sfrq").ok().flatten();
@@ -316,6 +469,18 @@ fn build_metadata(parameters: &BTreeMap<String, Vec<String>>) -> Metadata {
         temperature_k,
         origin: first_text(parameters, "operator").or_else(|| first_text(parameters, "username")),
         molecules: Vec::new(),
+    }
+}
+
+fn validate_2d_procpar(parameters: &BTreeMap<String, Vec<String>>) -> Result<()> {
+    match first_usize(parameters, "acqdim")? {
+        Some(2) | None => Ok(()),
+        Some(0 | 1) => Err(RSpinError::Unsupported {
+            feature: "Agilent one-dimensional FID in 2D reader",
+        }),
+        Some(_) => Err(RSpinError::Unsupported {
+            feature: "Agilent three-or-higher-dimensional FID",
+        }),
     }
 }
 

@@ -55,6 +55,8 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
 
 #[test]
 fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
+    let agilent_2d_reader = AgilentFid2D;
+    assert_eq!(format!("{agilent_2d_reader:?}"), "AgilentFid2D");
     let spectrum = read_spectrum1d_csv("x,intensity\n1,2\n2,4\n")?;
     assert_eq!(spectrum.len(), 2);
 

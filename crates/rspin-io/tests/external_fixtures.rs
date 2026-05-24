@@ -10,8 +10,8 @@ use std::{
 
 use rspin_core::{Nucleus, Unit};
 use rspin_io::{
-    read_agilent_fid_1d_dir, read_bruker_fid_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d,
-    read_jeol_jdf_1d_file,
+    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
+    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
 };
 
 #[test]
@@ -128,6 +128,28 @@ fn parses_external_agilent_1d_fid_when_available() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("none"));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.intensities.iter().any(|value| value.abs() > 1.0));
+    Ok(())
+}
+
+#[test]
+fn parses_external_agilent_2d_fid_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_2d");
+    require_fixture(&fixture.join("fid"))?;
+    require_fixture(&fixture.join("procpar"))?;
+
+    let spectrum = read_agilent_fid_2d_dir(&fixture)?;
+
+    assert_eq!(spectrum.shape(), (1500, 332));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.unit, Unit::Points);
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_close(spectrum.metadata.frequency_mhz, Some(125.690_610_7));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("none"));
+    assert!(spectrum.imaginary.is_some());
+    assert!(spectrum.z.iter().any(|value| value.abs() > 1.0));
     Ok(())
 }
 

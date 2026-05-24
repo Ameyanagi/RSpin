@@ -47,6 +47,22 @@ pub(super) fn first_f64(
     }
 }
 
+pub(super) fn first_usize(
+    parameters: &BTreeMap<String, Vec<String>>,
+    key: &'static str,
+) -> Result<Option<usize>> {
+    match parameters.get(key).and_then(|values| values.first()) {
+        Some(value) => {
+            let parsed = value.parse::<usize>().map_err(|error| RSpinError::Parse {
+                format: "Agilent",
+                message: format!("{key}: {error}"),
+            })?;
+            Ok(Some(parsed))
+        }
+        None => Ok(None),
+    }
+}
+
 fn read_counted_values(lines: &mut std::str::Lines<'_>) -> Option<Vec<String>> {
     let first_line = lines.next()?;
     let mut first_tokens = tokens(first_line);

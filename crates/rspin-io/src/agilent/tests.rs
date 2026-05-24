@@ -107,6 +107,157 @@ fn rejects_arrayed_or_multidimensional_fid() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn reads_big_endian_i32_complex_2d_fid() -> anyhow::Result<()> {
+    let root = synthetic_dataset("big-i32-2d")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+arrayelemts 1 1 9.99999984307e+17 -9.99999984307e+17 0 2 1 0 1 64
+1 1
+0
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"H1\"
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 400.13
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 200
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Big,
+        DataForTest::I32(&[1, 2, 3, 4, -5, 6, 7, -8]),
+        2,
+        1,
+    )?;
+
+    let spectrum = read_agilent_fid_2d_dir(root.join("fid"))?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.x.values, vec![0.0, 0.001]);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.values, vec![0.0, 0.005]);
+    assert_eq!(spectrum.z, vec![1.0, 3.0, -5.0, 7.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![2.0, 4.0, 6.0, -8.0]));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.13));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn reads_arrayed_2d_fid_with_point_axis() -> anyhow::Result<()> {
+    let root = synthetic_dataset("arrayed-2d")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+array 2 2 256 0 0 2 1 1 1 64
+1 \"phase\"
+0
+arrayelemts 1 1 9.99999984307e+17 -9.99999984307e+17 0 2 1 0 1 64
+1 2
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 200
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Little,
+        DataForTest::F32(&[0.5, -0.25, 1.5, -2.5, 3.0, 4.0, 5.0, 6.0]),
+        2,
+        1,
+    )?;
+
+    let spectrum = AgilentFid2D.read_dir(&root)?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.y.unit, Unit::Points);
+    assert_eq!(spectrum.y.values, vec![0.0, 1.0]);
+    assert_eq!(spectrum.z, vec![0.5, 1.5, 3.0, 5.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-0.25, -2.5, 4.0, 6.0]));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn reads_multitrace_2d_fid_block() -> anyhow::Result<()> {
+    let root = synthetic_dataset("multitrace-2d")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Big,
+        DataForTest::I16(&[1, -1, 2, -2, 3, -3, 4, -4]),
+        1,
+        2,
+    )?;
+
+    let spectrum = read_agilent_fid_2d_dir(&root)?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-1.0, -2.0, -3.0, -4.0]));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn rejects_three_dimensional_fid_for_2d_reader() -> anyhow::Result<()> {
+    let root = synthetic_dataset("three-dimensional")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 3
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Big,
+        DataForTest::I16(&[1, 2, 3, 4]),
+        2,
+        1,
+    )?;
+
+    let error = read_agilent_fid_2d_dir(&root).expect_err("3D Agilent FID should be unsupported");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 enum DataForTest<'a> {
     I16(&'a [i16]),
@@ -144,9 +295,21 @@ fn write_fid(
     ntraces: i32,
 ) -> anyhow::Result<()> {
     let (ebytes, status, data_bytes) = encode_data(endian, data);
-    let np_values = i32::try_from(data_bytes.len() / usize::try_from(ebytes)?)?;
+    let row_count = usize::try_from(nblocks)?
+        .checked_mul(usize::try_from(ntraces)?)
+        .ok_or_else(|| anyhow::anyhow!("synthetic Agilent row count overflow"))?;
+    let value_count = data_bytes.len() / usize::try_from(ebytes)?;
+    let np_values = i32::try_from(value_count / row_count)?;
     let tbytes = np_values * ebytes;
-    let bbytes = tbytes + i32::try_from(BLOCK_HEADER_LEN)?;
+    let trace_bytes = usize::try_from(tbytes)?;
+    let block_data_len = usize::try_from(ntraces)?
+        .checked_mul(trace_bytes)
+        .ok_or_else(|| anyhow::anyhow!("synthetic Agilent block length overflow"))?;
+    let bbytes = i32::try_from(
+        BLOCK_HEADER_LEN
+            .checked_add(block_data_len)
+            .ok_or_else(|| anyhow::anyhow!("synthetic Agilent block byte count overflow"))?,
+    )?;
 
     let mut fid_bytes = Vec::new();
     push_i32(&mut fid_bytes, endian, nblocks);
@@ -159,16 +322,25 @@ fn write_fid(
     push_i16(&mut fid_bytes, endian, status);
     push_i32(&mut fid_bytes, endian, 1);
 
-    push_i16(&mut fid_bytes, endian, 0);
-    push_i16(&mut fid_bytes, endian, status);
-    push_i16(&mut fid_bytes, endian, 1);
-    push_i16(&mut fid_bytes, endian, 0);
-    push_i32(&mut fid_bytes, endian, 1);
-    push_f32(&mut fid_bytes, endian, 0.0);
-    push_f32(&mut fid_bytes, endian, 0.0);
-    push_f32(&mut fid_bytes, endian, 0.0);
-    push_f32(&mut fid_bytes, endian, 0.0);
-    fid_bytes.extend(data_bytes);
+    for block_index in 0..usize::try_from(nblocks)? {
+        push_i16(&mut fid_bytes, endian, 0);
+        push_i16(&mut fid_bytes, endian, status);
+        push_i16(&mut fid_bytes, endian, 1);
+        push_i16(&mut fid_bytes, endian, 0);
+        push_i32(&mut fid_bytes, endian, i32::try_from(block_index + 1)?);
+        push_f32(&mut fid_bytes, endian, 0.0);
+        push_f32(&mut fid_bytes, endian, 0.0);
+        push_f32(&mut fid_bytes, endian, 0.0);
+        push_f32(&mut fid_bytes, endian, 0.0);
+        let block_data_start = block_index
+            .checked_mul(usize::try_from(ntraces)?)
+            .and_then(|index| index.checked_mul(trace_bytes))
+            .ok_or_else(|| anyhow::anyhow!("synthetic Agilent block offset overflow"))?;
+        let block_data_end = block_data_start
+            .checked_add(block_data_len)
+            .ok_or_else(|| anyhow::anyhow!("synthetic Agilent block end overflow"))?;
+        fid_bytes.extend(&data_bytes[block_data_start..block_data_end]);
+    }
 
     fs::write(root.join("fid"), fid_bytes)?;
     Ok(())
