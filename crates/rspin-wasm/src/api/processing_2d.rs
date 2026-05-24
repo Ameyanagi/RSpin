@@ -8,8 +8,8 @@ use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, abs_2d,
     apply_processing_recipe_2d, apply_processing_recipe_2d_until, auto_phase_correct_2d, crop_2d,
     fft_2d, gaussian_apodization_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y,
-    resample_2d, scale_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
-    zero_fill_2d,
+    resample_2d, scale_2d, sine_bell_apodization_2d, slice_x_at_y, slice_x_at_y_index,
+    slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, to_json};
@@ -128,6 +128,29 @@ pub fn gaussian_apodization_spectrum_2d_json(
         options.y_gaussian_broadening_hz,
         options.x_dwell_time_s,
         options.y_dwell_time_s,
+    )?;
+    to_json(&processed)
+}
+
+/// Applies separable sine-bell apodization to serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn sine_bell_apodization_spectrum_2d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let options: SineBellApodization2DJson = from_json(options_json)?;
+    let processed = sine_bell_apodization_2d(
+        &spectrum,
+        options.x_start_angle_deg,
+        options.x_end_angle_deg,
+        options.x_exponent,
+        options.y_start_angle_deg,
+        options.y_end_angle_deg,
+        options.y_exponent,
     )?;
     to_json(&processed)
 }
@@ -283,6 +306,16 @@ struct GaussianApodization2DJson {
     y_gaussian_broadening_hz: f64,
     x_dwell_time_s: f64,
     y_dwell_time_s: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct SineBellApodization2DJson {
+    x_start_angle_deg: f64,
+    x_end_angle_deg: f64,
+    x_exponent: f64,
+    y_start_angle_deg: f64,
+    y_end_angle_deg: f64,
+    y_exponent: f64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

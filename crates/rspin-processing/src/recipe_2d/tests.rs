@@ -60,6 +60,7 @@ fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let recipe = ProcessingRecipe2D::new()
         .crop(0.0, 1.0, 1.0, 1.0)
         .gaussian_apodization(0.0, 0.0, 0.1, 0.1)
+        .sine_bell_apodization(90.0, 90.0, 1.0, 90.0, 90.0, 1.0)
         .resample(
             Axis::linear("x", Unit::Ppm, 0.0, 1.0, 3)?,
             Axis::ppm(vec![1.0])?,
@@ -68,11 +69,15 @@ fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let decoded: ProcessingRecipe2D = serde_json::from_str(&json)?;
     let processed = ProcessingStep::apply(&decoded, &demo_spectrum()?)?;
 
-    assert_eq!(decoded.len(), 3);
+    assert_eq!(decoded.len(), 4);
     assert_eq!(processed.shape(), (3, 1));
     assert_eq!(processed.z, vec![3.0, -0.5, -4.0]);
     assert_eq!(processed.processing[1].operation, "gaussian_apodization_2d");
-    assert_eq!(processed.processing[2].operation, "resample_2d");
+    assert_eq!(
+        processed.processing[2].operation,
+        "sine_bell_apodization_2d"
+    );
+    assert_eq!(processed.processing[3].operation, "resample_2d");
     Ok(())
 }
 

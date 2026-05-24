@@ -90,6 +90,55 @@ fn applies_separable_gaussian_window_to_imaginary_channel() -> anyhow::Result<()
 }
 
 #[test]
+fn applies_separable_sine_bell_window() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let processed = sine_bell_apodization_2d(&spectrum, 30.0, 90.0, 1.0, 90.0, 30.0, 2.0)?;
+
+    let x0 = 0.5;
+    let x1 = 60.0_f64.to_radians().sin();
+    let x2 = 1.0;
+    let y0 = 1.0;
+    let y1 = 0.25;
+    assert_close(processed.z[0], x0 * y0);
+    assert_close(processed.z[1], 2.0 * x1 * y0);
+    assert_close(processed.z[2], 3.0 * x2 * y0);
+    assert_close(processed.z[3], 4.0 * x0 * y1);
+    assert_close(processed.z[4], 5.0 * x1 * y1);
+    assert_close(processed.z[5], 6.0 * x2 * y1);
+    assert_eq!(
+        processed.processing[0].operation,
+        "sine_bell_apodization_2d"
+    );
+    Ok(())
+}
+
+#[test]
+fn applies_separable_sine_bell_window_to_imaginary_channel() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new_complex(
+        Axis::linear("x", Unit::Seconds, 0.0, 0.2, 3)?,
+        Axis::linear("y", Unit::Seconds, 0.0, 0.1, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        Some(vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0]),
+        Metadata::default(),
+    )?;
+    let processed = SineBellApodization2D {
+        x_start_angle_deg: 30.0,
+        x_end_angle_deg: 90.0,
+        x_exponent: 1.0,
+        y_start_angle_deg: 90.0,
+        y_end_angle_deg: 30.0,
+        y_exponent: 2.0,
+    }
+    .apply(&spectrum)?;
+    let imaginary = require_imaginary(&processed)?;
+
+    assert_close(imaginary[0], 5.0);
+    assert_close(imaginary[1], 20.0 * 60.0_f64.to_radians().sin());
+    assert_close(imaginary[5], 15.0);
+    Ok(())
+}
+
+#[test]
 fn supports_processing_step_api() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let processed = ExponentialApodization2D {
@@ -125,6 +174,14 @@ fn rejects_invalid_parameters() -> anyhow::Result<()> {
     let gaussian_error = gaussian_apodization_2d(&spectrum, 0.0, -1.0, 0.1, 0.1)
         .expect_err("negative Gaussian broadening should fail");
     assert!(matches!(gaussian_error, RSpinError::InvalidSpectrum { .. }));
+
+    let sine_error = sine_bell_apodization_2d(&spectrum, 0.0, 181.0, 1.0, 0.0, 90.0, 1.0)
+        .expect_err("out-of-range sine-bell angle should fail");
+    assert!(matches!(sine_error, RSpinError::InvalidSpectrum { .. }));
+
+    let exponent_error = sine_bell_apodization_2d(&spectrum, 0.0, 90.0, 0.0, 0.0, 90.0, 1.0)
+        .expect_err("zero sine-bell exponent should fail");
+    assert!(matches!(exponent_error, RSpinError::InvalidSpectrum { .. }));
     Ok(())
 }
 

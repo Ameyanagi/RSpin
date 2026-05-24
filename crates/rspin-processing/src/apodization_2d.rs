@@ -56,6 +56,37 @@ impl ProcessingStep<Spectrum2D> for GaussianApodization2D {
     }
 }
 
+/// Applies separable sine-bell apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SineBellApodization2D {
+    /// X-dimension start angle in degrees.
+    pub x_start_angle_deg: f64,
+    /// X-dimension end angle in degrees.
+    pub x_end_angle_deg: f64,
+    /// X-dimension positive exponent.
+    pub x_exponent: f64,
+    /// Y-dimension start angle in degrees.
+    pub y_start_angle_deg: f64,
+    /// Y-dimension end angle in degrees.
+    pub y_end_angle_deg: f64,
+    /// Y-dimension positive exponent.
+    pub y_exponent: f64,
+}
+
+impl ProcessingStep<Spectrum2D> for SineBellApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        sine_bell_apodization_2d(
+            spectrum,
+            self.x_start_angle_deg,
+            self.x_end_angle_deg,
+            self.x_exponent,
+            self.y_start_angle_deg,
+            self.y_end_angle_deg,
+            self.y_exponent,
+        )
+    }
+}
+
 /// Applies a separable exponential window in x and y.
 ///
 /// The multiplier at `(x, y)` is
@@ -158,6 +189,61 @@ pub fn gaussian_apodization_2d(
     ))
 }
 
+/// Applies a separable sine-bell window in x and y.
+///
+/// Each dimension uses `sin(theta_i)^exponent`, where `theta_i` moves linearly
+/// from the configured start angle to end angle. Angles are constrained to
+/// `0..=180` degrees so weights remain non-negative.
+///
+/// # Errors
+///
+/// Returns an error when an angle is outside `0..=180` degrees, an exponent is
+/// not positive, any parameter is non-finite, or the shape is too large for
+/// checked numeric conversion.
+pub fn sine_bell_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_start_angle_deg: f64,
+    x_end_angle_deg: f64,
+    x_exponent: f64,
+    y_start_angle_deg: f64,
+    y_end_angle_deg: f64,
+    y_exponent: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = sine_bell_weights(
+        width,
+        x_start_angle_deg,
+        x_end_angle_deg,
+        x_exponent,
+        "2D x sine-bell apodization",
+    )?;
+    let y_weights = sine_bell_weights(
+        height,
+        y_start_angle_deg,
+        y_end_angle_deg,
+        y_exponent,
+        "2D y sine-bell apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("sine_bell_apodization_2d").with_details(format!(
+            "x_start_angle_deg={x_start_angle_deg},x_end_angle_deg={x_end_angle_deg},x_exponent={x_exponent},y_start_angle_deg={y_start_angle_deg},y_end_angle_deg={y_end_angle_deg},y_exponent={y_exponent}"
+        )),
+    ))
+}
+
 fn exponential_weights(len: usize, decay: f64) -> Vec<f64> {
     let mut weights = Vec::with_capacity(len);
     let mut weight = 1.0;
@@ -188,6 +274,55 @@ fn gaussian_weights(
             Ok((-(scaled * scaled) / denominator).exp())
         })
         .collect()
+}
+
+fn sine_bell_weights(
+    len: usize,
+    start_angle_deg: f64,
+    end_angle_deg: f64,
+    exponent: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_angle_degrees("start_angle_deg", start_angle_deg)?;
+    ensure_angle_degrees("end_angle_deg", end_angle_deg)?;
+    ensure_positive("exponent", exponent)?;
+    let denominator = if len <= 1 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+
+    (0..len)
+        .map(|index| {
+            let index =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let fraction = if denominator == 0.0 {
+                0.0
+            } else {
+                index / denominator
+            };
+            let angle = start_angle_deg + (end_angle_deg - start_angle_deg) * fraction;
+            Ok(angle.to_radians().sin().max(0.0).powf(exponent))
+        })
+        .collect()
+}
+
+fn ensure_angle_degrees(field: &'static str, value: f64) -> Result<()> {
+    ensure_finite(field, value)?;
+    if !(0.0..=180.0).contains(&value) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!("{field} must be between 0 and 180 degrees"),
+        });
+    }
+    Ok(())
 }
 
 fn ensure_non_negative(field: &'static str, value: f64) -> Result<()> {

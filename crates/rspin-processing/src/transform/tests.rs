@@ -35,6 +35,22 @@ fn gaussian_apodization_damps_real_and_imaginary_channels() -> anyhow::Result<()
 }
 
 #[test]
+fn sine_bell_apodization_weights_real_and_imaginary_channels() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = sine_bell_apodization(&spectrum, 0.0, 180.0, 1.0)?;
+
+    assert_close(processed.intensities[0], 0.0);
+    assert_close(processed.intensities[1], 2.0);
+    assert_close(processed.intensities[2], 0.0);
+    let imaginary = require_imaginary(&processed)?;
+    assert_close(imaginary[0], 0.0);
+    assert_close(imaginary[1], 1.0);
+    assert_close(imaginary[2], 0.0);
+    assert_eq!(processed.processing[0].operation, "sine_bell_apodization");
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;
@@ -127,6 +143,24 @@ fn rejects_negative_gaussian_broadening() -> anyhow::Result<()> {
     .apply(&spectrum)
     .expect_err("negative Gaussian broadening should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_sine_bell_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let angle_error = sine_bell_apodization(&spectrum, -1.0, 180.0, 1.0)
+        .expect_err("negative sine-bell angle should fail");
+    assert!(matches!(angle_error, RSpinError::InvalidSpectrum { .. }));
+
+    let exponent_error = SineBellApodization {
+        start_angle_deg: 0.0,
+        end_angle_deg: 180.0,
+        exponent: 0.0,
+    }
+    .apply(&spectrum)
+    .expect_err("zero sine-bell exponent should fail");
+    assert!(matches!(exponent_error, RSpinError::InvalidSpectrum { .. }));
     Ok(())
 }
 

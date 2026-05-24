@@ -5,8 +5,8 @@ use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 use crate::{
     Abs2D, AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
     FftDirection, GaussianApodization2D, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep,
-    ProjectionMode, Resample2D, Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y,
-    slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
+    ProjectionMode, Resample2D, Scale2D, SineBellApodization2D, ZeroFill2D, project_x, project_y,
+    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -143,6 +143,27 @@ impl Spectrum2DPipeline {
             y_gaussian_broadening_hz,
             x_dwell_time_s,
             y_dwell_time_s,
+        })
+    }
+
+    /// Applies separable sine-bell apodization.
+    #[must_use]
+    pub fn sine_bell_apodization(
+        self,
+        x_start_angle_deg: f64,
+        x_end_angle_deg: f64,
+        x_exponent: f64,
+        y_start_angle_deg: f64,
+        y_end_angle_deg: f64,
+        y_exponent: f64,
+    ) -> Self {
+        self.then(SineBellApodization2D {
+            x_start_angle_deg,
+            x_end_angle_deg,
+            x_exponent,
+            y_start_angle_deg,
+            y_end_angle_deg,
+            y_exponent,
         })
     }
 

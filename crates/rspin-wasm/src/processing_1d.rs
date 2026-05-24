@@ -8,7 +8,8 @@ use crate::{
     fft_spectrum_1d_json, gaussian_apodization_spectrum_1d_json, js_error,
     magnitude_spectrum_1d_json, normalize_spectrum_1d_json, offset_spectrum_1d_json,
     phase_spectrum_1d_json, resample_spectrum_1d_json, scale_spectrum_1d_json,
-    shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
+    shift_spectrum_1d_axis_json, sine_bell_apodization_spectrum_1d_json,
+    subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 
 /// Scales a serialized one-dimensional spectrum.
@@ -183,6 +184,21 @@ pub fn gaussian_apodization_spectrum_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     gaussian_apodization_spectrum_1d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies sine-bell apodization to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = sineBellApodizationSpectrum1d)]
+pub fn sine_bell_apodization_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    sine_bell_apodization_spectrum_1d_json(spectrum_json, options_json)
         .map_err(|error| js_error(&error))
 }
 

@@ -154,6 +154,19 @@ fn apodizes_and_subtracts_baseline_json() -> anyhow::Result<()> {
             .map(|record| record.operation.as_str()),
         Some("gaussian_apodization")
     );
+    let sine_bell_json = sine_bell_apodization_spectrum_1d_json(
+        &spectrum_json,
+        r#"{"start_angle_deg":0.0,"end_angle_deg":180.0,"exponent":1.0}"#,
+    )?;
+    let sine_bell: Spectrum1D = from_json(&sine_bell_json)?;
+    assert_vec_close(&sine_bell.intensities, &[0.0, 4.0, 0.0]);
+    assert_eq!(
+        sine_bell
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("sine_bell_apodization")
+    );
 
     let corrected_json =
         subtract_baseline_spectrum_1d_json(&spectrum_json, r#"{"method":"constant","value":1.5}"#)?;

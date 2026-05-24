@@ -152,6 +152,20 @@ fn gaussian_apodizes_2d_spectrum_json() -> anyhow::Result<()> {
             .map(|record| record.operation.as_str()),
         Some("gaussian_apodization_2d")
     );
+
+    let sine_bell_json = sine_bell_apodization_spectrum_2d_json(
+        &spectrum_json,
+        r#"{"x_start_angle_deg":90.0,"x_end_angle_deg":90.0,"x_exponent":1.0,"y_start_angle_deg":90.0,"y_end_angle_deg":90.0,"y_exponent":1.0}"#,
+    )?;
+    let sine_bell: Spectrum2D = from_json(&sine_bell_json)?;
+    assert_vec_close(&sine_bell.z, &complex_spectrum()?.z);
+    assert_eq!(
+        sine_bell
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("sine_bell_apodization_2d")
+    );
     Ok(())
 }
 

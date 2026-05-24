@@ -7,7 +7,7 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 use crate::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingStep, abs_2d,
     auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d, gaussian_apodization_2d,
-    normalize_2d_max_abs, resample_2d, scale_2d, zero_fill_2d,
+    normalize_2d_max_abs, resample_2d, scale_2d, sine_bell_apodization_2d, zero_fill_2d,
 };
 
 /// A serializable two-dimensional processing operation.
@@ -72,6 +72,21 @@ pub enum ProcessingOperation2D {
         /// Y-dimension dwell time in seconds.
         y_dwell_time_s: f64,
     },
+    /// Applies separable sine-bell apodization.
+    SineBellApodization {
+        /// X-dimension start angle in degrees.
+        x_start_angle_deg: f64,
+        /// X-dimension end angle in degrees.
+        x_end_angle_deg: f64,
+        /// X-dimension positive exponent.
+        x_exponent: f64,
+        /// Y-dimension start angle in degrees.
+        y_start_angle_deg: f64,
+        /// Y-dimension end angle in degrees.
+        y_end_angle_deg: f64,
+        /// Y-dimension positive exponent.
+        y_exponent: f64,
+    },
     /// Applies a forward or inverse 2D FFT.
     Fft {
         /// Transform direction.
@@ -133,6 +148,22 @@ impl ProcessingStep<Spectrum2D> for ProcessingOperation2D {
                 *y_gaussian_broadening_hz,
                 *x_dwell_time_s,
                 *y_dwell_time_s,
+            ),
+            Self::SineBellApodization {
+                x_start_angle_deg,
+                x_end_angle_deg,
+                x_exponent,
+                y_start_angle_deg,
+                y_end_angle_deg,
+                y_exponent,
+            } => sine_bell_apodization_2d(
+                spectrum,
+                *x_start_angle_deg,
+                *x_end_angle_deg,
+                *x_exponent,
+                *y_start_angle_deg,
+                *y_end_angle_deg,
+                *y_exponent,
             ),
             Self::Fft { direction } => fft_2d(spectrum, *direction),
             Self::Phase { correction } => crate::phase_correct_2d(spectrum, *correction),
@@ -308,6 +339,27 @@ impl ProcessingRecipe2D {
             y_gaussian_broadening_hz,
             x_dwell_time_s,
             y_dwell_time_s,
+        })
+    }
+
+    /// Appends a separable sine-bell apodization operation.
+    #[must_use]
+    pub fn sine_bell_apodization(
+        self,
+        x_start_angle_deg: f64,
+        x_end_angle_deg: f64,
+        x_exponent: f64,
+        y_start_angle_deg: f64,
+        y_end_angle_deg: f64,
+        y_exponent: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation2D::SineBellApodization {
+            x_start_angle_deg,
+            x_end_angle_deg,
+            x_exponent,
+            y_start_angle_deg,
+            y_end_angle_deg,
+            y_exponent,
         })
     }
 

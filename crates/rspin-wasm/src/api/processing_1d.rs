@@ -8,7 +8,7 @@ use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
     apply_processing_recipe_1d_until, crop_1d, exponential_apodization, fft_1d,
     gaussian_apodization, magnitude_spectrum, offset_intensity, phase_correct, resample_1d,
-    shift_axis, subtract_baseline, zero_fill,
+    shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
 };
 
 use super::{from_json, to_json};
@@ -161,6 +161,26 @@ pub fn gaussian_apodization_spectrum_1d_json(
     to_json(&processed)
 }
 
+/// Applies sine-bell apodization to serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn sine_bell_apodization_spectrum_1d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let options: SineBellApodizationJson = from_json(options_json)?;
+    let processed = sine_bell_apodization(
+        &spectrum,
+        options.start_angle_deg,
+        options.end_angle_deg,
+        options.exponent,
+    )?;
+    to_json(&processed)
+}
+
 /// Subtracts a fitted baseline from serialized `Spectrum1D` JSON.
 ///
 /// # Errors
@@ -249,6 +269,13 @@ struct ExponentialApodizationJson {
 struct GaussianApodizationJson {
     gaussian_broadening_hz: f64,
     dwell_time_s: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct SineBellApodizationJson {
+    start_angle_deg: f64,
+    end_angle_deg: f64,
+    exponent: f64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

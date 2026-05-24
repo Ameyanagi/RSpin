@@ -7,9 +7,9 @@ use crate::{
     auto_phase_spectrum_2d_json, crop_spectrum_2d_json, fft_spectrum_2d_json,
     gaussian_apodization_spectrum_2d_json, js_error, normalize_spectrum_2d_json,
     phase_spectrum_2d_json, project_spectrum_2d_x_json, project_spectrum_2d_y_json,
-    resample_spectrum_2d_json, scale_spectrum_2d_json, slice_spectrum_2d_x_at_y_index_json,
-    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
-    slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
+    resample_spectrum_2d_json, scale_spectrum_2d_json, sine_bell_apodization_spectrum_2d_json,
+    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
+    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
 };
 
 /// Scales a serialized two-dimensional spectrum.
@@ -127,6 +127,21 @@ pub fn gaussian_apodization_spectrum_2d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     gaussian_apodization_spectrum_2d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies separable sine-bell apodization to a serialized two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = sineBellApodizationSpectrum2d)]
+pub fn sine_bell_apodization_spectrum_2d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    sine_bell_apodization_spectrum_2d_json(spectrum_json, options_json)
         .map_err(|error| js_error(&error))
 }
 

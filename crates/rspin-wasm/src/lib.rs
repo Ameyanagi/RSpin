@@ -56,7 +56,8 @@ pub use api::{
     render_prediction_2d_json, resample_spectrum_1d_json, resample_spectrum_2d_json,
     scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, slice_spectrum_2d_x_at_y_index_json,
+    simulate_exact_spin_half_transitions_json, sine_bell_apodization_spectrum_1d_json,
+    sine_bell_apodization_spectrum_2d_json, slice_spectrum_2d_x_at_y_index_json,
     slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
     slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
     summarize_signals_2d_json, validate_assignment_set_json, validate_j_coupling_graph_json,
@@ -79,15 +80,16 @@ pub use processing_1d::{
     auto_phase_spectrum_1d, crop_spectrum_1d, exponential_apodization_spectrum_1d, fft_spectrum_1d,
     gaussian_apodization_spectrum_1d, magnitude_spectrum_1d, normalize_spectrum_1d,
     offset_spectrum_1d, phase_spectrum_1d, resample_spectrum_1d, scale_spectrum_1d,
-    shift_spectrum_1d_axis, subtract_baseline_spectrum_1d, zero_fill_spectrum_1d,
+    shift_spectrum_1d_axis, sine_bell_apodization_spectrum_1d, subtract_baseline_spectrum_1d,
+    zero_fill_spectrum_1d,
 };
 pub use processing_2d::{
     abs_spectrum_2d, apply_processing_recipe_2d, apply_processing_recipe_2d_until,
     auto_phase_spectrum_2d, crop_spectrum_2d, fft_spectrum_2d, gaussian_apodization_spectrum_2d,
     normalize_spectrum_2d, phase_spectrum_2d, project_spectrum_2d_x, project_spectrum_2d_y,
-    resample_spectrum_2d, scale_spectrum_2d, slice_spectrum_2d_x_at_y,
-    slice_spectrum_2d_x_at_y_index, slice_spectrum_2d_y_at_x, slice_spectrum_2d_y_at_x_index,
-    zero_fill_spectrum_2d,
+    resample_spectrum_2d, scale_spectrum_2d, sine_bell_apodization_spectrum_2d,
+    slice_spectrum_2d_x_at_y, slice_spectrum_2d_x_at_y_index, slice_spectrum_2d_y_at_x,
+    slice_spectrum_2d_y_at_x_index, zero_fill_spectrum_2d,
 };
 #[cfg(feature = "first-order")]
 pub use simulation::simulate_first_order_multiplet;

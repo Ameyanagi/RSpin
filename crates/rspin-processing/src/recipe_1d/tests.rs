@@ -64,15 +64,18 @@ fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let recipe = ProcessingRecipe1D::new()
         .scale(2.0)
         .gaussian_apodization(0.0, 0.1)
+        .sine_bell_apodization(90.0, 90.0, 1.0)
         .subtract_baseline_with(BaselineMethod::Polynomial { degree: 1 });
     let json = serde_json::to_string(&recipe)?;
     let decoded: ProcessingRecipe1D = serde_json::from_str(&json)?;
     let processed = decoded.apply(&demo_spectrum()?)?;
 
-    assert_eq!(decoded.len(), 3);
+    assert_eq!(decoded.len(), 4);
     assert_eq!(processed.processing[1].operation, "gaussian_apodization");
-    assert_eq!(processed.processing[2].operation, "baseline_polynomial");
+    assert_eq!(processed.processing[2].operation, "sine_bell_apodization");
+    assert_eq!(processed.processing[3].operation, "baseline_polynomial");
     assert!(json.contains("gaussian_apodization"));
+    assert!(json.contains("sine_bell_apodization"));
     assert!(json.contains("polynomial"));
     Ok(())
 }
