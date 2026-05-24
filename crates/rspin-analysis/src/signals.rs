@@ -10,8 +10,10 @@ use crate::{
 };
 
 mod model;
+mod two_d;
 
-pub use model::{SignalSummary1D, SignalSummaryOptions};
+pub use model::{SignalSummary1D, SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions};
+pub use two_d::summarize_signals_2d;
 
 /// Assembles stable one-dimensional signal summaries from ranges, multiplets,
 /// assignments, and a J-coupling graph.

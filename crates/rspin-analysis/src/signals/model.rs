@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{AssignedAtom, Assignment, DetectedMultiplet, DetectedRange, JCoupling, MultipletKind};
+use crate::{
+    AssignedAtom, Assignment, DetectedMultiplet, DetectedRange, DetectedZone, JCoupling,
+    MultipletKind,
+};
 
 /// Options for assembling one-dimensional signal summaries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -51,4 +54,67 @@ pub struct SignalSummary1D {
     pub atoms: Vec<AssignedAtom>,
     /// J couplings connected to assigned atom ids.
     pub couplings: Vec<JCoupling>,
+}
+
+/// Options for assembling two-dimensional signal summaries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SignalSummary2DOptions {
+    /// Emit zones even when no assignment is attached.
+    pub include_unassigned_zones: bool,
+}
+
+impl Default for SignalSummary2DOptions {
+    fn default() -> Self {
+        Self {
+            include_unassigned_zones: true,
+        }
+    }
+}
+
+impl SignalSummary2DOptions {
+    /// Creates default two-dimensional signal summary options.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets whether zones without assignments should be emitted.
+    #[must_use]
+    pub fn with_include_unassigned_zones(mut self, include_unassigned_zones: bool) -> Self {
+        self.include_unassigned_zones = include_unassigned_zones;
+        self
+    }
+}
+
+/// A stable two-dimensional signal summary.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SignalSummary2D {
+    /// Stable signal id.
+    pub id: String,
+    /// Source detected zone.
+    pub zone: DetectedZone,
+    /// Zone center along the x axis.
+    pub center_x: f64,
+    /// Zone center along the y axis.
+    pub center_y: f64,
+    /// Left x coordinate of the zone span.
+    pub x_from: f64,
+    /// Right x coordinate of the zone span.
+    pub x_to: f64,
+    /// Lower y coordinate of the zone span.
+    pub y_from: f64,
+    /// Upper y coordinate of the zone span.
+    pub y_to: f64,
+    /// Number of active points contributing to the zone.
+    pub active_points: usize,
+    /// Maximum absolute intensity represented by the signal.
+    pub max_abs_intensity: f64,
+    /// Sum of signed intensities over active points.
+    pub sum_intensity: f64,
+    /// Sum of absolute intensities over active points.
+    pub sum_abs_intensity: f64,
+    /// Assignments targeting the zone.
+    pub assignments: Vec<Assignment>,
+    /// Unique atoms collected from `assignments`.
+    pub atoms: Vec<AssignedAtom>,
 }

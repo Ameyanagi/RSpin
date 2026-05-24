@@ -8,12 +8,13 @@ mod processing_2d;
 use serde::{Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
-    AssignmentSet, DetectedMultiplet, DetectedRange, IntegralRegion, IntegralRegion2D,
-    JCouplingGraph, MatrixGeneration2DOptions, MatrixGenerationOptions, MultipletDetectionOptions,
-    PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions, SignalSummaryOptions,
-    ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones,
-    generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
-    integrate_region_2d, optimize_peaks_quadratic, pick_peaks, summarize_signals_1d,
+    AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion,
+    IntegralRegion2D, JCouplingGraph, MatrixGeneration2DOptions, MatrixGenerationOptions,
+    MultipletDetectionOptions, PeakOptimizationOptions, PeakPickOptions, RangeDetectionOptions,
+    SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
+    detect_ranges, detect_zones, generate_spectrum_matrix_1d, generate_spectrum_matrix_2d,
+    integrate_region, integrate_region_2d, optimize_peaks_quadratic, pick_peaks,
+    summarize_signals_1d, summarize_signals_2d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::read_jcamp_dx_1d;
@@ -215,6 +216,25 @@ pub fn summarize_signals_1d_json(
         &coupling_graph,
         options,
     )?;
+    to_json(&signals)
+}
+
+/// Assembles two-dimensional signal summary JSON from zone and assignment payloads.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, analysis, or serialization fails.
+pub fn summarize_signals_2d_json(
+    spectrum_json: &str,
+    zones_json: &str,
+    assignments_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let zones: Vec<DetectedZone> = from_json(zones_json)?;
+    let assignments: AssignmentSet = from_json(assignments_json)?;
+    let options: SignalSummary2DOptions = from_json(options_json)?;
+    let signals = summarize_signals_2d(&spectrum, &zones, &assignments, options)?;
     to_json(&signals)
 }
 

@@ -37,7 +37,10 @@ pub use peak_optimization::{
 };
 pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pick_peaks};
 pub use ranges::{DetectedRange, RangeDetectionOptions, ThresholdRangeDetector, detect_ranges};
-pub use signals::{SignalSummary1D, SignalSummaryOptions, summarize_signals_1d};
+pub use signals::{
+    SignalSummary1D, SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions,
+    summarize_signals_1d, summarize_signals_2d,
+};
 pub use traits::{
     Integrator, Integrator2D, MultipletDetector, PeakOptimizer, PeakPicker, RangeDetector,
     ZoneDetector,

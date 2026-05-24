@@ -255,6 +255,35 @@ fn summarizes_signals_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn summarizes_2d_signals_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![0.0, 0.0, 0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0],
+        Metadata::default(),
+    )?)?;
+    let zones_json = detect_zones_json(
+        &spectrum_json,
+        r#"{"threshold_abs":1.0,"min_active_points":1,"connectivity":"Four"}"#,
+    )?;
+    let signals_json = summarize_signals_2d_json(
+        &spectrum_json,
+        &zones_json,
+        r#"{"assignments":[{"id":"assign:zone2d:center:H1","target":{"Zone2D":{"id":"zone:x1-1:y1-1"}},"atoms":[{"id":"H1","label":null,"nucleus":"Hydrogen1"}],"confidence":null,"note":null}]}"#,
+        r#"{"include_unassigned_zones":true}"#,
+    )?;
+    let signals: Vec<rspin_analysis::SignalSummary2D> = from_json(&signals_json)?;
+
+    assert_eq!(signals.len(), 1);
+    assert_eq!(signals[0].id, "signal2d:zone:x1-1:y1-1");
+    assert_eq!(signals[0].assignments.len(), 1);
+    assert_eq!(signals[0].atoms.len(), 1);
+    assert!((signals[0].center_x - 1.0).abs() < 1e-12);
+    assert!((signals[0].center_y - 1.0).abs() < 1e-12);
+    Ok(())
+}
+
+#[test]
 fn integrates_region_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\

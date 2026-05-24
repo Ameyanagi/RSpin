@@ -1,8 +1,9 @@
-use rspin_core::{Axis, Metadata, Nucleus, Unit};
+use rspin_core::{Axis, Metadata, Nucleus, Spectrum2D, Unit};
 
 use super::*;
 use crate::{
-    CouplingNode, JCoupling, MultipletKind, Peak, PeakPolarity, deterministic_assignment_id,
+    CouplingNode, DetectedZone, JCoupling, MultipletKind, Peak, PeakPolarity,
+    deterministic_assignment_id,
 };
 
 #[test]
@@ -115,6 +116,62 @@ fn can_suppress_orphan_multiplets() -> anyhow::Result<()> {
 }
 
 #[test]
+fn summarizes_2d_zones_with_assignments() -> anyhow::Result<()> {
+    let spectrum = spectrum_2d()?;
+    let assigned = zone("zone:x1-1:y1-1", 1, 1, 1, 1)?;
+    let unassigned = zone("zone:x2-2:y2-2", 2, 2, 2, 2)?;
+    let assignments = AssignmentSet::default().with_deterministic_assignment(
+        AssignmentTarget::zone_2d(&assigned),
+        vec![AssignedAtom::new(
+            "H1-C1",
+            Nucleus::Other("correlation".to_owned()),
+        )],
+    )?;
+
+    let summaries = summarize_signals_2d(
+        &spectrum,
+        &[assigned.clone(), unassigned],
+        &assignments,
+        SignalSummary2DOptions::new().with_include_unassigned_zones(false),
+    )?;
+
+    assert_eq!(summaries.len(), 1);
+    assert_eq!(summaries[0].id, "signal2d:zone:x1-1:y1-1");
+    assert_eq!(summaries[0].zone, assigned);
+    assert_eq!(summaries[0].assignments.len(), 1);
+    assert_eq!(summaries[0].atoms.len(), 1);
+    assert_close(summaries[0].center_x, 1.0);
+    assert_close(summaries[0].center_y, 1.0);
+    assert_close(summaries[0].max_abs_intensity, 5.0);
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_2d_zone_summaries() -> anyhow::Result<()> {
+    let spectrum = spectrum_2d()?;
+    let duplicate = zone("zone:x1-1:y1-1", 1, 1, 1, 1)?;
+    let error = summarize_signals_2d(
+        &spectrum,
+        &[duplicate.clone(), duplicate],
+        &AssignmentSet::default(),
+        SignalSummary2DOptions::default(),
+    )
+    .expect_err("duplicate zone ids should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+
+    let out_of_bounds = zone("zone:x3-3:y0-0", 3, 3, 0, 0)?;
+    let error = summarize_signals_2d(
+        &spectrum,
+        &[out_of_bounds],
+        &AssignmentSet::default(),
+        SignalSummary2DOptions::default(),
+    )
+    .expect_err("out-of-bounds zone should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_range_and_multiplet_data() -> anyhow::Result<()> {
     let spectrum = spectrum(&[0.0, 1.0, 0.0])?;
     let invalid_range = DetectedRange {
@@ -179,6 +236,45 @@ fn singlet(index: usize, x: f64, intensity: f64) -> DetectedMultiplet {
         spacings_ppm: Vec::new(),
         estimated_j_hz: None,
     }
+}
+
+fn spectrum_2d() -> anyhow::Result<Spectrum2D> {
+    Ok(Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
+        Axis::linear("y", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![0.0, 1.0, 0.0, 2.0, 5.0, 0.0, 0.0, 0.0, 3.0],
+        Metadata::default(),
+    )?)
+}
+
+fn zone(
+    id: &str,
+    x_start_index: usize,
+    x_end_index: usize,
+    y_start_index: usize,
+    y_end_index: usize,
+) -> anyhow::Result<DetectedZone> {
+    let x_from = f64::from(u32::try_from(x_start_index)?);
+    let x_to = f64::from(u32::try_from(x_end_index)?);
+    let y_from = f64::from(u32::try_from(y_start_index)?);
+    let y_to = f64::from(u32::try_from(y_end_index)?);
+    Ok(DetectedZone {
+        id: id.to_owned(),
+        x_start_index,
+        x_end_index,
+        y_start_index,
+        y_end_index,
+        x_from,
+        x_to,
+        y_from,
+        y_to,
+        centroid_x: f64::midpoint(x_from, x_to),
+        centroid_y: f64::midpoint(y_from, y_to),
+        active_points: 1,
+        max_abs_intensity: 5.0,
+        sum_intensity: 5.0,
+        sum_abs_intensity: 5.0,
+    })
 }
 
 fn assert_close(actual: f64, expected: f64) {
