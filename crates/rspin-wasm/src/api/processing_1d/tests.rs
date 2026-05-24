@@ -156,6 +156,33 @@ fn apodizes_and_subtracts_baseline_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn applies_processing_recipe_1d_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&real_spectrum()?)?;
+    let processed_json = apply_processing_recipe_1d_json(
+        &spectrum_json,
+        r#"{"operations":[{"operation":"scale","factor":2.0},{"operation":"offset","offset":-2.0},{"operation":"absolute_value"},{"operation":"normalize_max_abs"}]}"#,
+    )?;
+    let processed: Spectrum1D = from_json(&processed_json)?;
+
+    assert_vec_close(&processed.x.values, &[0.0, 1.0, 2.0]);
+    assert_vec_close(&processed.intensities, &[0.0, 1.0, 1.0]);
+    assert_eq!(
+        processed
+            .processing
+            .iter()
+            .map(|record| record.operation.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "scale_intensity",
+            "offset_intensity",
+            "abs_1d",
+            "normalize_max_abs"
+        ]
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_1d_processing_json_options() -> anyhow::Result<()> {
     let spectrum_json = to_json(&real_spectrum()?)?;
 

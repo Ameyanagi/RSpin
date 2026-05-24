@@ -1,7 +1,9 @@
 use rspin_core::Spectrum1D;
+use serde::{Deserialize, Serialize};
 
 /// Options for deterministic grid-search automatic phase correction.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AutoPhaseOptions {
     /// Minimum zero-order phase searched, in degrees.
     pub zero_order_min_deg: f64,

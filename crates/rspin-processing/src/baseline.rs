@@ -2,11 +2,13 @@
 
 use nalgebra::{DMatrix, DVector};
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
 /// Baseline-correction algorithm.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "method", rename_all = "snake_case")]
 pub enum BaselineMethod {
     /// A fixed baseline value subtracted from all real intensities.
     Constant {

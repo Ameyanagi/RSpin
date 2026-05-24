@@ -4,6 +4,7 @@ use std::f64::consts::PI;
 
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
 use rustfft::{FftPlanner, num_complex::Complex};
+use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
 
@@ -33,7 +34,8 @@ impl ProcessingStep<Spectrum1D> for Magnitude {
 }
 
 /// FFT direction.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum FftDirection {
     /// Forward transform.
     Forward,

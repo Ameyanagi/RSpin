@@ -12,16 +12,16 @@ use wasm_bindgen::prelude::*;
 
 pub use analysis::{detect_ranges_1d, detect_zones_2d};
 pub use api::{
-    abs_spectrum_1d_json, abs_spectrum_2d_json, auto_phase_spectrum_1d_json,
-    auto_phase_spectrum_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
-    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
-    detect_zones_json, exponential_apodization_spectrum_1d_json, extract_contours_2d_json,
-    fft_spectrum_1d_json, fft_spectrum_2d_json, generate_spectrum_matrix_1d_json,
-    generate_spectrum_matrix_2d_json, integrate_region_2d_json, integrate_region_json,
-    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
-    offset_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, phase_spectrum_1d_json,
-    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
+    abs_spectrum_1d_json, abs_spectrum_2d_json, apply_processing_recipe_1d_json,
+    auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json, crop_spectrum_1d_json,
+    crop_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, detect_multiplets_json,
+    detect_ranges_json, detect_zones_json, exponential_apodization_spectrum_1d_json,
+    extract_contours_2d_json, fft_spectrum_1d_json, fft_spectrum_2d_json,
+    generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json, integrate_region_2d_json,
+    integrate_region_json, magnitude_spectrum_1d_json, normalize_spectrum_1d_json,
+    normalize_spectrum_2d_json, offset_spectrum_1d_json, optimize_peaks_json,
+    parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json,
+    phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
     project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
     resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
     scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
@@ -38,10 +38,11 @@ pub use io::{
     parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
 pub use processing_1d::{
-    abs_spectrum_1d, auto_phase_spectrum_1d, crop_spectrum_1d, exponential_apodization_spectrum_1d,
-    fft_spectrum_1d, magnitude_spectrum_1d, normalize_spectrum_1d, offset_spectrum_1d,
-    phase_spectrum_1d, resample_spectrum_1d, scale_spectrum_1d, shift_spectrum_1d_axis,
-    subtract_baseline_spectrum_1d, zero_fill_spectrum_1d,
+    abs_spectrum_1d, apply_processing_recipe_1d, auto_phase_spectrum_1d, crop_spectrum_1d,
+    exponential_apodization_spectrum_1d, fft_spectrum_1d, magnitude_spectrum_1d,
+    normalize_spectrum_1d, offset_spectrum_1d, phase_spectrum_1d, resample_spectrum_1d,
+    scale_spectrum_1d, shift_spectrum_1d_axis, subtract_baseline_spectrum_1d,
+    zero_fill_spectrum_1d,
 };
 pub use processing_2d::{
     abs_spectrum_2d, auto_phase_spectrum_2d, crop_spectrum_2d, fft_spectrum_2d,

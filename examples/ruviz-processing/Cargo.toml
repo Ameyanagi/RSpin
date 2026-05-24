@@ -1,0 +1,19 @@
+[package]
+name = "rspin-ruviz-processing-example"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.92"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace]
+
+[features]
+default = []
+ruviz = ["dep:ruviz"]
+
+[dependencies]
+anyhow = "1.0"
+rspin-core = { path = "../../crates/rspin-core" }
+rspin-processing = { path = "../../crates/rspin-processing" }
+ruviz = { version = "=0.4.17", default-features = false, optional = true }

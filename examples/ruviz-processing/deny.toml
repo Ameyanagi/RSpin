@@ -1,0 +1,16 @@
+[advisories]
+# Mirrors the workspace exception for nalgebra's current simba -> paste chain.
+ignore = ["RUSTSEC-2024-0436"]
+
+[licenses]
+# This config applies only to the feature-gated visualization example. The main
+# workspace keeps the stricter default allowlist.
+allow = [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MIT",
+    "Unicode-3.0",
+    "Zlib",
+]
+confidence-threshold = 0.8
