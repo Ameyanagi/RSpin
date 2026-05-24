@@ -1,5 +1,6 @@
 //! Spectrum input and output.
 
+mod analysis_csv;
 mod csv;
 mod csv_2d;
 mod csv_common;
@@ -7,6 +8,7 @@ mod jcamp;
 mod json;
 mod traits;
 
+pub use analysis_csv::{CsvAnalysis1D, CsvAnalysis2D, write_analysis1d_csv, write_analysis2d_csv};
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};
 pub use jcamp::{JcampDx, read_jcamp_dx_1d, write_jcamp_dx_1d};

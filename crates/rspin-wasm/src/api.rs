@@ -47,8 +47,8 @@ pub use consensus::{
 };
 pub use contours::extract_contours_2d_json;
 pub use csv_io::{
-    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
-    write_spectrum_2d_csv_json,
+    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_analysis_1d_csv_json,
+    write_analysis_2d_csv_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
 };
 pub use matrix::{
     align_spectra_by_peak_to_matrix_1d_json, align_spectra_by_zone_to_matrix_2d_json,

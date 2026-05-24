@@ -1,8 +1,10 @@
 //! CSV JSON adapters for WASM bindings.
 
+use rspin_analysis::{SpectrumAnalysis1D, SpectrumAnalysis2D};
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    read_spectrum1d_csv, read_spectrum2d_csv, write_spectrum1d_csv, write_spectrum2d_csv,
+    read_spectrum1d_csv, read_spectrum2d_csv, write_analysis1d_csv, write_analysis2d_csv,
+    write_spectrum1d_csv, write_spectrum2d_csv,
 };
 
 use super::{from_json, to_json};
@@ -45,6 +47,26 @@ pub fn parse_spectrum_2d_csv_json(input: &str) -> Result<String> {
 pub fn write_spectrum_2d_csv_json(spectrum_json: &str) -> Result<String> {
     let spectrum: Spectrum2D = from_json(spectrum_json)?;
     write_spectrum2d_csv(&spectrum)
+}
+
+/// Serializes one-dimensional analysis JSON into multi-section CSV text.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or CSV serialization fails.
+pub fn write_analysis_1d_csv_json(analysis_json: &str) -> Result<String> {
+    let analysis: SpectrumAnalysis1D = from_json(analysis_json)?;
+    write_analysis1d_csv(&analysis)
+}
+
+/// Serializes two-dimensional analysis JSON into multi-section CSV text.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or CSV serialization fails.
+pub fn write_analysis_2d_csv_json(analysis_json: &str) -> Result<String> {
+    let analysis: SpectrumAnalysis2D = from_json(analysis_json)?;
+    write_analysis2d_csv(&analysis)
 }
 
 #[cfg(test)]

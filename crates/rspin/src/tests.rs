@@ -232,6 +232,9 @@ fn prelude_supports_simple_analysis_workflows() -> Result<()> {
     assert_eq!(analysis.peaks.len(), 2);
     assert_eq!(analysis.ranges.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
+    let analysis_csv = write_analysis1d_csv(&analysis)?;
+    assert!(analysis_csv.contains("# section=peaks"));
+    assert!(analysis_csv.contains("# section=signals"));
 
     let spectrum_2d = Spectrum2D::new(
         Axis::linear_ppm(0.0, 2.0, 3)?,
@@ -246,6 +249,8 @@ fn prelude_supports_simple_analysis_workflows() -> Result<()> {
 
     assert_eq!(analysis_2d.zones.len(), 2);
     assert_eq!(analysis_2d.signals.len(), 2);
+    let analysis_2d_csv = write_analysis2d_csv(&analysis_2d)?;
+    assert!(analysis_2d_csv.contains("# section=zones"));
     Ok(())
 }
 

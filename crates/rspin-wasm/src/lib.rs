@@ -57,12 +57,13 @@ pub use api::{
     slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
     subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
     validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
-    zero_fill_spectrum_2d_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_spectrum_1d_csv_json,
+    write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
-    parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
+    parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_analysis_1d_csv, write_analysis_2d_csv,
+    write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
 pub use prediction::{
     predict_molecule_with_element_rules, render_prediction_1d, render_prediction_2d,

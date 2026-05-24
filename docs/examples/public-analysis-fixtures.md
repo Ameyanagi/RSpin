@@ -98,3 +98,17 @@ fn analyze_with_chain_methods(spectrum: &Spectrum1D) -> Result<SpectrumAnalysis1
         .run()
 }
 ```
+
+Analysis workflow results can be exported as sectioned CSV for quick inspection:
+
+```rust
+use rspin::prelude::*;
+
+fn analyze_and_export_csv(spectrum: &Spectrum1D) -> Result<String> {
+    let analysis = spectrum
+        .analyze()
+        .with_peak_options(PeakPickOptions::new().with_min_abs_intensity(0.05))
+        .run()?;
+    write_analysis1d_csv(&analysis)
+}
+```

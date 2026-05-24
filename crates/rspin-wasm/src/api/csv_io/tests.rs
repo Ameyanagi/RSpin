@@ -1,6 +1,6 @@
 use rspin_core::{Spectrum1D, Spectrum2D};
 
-use super::super::from_json;
+use super::super::{from_json, to_json};
 use super::*;
 
 #[test]
@@ -64,4 +64,48 @@ fn rejects_invalid_csv_and_json() {
 
     let error = write_spectrum_1d_csv_json("{").expect_err("invalid JSON should fail");
     assert!(error.to_string().contains("JSON"));
+}
+
+#[test]
+fn writes_analysis_csv_json() -> anyhow::Result<()> {
+    let analysis_1d = rspin_analysis::SpectrumAnalysis1D {
+        peaks: vec![rspin_analysis::Peak {
+            index: 1,
+            x: 1.0,
+            intensity: 2.0,
+            prominence: 1.5,
+            polarity: rspin_analysis::PeakPolarity::Positive,
+        }],
+        ranges: Vec::new(),
+        multiplets: Vec::new(),
+        signals: Vec::new(),
+    };
+    let csv_1d = write_analysis_1d_csv_json(&to_json(&analysis_1d)?)?;
+    assert!(csv_1d.contains("# format=RSpin Analysis 1D CSV"));
+    assert!(csv_1d.contains("index,x,intensity,prominence,polarity"));
+
+    let analysis_2d = rspin_analysis::SpectrumAnalysis2D {
+        zones: vec![rspin_analysis::DetectedZone {
+            id: "zone:x0-0:y0-0".to_owned(),
+            x_start_index: 0,
+            x_end_index: 0,
+            y_start_index: 0,
+            y_end_index: 0,
+            x_from: 1.0,
+            x_to: 1.0,
+            y_from: 10.0,
+            y_to: 10.0,
+            centroid_x: 1.0,
+            centroid_y: 10.0,
+            active_points: 1,
+            max_abs_intensity: 3.0,
+            sum_intensity: 3.0,
+            sum_abs_intensity: 3.0,
+        }],
+        signals: Vec::new(),
+    };
+    let csv_2d = write_analysis_2d_csv_json(&to_json(&analysis_2d)?)?;
+    assert!(csv_2d.contains("# format=RSpin Analysis 2D CSV"));
+    assert!(csv_2d.contains("zone:x0-0:y0-0"));
+    Ok(())
 }

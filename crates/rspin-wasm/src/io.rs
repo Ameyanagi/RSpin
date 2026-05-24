@@ -3,8 +3,8 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    js_error, parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,
-    write_spectrum_2d_csv_json,
+    js_error, parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_analysis_1d_csv_json,
+    write_analysis_2d_csv_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -45,4 +45,24 @@ pub fn parse_spectrum_2d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = writeSpectrum2dCsv)]
 pub fn write_spectrum_2d_csv(spectrum_json: &str) -> std::result::Result<String, JsValue> {
     write_spectrum_2d_csv_json(spectrum_json).map_err(|error| js_error(&error))
+}
+
+/// Serializes one-dimensional analysis JSON into multi-section CSV text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or CSV serialization fails.
+#[wasm_bindgen(js_name = writeAnalysis1dCsv)]
+pub fn write_analysis_1d_csv(analysis_json: &str) -> std::result::Result<String, JsValue> {
+    write_analysis_1d_csv_json(analysis_json).map_err(|error| js_error(&error))
+}
+
+/// Serializes two-dimensional analysis JSON into multi-section CSV text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or CSV serialization fails.
+#[wasm_bindgen(js_name = writeAnalysis2dCsv)]
+pub fn write_analysis_2d_csv(analysis_json: &str) -> std::result::Result<String, JsValue> {
+    write_analysis_2d_csv_json(analysis_json).map_err(|error| js_error(&error))
 }
