@@ -4,8 +4,9 @@ use serde::Deserialize;
 
 use rspin_core::{Axis, Result, Spectrum1D};
 use rspin_processing::{
-    BaselineMethod, FftDirection, crop_1d, exponential_apodization, fft_1d, magnitude_spectrum,
-    offset_intensity, phase_correct, resample_1d, shift_axis, subtract_baseline, zero_fill,
+    BaselineMethod, FftDirection, abs_1d, crop_1d, exponential_apodization, fft_1d,
+    magnitude_spectrum, offset_intensity, phase_correct, resample_1d, shift_axis,
+    subtract_baseline, zero_fill,
 };
 
 use super::{from_json, to_json};
@@ -51,6 +52,17 @@ pub fn zero_fill_spectrum_1d_json(spectrum_json: &str, target_len: usize) -> Res
 pub fn crop_spectrum_1d_json(spectrum_json: &str, from: f64, to: f64) -> Result<String> {
     let spectrum: Spectrum1D = from_json(spectrum_json)?;
     let processed = crop_1d(&spectrum, from, to)?;
+    to_json(&processed)
+}
+
+/// Applies component-wise absolute value to serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn abs_spectrum_1d_json(spectrum_json: &str) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let processed = abs_1d(&spectrum)?;
     to_json(&processed)
 }
 

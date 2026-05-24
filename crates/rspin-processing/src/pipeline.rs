@@ -3,7 +3,7 @@
 use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
-    AutoPhaseOptions, BaselineMethod, Crop1D, ExponentialApodization, Fft1D, FftDirection,
+    Abs1D, AutoPhaseOptions, BaselineMethod, Crop1D, ExponentialApodization, Fft1D, FftDirection,
     Magnitude, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D,
     ScaleIntensity, ShiftAxis, SubtractBaseline, ZeroFill,
 };
@@ -76,6 +76,12 @@ impl Spectrum1DPipeline {
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
         self.then(NormalizeMaxAbs)
+    }
+
+    /// Applies component-wise absolute value to real and imaginary channels.
+    #[must_use]
+    pub fn absolute_value(self) -> Self {
+        self.then(Abs1D)
     }
 
     /// Shifts the x-axis values by `delta`.
@@ -204,6 +210,7 @@ mod tests {
             .process()
             .scale(2.0)
             .offset(-2.0)
+            .absolute_value()
             .crop(0.0, 1.0)
             .resample(Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 3)?)
             .zero_fill(5)
@@ -211,12 +218,13 @@ mod tests {
             .finish()?;
 
         assert_eq!(processed.len(), 5);
-        assert_eq!(processed.intensities, vec![0.0, -0.5, -1.0, 0.0, 0.0]);
-        assert_eq!(processed.processing.len(), 6);
+        assert_eq!(processed.intensities, vec![0.0, 0.5, 1.0, 0.0, 0.0]);
+        assert_eq!(processed.processing.len(), 7);
         assert_eq!(processed.processing[0].operation, "scale_intensity");
-        assert_eq!(processed.processing[2].operation, "crop_1d");
-        assert_eq!(processed.processing[3].operation, "resample_1d");
-        assert_eq!(processed.processing[5].operation, "normalize_max_abs");
+        assert_eq!(processed.processing[2].operation, "abs_1d");
+        assert_eq!(processed.processing[3].operation, "crop_1d");
+        assert_eq!(processed.processing[4].operation, "resample_1d");
+        assert_eq!(processed.processing[6].operation, "normalize_max_abs");
         Ok(())
     }
 

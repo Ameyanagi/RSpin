@@ -40,6 +40,24 @@ fn crops_1d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn takes_absolute_value_1d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+    let abs_json = abs_spectrum_1d_json(&spectrum_json)?;
+    let processed: Spectrum1D = from_json(&abs_json)?;
+
+    assert_vec_close(&processed.intensities, &[1.0, 2.0, 3.0, 4.0]);
+    assert_option_vec_close(processed.imaginary.as_deref(), &[0.5, 1.0, 1.5, 2.0]);
+    assert_eq!(
+        processed
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("abs_1d")
+    );
+    Ok(())
+}
+
+#[test]
 fn resamples_1d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
     let target_axis_json = to_json(&Axis::linear("x", Unit::Ppm, 0.0, 3.0, 7)?)?;

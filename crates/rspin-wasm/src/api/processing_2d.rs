@@ -4,9 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use rspin_core::{Axis, Result, Spectrum2D};
 use rspin_processing::{
-    AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, auto_phase_correct_2d,
-    crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y, resample_2d,
-    scale_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
+    AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, abs_2d,
+    auto_phase_correct_2d, crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x,
+    project_y, resample_2d, scale_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
+    slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, to_json};
@@ -62,6 +63,17 @@ pub fn crop_spectrum_2d_json(
 ) -> Result<String> {
     let spectrum: Spectrum2D = from_json(spectrum_json)?;
     let processed = crop_2d(&spectrum, x_from, x_to, y_from, y_to)?;
+    to_json(&processed)
+}
+
+/// Applies component-wise absolute value to serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn abs_spectrum_2d_json(spectrum_json: &str) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let processed = abs_2d(&spectrum)?;
     to_json(&processed)
 }
 

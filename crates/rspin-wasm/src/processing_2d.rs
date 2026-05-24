@@ -3,8 +3,8 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    auto_phase_spectrum_2d_json, crop_spectrum_2d_json, fft_spectrum_2d_json, js_error,
-    normalize_spectrum_2d_json, phase_spectrum_2d_json, project_spectrum_2d_x_json,
+    abs_spectrum_2d_json, auto_phase_spectrum_2d_json, crop_spectrum_2d_json, fft_spectrum_2d_json,
+    js_error, normalize_spectrum_2d_json, phase_spectrum_2d_json, project_spectrum_2d_x_json,
     project_spectrum_2d_y_json, resample_spectrum_2d_json, scale_spectrum_2d_json,
     slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
     slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
@@ -64,6 +64,17 @@ pub fn crop_spectrum_2d(
 ) -> std::result::Result<String, JsValue> {
     crop_spectrum_2d_json(spectrum_json, x_from, x_to, y_from, y_to)
         .map_err(|error| js_error(&error))
+}
+
+/// Applies component-wise absolute value to a serialized two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = absSpectrum2d)]
+pub fn abs_spectrum_2d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    abs_spectrum_2d_json(spectrum_json).map_err(|error| js_error(&error))
 }
 
 /// Resamples a serialized two-dimensional spectrum onto serialized target axes.

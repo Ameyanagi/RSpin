@@ -3,11 +3,11 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    auto_phase_spectrum_1d_json, crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json,
-    fft_spectrum_1d_json, js_error, magnitude_spectrum_1d_json, normalize_spectrum_1d_json,
-    offset_spectrum_1d_json, phase_spectrum_1d_json, resample_spectrum_1d_json,
-    scale_spectrum_1d_json, shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json,
-    zero_fill_spectrum_1d_json,
+    abs_spectrum_1d_json, auto_phase_spectrum_1d_json, crop_spectrum_1d_json,
+    exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json, js_error,
+    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, offset_spectrum_1d_json,
+    phase_spectrum_1d_json, resample_spectrum_1d_json, scale_spectrum_1d_json,
+    shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 
 /// Scales a serialized one-dimensional spectrum.
@@ -87,6 +87,17 @@ pub fn crop_spectrum_1d(
     to: f64,
 ) -> std::result::Result<String, JsValue> {
     crop_spectrum_1d_json(spectrum_json, from, to).map_err(|error| js_error(&error))
+}
+
+/// Applies component-wise absolute value to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = absSpectrum1d)]
+pub fn abs_spectrum_1d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    abs_spectrum_1d_json(spectrum_json).map_err(|error| js_error(&error))
 }
 
 /// Resamples a serialized one-dimensional spectrum onto a serialized target axis.

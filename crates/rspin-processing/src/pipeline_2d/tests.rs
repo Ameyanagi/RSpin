@@ -8,6 +8,7 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
     let processed = spectrum
         .process()
         .scale(2.0)
+        .absolute_value()
         .crop(1.0, 2.0, 10.0, 11.0)
         .resample(
             Axis::linear("x", Unit::Ppm, 1.0, 2.0, 3)?,
@@ -21,12 +22,12 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
     assert_vec_close(
         &processed.z,
         &[
-            -4.0 / 12.0,
-            1.0 / 12.0,
+            4.0 / 12.0,
+            5.0 / 12.0,
             6.0 / 12.0,
             0.0,
-            -10.0 / 12.0,
-            1.0 / 12.0,
+            10.0 / 12.0,
+            11.0 / 12.0,
             1.0,
             0.0,
             0.0,
@@ -35,11 +36,12 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
             0.0,
         ],
     );
-    assert_eq!(processed.processing.len(), 5);
+    assert_eq!(processed.processing.len(), 6);
     assert_eq!(processed.processing[0].operation, "scale_2d");
-    assert_eq!(processed.processing[1].operation, "crop_2d");
-    assert_eq!(processed.processing[2].operation, "resample_2d");
-    assert_eq!(processed.processing[4].operation, "normalize_2d_max_abs");
+    assert_eq!(processed.processing[1].operation, "abs_2d");
+    assert_eq!(processed.processing[2].operation, "crop_2d");
+    assert_eq!(processed.processing[3].operation, "resample_2d");
+    assert_eq!(processed.processing[5].operation, "normalize_2d_max_abs");
     Ok(())
 }
 

@@ -3,7 +3,7 @@
 use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
+    Abs2D, AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
     FftDirection, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Resample2D,
     Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
     slice_y_at_x_index,
@@ -72,6 +72,12 @@ impl Spectrum2DPipeline {
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
         self.then(Normalize2DMaxAbs)
+    }
+
+    /// Applies component-wise absolute value to real and imaginary matrices.
+    #[must_use]
+    pub fn absolute_value(self) -> Self {
+        self.then(Abs2D)
     }
 
     /// Appends zeroes in x and y until the requested shape is reached.

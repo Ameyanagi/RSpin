@@ -27,6 +27,24 @@ fn scales_and_normalizes_2d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn takes_absolute_value_2d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+    let abs_json = abs_spectrum_2d_json(&spectrum_json)?;
+    let processed: Spectrum2D = from_json(&abs_json)?;
+
+    assert_vec_close(&processed.z, &[1.0, 2.0, 3.0, 4.0]);
+    assert_option_vec_close(processed.imaginary.as_deref(), &[0.5, 1.0, 1.5, 2.0]);
+    assert_eq!(
+        processed
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("abs_2d")
+    );
+    Ok(())
+}
+
+#[test]
 fn zero_fills_2d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
     let filled_json = zero_fill_spectrum_2d_json(&spectrum_json, 3, 3)?;
