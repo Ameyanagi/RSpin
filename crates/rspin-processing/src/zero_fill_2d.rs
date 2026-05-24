@@ -57,17 +57,21 @@ pub fn zero_fill_2d(
             })?;
 
     let mut z = vec![0.0; target_len];
+    let mut imaginary = spectrum.imaginary.as_ref().map(|_| vec![0.0; target_len]);
     for y_index in 0..height {
         let source_start = y_index * width;
         let target_start = y_index * target_width;
         let source_end = source_start + width;
         let target_end = target_start + width;
         z[target_start..target_end].copy_from_slice(&spectrum.z[source_start..source_end]);
+        if let (Some(source), Some(target)) = (&spectrum.imaginary, &mut imaginary) {
+            target[target_start..target_end].copy_from_slice(&source[source_start..source_end]);
+        }
     }
 
     let x = extend_axis(&spectrum.x, target_width)?;
     let y = extend_axis(&spectrum.y, target_height)?;
-    let mut processed = Spectrum2D::new(x, y, z, spectrum.metadata.clone())?;
+    let mut processed = Spectrum2D::new_complex(x, y, z, imaginary, spectrum.metadata.clone())?;
     processed.processing.clone_from(&spectrum.processing);
     Ok(
         processed.with_processing_record(ProcessingRecord::new("zero_fill_2d").with_details(

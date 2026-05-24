@@ -25,6 +25,26 @@ fn applies_separable_exponential_window() -> anyhow::Result<()> {
 }
 
 #[test]
+fn applies_separable_exponential_window_to_imaginary_channel() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new_complex(
+        Axis::linear("x", Unit::Seconds, 0.0, 0.2, 3)?,
+        Axis::linear("y", Unit::Seconds, 0.0, 0.1, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        Some(vec![10.0, 20.0, 30.0, 40.0, 50.0, 60.0]),
+        Metadata::default(),
+    )?;
+    let processed = exponential_apodization_2d(&spectrum, 1.0, 2.0, 0.1, 0.2)?;
+    let imaginary = require_imaginary(&processed)?;
+
+    let x_decay = (-PI * 0.1).exp();
+    let y_decay = (-PI * 0.4).exp();
+    assert_close(imaginary[0], 10.0);
+    assert_close(imaginary[1], 20.0 * x_decay);
+    assert_close(imaginary[5], 60.0 * x_decay * x_decay * y_decay);
+    Ok(())
+}
+
+#[test]
 fn supports_processing_step_api() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let processed = ExponentialApodization2D {
@@ -70,4 +90,11 @@ fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
 
 fn assert_close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-12, "{actual} != {expected}");
+}
+
+fn require_imaginary(spectrum: &Spectrum2D) -> anyhow::Result<&[f64]> {
+    match &spectrum.imaginary {
+        Some(imaginary) => Ok(imaginary),
+        None => anyhow::bail!("missing imaginary channel"),
+    }
 }

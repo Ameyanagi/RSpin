@@ -23,6 +23,37 @@ fn zero_fills_x_and_y_dimensions() -> anyhow::Result<()> {
 }
 
 #[test]
+fn zero_fills_complex_2d_data() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new_complex(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Some(vec![10.0, 20.0, 30.0, 40.0]),
+        Metadata::named("complex 2d"),
+    )?;
+    let processed = zero_fill_2d(&spectrum, 3, 3)?;
+
+    assert_eq!(processed.shape(), (3, 3));
+    assert_eq!(
+        processed.z,
+        vec![
+            1.0, 2.0, 0.0, //
+            3.0, 4.0, 0.0, //
+            0.0, 0.0, 0.0,
+        ]
+    );
+    assert_eq!(
+        require_imaginary(&processed)?,
+        &[
+            10.0, 20.0, 0.0, //
+            30.0, 40.0, 0.0, //
+            0.0, 0.0, 0.0,
+        ]
+    );
+    Ok(())
+}
+
+#[test]
 fn supports_processing_step_api() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let processed = ZeroFill2D {
@@ -84,4 +115,11 @@ fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
         vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         Metadata::named("2d"),
     )?)
+}
+
+fn require_imaginary(spectrum: &Spectrum2D) -> anyhow::Result<&[f64]> {
+    match &spectrum.imaginary {
+        Some(imaginary) => Ok(imaginary),
+        None => anyhow::bail!("missing imaginary channel"),
+    }
 }

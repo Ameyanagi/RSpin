@@ -228,6 +228,9 @@ pub struct Spectrum2D {
     pub y: Axis,
     /// Row-major intensity matrix with `y.len() * x.len()` values.
     pub z: Vec<f64>,
+    /// Optional row-major imaginary component.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub imaginary: Option<Vec<f64>>,
     /// Spectrum metadata.
     pub metadata: Metadata,
     /// Applied processing records.
@@ -241,6 +244,21 @@ impl Spectrum2D {
     ///
     /// Returns an error when matrix length is not `x.len() * y.len()` or data is non-finite.
     pub fn new(x: Axis, y: Axis, z: Vec<f64>, metadata: Metadata) -> Result<Self> {
+        Self::new_complex(x, y, z, None, metadata)
+    }
+
+    /// Creates a two-dimensional spectrum with an optional imaginary channel.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when matrix length is not `x.len() * y.len()` or data is non-finite.
+    pub fn new_complex(
+        x: Axis,
+        y: Axis,
+        z: Vec<f64>,
+        imaginary: Option<Vec<f64>>,
+        metadata: Metadata,
+    ) -> Result<Self> {
         validate_vector("z", &z)?;
         let expected = x
             .len()
@@ -253,10 +271,22 @@ impl Spectrum2D {
                 message: format!("matrix has {} values but axes require {expected}", z.len()),
             });
         }
+        if let Some(imaginary_values) = imaginary.as_deref() {
+            validate_vector("imaginary", imaginary_values)?;
+            if imaginary_values.len() != expected {
+                return Err(RSpinError::InvalidSpectrum {
+                    message: format!(
+                        "imaginary matrix has {} values but axes require {expected}",
+                        imaginary_values.len()
+                    ),
+                });
+            }
+        }
         Ok(Self {
             x,
             y,
             z,
+            imaginary,
             metadata,
             processing: Vec::new(),
         })
@@ -278,6 +308,18 @@ impl Spectrum2D {
         self.z.get(y_index * width + x_index).copied()
     }
 
+    /// Gets an imaginary matrix value by x/y index.
+    #[must_use]
+    pub fn imaginary_at(&self, x_index: usize, y_index: usize) -> Option<f64> {
+        let (width, height) = self.shape();
+        if x_index >= width || y_index >= height {
+            return None;
+        }
+        self.imaginary
+            .as_ref()
+            .and_then(|values| values.get(y_index * width + x_index).copied())
+    }
+
     /// Returns a copy with one appended processing record.
     #[must_use]
     pub fn with_processing_record(mut self, record: ProcessingRecord) -> Self {
@@ -294,52 +336,4 @@ fn validate_vector(field: &'static str, values: &[f64]) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn creates_linear_axis() -> Result<()> {
-        let axis = Axis::linear("shift", Unit::Ppm, 10.0, 8.0, 3)?;
-        assert_eq!(axis.values, vec![10.0, 9.0, 8.0]);
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_empty_axis() {
-        assert!(Axis::new("x", Unit::Points, Vec::new()).is_err());
-    }
-
-    #[test]
-    fn creates_1d_spectrum() -> Result<()> {
-        let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?;
-        let spectrum = Spectrum1D::new(x, vec![1.0, 2.0, 3.0], Metadata::default())?;
-        assert_eq!(
-            spectrum.points().collect::<Vec<_>>(),
-            vec![(0.0, 1.0), (1.0, 2.0), (2.0, 3.0)]
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_mismatched_1d_data() -> Result<()> {
-        let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?;
-        assert!(Spectrum1D::new(x, vec![1.0, 2.0], Metadata::default()).is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn reads_2d_row_major_values() -> Result<()> {
-        let x = Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?;
-        let y = Axis::linear("y", Unit::Ppm, 10.0, 12.0, 3)?;
-        let spectrum = Spectrum2D::new(
-            x,
-            y,
-            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
-            Metadata::default(),
-        )?;
-        assert_eq!(spectrum.shape(), (2, 3));
-        assert_eq!(spectrum.value_at(1, 2), Some(6.0));
-        assert_eq!(spectrum.value_at(2, 2), None);
-        Ok(())
-    }
-}
+mod tests;

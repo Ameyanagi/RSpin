@@ -55,6 +55,9 @@ pub fn scale_2d(spectrum: &Spectrum2D, factor: f64) -> Result<Spectrum2D> {
         .into_iter()
         .map(|value| value * factor)
         .collect();
+    if let Some(imaginary) = processed.imaginary.take() {
+        processed.imaginary = Some(imaginary.into_iter().map(|value| value * factor).collect());
+    }
     Ok(recorded_2d(
         processed,
         ProcessingRecord::new("scale_2d").with_details(format!("factor={factor}")),
@@ -94,17 +97,33 @@ pub fn project_x(spectrum: &Spectrum2D, mode: ProjectionMode) -> Result<Spectrum
     let (width, height) = spectrum.shape();
     let divisor = divisor(height)?;
     let mut values = Vec::with_capacity(width);
+    let mut imaginary_values = spectrum
+        .imaginary
+        .as_ref()
+        .map(|_| Vec::with_capacity(width));
     for x_index in 0..width {
         let mut column = Vec::with_capacity(height);
+        let mut imaginary_column = spectrum
+            .imaginary
+            .as_ref()
+            .map(|_| Vec::with_capacity(height));
         for y_index in 0..height {
             column.push(spectrum.z[y_index * width + x_index]);
+            if let (Some(source), Some(target)) = (&spectrum.imaginary, &mut imaginary_column) {
+                target.push(source[y_index * width + x_index]);
+            }
         }
-        values.push(reduce(&column, mode, divisor));
+        let reduced = reduce_complex(&column, imaginary_column.as_deref(), mode, divisor);
+        values.push(reduced.real);
+        if let (Some(value), Some(target)) = (reduced.imaginary, &mut imaginary_values) {
+            target.push(value);
+        }
     }
     derived_1d(
         spectrum,
         spectrum.x.clone(),
         values,
+        imaginary_values,
         ProcessingRecord::new("project_x").with_details(format!("mode={mode:?}")),
     )
 }
@@ -118,15 +137,33 @@ pub fn project_y(spectrum: &Spectrum2D, mode: ProjectionMode) -> Result<Spectrum
     let (width, height) = spectrum.shape();
     let divisor = divisor(width)?;
     let mut values = Vec::with_capacity(height);
+    let mut imaginary_values = spectrum
+        .imaginary
+        .as_ref()
+        .map(|_| Vec::with_capacity(height));
     for y_index in 0..height {
         let row_start = y_index * width;
         let row_end = row_start + width;
-        values.push(reduce(&spectrum.z[row_start..row_end], mode, divisor));
+        let imaginary_row = spectrum
+            .imaginary
+            .as_ref()
+            .map(|imaginary| &imaginary[row_start..row_end]);
+        let reduced = reduce_complex(
+            &spectrum.z[row_start..row_end],
+            imaginary_row,
+            mode,
+            divisor,
+        );
+        values.push(reduced.real);
+        if let (Some(value), Some(target)) = (reduced.imaginary, &mut imaginary_values) {
+            target.push(value);
+        }
     }
     derived_1d(
         spectrum,
         spectrum.y.clone(),
         values,
+        imaginary_values,
         ProcessingRecord::new("project_y").with_details(format!("mode={mode:?}")),
     )
 }
@@ -149,6 +186,10 @@ pub fn slice_x_at_y_index(spectrum: &Spectrum2D, y_index: usize) -> Result<Spect
         spectrum,
         spectrum.x.clone(),
         spectrum.z[row_start..row_end].to_vec(),
+        spectrum
+            .imaginary
+            .as_ref()
+            .map(|imaginary| imaginary[row_start..row_end].to_vec()),
         ProcessingRecord::new("slice_x_at_y_index").with_details(format!("y_index={y_index}")),
     )
 }
@@ -166,31 +207,71 @@ pub fn slice_y_at_x_index(spectrum: &Spectrum2D, x_index: usize) -> Result<Spect
         });
     }
     let mut values = Vec::with_capacity(height);
+    let mut imaginary_values = spectrum
+        .imaginary
+        .as_ref()
+        .map(|_| Vec::with_capacity(height));
     for y_index in 0..height {
         values.push(spectrum.z[y_index * width + x_index]);
+        if let (Some(source), Some(target)) = (&spectrum.imaginary, &mut imaginary_values) {
+            target.push(source[y_index * width + x_index]);
+        }
     }
     derived_1d(
         spectrum,
         spectrum.y.clone(),
         values,
+        imaginary_values,
         ProcessingRecord::new("slice_y_at_x_index").with_details(format!("x_index={x_index}")),
     )
 }
 
-fn reduce(values: &[f64], mode: ProjectionMode, divisor: f64) -> f64 {
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct ReducedComplex {
+    real: f64,
+    imaginary: Option<f64>,
+}
+
+fn reduce_complex(
+    values: &[f64],
+    imaginary: Option<&[f64]>,
+    mode: ProjectionMode,
+    divisor: f64,
+) -> ReducedComplex {
     match mode {
-        ProjectionMode::Sum => values.iter().sum(),
-        ProjectionMode::Mean => values.iter().sum::<f64>() / divisor,
-        ProjectionMode::Max => values.iter().copied().fold(f64::NEG_INFINITY, f64::max),
-        ProjectionMode::Min => values.iter().copied().fold(f64::INFINITY, f64::min),
-        ProjectionMode::MaxAbs => values.iter().copied().fold(0.0, |selected, candidate| {
-            if candidate.abs() > selected.abs() {
-                candidate
-            } else {
-                selected
+        ProjectionMode::Sum => ReducedComplex {
+            real: values.iter().sum(),
+            imaginary: imaginary.map(|values| values.iter().sum()),
+        },
+        ProjectionMode::Mean => ReducedComplex {
+            real: values.iter().sum::<f64>() / divisor,
+            imaginary: imaginary.map(|values| values.iter().sum::<f64>() / divisor),
+        },
+        ProjectionMode::Max | ProjectionMode::Min | ProjectionMode::MaxAbs => {
+            let index = selected_index(values, mode);
+            ReducedComplex {
+                real: values[index],
+                imaginary: imaginary.map(|values| values[index]),
             }
-        }),
+        }
     }
+}
+
+fn selected_index(values: &[f64], mode: ProjectionMode) -> usize {
+    let mut selected = 0;
+    for (index, value) in values.iter().copied().enumerate().skip(1) {
+        let current = values[selected];
+        let better = match mode {
+            ProjectionMode::Max => value > current,
+            ProjectionMode::Min => value < current,
+            ProjectionMode::MaxAbs => value.abs() > current.abs(),
+            ProjectionMode::Sum | ProjectionMode::Mean => false,
+        };
+        if better {
+            selected = index;
+        }
+    }
+    selected
 }
 
 fn divisor(value: usize) -> Result<f64> {
@@ -204,9 +285,10 @@ fn derived_1d(
     spectrum: &Spectrum2D,
     axis: Axis,
     values: Vec<f64>,
+    imaginary: Option<Vec<f64>>,
     record: ProcessingRecord,
 ) -> Result<Spectrum1D> {
-    let mut derived = Spectrum1D::new(axis, values, spectrum.metadata.clone())?;
+    let mut derived = Spectrum1D::new_complex(axis, values, imaginary, spectrum.metadata.clone())?;
     derived.processing.clone_from(&spectrum.processing);
     Ok(derived.with_processing_record(record))
 }
@@ -223,82 +305,4 @@ fn ensure_finite(field: &'static str, value: f64) -> Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use rspin_core::{Axis, Metadata, Unit};
-
-    use super::*;
-
-    #[test]
-    fn scales_2d_values() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let processed = Scale2D { factor: 2.0 }.apply(&spectrum)?;
-        assert_eq!(processed.z, vec![2.0, -4.0, 6.0, 8.0, -10.0, 12.0]);
-        assert_eq!(processed.processing[0].operation, "scale_2d");
-        Ok(())
-    }
-
-    #[test]
-    fn normalizes_2d_values() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let processed = Normalize2DMaxAbs.apply(&spectrum)?;
-        assert_vec_close(
-            &processed.z,
-            &[1.0 / 6.0, -2.0 / 6.0, 3.0 / 6.0, 4.0 / 6.0, -5.0 / 6.0, 1.0],
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn projects_x_and_y() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let x_projection = project_x(&spectrum, ProjectionMode::Sum)?;
-        let y_projection = project_y(&spectrum, ProjectionMode::Mean)?;
-        assert_eq!(x_projection.intensities, vec![5.0, -7.0, 9.0]);
-        assert_eq!(y_projection.intensities, vec![2.0 / 3.0, 5.0 / 3.0]);
-        Ok(())
-    }
-
-    #[test]
-    fn projects_max_abs_with_sign() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let projection = project_x(&spectrum, ProjectionMode::MaxAbs)?;
-        assert_eq!(projection.intensities, vec![4.0, -5.0, 6.0]);
-        Ok(())
-    }
-
-    #[test]
-    fn extracts_row_and_column_slices() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let row = slice_x_at_y_index(&spectrum, 1)?;
-        let column = slice_y_at_x_index(&spectrum, 1)?;
-        assert_eq!(row.intensities, vec![4.0, -5.0, 6.0]);
-        assert_eq!(row.x.values, spectrum.x.values);
-        assert_eq!(column.intensities, vec![-2.0, -5.0]);
-        assert_eq!(column.x.values, spectrum.y.values);
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_out_of_bounds_slice() -> anyhow::Result<()> {
-        let spectrum = demo_spectrum()?;
-        let error = slice_y_at_x_index(&spectrum, 3).expect_err("x index should be out of bounds");
-        assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
-        Ok(())
-    }
-
-    fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
-        Ok(Spectrum2D::new(
-            Axis::linear("x", Unit::Ppm, 0.0, 2.0, 3)?,
-            Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
-            vec![1.0, -2.0, 3.0, 4.0, -5.0, 6.0],
-            Metadata::named("2d"),
-        )?)
-    }
-
-    fn assert_vec_close(actual: &[f64], expected: &[f64]) {
-        assert_eq!(actual.len(), expected.len());
-        for (left, right) in actual.iter().zip(expected) {
-            assert!((left - right).abs() < 1e-12, "{left} != {right}");
-        }
-    }
-}
+mod tests;

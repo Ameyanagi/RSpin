@@ -64,6 +64,9 @@ pub fn exponential_apodization_2d(
         let row_start = y_index * width;
         for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
             processed.z[row_start + x_index] *= x_weight * y_weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= x_weight * y_weight;
+            }
         }
     }
 

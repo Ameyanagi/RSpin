@@ -118,6 +118,21 @@ mod tests {
     }
 
     #[test]
+    fn round_trips_complex_2d_spectrum() -> anyhow::Result<()> {
+        let spectrum = Spectrum2D::new_complex(
+            Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+            Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+            vec![1.0, 2.0, 3.0, 4.0],
+            Some(vec![0.1, 0.2, 0.3, 0.4]),
+            Metadata::named("complex two"),
+        )?;
+        let text = write_spectrum2d_json(&spectrum)?;
+        let parsed = read_spectrum2d_json(&text)?;
+        assert_eq!(parsed, spectrum);
+        Ok(())
+    }
+
+    #[test]
     fn rejects_invalid_json() {
         let error = read_spectrum1d_json("{").expect_err("invalid JSON should fail");
         assert!(matches!(error, RSpinError::Parse { .. }));
