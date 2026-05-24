@@ -10,7 +10,7 @@ use rspin_analysis::{
 };
 use rspin_core::{RSpinError, Result, Spectrum1D};
 use rspin_io::read_jcamp_dx_1d;
-use rspin_prediction::PredictionSet;
+use rspin_prediction::{PredictionSet, PredictionSpectrumOptions, render_prediction_1d};
 use rspin_processing::{normalize_max_abs, scale_intensity};
 use rspin_simulation::{
     ExactSpectrumOptions, ExactSpinOptions, FirstOrderMultiplet, SimulationOptions, SpinHalfSystem,
@@ -218,6 +218,18 @@ pub fn validate_prediction_json(prediction_json: &str) -> Result<String> {
     let prediction: PredictionSet = from_json(prediction_json)?;
     prediction.validate()?;
     to_json(&prediction)
+}
+
+/// Renders serialized one-dimensional prediction JSON into `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, rendering, or serialization fails.
+pub fn render_prediction_1d_json(prediction_json: &str, options_json: &str) -> Result<String> {
+    let prediction: PredictionSet = from_json(prediction_json)?;
+    let options: PredictionSpectrumOptions = from_json(options_json)?;
+    let spectrum = render_prediction_1d(&prediction, &options)?;
+    to_json(&spectrum)
 }
 
 fn from_json<T: DeserializeOwned>(input: &str) -> Result<T> {

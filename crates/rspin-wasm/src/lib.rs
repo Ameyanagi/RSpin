@@ -8,7 +8,7 @@ use wasm_bindgen::prelude::*;
 pub use api::{
     decompose_exact_spin_half_spectrum_json, detect_multiplets_json, integrate_region_json,
     normalize_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json, pick_peaks_json,
-    scale_spectrum_1d_json, simulate_exact_spin_half_spectrum_json,
+    render_prediction_1d_json, scale_spectrum_1d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
     summarize_signals_1d_json, validate_j_coupling_graph_json, validate_prediction_json,
 };
@@ -210,6 +210,20 @@ pub fn decompose_exact_spin_half_spectrum(
 #[wasm_bindgen(js_name = validatePrediction)]
 pub fn validate_prediction(prediction_json: &str) -> std::result::Result<String, JsValue> {
     validate_prediction_json(prediction_json).map_err(|error| js_error(&error))
+}
+
+/// Renders a serialized one-dimensional prediction as a spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, validation,
+/// rendering, or serialization fails.
+#[wasm_bindgen(js_name = renderPrediction1d)]
+pub fn render_prediction_1d(
+    prediction_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    render_prediction_1d_json(prediction_json, options_json).map_err(|error| js_error(&error))
 }
 
 fn js_error(error: &RSpinError) -> JsValue {

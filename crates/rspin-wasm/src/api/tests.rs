@@ -261,3 +261,17 @@ fn validates_prediction_json() -> anyhow::Result<()> {
     assert_eq!(prediction.signals_1d.len(), 1);
     Ok(())
 }
+
+#[test]
+fn renders_prediction_json() -> anyhow::Result<()> {
+    let spectrum_json = render_prediction_1d_json(
+        r#"{"name":"demo","signals_1d":[{"experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.0,"intensity":1.0,"confidence":0.9,"assignments":["H1"]}],"correlations_2d":[],"provenance":{"source":"fixture","version":null}}"#,
+        r#"{"experiment":"Proton1D","nucleus":"Hydrogen1","from_ppm":0.99,"to_ppm":1.01,"points":3,"spectrometer_mhz":400.0,"line_width_hz":1.0,"line_shape":"Lorentzian","area_scale":1.0}"#,
+    )?;
+    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
+
+    assert_eq!(spectrum.len(), 3);
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
+    assert!(spectrum.intensities[1] > spectrum.intensities[0]);
+    Ok(())
+}
