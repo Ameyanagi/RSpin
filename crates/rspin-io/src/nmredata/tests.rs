@@ -196,6 +196,11 @@ Hcombo, 3.900, H2, H3
 
 >  <NMREDATA_J>
 H1, Hcombo, 7.0
+
+>  <NMREDATA_1D_1H>
+4.200, L=H1
+3.900-3.800, L=H2, H3
+2.000, orphan
 ",
     )?;
 
@@ -224,6 +229,28 @@ H1, Hcombo, 7.0
     assert_eq!(analysis.j_coupling_graph, graph);
     let inherent_analysis = record.to_analysis(Nucleus::Hydrogen1)?;
     assert_eq!(inherent_analysis, analysis);
+
+    let signal_assignments = record.to_signal_assignment_set(Nucleus::Hydrogen1)?;
+    assert_eq!(signal_assignments.len(), 3);
+    assert!(matches!(
+        signal_assignments.assignments[0].target,
+        AssignmentTarget::Peak1D { index: 0, x } if (x - 4.2).abs() < 1.0e-12
+    ));
+    assert_eq!(signal_assignments.assignments[0].atoms[0].id, "H1");
+    assert!(matches!(
+        signal_assignments.assignments[1].target,
+        AssignmentTarget::Range1D {
+            start_index: 1,
+            end_index: 1,
+            from,
+            to,
+        } if (from - 3.9).abs() < 1.0e-12 && (to - 3.8).abs() < 1.0e-12
+    ));
+    assert_eq!(signal_assignments.assignments[1].atoms[1].id, "H3");
+    assert_eq!(signal_assignments.assignments[2].atoms[0].id, "orphan");
+    let free_signal_assignments =
+        nmredata_1d_signals_to_assignment_set(&record, Nucleus::Hydrogen1)?;
+    assert_eq!(free_signal_assignments, signal_assignments);
     Ok(())
 }
 
@@ -240,6 +267,17 @@ H2, H1, 7.0
     let error = duplicate_coupling
         .to_j_coupling_graph(Nucleus::Hydrogen1)
         .expect_err("duplicate coupling pairs should fail");
+    assert!(matches!(error, RSpinError::InvalidAssignment { .. }));
+
+    let duplicate_signal_labels = read_nmredata_str(
+        r"
+>  <NMREDATA_1D_1H>
+4.200, L=H1, H1
+",
+    )?;
+    let error = duplicate_signal_labels
+        .to_signal_assignment_set(Nucleus::Hydrogen1)
+        .expect_err("duplicate signal labels should fail");
     assert!(matches!(error, RSpinError::InvalidAssignment { .. }));
     Ok(())
 }

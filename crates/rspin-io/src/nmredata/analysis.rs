@@ -44,6 +44,20 @@ impl NmreDataRecord {
         nmredata_assignments_to_assignment_set(self, nucleus)
     }
 
+    /// Converts parsed one-dimensional signal labels to an [`AssignmentSet`].
+    ///
+    /// Signal `L=` attributes are used as assigned atom ids. If a signal has no
+    /// `L=` attribute, positional items on that signal are used instead. Scalar
+    /// signal positions become peak targets; ranged signals become range targets
+    /// using stable synthetic signal indices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the generated assignment payload is invalid.
+    pub fn to_signal_assignment_set(&self, nucleus: impl Into<Nucleus>) -> Result<AssignmentSet> {
+        nmredata_1d_signals_to_assignment_set(self, nucleus)
+    }
+
     /// Converts parsed `NMReDATA` scalar couplings to a [`JCouplingGraph`].
     ///
     /// Assignment labels become graph nodes. Coupling endpoints that are not
@@ -96,6 +110,47 @@ pub fn nmredata_assignments_to_assignment_set(
         )?;
         assignments.push(assignment);
     }
+    AssignmentSet::new(assignments)
+}
+
+/// Converts parsed one-dimensional signal labels to an [`AssignmentSet`].
+///
+/// # Errors
+///
+/// Returns an error when the generated assignment payload is invalid.
+pub fn nmredata_1d_signals_to_assignment_set(
+    record: &NmreDataRecord,
+    nucleus: impl Into<Nucleus>,
+) -> Result<AssignmentSet> {
+    let nucleus = nucleus.into();
+    let mut assignments = Vec::new();
+    let mut signal_index = 0;
+
+    for spectrum in &record.spectra {
+        if !matches!(spectrum.kind, super::NmreDataSpectrumKind::OneD { .. }) {
+            continue;
+        }
+        for signal in &spectrum.signals_1d {
+            let atoms = assigned_atoms_for_signal(signal, &nucleus);
+            if !atoms.is_empty() {
+                let target = match signal.to_ppm {
+                    Some(to) => AssignmentTarget::Range1D {
+                        start_index: signal_index,
+                        end_index: signal_index,
+                        from: signal.from_ppm,
+                        to,
+                    },
+                    None => AssignmentTarget::Peak1D {
+                        index: signal_index,
+                        x: signal.from_ppm,
+                    },
+                };
+                assignments.push(Assignment::deterministic(target, atoms)?);
+            }
+            signal_index += 1;
+        }
+    }
+
     AssignmentSet::new(assignments)
 }
 
@@ -162,6 +217,26 @@ fn assigned_atoms_for_source(
         .atom_refs
         .iter()
         .map(|atom_ref| AssignedAtom::new(atom_ref.clone(), nucleus.clone()).with_label(atom_ref))
+        .collect()
+}
+
+fn assigned_atoms_for_signal(
+    signal: &super::NmreDataSignal1D,
+    nucleus: &Nucleus,
+) -> Vec<AssignedAtom> {
+    let labels = match signal
+        .attributes
+        .get("L")
+        .filter(|labels| !labels.is_empty())
+    {
+        Some(labels) => labels.as_slice(),
+        None => signal.items.as_slice(),
+    };
+
+    labels
+        .iter()
+        .filter(|label| !label.trim().is_empty())
+        .map(|label| AssignedAtom::new(label.clone(), nucleus.clone()).with_label(label))
         .collect()
 }
 
