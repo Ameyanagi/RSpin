@@ -85,7 +85,9 @@ fn json_error(error: &serde_json::Error) -> RSpinError {
 
 #[cfg(test)]
 mod tests {
-    use rspin_core::{Axis, Metadata, Unit};
+    use rspin_core::{
+        AnnotationTarget, Atom, Axis, Bond, Metadata, Molecule, SpectrumAnnotation, Unit,
+    };
 
     use super::*;
 
@@ -98,6 +100,33 @@ mod tests {
         )?;
         let text = write_spectrum1d_json(&spectrum)?;
         let parsed = read_spectrum1d_json(&text)?;
+        assert_eq!(parsed, spectrum);
+        Ok(())
+    }
+
+    #[test]
+    fn round_trips_molecules_and_annotations() -> anyhow::Result<()> {
+        let molecule = Molecule::new("sample")
+            .with_atom(Atom::new("H1", "H"))
+            .with_atom(Atom::new("C1", "C"))
+            .with_bond(Bond::new("H1", "C1"));
+        let spectrum = Spectrum1D::new(
+            Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+            vec![1.0, 2.0, 3.0],
+            Metadata::named("annotated").with_molecule(molecule),
+        )?
+        .with_annotation(SpectrumAnnotation::new(
+            "peak-1",
+            AnnotationTarget::molecule_atom("sample", "H1"),
+        ));
+
+        let text = write_spectrum1d_json(&spectrum)?;
+        let parsed = read_spectrum1d_json(&text)?;
+
+        assert!(text.contains("molecules"));
+        assert!(text.contains("annotations"));
+        parsed.metadata.validate_molecules()?;
+        parsed.validate_annotations()?;
         assert_eq!(parsed, spectrum);
         Ok(())
     }

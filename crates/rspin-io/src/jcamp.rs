@@ -299,6 +299,7 @@ fn metadata_from_raw(raw: &RawJcamp) -> Metadata {
         solvent: None,
         temperature_k: None,
         origin: None,
+        molecules: Vec::new(),
     }
 }
 

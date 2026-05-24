@@ -25,7 +25,8 @@ pub use analysis::{
     summarize_signals_2d,
 };
 pub use core::{
-    Axis, Metadata, Nucleus, ProcessingRecord, RSpinError, Result, Spectrum1D, Spectrum2D, Unit,
+    AnnotationTarget, Atom, Axis, Bond, BondOrder, Metadata, Molecule, Nucleus, ProcessingRecord,
+    RSpinError, Result, Spectrum1D, Spectrum2D, SpectrumAnnotation, Unit,
 };
 pub use io::{
     CsvSpectrum1D, CsvSpectrum2D, JcampDx, JsonSpectrum1D, JsonSpectrum2D, SpectrumReader,
@@ -70,32 +71,32 @@ pub use simulation::{
 /// simulation APIs.
 pub mod prelude {
     pub use crate::{
-        Abs1D, Abs2D, AlignmentWindow, AssignedAtom, Assignment, AssignmentSet, AssignmentTarget,
-        AutoPhaseOptions, Axis, BaselineMethod, BilinearIntegrator2D, Crop1D, Crop2D,
-        CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange, DetectedZone,
-        ExactSpectrumOptions, ExactSpinOptions, ExactTransition, Experiment, FftDirection,
-        Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph,
-        LineShape, MatrixGeneration2DOptions, MatrixGenerationOptions, Metadata,
-        MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignmentOptions,
+        Abs1D, Abs2D, AlignmentWindow, AnnotationTarget, AssignedAtom, Assignment, AssignmentSet,
+        AssignmentTarget, Atom, AutoPhaseOptions, Axis, BaselineMethod, BilinearIntegrator2D, Bond,
+        BondOrder, Crop1D, Crop2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange,
+        DetectedZone, ExactSpectrumOptions, ExactSpinOptions, ExactTransition, Experiment,
+        FftDirection, Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling,
+        JCouplingGraph, LineShape, MatrixGeneration2DOptions, MatrixGenerationOptions, Metadata,
+        Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak, PeakAlignmentOptions,
         PeakPickOptions, PeakPolarity, PredictionLineShape, PredictionSet,
         PredictionSpectrum2DOptions, PredictionSpectrumOptions, ProcessSpectrum1D,
         ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D, ProcessingRecipe1D,
         ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions, Resample1D,
         Resample2D, Result, ScalarCoupling, SignalSummary1D, SignalSummary2D,
-        SignalSummary2DOptions, SignalSummaryOptions, Spectrum1D, Spectrum2D, SpectrumMatrix1D,
-        SpectrumMatrix2D, SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem,
-        TrapezoidalIntegrator, Unit, ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d,
-        align_spectra_by_peak, apply_processing_recipe_1d, apply_processing_recipe_1d_until,
-        apply_processing_recipe_2d, apply_processing_recipe_2d_until, auto_phase_correct,
-        auto_phase_correct_2d, crop_1d, crop_2d, decompose_exact_spin_half_1d, detect_multiplets,
-        detect_ranges, detect_zones, exact_spin_half_transitions, extract_contours,
-        generate_spectrum_matrix_1d, generate_spectrum_matrix_2d, integrate_region,
-        integrate_region_2d, normalize_max_abs, pick_peaks, read_jcamp_dx_1d, read_spectrum1d_csv,
-        read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d,
-        render_prediction_2d, resample_1d, resample_2d, scale_intensity,
-        simulate_exact_spin_half_1d, slice_x_at_y, slice_y_at_x, subtract_baseline,
-        summarize_signals_2d, write_jcamp_dx_1d, write_spectrum1d_csv, write_spectrum1d_json,
-        write_spectrum2d_csv, write_spectrum2d_json,
+        SignalSummary2DOptions, SignalSummaryOptions, Spectrum1D, Spectrum2D, SpectrumAnnotation,
+        SpectrumMatrix1D, SpectrumMatrix2D, SpectrumReader, SpectrumWriter, SpinHalf,
+        SpinHalfSystem, TrapezoidalIntegrator, Unit, ZoneConnectivity, ZoneDetectionOptions,
+        abs_1d, abs_2d, align_spectra_by_peak, apply_processing_recipe_1d,
+        apply_processing_recipe_1d_until, apply_processing_recipe_2d,
+        apply_processing_recipe_2d_until, auto_phase_correct, auto_phase_correct_2d, crop_1d,
+        crop_2d, decompose_exact_spin_half_1d, detect_multiplets, detect_ranges, detect_zones,
+        exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
+        generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, normalize_max_abs,
+        pick_peaks, read_jcamp_dx_1d, read_spectrum1d_csv, read_spectrum1d_json,
+        read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d, render_prediction_2d,
+        resample_1d, resample_2d, scale_intensity, simulate_exact_spin_half_1d, slice_x_at_y,
+        slice_y_at_x, subtract_baseline, summarize_signals_2d, write_jcamp_dx_1d,
+        write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
     };
 }
 

@@ -1,4 +1,5 @@
 use super::*;
+use crate::AnnotationTarget;
 
 #[test]
 fn creates_linear_axis() -> Result<()> {
@@ -38,6 +39,60 @@ fn creates_1d_spectrum() -> Result<()> {
 }
 
 #[test]
+fn attaches_and_validates_1d_annotations() -> Result<()> {
+    let spectrum = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![1.0, 2.0, 3.0],
+        Metadata::default(),
+    )?
+    .with_annotation(
+        SpectrumAnnotation::new("peak-1", AnnotationTarget::point_1d(1, 1.0)).with_label("peak"),
+    );
+
+    spectrum.validate_annotations()?;
+    assert_eq!(
+        spectrum
+            .annotation("peak-1")
+            .and_then(|annotation| annotation.label.as_deref()),
+        Some("peak")
+    );
+    assert_eq!(spectrum.without_annotations().annotations.len(), 0);
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_1d_annotations() -> Result<()> {
+    let duplicate = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![1.0, 2.0, 3.0],
+        Metadata::default(),
+    )?
+    .with_annotations(vec![
+        SpectrumAnnotation::new("a", AnnotationTarget::point_1d(0, 0.0)),
+        SpectrumAnnotation::new("a", AnnotationTarget::point_1d(1, 1.0)),
+    ]);
+    let wrong_dimension = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
+        vec![1.0, 2.0, 3.0],
+        Metadata::default(),
+    )?
+    .with_annotation(SpectrumAnnotation::new(
+        "zone",
+        AnnotationTarget::zone_2d(0.0, 1.0, 0.0, 1.0),
+    ));
+
+    assert!(matches!(
+        duplicate.validate_annotations(),
+        Err(RSpinError::InvalidMetadata { .. })
+    ));
+    assert!(matches!(
+        wrong_dimension.validate_annotations(),
+        Err(RSpinError::InvalidMetadata { .. })
+    ));
+    Ok(())
+}
+
+#[test]
 fn rejects_mismatched_1d_data() -> Result<()> {
     let x = Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?;
     assert!(Spectrum1D::new(x, vec![1.0, 2.0], Metadata::default()).is_err());
@@ -57,6 +112,44 @@ fn reads_2d_row_major_values() -> Result<()> {
     assert_eq!(spectrum.shape(), (2, 3));
     assert_eq!(spectrum.value_at(1, 2), Some(6.0));
     assert_eq!(spectrum.value_at(2, 2), None);
+    Ok(())
+}
+
+#[test]
+fn attaches_and_validates_2d_annotations() -> Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::default(),
+    )?
+    .with_annotation(SpectrumAnnotation::new(
+        "cross-peak",
+        AnnotationTarget::point_2d(1, 1, 1.0, 11.0),
+    ));
+
+    spectrum.validate_annotations()?;
+    assert!(spectrum.annotation("cross-peak").is_some());
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_2d_annotations() -> Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 1.0, 2)?,
+        Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::default(),
+    )?
+    .with_annotation(SpectrumAnnotation::new(
+        "range",
+        AnnotationTarget::range_1d(0.0, 1.0),
+    ));
+
+    assert!(matches!(
+        spectrum.validate_annotations(),
+        Err(RSpinError::InvalidMetadata { .. })
+    ));
     Ok(())
 }
 

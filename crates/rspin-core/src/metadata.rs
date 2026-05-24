@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::Nucleus;
+use crate::{Molecule, RSpinError, Result};
 
 /// Descriptive metadata for a spectrum.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -19,6 +20,9 @@ pub struct Metadata {
     pub temperature_k: Option<f64>,
     /// Free-form source label, path, or provenance identifier.
     pub origin: Option<String>,
+    /// Sample molecules associated with this spectrum or dataset.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub molecules: Vec<Molecule>,
 }
 
 impl Metadata {
@@ -120,6 +124,52 @@ impl Metadata {
         self.origin = None;
         self
     }
+
+    /// Appends a sample molecule.
+    #[must_use]
+    pub fn with_molecule(mut self, molecule: Molecule) -> Self {
+        self.molecules.push(molecule);
+        self
+    }
+
+    /// Replaces all sample molecules.
+    #[must_use]
+    pub fn with_molecules(mut self, molecules: Vec<Molecule>) -> Self {
+        self.molecules = molecules;
+        self
+    }
+
+    /// Clears all sample molecules.
+    #[must_use]
+    pub fn without_molecules(mut self) -> Self {
+        self.molecules.clear();
+        self
+    }
+
+    /// Finds a sample molecule by stable identifier.
+    #[must_use]
+    pub fn molecule(&self, id: &str) -> Option<&Molecule> {
+        self.molecules.iter().find(|molecule| molecule.id == id)
+    }
+
+    /// Validates all sample molecules and checks for duplicate molecule IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when any molecule is invalid or duplicate molecule IDs
+    /// are present.
+    pub fn validate_molecules(&self) -> Result<()> {
+        let mut ids = std::collections::BTreeSet::new();
+        for molecule in &self.molecules {
+            molecule.validate()?;
+            if !ids.insert(molecule.id.as_str()) {
+                return Err(RSpinError::InvalidMetadata {
+                    message: format!("duplicate molecule id {}", molecule.id),
+                });
+            }
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -127,14 +177,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn builder_methods_set_and_clear_metadata_fields() {
+    fn builder_methods_set_and_clear_metadata_fields() -> Result<()> {
         let metadata = Metadata::new()
             .with_name("demo")
             .with_nucleus(Nucleus::Hydrogen1)
             .with_frequency_mhz(400.0)
             .with_solvent("CDCl3")
             .with_temperature_k(298.0)
-            .with_origin("fixture");
+            .with_origin("fixture")
+            .with_molecule(Molecule::new("sample").with_name("Sample"));
 
         assert_eq!(metadata.name.as_deref(), Some("demo"));
         assert_eq!(metadata.nucleus, Some(Nucleus::Hydrogen1));
@@ -142,6 +193,13 @@ mod tests {
         assert_eq!(metadata.solvent.as_deref(), Some("CDCl3"));
         assert_eq!(metadata.temperature_k, Some(298.0));
         assert_eq!(metadata.origin.as_deref(), Some("fixture"));
+        assert_eq!(
+            metadata
+                .molecule("sample")
+                .and_then(|molecule| molecule.name.as_deref()),
+            Some("Sample")
+        );
+        metadata.validate_molecules()?;
 
         let cleared = metadata
             .without_name()
@@ -149,8 +207,22 @@ mod tests {
             .without_frequency_mhz()
             .without_solvent()
             .without_temperature_k()
-            .without_origin();
+            .without_origin()
+            .without_molecules();
 
         assert_eq!(cleared, Metadata::default());
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_duplicate_metadata_molecules() {
+        let metadata = Metadata::new()
+            .with_molecule(Molecule::new("sample"))
+            .with_molecule(Molecule::new("sample"));
+
+        assert!(matches!(
+            metadata.validate_molecules(),
+            Err(RSpinError::InvalidMetadata { .. })
+        ));
     }
 }

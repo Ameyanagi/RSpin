@@ -30,6 +30,13 @@ pub enum RSpinError {
         message: String,
     },
 
+    /// Metadata, molecules, or annotations are incomplete or inconsistent.
+    #[error("invalid metadata: {message}")]
+    InvalidMetadata {
+        /// Human-readable validation message.
+        message: String,
+    },
+
     /// Assignment data is incomplete or inconsistent.
     #[error("invalid assignment: {message}")]
     InvalidAssignment {

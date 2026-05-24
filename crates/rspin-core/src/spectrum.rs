@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Metadata, RSpinError, Result, Unit};
+use crate::{Metadata, RSpinError, Result, SpectrumAnnotation, Unit};
 
 /// A numeric axis.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -153,6 +153,9 @@ pub struct Spectrum1D {
     pub metadata: Metadata,
     /// Applied processing records.
     pub processing: Vec<ProcessingRecord>,
+    /// User or algorithm annotations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub annotations: Vec<SpectrumAnnotation>,
 }
 
 impl Spectrum1D {
@@ -205,6 +208,7 @@ impl Spectrum1D {
             imaginary,
             metadata,
             processing: Vec::new(),
+            annotations: Vec::new(),
         })
     }
 
@@ -253,6 +257,9 @@ pub struct Spectrum2D {
     pub metadata: Metadata,
     /// Applied processing records.
     pub processing: Vec<ProcessingRecord>,
+    /// User or algorithm annotations.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub annotations: Vec<SpectrumAnnotation>,
 }
 
 impl Spectrum2D {
@@ -307,6 +314,7 @@ impl Spectrum2D {
             imaginary,
             metadata,
             processing: Vec::new(),
+            annotations: Vec::new(),
         })
     }
 
@@ -352,6 +360,8 @@ fn validate_vector(field: &'static str, values: &[f64]) -> Result<()> {
     }
     Ok(())
 }
+
+mod annotations;
 
 #[cfg(test)]
 mod tests;
