@@ -153,6 +153,72 @@ sw 1 1 5 5 5 2 1 8203 1 64
 }
 
 #[test]
+fn reads_processed_2d_phasefile() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-2d-phasefile")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"H1\"
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 500
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+rfl 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 750
+0
+rfp 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 250
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 400
+0
+dfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 100
+0
+rfl1 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 300
+0
+rfp1 1 1 1000000000 -1000000000 0 2 1 11 1 64
+1 100
+0
+comment 2 2 32 0 0 2 1 0 1 64
+1 \"processed 2d demo\"
+0
+",
+    )?;
+    write_phasefile_matrix(
+        &root,
+        EndianForTest::Little,
+        DataForTest::I32(&[1, 2, 3, 4, 5, 6]),
+        2,
+        1,
+    )?;
+
+    let spectrum = AgilentProcessed2D.read_dir(root.join("datdir/phasefile"))?;
+
+    assert_eq!(spectrum.shape(), (3, 2));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.x.values, vec![1.0, 0.0, -1.0]);
+    assert_eq!(spectrum.y.unit, Unit::Ppm);
+    assert_eq!(spectrum.y.values, vec![2.0, -2.0]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
+    assert!(spectrum.imaginary.is_none());
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(500.0));
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("processed 2d demo"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn rejects_truncated_processed_phasefile() -> anyhow::Result<()> {
     let root = synthetic_dataset("processed-truncated")?;
     write_procpar(&root, "")?;
@@ -169,6 +235,20 @@ fn rejects_truncated_processed_phasefile() -> anyhow::Result<()> {
     let error = read_agilent_processed_1d_dir(&root).expect_err("truncated phasefile should fail");
     assert!(matches!(error, RSpinError::Parse { .. }));
     assert!(error.to_string().contains("phasefile"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn rejects_1d_phasefile_for_2d_reader() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-1d-as-2d")?;
+    write_procpar(&root, "")?;
+    write_phasefile(&root, EndianForTest::Big, DataForTest::I32(&[1, 2, 3]))?;
+
+    let error =
+        read_agilent_processed_2d_dir(&root).expect_err("1D phasefile should not be read as 2D");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
 
     remove_dir(root)?;
     Ok(())
@@ -438,39 +518,71 @@ fn write_phasefile(
     endian: EndianForTest,
     data: DataForTest<'_>,
 ) -> anyhow::Result<()> {
+    write_phasefile_matrix(root, endian, data, 1, 1)
+}
+
+fn write_phasefile_matrix(
+    root: &Path,
+    endian: EndianForTest,
+    data: DataForTest<'_>,
+    nblocks: i32,
+    ntraces: i32,
+) -> anyhow::Result<()> {
     let datdir = root.join("datdir");
     fs::create_dir_all(&datdir)?;
     let (ebytes, status, data_bytes) = encode_real_data(endian, data);
-    let point_count = data_bytes.len() / usize::try_from(ebytes)?;
-    let tbytes = i32::try_from(point_count)?
+    let row_count = usize::try_from(nblocks)?
+        .checked_mul(usize::try_from(ntraces)?)
+        .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile row count overflow"))?;
+    let value_count = data_bytes.len() / usize::try_from(ebytes)?;
+    let np_values = i32::try_from(value_count / row_count)?;
+    let tbytes = np_values
         .checked_mul(ebytes)
         .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile trace size overflow"))?;
+    let trace_bytes = usize::try_from(tbytes)?;
+    let block_data_len = usize::try_from(ntraces)?
+        .checked_mul(trace_bytes)
+        .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile block length overflow"))?;
     let bbytes = i32::try_from(
         BLOCK_HEADER_LEN
-            .checked_add(data_bytes.len())
+            .checked_add(block_data_len)
             .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile block size overflow"))?,
     )?;
 
     let mut phasefile_bytes = Vec::new();
-    push_i32(&mut phasefile_bytes, endian, 1);
-    push_i32(&mut phasefile_bytes, endian, 1);
-    push_i32(&mut phasefile_bytes, endian, i32::try_from(point_count)?);
+    push_i32(&mut phasefile_bytes, endian, nblocks);
+    push_i32(&mut phasefile_bytes, endian, ntraces);
+    push_i32(&mut phasefile_bytes, endian, np_values);
     push_i32(&mut phasefile_bytes, endian, ebytes);
     push_i32(&mut phasefile_bytes, endian, tbytes);
     push_i32(&mut phasefile_bytes, endian, bbytes);
     push_i16(&mut phasefile_bytes, endian, 0);
     push_i16(&mut phasefile_bytes, endian, status);
     push_i32(&mut phasefile_bytes, endian, 1);
-    push_i16(&mut phasefile_bytes, endian, 0);
-    push_i16(&mut phasefile_bytes, endian, status);
-    push_i16(&mut phasefile_bytes, endian, 1);
-    push_i16(&mut phasefile_bytes, endian, 0);
-    push_i32(&mut phasefile_bytes, endian, 1);
-    push_f32(&mut phasefile_bytes, endian, 0.0);
-    push_f32(&mut phasefile_bytes, endian, 0.0);
-    push_f32(&mut phasefile_bytes, endian, 0.0);
-    push_f32(&mut phasefile_bytes, endian, 0.0);
-    phasefile_bytes.extend(data_bytes);
+
+    for block_index in 0..usize::try_from(nblocks)? {
+        push_i16(&mut phasefile_bytes, endian, 0);
+        push_i16(&mut phasefile_bytes, endian, status);
+        push_i16(&mut phasefile_bytes, endian, 1);
+        push_i16(&mut phasefile_bytes, endian, 0);
+        push_i32(
+            &mut phasefile_bytes,
+            endian,
+            i32::try_from(block_index + 1)?,
+        );
+        push_f32(&mut phasefile_bytes, endian, 0.0);
+        push_f32(&mut phasefile_bytes, endian, 0.0);
+        push_f32(&mut phasefile_bytes, endian, 0.0);
+        push_f32(&mut phasefile_bytes, endian, 0.0);
+        let block_data_start = block_index
+            .checked_mul(usize::try_from(ntraces)?)
+            .and_then(|index| index.checked_mul(trace_bytes))
+            .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile block offset overflow"))?;
+        let block_data_end = block_data_start
+            .checked_add(block_data_len)
+            .ok_or_else(|| anyhow::anyhow!("synthetic Agilent phasefile block end overflow"))?;
+        phasefile_bytes.extend(&data_bytes[block_data_start..block_data_end]);
+    }
 
     fs::write(datdir.join("phasefile"), phasefile_bytes)?;
     Ok(())

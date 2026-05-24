@@ -20,8 +20,8 @@ mod processing_json;
 mod traits;
 
 pub use agilent::{
-    AgilentFid1D, AgilentFid2D, AgilentProcessed1D, read_agilent_fid_1d_dir,
-    read_agilent_fid_2d_dir, read_agilent_processed_1d_dir,
+    AgilentFid1D, AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D, read_agilent_fid_1d_dir,
+    read_agilent_fid_2d_dir, read_agilent_processed_1d_dir, read_agilent_processed_2d_dir,
 };
 pub use analysis_csv::{CsvAnalysis1D, CsvAnalysis2D, write_analysis1d_csv, write_analysis2d_csv};
 pub use analysis_json::{

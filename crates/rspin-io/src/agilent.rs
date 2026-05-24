@@ -153,6 +153,58 @@ pub fn read_agilent_fid_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
 }
 
+/// Reader for Agilent/Varian processed two-dimensional `phasefile` datasets.
+///
+/// The reader accepts the dataset directory, its `datdir` directory, or the
+/// `phasefile` itself. It pairs the binary phasefile with the nearest `procpar`
+/// and returns a frequency-domain matrix.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct AgilentProcessed2D;
+
+impl AgilentProcessed2D {
+    /// Reads a processed two-dimensional spectrum from an Agilent/Varian dataset.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `phasefile` or `procpar` is missing, malformed, or
+    /// the phasefile is not two-dimensional.
+    pub fn read_dir(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        read_agilent_processed_2d_dir(path)
+    }
+}
+
+/// Reads a processed two-dimensional spectrum from an Agilent/Varian phasefile.
+///
+/// The path may point to the dataset directory, `datdir`, or directly to the
+/// `phasefile`. The direct axis uses `sw`/`sfrq`/`rfl`/`rfp`; the indirect axis
+/// uses `sw1` with `dfrq` or `sfrq`, plus `rfl1`/`rfp1`, when those values are
+/// available. Missing reference metadata falls back to hertz or point axes.
+///
+/// # Errors
+///
+/// Returns an error when the dataset is missing, malformed, one-dimensional, or
+/// uses an unsupported data representation.
+pub fn read_agilent_processed_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
+    let path = path.as_ref();
+    let phasefile_path = locate_phasefile_path(path)?;
+    let procpar_path = locate_procpar_path(path, &phasefile_path)?;
+    let procpar = parse_procpar(&read_text(&procpar_path, "Agilent procpar")?);
+    validate_2d_procpar(&procpar)?;
+    let phasefile_bytes = fs::read(&phasefile_path).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!(
+            "failed to read phasefile at {}: {error}",
+            phasefile_path.display()
+        ),
+    })?;
+
+    let matrix = read_phasefile_matrix_values(&phasefile_bytes)?;
+    let x = build_processed_axis_with(real_axis_parameters(), matrix.x_count, &procpar)?;
+    let y = build_processed_axis_with(indirect_axis_parameters(), matrix.y_count, &procpar)?;
+    let metadata = build_metadata(&procpar);
+    Spectrum2D::new_complex(x, y, matrix.real, matrix.imaginary, metadata)
+}
+
 fn locate_dataset_dir(path: &Path) -> PathBuf {
     if path.is_file() {
         path.parent().map_or_else(PathBuf::new, Path::to_path_buf)
@@ -233,6 +285,53 @@ fn read_phasefile_values(bytes: &[u8]) -> Result<(Vec<f64>, Option<Vec<f64>>)> {
         append_real_trace(trace, &header, &mut real)?;
         Ok((real, None))
     }
+}
+
+struct PhasefileMatrixValues {
+    real: Vec<f64>,
+    imaginary: Option<Vec<f64>>,
+    x_count: usize,
+    y_count: usize,
+}
+
+fn read_phasefile_matrix_values(bytes: &[u8]) -> Result<PhasefileMatrixValues> {
+    let header = FileHeader::parse(bytes)?;
+    header.validate_processed_2d()?;
+    let x_count = if header.is_complex() {
+        header.np_values / 2
+    } else {
+        header.np_values
+    };
+    let y_count = header.trace_count()?;
+    let matrix_len = x_count
+        .checked_mul(y_count)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "Agilent phasefile matrix size overflow".to_owned(),
+        })?;
+    let mut real = Vec::with_capacity(matrix_len);
+    let mut imaginary = if header.is_complex() {
+        Some(Vec::with_capacity(matrix_len))
+    } else {
+        None
+    };
+
+    for block_index in 0..header.nblocks {
+        for trace_index in 0..header.ntraces {
+            let trace = trace_at(bytes, &header, block_index, trace_index, "phasefile")?;
+            if let Some(imaginary_values) = imaginary.as_mut() {
+                append_complex_trace(trace, &header, &mut real, imaginary_values)?;
+            } else {
+                append_real_trace(trace, &header, &mut real)?;
+            }
+        }
+    }
+
+    Ok(PhasefileMatrixValues {
+        real,
+        imaginary,
+        x_count,
+        y_count,
+    })
 }
 
 fn read_complex_trace_matrix(
@@ -429,6 +528,21 @@ impl FileHeader {
         Ok(())
     }
 
+    fn validate_processed_2d(self) -> Result<()> {
+        if self.trace_count()? <= 1 {
+            return Err(RSpinError::Unsupported {
+                feature: "Agilent one-dimensional phasefile in 2D reader",
+            });
+        }
+        if self.is_complex() && self.np_values % 2 != 0 {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "Agilent complex phasefile trace must contain an even value count"
+                    .to_owned(),
+            });
+        }
+        Ok(())
+    }
+
     fn validate_complex(self) -> Result<()> {
         if !self.is_complex() {
             return Err(RSpinError::Unsupported {
@@ -592,19 +706,68 @@ fn build_processed_axis(
     point_count: usize,
     parameters: &BTreeMap<String, Vec<String>>,
 ) -> Result<Axis> {
-    let sw = first_f64(parameters, "sw")?;
-    let sfrq = first_f64(parameters, "sfrq")?;
-    let rfl = first_f64(parameters, "rfl")?;
-    let rfp = first_f64(parameters, "rfp")?;
+    build_processed_axis_with(real_axis_parameters(), point_count, parameters)
+}
 
-    match (sw, sfrq, rfl, rfp) {
+#[derive(Clone, Copy)]
+struct ProcessedAxisParameters {
+    sw_key: &'static str,
+    frequency_key: &'static str,
+    fallback_frequency_key: Option<&'static str>,
+    rfl_key: &'static str,
+    rfp_key: &'static str,
+    hz_label: &'static str,
+    point_label: &'static str,
+}
+
+fn real_axis_parameters() -> ProcessedAxisParameters {
+    ProcessedAxisParameters {
+        sw_key: "sw",
+        frequency_key: "sfrq",
+        fallback_frequency_key: None,
+        rfl_key: "rfl",
+        rfp_key: "rfp",
+        hz_label: "frequency offset",
+        point_label: "point",
+    }
+}
+
+fn indirect_axis_parameters() -> ProcessedAxisParameters {
+    ProcessedAxisParameters {
+        sw_key: "sw1",
+        frequency_key: "dfrq",
+        fallback_frequency_key: Some("sfrq"),
+        rfl_key: "rfl1",
+        rfp_key: "rfp1",
+        hz_label: "indirect frequency offset",
+        point_label: "indirect point",
+    }
+}
+
+fn build_processed_axis_with(
+    axis_parameters: ProcessedAxisParameters,
+    point_count: usize,
+    parameters: &BTreeMap<String, Vec<String>>,
+) -> Result<Axis> {
+    let sw = first_f64(parameters, axis_parameters.sw_key)?;
+    let frequency = match first_f64(parameters, axis_parameters.frequency_key)? {
+        Some(value) => Some(value),
+        None => match axis_parameters.fallback_frequency_key {
+            Some(key) => first_f64(parameters, key)?,
+            None => None,
+        },
+    };
+    let rfl = first_f64(parameters, axis_parameters.rfl_key)?;
+    let rfp = first_f64(parameters, axis_parameters.rfp_key)?;
+
+    match (sw, frequency, rfl, rfp) {
         (Some(sw), Some(sfrq), Some(rfl), Some(rfp)) if sw > 0.0 && sfrq > 0.0 => {
             let start_ppm = (sw - rfl + rfp) / sfrq;
             let end_ppm = (-rfl + rfp) / sfrq;
             Axis::linear_ppm(start_ppm, end_ppm, point_count)
         }
         (Some(sw), _, _, _) if sw > 0.0 => Axis::linear(
-            "frequency offset",
+            axis_parameters.hz_label,
             Unit::Hertz,
             sw / 2.0,
             -sw / 2.0,
@@ -612,7 +775,13 @@ fn build_processed_axis(
         ),
         _ => {
             let end = u32::try_from(point_count.saturating_sub(1)).map_or(0.0, f64::from);
-            Axis::linear("point", Unit::Points, 0.0, end, point_count)
+            Axis::linear(
+                axis_parameters.point_label,
+                Unit::Points,
+                0.0,
+                end,
+                point_count,
+            )
         }
     }
 }
