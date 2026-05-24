@@ -10,7 +10,8 @@ use crate::{
     parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
     parse_spectrum_2d_text_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
     write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
-    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
+    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
+    write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -205,6 +206,20 @@ pub fn write_spectrum_1d_csv(spectrum_json: &str) -> std::result::Result<String,
     write_spectrum_1d_csv_json(spectrum_json).map_err(|error| js_error(&error))
 }
 
+/// Serializes one-dimensional spectrum JSON into the requested text format.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, format parsing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = writeSpectrum1dText)]
+pub fn write_spectrum_1d_text(
+    spectrum_json: &str,
+    format: &str,
+) -> std::result::Result<String, JsValue> {
+    write_spectrum_1d_text_json(spectrum_json, format).map_err(|error| js_error(&error))
+}
+
 /// Parses two-dimensional CSV text into serialized spectrum JSON.
 ///
 /// # Errors
@@ -233,6 +248,20 @@ pub fn parse_spectrum_2d_text(input: &str) -> std::result::Result<String, JsValu
 #[wasm_bindgen(js_name = writeSpectrum2dCsv)]
 pub fn write_spectrum_2d_csv(spectrum_json: &str) -> std::result::Result<String, JsValue> {
     write_spectrum_2d_csv_json(spectrum_json).map_err(|error| js_error(&error))
+}
+
+/// Serializes two-dimensional spectrum JSON into the requested text format.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, format parsing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = writeSpectrum2dText)]
+pub fn write_spectrum_2d_text(
+    spectrum_json: &str,
+    format: &str,
+) -> std::result::Result<String, JsValue> {
+    write_spectrum_2d_text_json(spectrum_json, format).map_err(|error| js_error(&error))
 }
 
 /// Serializes one-dimensional analysis JSON into multi-section CSV text.

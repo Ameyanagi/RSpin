@@ -1,4 +1,4 @@
-//! Text spectrum format detection and convenience readers.
+//! Text spectrum format detection and convenience readers/writers.
 
 use std::{fs, path::Path};
 
@@ -10,8 +10,15 @@ use crate::{
     read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
     read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file, read_nmrml_1d_str,
     read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv,
-    read_spectrum2d_json, write_jcamp_dx_1d, write_nmrml_1d, write_nmrml_2d, write_spectrum1d_csv,
-    write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
+    read_spectrum2d_json,
+};
+
+mod writer;
+
+pub use writer::{
+    Spectrum1DTextWriter, Spectrum1DWriteFormat, Spectrum2DTextWriter, Spectrum2DWriteFormat,
+    parse_spectrum1d_write_format, parse_spectrum2d_write_format, write_spectrum1d_text,
+    write_spectrum2d_text,
 };
 
 /// Text spectrum formats supported by the auto-detecting readers.
@@ -443,12 +450,8 @@ pub fn read_spectrum2d_path(path: impl AsRef<Path>) -> Result<Spectrum2D> {
 /// represented by the selected writer, or the file cannot be written.
 pub fn write_spectrum1d_path(spectrum: &Spectrum1D, path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref();
-    let payload = match detect_spectrum1d_write_path_format(path)? {
-        Spectrum1DWritePathFormat::Json => write_spectrum1d_json(spectrum)?,
-        Spectrum1DWritePathFormat::NmrMl => write_nmrml_1d(spectrum)?,
-        Spectrum1DWritePathFormat::JcampDx => write_jcamp_dx_1d(spectrum)?,
-        Spectrum1DWritePathFormat::Csv => write_spectrum1d_csv(spectrum)?,
-    };
+    let payload =
+        write_spectrum1d_text(spectrum, detect_spectrum1d_write_path_format(path)?.into())?;
     write_text_file(path, &payload)
 }
 
@@ -460,11 +463,8 @@ pub fn write_spectrum1d_path(spectrum: &Spectrum1D, path: impl AsRef<Path>) -> R
 /// represented by the selected writer, or the file cannot be written.
 pub fn write_spectrum2d_path(spectrum: &Spectrum2D, path: impl AsRef<Path>) -> Result<()> {
     let path = path.as_ref();
-    let payload = match detect_spectrum2d_write_path_format(path)? {
-        Spectrum2DWritePathFormat::Json => write_spectrum2d_json(spectrum)?,
-        Spectrum2DWritePathFormat::NmrMl => write_nmrml_2d(spectrum)?,
-        Spectrum2DWritePathFormat::Csv => write_spectrum2d_csv(spectrum)?,
-    };
+    let payload =
+        write_spectrum2d_text(spectrum, detect_spectrum2d_write_path_format(path)?.into())?;
     write_text_file(path, &payload)
 }
 

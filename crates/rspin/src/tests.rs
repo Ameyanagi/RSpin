@@ -394,6 +394,44 @@ fn prelude_supports_path_writer_exports() -> Result<()> {
         detect_spectrum2d_write_path_format("two.nmrml")?,
         Spectrum2DWritePathFormat::NmrMl
     );
+    assert_eq!(
+        parse_spectrum1d_write_format("jdx")?,
+        Spectrum1DWriteFormat::JcampDx
+    );
+    assert_eq!(
+        parse_spectrum2d_write_format("csv")?,
+        Spectrum2DWriteFormat::Csv
+    );
+
+    let spectrum = Spectrum1D::new(
+        Axis::linear_ppm(10.0, 8.0, 3)?,
+        vec![1.0, -2.0, 3.0],
+        Metadata::named("text export"),
+    )?;
+    let text = Spectrum1DTextWriter::jcamp_dx().write_string(&spectrum)?;
+    assert!(text.contains("##JCAMP-DX=5.00"));
+    assert_eq!(
+        read_spectrum1d_text(&write_spectrum1d_text(
+            &spectrum,
+            Spectrum1DWriteFormat::Csv,
+        )?)?
+        .intensities,
+        spectrum.intensities
+    );
+
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        Axis::linear_ppm(10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("text export 2d"),
+    )?;
+    let two_d_text = Spectrum2DTextWriter::csv().write_string(&spectrum_2d)?;
+    assert_eq!(
+        read_spectrum2d_text(&two_d_text)?.z,
+        write_spectrum2d_text(&spectrum_2d, Spectrum2DWriteFormat::Csv)
+            .and_then(|text| read_spectrum2d_text(&text))?
+            .z
+    );
     Ok(())
 }
 

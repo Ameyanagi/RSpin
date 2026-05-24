@@ -56,6 +56,40 @@ fn writes_jcamp_from_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_spectrum_text_by_format_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new(
+        Axis::linear_ppm(10.0, 8.0, 3)?,
+        vec![1.0, -2.0, 3.5],
+        Metadata::named("wasm text"),
+    )?;
+    let spectrum_json = to_json(&spectrum)?;
+
+    let csv = write_spectrum_1d_text_json(&spectrum_json, "csv")?;
+    let parsed_csv = spectrum1d_from_json(&parse_spectrum_1d_text_json(&csv)?)?;
+    assert_eq!(parsed_csv.x.values, spectrum.x.values);
+    assert_eq!(parsed_csv.intensities, spectrum.intensities);
+
+    let jcamp = write_spectrum_1d_text_json(&spectrum_json, "jdx")?;
+    assert!(jcamp.contains("##JCAMP-DX=5.00"));
+
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        Axis::linear_ppm(10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("wasm text 2d"),
+    )?;
+    let spectrum_2d_json = to_json(&spectrum_2d)?;
+    let csv_2d = write_spectrum_2d_text_json(&spectrum_2d_json, "csv")?;
+    let parsed_csv_2d = spectrum2d_from_json(&parse_spectrum_2d_text_json(&csv_2d)?)?;
+    assert_eq!(parsed_csv_2d.z, spectrum_2d.z);
+
+    let error = write_spectrum_2d_text_json(&spectrum_2d_json, "jdx")
+        .expect_err("2D JCAMP-DX text export should fail");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
 fn parses_nmrml_to_json() -> anyhow::Result<()> {
     let json = parse_nmrml_1d_json(
         r#"
