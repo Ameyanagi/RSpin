@@ -7,13 +7,14 @@ use crate::{
     inspect_nmrml_document_json, js_error, nmredata_1d_signals_to_assignment_set_json,
     nmredata_2d_signals_to_assignment_set_json, nmredata_assignments_to_assignment_set_json,
     nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json,
-    parse_jcamp_dx_version_json, parse_nmredata_json, parse_nmredata_records_json,
-    parse_nmrml_1d_json, parse_nmrml_2d_json, parse_spectrum_1d_csv_json,
-    parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
-    parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json, write_analysis_1d_csv_json,
-    write_analysis_2d_csv_json, write_nmredata_json, write_nmredata_records_json,
-    write_nmrml_1d_json, write_nmrml_2d_json, write_spectrum_1d_csv_json,
-    write_spectrum_1d_text_json, write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
+    parse_jcamp_dx_version_json, parse_jeol_jdf_1d_bytes_json, parse_jeol_jdf_2d_bytes_json,
+    parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
+    parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json,
+    parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
+    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
+    write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -34,6 +35,26 @@ pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = parseJcampDxVersion)]
 pub fn parse_jcamp_dx_version(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_version_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses JEOL Delta `.jdf` bytes into serialized one-dimensional spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseJeolJdf1dBytes)]
+pub fn parse_jeol_jdf_1d_bytes(input: &[u8]) -> std::result::Result<String, JsValue> {
+    parse_jeol_jdf_1d_bytes_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses JEOL Delta `.jdf` bytes into serialized two-dimensional spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseJeolJdf2dBytes)]
+pub fn parse_jeol_jdf_2d_bytes(input: &[u8]) -> std::result::Result<String, JsValue> {
+    parse_jeol_jdf_2d_bytes_json(input).map_err(|error| js_error(&error))
 }
 
 /// Parses Bruker parameter-file routing metadata into serialized JSON.

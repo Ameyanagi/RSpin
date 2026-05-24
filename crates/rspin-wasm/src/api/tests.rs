@@ -279,6 +279,36 @@ tn 2 2 4 0 0 2 1 8 1 64
 }
 
 #[test]
+fn parses_jeol_jdf_bytes_to_spectrum_json() -> anyhow::Result<()> {
+    let one_d_json = parse_jeol_jdf_1d_bytes_json(&synthetic_jdf_1d_bytes()?)?;
+    let one_d = spectrum1d_from_json(&one_d_json)?;
+
+    assert_eq!(one_d.x.unit, Unit::Seconds);
+    assert_eq!(one_d.x.values, vec![0.0, 0.25, 0.5, 0.75]);
+    assert_eq!(one_d.intensities, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(one_d.imaginary, None);
+    assert_eq!(one_d.metadata.name.as_deref(), Some("wasm jdf 1d"));
+    assert_eq!(one_d.metadata.origin.as_deref(), Some("JEOL"));
+
+    let two_d_json = parse_jeol_jdf_2d_bytes_json(&synthetic_jdf_2d_bytes()?)?;
+    let two_d = spectrum2d_from_json(&two_d_json)?;
+
+    assert_eq!(two_d.shape(), (2, 2));
+    assert_eq!(two_d.x.unit, Unit::Seconds);
+    assert_eq!(two_d.y.unit, Unit::Seconds);
+    assert_eq!(two_d.x.values, vec![0.0, 0.5]);
+    assert_eq!(two_d.y.values, vec![10.0, 12.0]);
+    assert_eq!(two_d.z, vec![1.0, 2.0, 3.0, 4.0]);
+    assert_eq!(two_d.imaginary, None);
+    assert_eq!(two_d.metadata.name.as_deref(), Some("wasm jdf 2d"));
+
+    let error = parse_jeol_jdf_2d_bytes_json(&synthetic_jdf_1d_bytes()?)
+        .expect_err("1D JEOL JDF bytes should not parse as 2D");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
 fn parses_nmredata_to_json() -> anyhow::Result<()> {
     let json = parse_nmredata_json(
         r"
@@ -1084,25 +1114,101 @@ fn integrates_detected_zones_json() -> anyhow::Result<()> {
 }
 
 fn minimal_jdf_header() -> Vec<u8> {
+    let (bytes, _param_start_pos, _param_length_pos, _data_start_pos) =
+        jdf_header_prefix(&JdfFixtureSpec::one_d("wasm jdf"));
+    bytes
+}
+
+fn synthetic_jdf_1d_bytes() -> anyhow::Result<Vec<u8>> {
+    let (mut bytes, param_start_pos, param_length_pos, data_start_pos) =
+        jdf_header_prefix(&JdfFixtureSpec::one_d("wasm jdf 1d"));
+    let data_start = bytes.len();
+    for value in [1.0_f64, 2.0, 3.0, 4.0] {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    write_be_u32_at(&mut bytes, param_start_pos, usize_to_u32(data_start)?)?;
+    write_be_u32_at(&mut bytes, param_length_pos, 0)?;
+    write_be_u32_at(&mut bytes, data_start_pos, usize_to_u32(data_start)?)?;
+    Ok(bytes)
+}
+
+fn synthetic_jdf_2d_bytes() -> anyhow::Result<Vec<u8>> {
+    let (mut bytes, param_start_pos, param_length_pos, data_start_pos) =
+        jdf_header_prefix(&JdfFixtureSpec::two_d("wasm jdf 2d"));
+    let data_start = bytes.len();
+    for value in [1.0_f64, 2.0, 3.0, 4.0] {
+        bytes.extend_from_slice(&value.to_le_bytes());
+    }
+
+    write_be_u32_at(&mut bytes, param_start_pos, usize_to_u32(data_start)?)?;
+    write_be_u32_at(&mut bytes, param_length_pos, 0)?;
+    write_be_u32_at(&mut bytes, data_start_pos, usize_to_u32(data_start)?)?;
+    Ok(bytes)
+}
+
+struct JdfFixtureSpec<'a> {
+    title: &'a str,
+    dimension_count: u8,
+    dimension_presence: u8,
+    data_format: u8,
+    axis_unit_bases: [u8; 8],
+    point_counts: [u32; 8],
+    offset_stops: [u32; 8],
+    axis_starts: [f64; 8],
+    axis_stops: [f64; 8],
+}
+
+impl<'a> JdfFixtureSpec<'a> {
+    fn one_d(title: &'a str) -> Self {
+        Self {
+            title,
+            dimension_count: 1,
+            dimension_presence: 0x80,
+            data_format: 1,
+            axis_unit_bases: [28, 0, 0, 0, 0, 0, 0, 0],
+            point_counts: [4, 0, 0, 0, 0, 0, 0, 0],
+            offset_stops: [3, 0, 0, 0, 0, 0, 0, 0],
+            axis_starts: [0.0; 8],
+            axis_stops: [0.75, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        }
+    }
+
+    fn two_d(title: &'a str) -> Self {
+        Self {
+            title,
+            dimension_count: 2,
+            dimension_presence: 0xC0,
+            data_format: 2,
+            axis_unit_bases: [28, 28, 0, 0, 0, 0, 0, 0],
+            point_counts: [2, 2, 0, 0, 0, 0, 0, 0],
+            offset_stops: [1, 1, 0, 0, 0, 0, 0, 0],
+            axis_starts: [0.0, 10.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            axis_stops: [0.5, 12.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        }
+    }
+}
+
+fn jdf_header_prefix(spec: &JdfFixtureSpec<'_>) -> (Vec<u8>, usize, usize, usize) {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"JEOL.NMR");
     bytes.push(1);
     bytes.push(1);
     push_be_u16(&mut bytes, 2);
-    bytes.push(1);
-    bytes.push(0x80);
-    bytes.push(1);
+    bytes.push(spec.dimension_count);
+    bytes.push(spec.dimension_presence);
+    bytes.push(spec.data_format);
     bytes.push(25);
     bytes.extend_from_slice(&[0; 8]);
-    bytes.extend_from_slice(&[3, 0, 0, 0, 0, 0, 0, 0]);
-    bytes.extend_from_slice(&[0; 16]);
-    push_padded(&mut bytes, "wasm jdf", 124);
+    bytes.extend_from_slice(&[0; 8]);
+    push_unit_array(&mut bytes, spec.axis_unit_bases);
+    push_padded(&mut bytes, spec.title, 124);
     bytes.extend_from_slice(&[0; 4]);
-    push_be_u32_array(&mut bytes, &[4, 0, 0, 0, 0, 0, 0, 0]);
+    push_be_u32_array(&mut bytes, &spec.point_counts);
     push_be_u32_array(&mut bytes, &[0; 8]);
-    push_be_u32_array(&mut bytes, &[3, 0, 0, 0, 0, 0, 0, 0]);
-    push_be_f64_array(&mut bytes, &[0.0; 8]);
-    push_be_f64_array(&mut bytes, &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
+    push_be_u32_array(&mut bytes, &spec.offset_stops);
+    push_be_f64_array(&mut bytes, &spec.axis_starts);
+    push_be_f64_array(&mut bytes, &spec.axis_stops);
     bytes.extend_from_slice(&[0; 8]);
     bytes.extend_from_slice(&[0; 16]);
     bytes.extend_from_slice(&[0; 128]);
@@ -1114,12 +1220,15 @@ fn minimal_jdf_header() -> Vec<u8> {
     bytes.extend_from_slice(&[0; 8]);
     bytes.extend_from_slice(&[0; 4]);
     bytes.extend_from_slice(&[0; 8]);
+    let param_start_pos = bytes.len();
     push_be_u32(&mut bytes, 0);
+    let param_length_pos = bytes.len();
     push_be_u32(&mut bytes, 0);
     bytes.extend_from_slice(&[0; 8 * 4]);
     bytes.extend_from_slice(&[0; 8 * 4]);
+    let data_start_pos = bytes.len();
     push_be_u32(&mut bytes, 0);
-    bytes
+    (bytes, param_start_pos, param_length_pos, data_start_pos)
 }
 
 fn push_padded(bytes: &mut Vec<u8>, value: &str, len: usize) {
@@ -1130,6 +1239,13 @@ fn push_padded(bytes: &mut Vec<u8>, value: &str, len: usize) {
             None => 0,
         };
         bytes.push(byte);
+    }
+}
+
+fn push_unit_array(bytes: &mut Vec<u8>, base_units: [u8; 8]) {
+    for base_unit in base_units {
+        bytes.push(0);
+        bytes.push(base_unit);
     }
 }
 
@@ -1151,4 +1267,19 @@ fn push_be_f64_array(bytes: &mut Vec<u8>, values: &[f64; 8]) {
     for value in values {
         bytes.extend_from_slice(&value.to_be_bytes());
     }
+}
+
+fn write_be_u32_at(bytes: &mut [u8], offset: usize, value: u32) -> anyhow::Result<()> {
+    let end = offset
+        .checked_add(4)
+        .ok_or_else(|| anyhow::anyhow!("JDF fixture offset overflow"))?;
+    let Some(slice) = bytes.get_mut(offset..end) else {
+        anyhow::bail!("JDF fixture offset outside buffer");
+    };
+    slice.copy_from_slice(&value.to_be_bytes());
+    Ok(())
+}
+
+fn usize_to_u32(value: usize) -> anyhow::Result<u32> {
+    Ok(u32::try_from(value)?)
 }
