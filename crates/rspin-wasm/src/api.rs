@@ -27,11 +27,12 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    NmreDataRecord, read_jcamp_dx_1d, read_nmredata_records_str, read_nmredata_str,
-    read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum1d_json,
-    read_spectrum1d_text, read_spectrum2d_json, read_spectrum2d_text, write_nmredata_record,
-    write_nmredata_records, write_nmrml_1d, write_nmrml_2d, write_spectrum1d_json,
-    write_spectrum2d_json,
+    read_jcamp_dx_1d, read_nmredata_record_json, read_nmredata_records_json,
+    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json,
+    read_spectrum2d_text, write_nmredata_record, write_nmredata_record_json,
+    write_nmredata_records, write_nmredata_records_json as write_nmredata_records_json_io,
+    write_nmrml_1d, write_nmrml_2d, write_spectrum1d_json, write_spectrum2d_json,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -133,7 +134,7 @@ pub fn parse_nmrml_2d_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_nmredata_json(input: &str) -> Result<String> {
     let record = read_nmredata_str(input)?;
-    to_json(&record)
+    write_nmredata_record_json(&record)
 }
 
 /// Parses all `NMReDATA` SDF records into serialized record-list JSON.
@@ -143,7 +144,7 @@ pub fn parse_nmredata_json(input: &str) -> Result<String> {
 /// Returns an error when parsing or serialization fails.
 pub fn parse_nmredata_records_json(input: &str) -> Result<String> {
     let records = read_nmredata_records_str(input)?;
-    to_json(&records)
+    write_nmredata_records_json_io(&records)
 }
 
 /// Serializes `NMReDATA` record JSON into SDF text.
@@ -152,7 +153,7 @@ pub fn parse_nmredata_records_json(input: &str) -> Result<String> {
 ///
 /// Returns an error when deserialization or `NMReDATA` serialization fails.
 pub fn write_nmredata_json(record_json: &str) -> Result<String> {
-    let record: NmreDataRecord = from_json(record_json)?;
+    let record = read_nmredata_record_json(record_json)?;
     write_nmredata_record(&record)
 }
 
@@ -162,7 +163,7 @@ pub fn write_nmredata_json(record_json: &str) -> Result<String> {
 ///
 /// Returns an error when deserialization or `NMReDATA` serialization fails.
 pub fn write_nmredata_records_json(records_json: &str) -> Result<String> {
-    let records: Vec<NmreDataRecord> = from_json(records_json)?;
+    let records = read_nmredata_records_json(records_json)?;
     write_nmredata_records(&records)
 }
 
@@ -176,7 +177,7 @@ pub fn nmredata_assignments_to_assignment_set_json(
     record_json: &str,
     nucleus_label: &str,
 ) -> Result<String> {
-    let record: NmreDataRecord = from_json(record_json)?;
+    let record = read_nmredata_record_json(record_json)?;
     let assignments = record.to_assignment_set(parse_nucleus_label(nucleus_label)?)?;
     to_json(&assignments)
 }
@@ -191,7 +192,7 @@ pub fn nmredata_1d_signals_to_assignment_set_json(
     record_json: &str,
     nucleus_label: &str,
 ) -> Result<String> {
-    let record: NmreDataRecord = from_json(record_json)?;
+    let record = read_nmredata_record_json(record_json)?;
     let assignments = record.to_signal_assignment_set(parse_nucleus_label(nucleus_label)?)?;
     to_json(&assignments)
 }
@@ -202,7 +203,7 @@ pub fn nmredata_1d_signals_to_assignment_set_json(
 ///
 /// Returns an error when deserialization, conversion, or serialization fails.
 pub fn nmredata_2d_signals_to_assignment_set_json(record_json: &str) -> Result<String> {
-    let record: NmreDataRecord = from_json(record_json)?;
+    let record = read_nmredata_record_json(record_json)?;
     let assignments = record.to_2d_signal_assignment_set()?;
     to_json(&assignments)
 }
@@ -217,7 +218,7 @@ pub fn nmredata_couplings_to_j_coupling_graph_json(
     record_json: &str,
     nucleus_label: &str,
 ) -> Result<String> {
-    let record: NmreDataRecord = from_json(record_json)?;
+    let record = read_nmredata_record_json(record_json)?;
     let graph = record.to_j_coupling_graph(parse_nucleus_label(nucleus_label)?)?;
     to_json(&graph)
 }
@@ -229,7 +230,7 @@ pub fn nmredata_couplings_to_j_coupling_graph_json(
 /// Returns an error when deserialization, nucleus parsing, conversion, or
 /// serialization fails.
 pub fn nmredata_to_analysis_json(record_json: &str, nucleus_label: &str) -> Result<String> {
-    let record: NmreDataRecord = from_json(record_json)?;
+    let record = read_nmredata_record_json(record_json)?;
     let analysis = record.to_analysis(parse_nucleus_label(nucleus_label)?)?;
     to_json(&analysis)
 }

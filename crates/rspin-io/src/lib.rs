@@ -12,6 +12,7 @@ mod jcamp;
 mod jeol;
 mod json;
 mod nmredata;
+mod nmredata_json;
 mod nmrml;
 mod nmrml_2d;
 mod nmrml_2d_writer;
@@ -66,6 +67,11 @@ pub use nmredata::{
     read_nmredata_records_bytes, read_nmredata_records_file, read_nmredata_records_str,
     read_nmredata_str, write_nmredata_file, write_nmredata_record, write_nmredata_records,
     write_nmredata_records_file,
+};
+pub use nmredata_json::{
+    JsonNmreDataRecord, JsonNmreDataRecords, NMREDATA_JSON_VERSION, NMREDATA_RECORD_JSON_FORMAT,
+    NMREDATA_RECORDS_JSON_FORMAT, read_nmredata_record_json, read_nmredata_records_json,
+    write_nmredata_record_json, write_nmredata_records_json,
 };
 pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_str};
 pub use nmrml_2d::{NmrMl2D, read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str};

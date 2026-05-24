@@ -1,4 +1,5 @@
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
+use rspin_io::{NMREDATA_RECORD_JSON_FORMAT, NMREDATA_RECORDS_JSON_FORMAT};
 
 use super::*;
 
@@ -192,21 +193,33 @@ Spectrum_Location=file:./nmr/10
 4.200, L=H1, J=7.0
 ",
     )?;
-    let value: serde_json::Value = from_json(&json)?;
+    assert!(json.contains(NMREDATA_RECORD_JSON_FORMAT));
+    let record = rspin_io::read_nmredata_record_json(&json)?;
 
-    assert_eq!(value["version"]["major"], 1);
-    assert_eq!(value["version"]["minor"], 1);
-    assert_eq!(value["assignments"][0]["label"], "H1");
-    assert_eq!(value["assignments"][0]["shift_ppm"], 4.2);
-    assert_eq!(value["couplings"][0]["j_hz"], 7.0);
-    assert_eq!(value["spectra"][0]["kind"]["kind"], "one_d");
-    assert_eq!(value["spectra"][0]["kind"]["observed_label"], "1H");
-    assert_eq!(value["spectra"][0]["larmor_mhz"], 500.0);
     assert_eq!(
-        value["spectra"][0]["spectrum_locations"][0],
-        "file:./nmr/10"
+        record.version.as_ref().map(|version| version.major),
+        Some(1)
     );
-    assert_eq!(value["spectra"][0]["signals_1d"][0]["from_ppm"], 4.2);
+    assert_eq!(
+        record.version.as_ref().and_then(|version| version.minor),
+        Some(1)
+    );
+    assert_eq!(record.assignments[0].label, "H1");
+    assert!((record.assignments[0].shift_ppm - 4.2).abs() < 1.0e-12);
+    assert!((record.couplings[0].j_hz - 7.0).abs() < 1.0e-12);
+    assert_eq!(
+        record.spectra[0].kind,
+        rspin_io::NmreDataSpectrumKind::OneD {
+            observed_label: "1H".to_owned(),
+            observed_nucleus: Some(rspin_core::Nucleus::Hydrogen1),
+        }
+    );
+    assert_eq!(record.spectra[0].larmor_mhz, Some(500.0));
+    assert_eq!(
+        record.spectra[0].spectrum_locations,
+        vec!["file:./nmr/10".to_owned()]
+    );
+    assert!((record.spectra[0].signals_1d[0].from_ppm - 4.2).abs() < 1.0e-12);
     Ok(())
 }
 
@@ -225,12 +238,25 @@ C2H6O
 $$$$
 ",
     )?;
-    let value: serde_json::Value = from_json(&json)?;
+    assert!(json.contains(NMREDATA_RECORDS_JSON_FORMAT));
+    let records = rspin_io::read_nmredata_records_json(&json)?;
 
-    assert_eq!(value.as_array().map(Vec::len), Some(2));
-    assert_eq!(value[0]["version"]["raw"], "1.0");
-    assert_eq!(value[1]["version"]["raw"], "1.1");
-    assert_eq!(value[1]["formula"], "C2H6O");
+    assert_eq!(records.len(), 2);
+    assert_eq!(
+        records[0]
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.0")
+    );
+    assert_eq!(
+        records[1]
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.1")
+    );
+    assert_eq!(records[1].formula.as_deref(), Some("C2H6O"));
     Ok(())
 }
 
@@ -251,9 +277,19 @@ H1, 4.200, H1
     assert!(text.contains("H1, 4.200, H1"));
 
     let reparsed_json = parse_nmredata_json(&text)?;
-    let reparsed: serde_json::Value = from_json(&reparsed_json)?;
-    assert_eq!(reparsed["version"]["raw"], "1.1");
-    assert_eq!(reparsed["assignments"][0]["label"], "H1");
+    let reparsed = rspin_io::read_nmredata_record_json(&reparsed_json)?;
+    assert_eq!(
+        reparsed
+            .version
+            .as_ref()
+            .map(|version| version.raw.as_str()),
+        Some("1.1")
+    );
+    assert_eq!(reparsed.assignments[0].label, "H1");
+
+    let legacy_json = serde_json::to_string(&reparsed)?;
+    let legacy_text = write_nmredata_json(&legacy_json)?;
+    assert!(legacy_text.contains("H1, 4.200, H1"));
     Ok(())
 }
 
@@ -287,6 +323,10 @@ $$$$
             .map(|version| version.raw.as_str()),
         Some("1.1")
     );
+
+    let legacy_json = serde_json::to_string(&reparsed)?;
+    let legacy_text = write_nmredata_records_json(&legacy_json)?;
+    assert_eq!(legacy_text.matches("$$$$").count(), 2);
     Ok(())
 }
 

@@ -249,6 +249,10 @@ H1/C1, I=1.0
     let trait_record = SpectrumReader::read_str(&NmreData, &nmredata_text)?;
     let trait_text = SpectrumWriter::write_string(&NmreData, &trait_record)?;
     assert!(trait_text.contains(">  <NMREDATA_VERSION>"));
+    let record_payload = write_nmredata_record_json(&trait_record)?;
+    assert!(record_payload.contains(NMREDATA_RECORD_JSON_FORMAT));
+    assert!(record_payload.contains(&format!("\"version\":{NMREDATA_JSON_VERSION}")));
+    assert_eq!(read_nmredata_record_json(&record_payload)?, trait_record);
     let assignment_set = trait_record.to_assignment_set(Nucleus::Hydrogen1)?;
     assert_eq!(assignment_set.len(), 1);
     let coupling_graph = nmredata_couplings_to_j_coupling_graph(&trait_record, Nucleus::Hydrogen1)?;
@@ -295,6 +299,12 @@ H1/C1, I=1.0
         &trait_records,
     )?;
     assert_eq!(records_codec_text.matches("$$$$").count(), 1);
+    let record_list_payload = write_nmredata_records_json(&trait_records)?;
+    assert!(record_list_payload.contains(NMREDATA_RECORDS_JSON_FORMAT));
+    assert_eq!(
+        read_nmredata_records_json(&record_list_payload)?,
+        trait_records
+    );
     assert_eq!(format!("{NmreData:?}"), "NmreData");
     assert_eq!(format!("{NmreDataRecords:?}"), "NmreDataRecords");
     Ok(())
