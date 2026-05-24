@@ -6,7 +6,8 @@ use crate::{
     inspect_nmrml_document_json, js_error, parse_nmrml_1d_json, parse_nmrml_2d_json,
     parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
     parse_spectrum_2d_text_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
-    write_nmrml_1d_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
+    write_nmrml_1d_json, write_nmrml_2d_json, write_spectrum_1d_csv_json,
+    write_spectrum_2d_csv_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -67,6 +68,16 @@ pub fn inspect_nmrml_document(input: &str) -> std::result::Result<String, JsValu
 #[wasm_bindgen(js_name = writeNmrMl1d)]
 pub fn write_nmrml_1d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
     write_nmrml_1d_json(spectrum_json).map_err(|error| js_error(&error))
+}
+
+/// Serializes two-dimensional spectrum JSON into nmrML text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or nmrML serialization fails.
+#[wasm_bindgen(js_name = writeNmrMl2d)]
+pub fn write_nmrml_2d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    write_nmrml_2d_json(spectrum_json).map_err(|error| js_error(&error))
 }
 
 /// Serializes one-dimensional spectrum JSON into CSV text.

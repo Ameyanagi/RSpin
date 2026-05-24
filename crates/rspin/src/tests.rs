@@ -105,6 +105,14 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
         read_nmrml_1d_str(&nmrml_text)?.intensities,
         spectrum.intensities
     );
+    let spectrum_2d = Spectrum2D::new(
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        Axis::linear_ppm(10.0, 11.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("io 2d"),
+    )?;
+    let nmrml_2d_text = write_nmrml_2d(&spectrum_2d)?;
+    assert_eq!(read_nmrml_2d_str(&nmrml_2d_text)?.z, spectrum_2d.z);
 
     let aligned = align_spectra_by_peak_to_matrix(
         &[

@@ -86,6 +86,25 @@ fn writes_nmrml_1d_from_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_nmrml_2d_from_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear_ppm(10.0, 8.0, 3)?,
+        Axis::linear_ppm(120.0, 100.0, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        Metadata::named("wasm 2d"),
+    )?;
+    let text = write_nmrml_2d_json(&to_json(&spectrum)?)?;
+    let parsed_json = parse_nmrml_2d_json(&text)?;
+    let parsed: Spectrum2D = from_json(&parsed_json)?;
+
+    assert!(text.contains("<spectrumMultiD"));
+    assert_eq!(parsed.x, spectrum.x);
+    assert_eq!(parsed.y, spectrum.y);
+    assert_eq!(parsed.z, spectrum.z);
+    Ok(())
+}
+
+#[test]
 fn parses_nmrml_2d_to_json() -> anyhow::Result<()> {
     let json = parse_nmrml_2d_json(
         r#"
