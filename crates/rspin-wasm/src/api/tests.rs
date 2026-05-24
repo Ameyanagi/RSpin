@@ -6,6 +6,7 @@ use rspin_io::{
 
 use super::*;
 
+mod agilent;
 mod assignments;
 mod buckets;
 mod clustering;

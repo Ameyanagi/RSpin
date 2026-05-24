@@ -7,6 +7,8 @@ use crate::{
     inspect_nmrml_document_json, js_error, nmredata_1d_signals_to_assignment_set_json,
     nmredata_2d_signals_to_assignment_set_json, nmredata_assignments_to_assignment_set_json,
     nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json,
+    parse_agilent_fid_1d_bytes_json, parse_agilent_fid_2d_bytes_json,
+    parse_agilent_processed_1d_bytes_json, parse_agilent_processed_2d_bytes_json,
     parse_jcamp_dx_version_json, parse_jeol_jdf_1d_bytes_json, parse_jeol_jdf_2d_bytes_json,
     parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
     parse_spectrum_1d_csv_json, parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json,
@@ -35,6 +37,62 @@ pub fn parse_spectrum_1d_csv(input: &str) -> std::result::Result<String, JsValue
 #[wasm_bindgen(js_name = parseJcampDxVersion)]
 pub fn parse_jcamp_dx_version(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_version_json(input).map_err(|error| js_error(&error))
+}
+
+/// Parses Agilent/Varian raw one-dimensional FID bytes into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseAgilentFid1dBytes)]
+pub fn parse_agilent_fid_1d_bytes(
+    procpar: &str,
+    fid_bytes: &[u8],
+) -> std::result::Result<String, JsValue> {
+    parse_agilent_fid_1d_bytes_json(procpar, fid_bytes).map_err(|error| js_error(&error))
+}
+
+/// Parses Agilent/Varian processed one-dimensional phasefile bytes into
+/// serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseAgilentProcessed1dBytes)]
+pub fn parse_agilent_processed_1d_bytes(
+    procpar: &str,
+    phasefile_bytes: &[u8],
+) -> std::result::Result<String, JsValue> {
+    parse_agilent_processed_1d_bytes_json(procpar, phasefile_bytes)
+        .map_err(|error| js_error(&error))
+}
+
+/// Parses Agilent/Varian raw two-dimensional FID bytes into serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseAgilentFid2dBytes)]
+pub fn parse_agilent_fid_2d_bytes(
+    procpar: &str,
+    fid_bytes: &[u8],
+) -> std::result::Result<String, JsValue> {
+    parse_agilent_fid_2d_bytes_json(procpar, fid_bytes).map_err(|error| js_error(&error))
+}
+
+/// Parses Agilent/Varian processed two-dimensional phasefile bytes into
+/// serialized spectrum JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = parseAgilentProcessed2dBytes)]
+pub fn parse_agilent_processed_2d_bytes(
+    procpar: &str,
+    phasefile_bytes: &[u8],
+) -> std::result::Result<String, JsValue> {
+    parse_agilent_processed_2d_bytes_json(procpar, phasefile_bytes)
+        .map_err(|error| js_error(&error))
 }
 
 /// Parses JEOL Delta `.jdf` bytes into serialized one-dimensional spectrum JSON.

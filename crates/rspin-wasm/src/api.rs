@@ -29,13 +29,15 @@ use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
     inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
     parse_jcamp_dx_version, parse_spectrum_text_format, parse_spectrum1d_write_format,
-    parse_spectrum2d_write_format, read_assignment_set_json, read_j_coupling_graph_json,
-    read_jcamp_dx_1d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes, read_nmredata_record_json,
-    read_nmredata_records_json, read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str,
-    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum1d_json, read_spectrum1d_text,
-    read_spectrum1d_text_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
-    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d,
-    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
+    parse_spectrum2d_write_format, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
+    read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
+    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
+    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
+    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
+    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_json,
+    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
+    write_j_coupling_graph_json, write_jcamp_dx_1d, write_nmredata_record,
+    write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum1d_json, write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
 };
@@ -115,6 +117,55 @@ pub use workflow::{analyze_spectrum_1d_json, analyze_spectrum_2d_json};
 pub fn parse_jcamp_dx_1d_json(input: &str) -> Result<String> {
     let spectrum = read_jcamp_dx_1d(input)?;
     spectrum1d_to_json(&spectrum)
+}
+
+/// Parses Agilent/Varian raw one-dimensional FID bytes into serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_agilent_fid_1d_bytes_json(procpar: &str, fid_bytes: &[u8]) -> Result<String> {
+    let spectrum = read_agilent_fid_1d_bytes(procpar, fid_bytes)?;
+    spectrum1d_to_json(&spectrum)
+}
+
+/// Parses Agilent/Varian processed one-dimensional phasefile bytes into
+/// serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_agilent_processed_1d_bytes_json(
+    procpar: &str,
+    phasefile_bytes: &[u8],
+) -> Result<String> {
+    let spectrum = read_agilent_processed_1d_bytes(procpar, phasefile_bytes)?;
+    spectrum1d_to_json(&spectrum)
+}
+
+/// Parses Agilent/Varian raw two-dimensional FID bytes into serialized
+/// `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_agilent_fid_2d_bytes_json(procpar: &str, fid_bytes: &[u8]) -> Result<String> {
+    let spectrum = read_agilent_fid_2d_bytes(procpar, fid_bytes)?;
+    spectrum2d_to_json(&spectrum)
+}
+
+/// Parses Agilent/Varian processed two-dimensional phasefile bytes into
+/// serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_agilent_processed_2d_bytes_json(
+    procpar: &str,
+    phasefile_bytes: &[u8],
+) -> Result<String> {
+    let spectrum = read_agilent_processed_2d_bytes(procpar, phasefile_bytes)?;
+    spectrum2d_to_json(&spectrum)
 }
 
 /// Parses JEOL Delta `.jdf` bytes into serialized `Spectrum1D` JSON.
