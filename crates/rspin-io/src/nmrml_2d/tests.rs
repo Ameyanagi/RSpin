@@ -1,5 +1,7 @@
 use rspin_core::Unit;
 
+use crate::SpectrumReader;
+
 use super::*;
 
 #[test]
@@ -91,6 +93,39 @@ fn reads_processed_float64_2d_spectrum() -> Result<()> {
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.frequency_mhz, Some(600.0));
     assert_eq!(spectrum.metadata.temperature_k, Some(298.15));
+    Ok(())
+}
+
+#[test]
+fn supports_trait_api() -> Result<()> {
+    let input = r#"
+        <nmrML version="v1.0.rc1">
+          <acquisition>
+            <acquisitionMultiD>
+              <acquisitionParameterSet>
+                <directDimensionParameterSet decoupled="false" numberOfDataPoints="2"/>
+                <indirectDimensionParameterSet decoupled="false" numberOfDataPoints="1"/>
+              </acquisitionParameterSet>
+            </acquisitionMultiD>
+          </acquisition>
+          <spectrumList>
+            <spectrumMultiD id="processed" numberOfDataPoints="2">
+              <spectrumDataArray compressed="false" encodedLength="24" byteFormat="float64">
+                AAAAAAAA8D8AAAAAAAAAQA==
+              </spectrumDataArray>
+              <xAxis unitName="parts per million" startValue="1.0" endValue="0.0"/>
+              <firstDimensionProcessingParameterSet/>
+              <higherDimensionProcessingParameterSet/>
+            </spectrumMultiD>
+          </spectrumList>
+        </nmrML>
+    "#;
+
+    let spectrum = SpectrumReader::read_str(&NmrMl2D, input)?;
+
+    assert_eq!(spectrum.shape(), (2, 1));
+    assert_eq!(spectrum.x.values, vec![1.0, 0.0]);
+    assert_eq!(spectrum.z, vec![1.0, 2.0]);
     Ok(())
 }
 

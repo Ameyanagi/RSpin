@@ -15,6 +15,8 @@ use quick_xml::{
 };
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum2D, Unit};
 
+use crate::SpectrumReader;
+
 const FORMAT: &str = "nmrML";
 
 /// Reader for raw or processed two-dimensional nmrML payloads.
@@ -47,6 +49,14 @@ impl NmrMl2D {
     /// unsupported binary data.
     pub fn read_bytes(self, bytes: &[u8]) -> Result<Spectrum2D> {
         read_nmrml_2d_bytes(bytes)
+    }
+}
+
+impl SpectrumReader for NmrMl2D {
+    type Output = Spectrum2D;
+
+    fn read_str(&self, input: &str) -> Result<Self::Output> {
+        read_nmrml_2d_str(input)
     }
 }
 
