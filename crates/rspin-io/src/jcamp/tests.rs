@@ -76,6 +76,27 @@ fn reads_scaled_xypoints_spectrum() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_peak_table_as_explicit_points() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=peak table
+##XUNITS=(ppm)
+##NPOINTS=3
+##PEAK TABLE=(XY..XY)
+0.5 2
+1.0 4
+1.5 3
+##END
+";
+    let spectrum = read_jcamp_dx_1d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("peak table"));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_axis_close(&spectrum.x.values, &[0.5, 1.0, 1.5]);
+    assert_eq!(spectrum.intensities, vec![2.0, 4.0, 3.0]);
+    Ok(())
+}
+
+#[test]
 fn rejects_odd_xypoints_values() {
     let input = "\
 ##XYPOINTS=(XY..XY)

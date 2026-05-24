@@ -51,10 +51,10 @@ enum DataBlock {
 
 /// Reads a one-dimensional spectrum from a JCAMP-DX string.
 ///
-/// This parser targets numeric `XYDATA=(X++(Y..Y))` and `XYPOINTS=(XY..XY)`
-/// subsets. It applies JCAMP scaling factors to tabulated ordinates, and to
-/// explicit `XYPOINTS` abscissae. Richer compressed variants are left for later
-/// format modules.
+/// This parser targets numeric `XYDATA=(X++(Y..Y))`, `XYPOINTS=(XY..XY)`, and
+/// `PEAK TABLE=(XY..XY)` subsets. It applies JCAMP scaling factors to tabulated
+/// ordinates, and to explicit `XYPOINTS`/peak-table abscissae. Richer compressed
+/// variants are left for later format modules.
 ///
 /// # Errors
 ///
@@ -67,10 +67,15 @@ pub fn read_jcamp_dx_1d(input: &str) -> Result<Spectrum1D> {
         if let Some((key, value)) = parse_labeled_line(line) {
             data_block = match normalized_key(key).as_str() {
                 "XYDATA" => Some(DataBlock::XyData),
-                "XYPOINTS" => Some(DataBlock::XyPoints),
+                "XYPOINTS" | "PEAKTABLE" => Some(DataBlock::XyPoints),
                 _ => None,
             };
             apply_label(&mut raw, key, value)?;
+            continue;
+        }
+
+        if line.starts_with("##") {
+            data_block = None;
             continue;
         }
 
