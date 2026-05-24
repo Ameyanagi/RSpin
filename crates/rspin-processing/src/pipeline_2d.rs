@@ -4,9 +4,10 @@ use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     Abs2D, AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
-    FftDirection, GaussianApodization2D, Normalize2DMaxAbs, Normalize2DVolume, PhaseCorrection2D,
-    ProcessingStep, ProjectionMode, Resample2D, Scale2D, SineBellApodization2D, ZeroFill2D,
-    project_x, project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
+    FftDirection, GaussianApodization2D, Normalize2DMaxAbs, Normalize2DVolume, Offset2D,
+    PhaseCorrection2D, ProcessingStep, ProjectionMode, Resample2D, Scale2D, Shift2DAxes,
+    SineBellApodization2D, ZeroFill2D, project_x, project_y, slice_x_at_y, slice_x_at_y_index,
+    slice_y_at_x, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -68,6 +69,12 @@ impl Spectrum2DPipeline {
         self.then(Scale2D::new(factor))
     }
 
+    /// Adds an offset to all real intensities.
+    #[must_use]
+    pub fn offset(self, offset: f64) -> Self {
+        self.then(Offset2D::new(offset))
+    }
+
     /// Normalizes intensities by their maximum absolute value.
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
@@ -84,6 +91,24 @@ impl Spectrum2DPipeline {
     #[must_use]
     pub fn normalize_abs_volume(self, target_volume: f64) -> Self {
         self.then(Normalize2DVolume::absolute(target_volume))
+    }
+
+    /// Shifts x and y axes by constant deltas.
+    #[must_use]
+    pub fn shift_axes(self, x_delta: f64, y_delta: f64) -> Self {
+        self.then(Shift2DAxes::new(x_delta, y_delta))
+    }
+
+    /// Shifts only the x axis.
+    #[must_use]
+    pub fn shift_x_axis(self, delta: f64) -> Self {
+        self.then(Shift2DAxes::x(delta))
+    }
+
+    /// Shifts only the y axis.
+    #[must_use]
+    pub fn shift_y_axis(self, delta: f64) -> Self {
+        self.then(Shift2DAxes::y(delta))
     }
 
     /// Applies component-wise absolute value to real and imaginary matrices.

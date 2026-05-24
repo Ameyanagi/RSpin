@@ -7,8 +7,8 @@ use crate::{
     Abs1D, Abs2D, AutoPhaseCorrection, AutoPhaseCorrection2D, BaselineMethod, Crop1D, Crop2D,
     ExponentialApodization, ExponentialApodization2D, Fft1D, Fft2D, FftDirection,
     GaussianApodization, GaussianApodization2D, Magnitude, Normalize2DMaxAbs, Normalize2DVolume,
-    NormalizeArea, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, PhaseCorrection2D,
-    ProjectionMode, Resample1D, Resample2D, Scale2D, ScaleIntensity, ShiftAxis,
+    NormalizeArea, NormalizeMaxAbs, Offset2D, OffsetIntensity, PhaseCorrection, PhaseCorrection2D,
+    ProjectionMode, Resample1D, Resample2D, Scale2D, ScaleIntensity, Shift2DAxes, ShiftAxis,
     SineBellApodization, SineBellApodization2D, SubtractBaseline, ZeroFill, ZeroFill2D,
 };
 
@@ -67,8 +67,13 @@ fn serializes_two_dimensional_steps() -> anyhow::Result<()> {
 
     round_trip(&Abs2D)?;
     round_trip(&Scale2D { factor: 0.5 })?;
+    round_trip(&Offset2D { offset: -0.25 })?;
     round_trip(&Normalize2DMaxAbs)?;
     round_trip(&Normalize2DVolume::absolute(3.0))?;
+    round_trip(&Shift2DAxes {
+        x_delta: 0.03,
+        y_delta: -0.05,
+    })?;
     round_trip(&ZeroFill2D {
         target_x_len: 8,
         target_y_len: 6,

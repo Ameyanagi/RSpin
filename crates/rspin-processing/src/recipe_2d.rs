@@ -7,8 +7,8 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 use crate::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingStep, abs_2d,
     auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d, gaussian_apodization_2d,
-    normalize_2d_max_abs, normalize_2d_volume, resample_2d, scale_2d, sine_bell_apodization_2d,
-    zero_fill_2d,
+    normalize_2d_max_abs, normalize_2d_volume, offset_2d, resample_2d, scale_2d, shift_2d_axes,
+    sine_bell_apodization_2d, zero_fill_2d,
 };
 
 /// A serializable two-dimensional processing operation.
@@ -20,6 +20,11 @@ pub enum ProcessingOperation2D {
         /// Multiplicative factor.
         factor: f64,
     },
+    /// Adds an offset to all real intensities.
+    Offset {
+        /// Additive offset.
+        offset: f64,
+    },
     /// Normalizes real intensities by their maximum absolute value.
     NormalizeMaxAbs,
     /// Normalizes real and imaginary intensities by bilinear volume.
@@ -28,6 +33,13 @@ pub enum ProcessingOperation2D {
         target_volume: f64,
         /// Use absolute real intensities when measuring the volume.
         use_absolute_intensity: bool,
+    },
+    /// Shifts x and y axes by constant deltas.
+    ShiftAxes {
+        /// Shift amount in the x-axis unit.
+        x_delta: f64,
+        /// Shift amount in the y-axis unit.
+        y_delta: f64,
     },
     /// Applies component-wise absolute value to real and imaginary matrices.
     AbsoluteValue,
@@ -116,11 +128,13 @@ impl ProcessingStep<Spectrum2D> for ProcessingOperation2D {
     fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         match self {
             Self::Scale { factor } => scale_2d(spectrum, *factor),
+            Self::Offset { offset } => offset_2d(spectrum, *offset),
             Self::NormalizeMaxAbs => normalize_2d_max_abs(spectrum),
             Self::NormalizeVolume {
                 target_volume,
                 use_absolute_intensity,
             } => normalize_2d_volume(spectrum, *target_volume, *use_absolute_intensity),
+            Self::ShiftAxes { x_delta, y_delta } => shift_2d_axes(spectrum, *x_delta, *y_delta),
             Self::AbsoluteValue => abs_2d(spectrum),
             Self::ZeroFill {
                 target_x_len,
@@ -272,6 +286,12 @@ impl ProcessingRecipe2D {
         self.with_operation(ProcessingOperation2D::Scale { factor })
     }
 
+    /// Appends a real-intensity offset operation.
+    #[must_use]
+    pub fn offset(self, offset: f64) -> Self {
+        self.with_operation(ProcessingOperation2D::Offset { offset })
+    }
+
     /// Appends a maximum-absolute normalization operation.
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
@@ -297,6 +317,24 @@ impl ProcessingRecipe2D {
             target_volume,
             use_absolute_intensity,
         })
+    }
+
+    /// Appends an x/y axis-shift operation.
+    #[must_use]
+    pub fn shift_axes(self, x_delta: f64, y_delta: f64) -> Self {
+        self.with_operation(ProcessingOperation2D::ShiftAxes { x_delta, y_delta })
+    }
+
+    /// Appends an x-axis-only shift operation.
+    #[must_use]
+    pub fn shift_x_axis(self, delta: f64) -> Self {
+        self.shift_axes(delta, 0.0)
+    }
+
+    /// Appends a y-axis-only shift operation.
+    #[must_use]
+    pub fn shift_y_axis(self, delta: f64) -> Self {
+        self.shift_axes(0.0, delta)
     }
 
     /// Appends a component-wise absolute-value operation.

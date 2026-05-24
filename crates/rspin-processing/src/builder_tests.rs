@@ -3,9 +3,9 @@ use rspin_core::{Axis, Unit};
 use crate::{
     Abs1D, Abs2D, BaselineMethod, Crop1D, Crop2D, ExponentialApodization, ExponentialApodization2D,
     Fft1D, Fft2D, FftDirection, GaussianApodization, GaussianApodization2D, Magnitude,
-    Normalize2DMaxAbs, Normalize2DVolume, NormalizeArea, NormalizeMaxAbs, OffsetIntensity,
-    PhaseCorrection, Resample1D, Resample2D, Scale2D, ScaleIntensity, ShiftAxis,
-    SineBellApodization, SineBellApodization2D, SubtractBaseline, ZeroFill, ZeroFill2D,
+    Normalize2DMaxAbs, Normalize2DVolume, NormalizeArea, NormalizeMaxAbs, Offset2D,
+    OffsetIntensity, PhaseCorrection, Resample1D, Resample2D, Scale2D, ScaleIntensity, Shift2DAxes,
+    ShiftAxis, SineBellApodization, SineBellApodization2D, SubtractBaseline, ZeroFill, ZeroFill2D,
 };
 
 #[test]
@@ -77,6 +77,7 @@ fn two_dimensional_step_builders_are_chainable() -> anyhow::Result<()> {
 
     assert_eq!(Abs2D::new(), Abs2D);
     assert_eq!(Scale2D::new(0.5), Scale2D { factor: 0.5 });
+    assert_eq!(Offset2D::new(-0.25), Offset2D { offset: -0.25 });
     assert_eq!(Normalize2DMaxAbs::new(), Normalize2DMaxAbs);
     assert_eq!(
         Normalize2DVolume::new(3.0).with_absolute_intensity(true),
@@ -137,6 +138,14 @@ fn two_dimensional_step_builders_are_chainable() -> anyhow::Result<()> {
     );
     assert_eq!(Fft2D::forward(), Fft2D::new(FftDirection::Forward));
     assert_eq!(Fft2D::inverse(), Fft2D::new(FftDirection::Inverse));
+    assert_eq!(
+        Shift2DAxes::x(0.1).with_y_delta(-0.2),
+        Shift2DAxes::new(0.1, -0.2)
+    );
+    assert_eq!(
+        Shift2DAxes::y(0.3).with_x_delta(-0.4),
+        Shift2DAxes::new(-0.4, 0.3)
+    );
 
     Ok(())
 }

@@ -42,6 +42,37 @@ fn scales_and_normalizes_2d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn offsets_and_shifts_2d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+
+    let offset_json = offset_spectrum_2d_json(&spectrum_json, 1.0)?;
+    let offset = spectrum2d_from_json(&offset_json)?;
+    assert_vec_close(&offset.z, &[2.0, -1.0, 4.0, 5.0]);
+    assert_option_vec_close(offset.imaginary.as_deref(), &[0.5, -1.0, 1.5, 2.0]);
+    assert_eq!(
+        offset
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("offset_2d")
+    );
+
+    let shifted_json = shift_spectrum_2d_axes_json(&spectrum_json, -0.25, 2.0)?;
+    let shifted = spectrum2d_from_json(&shifted_json)?;
+    assert_vec_close(&shifted.x.values, &[-0.25, 0.75]);
+    assert_vec_close(&shifted.y.values, &[2.0, 3.0]);
+    assert_vec_close(&shifted.z, &[1.0, -2.0, 3.0, 4.0]);
+    assert_eq!(
+        shifted
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("shift_2d_axes")
+    );
+    Ok(())
+}
+
+#[test]
 fn takes_absolute_value_2d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
     let abs_json = abs_spectrum_2d_json(&spectrum_json)?;

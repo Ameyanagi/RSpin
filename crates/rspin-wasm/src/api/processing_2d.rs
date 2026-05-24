@@ -8,9 +8,9 @@ use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, abs_2d,
     apply_processing_recipe_2d, apply_processing_recipe_2d_until, auto_phase_correct_2d, crop_2d,
     exponential_apodization_2d, fft_2d, gaussian_apodization_2d, normalize_2d_max_abs,
-    normalize_2d_volume, phase_correct_2d, project_x, project_y, resample_2d, scale_2d,
-    sine_bell_apodization_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
-    zero_fill_2d,
+    normalize_2d_volume, offset_2d, phase_correct_2d, project_x, project_y, resample_2d, scale_2d,
+    shift_2d_axes, sine_bell_apodization_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
+    slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, spectrum1d_to_json, spectrum2d_from_json, spectrum2d_to_json, to_json};
@@ -23,6 +23,17 @@ use super::{from_json, spectrum1d_to_json, spectrum2d_from_json, spectrum2d_to_j
 pub fn scale_spectrum_2d_json(spectrum_json: &str, factor: f64) -> Result<String> {
     let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = scale_2d(&spectrum, factor)?;
+    spectrum2d_to_json(&processed)
+}
+
+/// Adds an offset to serialized `Spectrum2D` real intensities.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn offset_spectrum_2d_json(spectrum_json: &str, offset: f64) -> Result<String> {
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
+    let processed = offset_2d(&spectrum, offset)?;
     spectrum2d_to_json(&processed)
 }
 
@@ -49,6 +60,21 @@ pub fn normalize_spectrum_2d_volume_json(
 ) -> Result<String> {
     let spectrum = spectrum2d_from_json(spectrum_json)?;
     let processed = normalize_2d_volume(&spectrum, target_volume, use_absolute_intensity)?;
+    spectrum2d_to_json(&processed)
+}
+
+/// Shifts serialized `Spectrum2D` x/y axes by constant deltas.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn shift_spectrum_2d_axes_json(
+    spectrum_json: &str,
+    x_delta: f64,
+    y_delta: f64,
+) -> Result<String> {
+    let spectrum = spectrum2d_from_json(spectrum_json)?;
+    let processed = shift_2d_axes(&spectrum, x_delta, y_delta)?;
     spectrum2d_to_json(&processed)
 }
 

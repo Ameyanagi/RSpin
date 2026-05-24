@@ -67,8 +67,9 @@ pub use transform::{
 };
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{
-    Normalize2DMaxAbs, Normalize2DVolume, ProjectionMode, Scale2D, normalize_2d_max_abs,
-    normalize_2d_volume, project_x, project_y, scale_2d, slice_x_at_y, slice_x_at_y_index,
-    slice_y_at_x, slice_y_at_x_index, spectrum_volume_2d,
+    Normalize2DMaxAbs, Normalize2DVolume, Offset2D, ProjectionMode, Scale2D, Shift2DAxes,
+    normalize_2d_max_abs, normalize_2d_volume, offset_2d, project_x, project_y, scale_2d,
+    shift_2d_axes, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
+    spectrum_volume_2d,
 };
 pub use zero_fill_2d::{ZeroFill2D, zero_fill_2d};

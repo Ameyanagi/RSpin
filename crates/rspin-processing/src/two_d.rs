@@ -42,6 +42,27 @@ impl ProcessingStep<Spectrum2D> for Scale2D {
     }
 }
 
+/// Adds a scalar offset to all real 2D intensities.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Offset2D {
+    /// Additive offset.
+    pub offset: f64,
+}
+
+impl Offset2D {
+    /// Creates a two-dimensional real-intensity offset step.
+    #[must_use]
+    pub fn new(offset: f64) -> Self {
+        Self { offset }
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for Offset2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        offset_2d(spectrum, self.offset)
+    }
+}
+
 /// Normalizes 2D intensities by their maximum absolute value.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Normalize2DMaxAbs;
@@ -102,6 +123,55 @@ impl ProcessingStep<Spectrum2D> for Normalize2DVolume {
     }
 }
 
+/// Shifts the x and y axes by constant deltas.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Shift2DAxes {
+    /// Shift amount in the x-axis unit.
+    pub x_delta: f64,
+    /// Shift amount in the y-axis unit.
+    pub y_delta: f64,
+}
+
+impl Shift2DAxes {
+    /// Creates a two-dimensional axis-shift step.
+    #[must_use]
+    pub fn new(x_delta: f64, y_delta: f64) -> Self {
+        Self { x_delta, y_delta }
+    }
+
+    /// Creates a step that shifts only the x axis.
+    #[must_use]
+    pub fn x(delta: f64) -> Self {
+        Self::new(delta, 0.0)
+    }
+
+    /// Creates a step that shifts only the y axis.
+    #[must_use]
+    pub fn y(delta: f64) -> Self {
+        Self::new(0.0, delta)
+    }
+
+    /// Sets the x-axis shift amount.
+    #[must_use]
+    pub fn with_x_delta(mut self, x_delta: f64) -> Self {
+        self.x_delta = x_delta;
+        self
+    }
+
+    /// Sets the y-axis shift amount.
+    #[must_use]
+    pub fn with_y_delta(mut self, y_delta: f64) -> Self {
+        self.y_delta = y_delta;
+        self
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for Shift2DAxes {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        shift_2d_axes(spectrum, self.x_delta, self.y_delta)
+    }
+}
+
 /// Multiplies all 2D intensities by `factor`.
 ///
 /// # Errors
@@ -114,6 +184,27 @@ pub fn scale_2d(spectrum: &Spectrum2D, factor: f64) -> Result<Spectrum2D> {
     Ok(recorded_2d(
         processed,
         ProcessingRecord::new("scale_2d").with_details(format!("factor={factor}")),
+    ))
+}
+
+/// Adds `offset` to all real 2D intensities.
+///
+/// The imaginary matrix, when present, is preserved unchanged.
+///
+/// # Errors
+///
+/// Returns an error when `offset` is not finite.
+pub fn offset_2d(spectrum: &Spectrum2D, offset: f64) -> Result<Spectrum2D> {
+    ensure_finite("2D intensity offset", offset)?;
+    let mut processed = spectrum.clone();
+    processed.z = processed
+        .z
+        .into_iter()
+        .map(|value| value + offset)
+        .collect();
+    Ok(recorded_2d(
+        processed,
+        ProcessingRecord::new("offset_2d").with_details(format!("offset={offset}")),
     ))
 }
 
@@ -241,6 +332,24 @@ pub fn normalize_2d_volume(
         ProcessingRecord::new("normalize_2d_volume").with_details(format!(
             "target_volume={target_volume},use_absolute_intensity={use_absolute_intensity}"
         )),
+    ))
+}
+
+/// Shifts x and y axis values by constant deltas.
+///
+/// # Errors
+///
+/// Returns an error when either delta is not finite.
+pub fn shift_2d_axes(spectrum: &Spectrum2D, x_delta: f64, y_delta: f64) -> Result<Spectrum2D> {
+    ensure_finite("x axis shift", x_delta)?;
+    ensure_finite("y axis shift", y_delta)?;
+    let mut processed = spectrum.clone();
+    processed.x = shifted_axis(&processed.x, x_delta)?;
+    processed.y = shifted_axis(&processed.y, y_delta)?;
+    Ok(recorded_2d(
+        processed,
+        ProcessingRecord::new("shift_2d_axes")
+            .with_details(format!("x_delta={x_delta},y_delta={y_delta}")),
     ))
 }
 
@@ -547,6 +656,14 @@ fn scale_2d_values(spectrum: &mut Spectrum2D, factor: f64) {
             *value *= factor;
         }
     }
+}
+
+fn shifted_axis(axis: &Axis, delta: f64) -> Result<Axis> {
+    Axis::new(
+        axis.label.clone(),
+        axis.unit,
+        axis.values.iter().map(|value| value + delta).collect(),
+    )
 }
 
 fn matrix_value(

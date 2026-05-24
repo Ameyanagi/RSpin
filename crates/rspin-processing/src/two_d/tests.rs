@@ -24,6 +24,24 @@ fn scales_complex_2d_values() -> anyhow::Result<()> {
 }
 
 #[test]
+fn offsets_2d_real_values_and_preserves_imaginary_values() -> anyhow::Result<()> {
+    let spectrum = demo_complex_spectrum()?;
+    let processed = Offset2D::new(1.5).apply(&spectrum)?;
+
+    assert_eq!(processed.z, vec![2.5, -0.5, 4.5, 5.5, -3.5, 7.5]);
+    assert_eq!(
+        require_imaginary_2d(&processed)?,
+        &[10.0, 20.0, 30.0, 40.0, 50.0, 60.0]
+    );
+    assert_eq!(processed.processing[0].operation, "offset_2d");
+    assert_eq!(
+        processed.processing[0].details.as_deref(),
+        Some("offset=1.5")
+    );
+    Ok(())
+}
+
+#[test]
 fn normalizes_2d_values() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let processed = Normalize2DMaxAbs.apply(&spectrum)?;
@@ -98,6 +116,36 @@ fn rejects_unusable_2d_volume_normalization_inputs() -> anyhow::Result<()> {
     )?;
     let short_error = spectrum_volume_2d(&short, false).expect_err("short 2D spectrum should fail");
     assert!(matches!(short_error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn shifts_2d_axes_without_changing_values() -> anyhow::Result<()> {
+    let spectrum = demo_complex_spectrum()?;
+    let processed = Shift2DAxes::new(-0.1, 2.0).apply(&spectrum)?;
+
+    assert_vec_close(&processed.x.values, &[-0.1, 0.9, 1.9]);
+    assert_vec_close(&processed.y.values, &[12.0, 13.0]);
+    assert_eq!(processed.z, spectrum.z);
+    assert_eq!(processed.imaginary, spectrum.imaginary);
+    assert_eq!(processed.processing[0].operation, "shift_2d_axes");
+    assert_eq!(
+        processed.processing[0].details.as_deref(),
+        Some("x_delta=-0.1,y_delta=2")
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_non_finite_2d_offset_and_axis_shift() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+
+    let offset_error = offset_2d(&spectrum, f64::NAN).expect_err("non-finite offset should fail");
+    assert!(matches!(offset_error, RSpinError::NonFinite { .. }));
+
+    let shift_error =
+        shift_2d_axes(&spectrum, 0.0, f64::INFINITY).expect_err("non-finite shift should fail");
+    assert!(matches!(shift_error, RSpinError::NonFinite { .. }));
     Ok(())
 }
 

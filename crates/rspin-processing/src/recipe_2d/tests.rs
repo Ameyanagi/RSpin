@@ -7,20 +7,24 @@ fn applies_chainable_recipe_operations() -> anyhow::Result<()> {
     let spectrum = demo_spectrum()?;
     let recipe = ProcessingRecipe2D::new()
         .scale(2.0)
+        .offset(1.0)
+        .shift_axes(0.25, -0.5)
         .absolute_value()
         .zero_fill(3, 2)
-        .normalize_max_abs()
-        .normalize_abs_volume(2.0);
+        .normalize_max_abs();
 
     let processed = recipe.apply(&spectrum)?;
 
-    assert_eq!(recipe.len(), 5);
+    assert_eq!(recipe.len(), 6);
     assert_eq!(processed.shape(), (3, 2));
-    assert_eq!(processed.z, vec![0.5, 1.0, 0.0, 1.5, 2.0, 0.0]);
-    assert_eq!(processed.processing.len(), 5);
+    assert_eq!(processed.z, vec![3.0 / 7.0, 3.0 / 7.0, 0.0, 1.0, 1.0, 0.0]);
+    assert_eq!(processed.x.values, vec![0.25, 1.25, 2.25]);
+    assert_eq!(processed.y.values, vec![-0.5, 0.5]);
+    assert_eq!(processed.processing.len(), 6);
     assert_eq!(processed.processing[0].operation, "scale_2d");
-    assert_eq!(processed.processing[3].operation, "normalize_2d_max_abs");
-    assert_eq!(processed.processing[4].operation, "normalize_2d_volume");
+    assert_eq!(processed.processing[1].operation, "offset_2d");
+    assert_eq!(processed.processing[2].operation, "shift_2d_axes");
+    assert_eq!(processed.processing[5].operation, "normalize_2d_max_abs");
     Ok(())
 }
 
@@ -61,6 +65,8 @@ fn rejects_recipe_prefix_past_end() -> anyhow::Result<()> {
 fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let recipe = ProcessingRecipe2D::new()
         .normalize_volume(-1.0)
+        .shift_x_axis(0.0)
+        .shift_y_axis(0.0)
         .crop(0.0, 1.0, 1.0, 1.0)
         .gaussian_apodization(0.0, 0.0, 0.1, 0.1)
         .sine_bell_apodization(90.0, 90.0, 1.0, 90.0, 90.0, 1.0)
@@ -72,16 +78,17 @@ fn round_trips_recipe_json_and_applies_step_trait() -> anyhow::Result<()> {
     let decoded: ProcessingRecipe2D = serde_json::from_str(&json)?;
     let processed = ProcessingStep::apply(&decoded, &demo_spectrum()?)?;
 
-    assert_eq!(decoded.len(), 5);
+    assert_eq!(decoded.len(), 7);
     assert_eq!(processed.shape(), (3, 1));
     assert_eq!(processed.z, vec![6.0, -1.0, -8.0]);
     assert_eq!(processed.processing[0].operation, "normalize_2d_volume");
     assert_eq!(
-        processed.processing[3].operation,
+        processed.processing[5].operation,
         "sine_bell_apodization_2d"
     );
-    assert_eq!(processed.processing[4].operation, "resample_2d");
+    assert_eq!(processed.processing[6].operation, "resample_2d");
     assert!(json.contains("normalize_volume"));
+    assert!(json.contains("shift_axes"));
     Ok(())
 }
 

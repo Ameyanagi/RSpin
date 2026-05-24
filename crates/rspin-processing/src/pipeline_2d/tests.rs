@@ -79,6 +79,26 @@ fn chains_2d_volume_normalization() -> anyhow::Result<()> {
 }
 
 #[test]
+fn chains_2d_offset_and_axis_shifts() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let processed = spectrum
+        .process()
+        .offset(1.0)
+        .shift_x_axis(0.25)
+        .shift_y_axis(-0.5)
+        .finish()?;
+
+    assert_eq!(processed.z, vec![2.0, -1.0, 4.0, 5.0, -4.0, 7.0]);
+    assert_eq!(processed.x.values, vec![0.25, 1.25, 2.25]);
+    assert_eq!(processed.y.values, vec![9.5, 10.5]);
+    assert_eq!(processed.processing.len(), 3);
+    assert_eq!(processed.processing[0].operation, "offset_2d");
+    assert_eq!(processed.processing[1].operation, "shift_2d_axes");
+    assert_eq!(processed.processing[2].operation, "shift_2d_axes");
+    Ok(())
+}
+
+#[test]
 fn chains_from_fallible_2d_spectrum_result() -> anyhow::Result<()> {
     let spectrum_result: rspin_core::Result<Spectrum2D> = Ok(demo_spectrum()?);
     let processed = spectrum_result.process().scale(2.0).finish()?;

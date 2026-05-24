@@ -6,11 +6,12 @@ use crate::{
     abs_spectrum_2d_json, apply_processing_recipe_2d_json, apply_processing_recipe_2d_until_json,
     auto_phase_spectrum_2d_json, crop_spectrum_2d_json, exponential_apodization_spectrum_2d_json,
     fft_spectrum_2d_json, gaussian_apodization_spectrum_2d_json, js_error,
-    normalize_spectrum_2d_json, normalize_spectrum_2d_volume_json, phase_spectrum_2d_json,
-    project_spectrum_2d_x_json, project_spectrum_2d_y_json, resample_spectrum_2d_json,
-    scale_spectrum_2d_json, sine_bell_apodization_spectrum_2d_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
-    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
+    normalize_spectrum_2d_json, normalize_spectrum_2d_volume_json, offset_spectrum_2d_json,
+    phase_spectrum_2d_json, project_spectrum_2d_x_json, project_spectrum_2d_y_json,
+    resample_spectrum_2d_json, scale_spectrum_2d_json, shift_spectrum_2d_axes_json,
+    sine_bell_apodization_spectrum_2d_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
+    slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
 };
 
 /// Scales a serialized two-dimensional spectrum.
@@ -22,6 +23,20 @@ use crate::{
 #[wasm_bindgen(js_name = scaleSpectrum2d)]
 pub fn scale_spectrum_2d(spectrum_json: &str, factor: f64) -> std::result::Result<String, JsValue> {
     scale_spectrum_2d_json(spectrum_json, factor).map_err(|error| js_error(&error))
+}
+
+/// Adds an offset to serialized two-dimensional real intensities.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = offsetSpectrum2d)]
+pub fn offset_spectrum_2d(
+    spectrum_json: &str,
+    offset: f64,
+) -> std::result::Result<String, JsValue> {
+    offset_spectrum_2d_json(spectrum_json, offset).map_err(|error| js_error(&error))
 }
 
 /// Normalizes a serialized two-dimensional spectrum by maximum absolute value.
@@ -49,6 +64,21 @@ pub fn normalize_spectrum_2d_volume(
 ) -> std::result::Result<String, JsValue> {
     normalize_spectrum_2d_volume_json(spectrum_json, target_volume, use_absolute_intensity)
         .map_err(|error| js_error(&error))
+}
+
+/// Shifts serialized two-dimensional x/y axes by constant deltas.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = shiftSpectrum2dAxes)]
+pub fn shift_spectrum_2d_axes(
+    spectrum_json: &str,
+    x_delta: f64,
+    y_delta: f64,
+) -> std::result::Result<String, JsValue> {
+    shift_spectrum_2d_axes_json(spectrum_json, x_delta, y_delta).map_err(|error| js_error(&error))
 }
 
 /// Zero-fills a serialized two-dimensional spectrum.
