@@ -8,6 +8,7 @@ mod csv;
 mod csv_2d;
 mod csv_common;
 mod jcamp;
+mod jeol;
 mod json;
 mod processing_json;
 mod traits;
@@ -22,6 +23,7 @@ pub use bruker::{BrukerProcessed1D, read_bruker_processed_1d_dir};
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};
 pub use jcamp::{JcampDx, read_jcamp_dx_1d, write_jcamp_dx_1d};
+pub use jeol::{JeolJdf1D, read_jeol_jdf_1d_bytes, read_jeol_jdf_1d_file};
 pub use json::{
     JsonSpectrum1D, JsonSpectrum2D, read_spectrum1d_json, read_spectrum2d_json,
     write_spectrum1d_json, write_spectrum2d_json,
