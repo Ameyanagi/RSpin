@@ -11,8 +11,8 @@ use rspin_core::RSpinError;
 use wasm_bindgen::prelude::*;
 
 pub use analysis::{
-    align_spectra_by_peak_to_matrix_1d, bucket_spectra_1d, bucket_spectrum_1d, detect_ranges_1d,
-    detect_zones_2d,
+    align_spectra_by_peak_to_matrix_1d, bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d,
+    bucket_spectrum_2d, detect_ranges_1d, detect_zones_2d,
 };
 #[cfg(feature = "first-order")]
 pub use api::simulate_first_order_multiplet_json;
@@ -22,25 +22,25 @@ pub use api::{
     apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
     apply_processing_recipe_2d_json, apply_processing_recipe_2d_until_json,
     auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json, bucket_spectra_1d_json,
-    bucket_spectrum_1d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
-    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
-    detect_zones_json, exponential_apodization_spectrum_1d_json, extract_contours_2d_json,
-    fft_spectrum_1d_json, fft_spectrum_2d_json, generate_spectrum_matrix_1d_json,
-    generate_spectrum_matrix_2d_json, integrate_region_2d_json, integrate_region_json,
-    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
-    offset_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
-    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, phase_spectrum_1d_json,
-    phase_spectrum_2d_json, pick_peaks_json, predict_molecule_with_element_rules_json,
-    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
-    render_prediction_2d_json, resample_spectrum_1d_json, resample_spectrum_2d_json,
-    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
-    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
-    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
-    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
-    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
-    validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
-    zero_fill_spectrum_2d_json,
+    bucket_spectra_2d_json, bucket_spectrum_1d_json, bucket_spectrum_2d_json,
+    crop_spectrum_1d_json, crop_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,
+    detect_multiplets_json, detect_ranges_json, detect_zones_json,
+    exponential_apodization_spectrum_1d_json, extract_contours_2d_json, fft_spectrum_1d_json,
+    fft_spectrum_2d_json, generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
+    integrate_region_2d_json, integrate_region_json, magnitude_spectrum_1d_json,
+    normalize_spectrum_1d_json, normalize_spectrum_2d_json, offset_spectrum_1d_json,
+    optimize_peaks_json, parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json,
+    parse_spectrum_2d_csv_json, phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
+    predict_molecule_with_element_rules_json, project_spectrum_2d_x_json,
+    project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
+    resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
+    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, slice_spectrum_2d_x_at_y_index_json,
+    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
+    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
+    summarize_signals_2d_json, validate_assignment_set_json, validate_j_coupling_graph_json,
+    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
+    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{

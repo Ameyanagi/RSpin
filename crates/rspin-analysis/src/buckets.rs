@@ -1,10 +1,16 @@
-//! One-dimensional spectral bucketing.
+//! Spectral bucketing.
+
+mod two_d;
 
 use serde::{Deserialize, Serialize};
 
 use rspin_core::{RSpinError, Result, Spectrum1D};
 
 use crate::{IntegralRegion, integrate_region};
+
+pub use two_d::{
+    BucketMatrix2D, BucketOptions2D, SpectralBucket2D, bucket_spectra_2d, bucket_spectrum_2d,
+};
 
 /// Options for equal-width one-dimensional spectral buckets.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

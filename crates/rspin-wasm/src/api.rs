@@ -29,7 +29,10 @@ pub use assignments::{
     annotate_spectrum_1d_with_assignments_json, annotate_spectrum_2d_with_assignments_json,
     validate_assignment_set_json,
 };
-pub use buckets::{bucket_spectra_1d_json, bucket_spectrum_1d_json};
+pub use buckets::{
+    bucket_spectra_1d_json, bucket_spectra_2d_json, bucket_spectrum_1d_json,
+    bucket_spectrum_2d_json,
+};
 pub use contours::extract_contours_2d_json;
 pub use csv_io::{
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, write_spectrum_1d_csv_json,

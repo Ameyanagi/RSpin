@@ -3,8 +3,9 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    align_spectra_by_peak_to_matrix_1d_json, bucket_spectra_1d_json, bucket_spectrum_1d_json,
-    detect_ranges_json, detect_zones_json, js_error,
+    align_spectra_by_peak_to_matrix_1d_json, bucket_spectra_1d_json, bucket_spectra_2d_json,
+    bucket_spectrum_1d_json, bucket_spectrum_2d_json, detect_ranges_json, detect_zones_json,
+    js_error,
 };
 
 /// Detects ranges from a serialized one-dimensional spectrum.
@@ -81,4 +82,32 @@ pub fn bucket_spectra_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     bucket_spectra_1d_json(spectra_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Buckets a two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, bucketing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = bucketSpectrum2d)]
+pub fn bucket_spectrum_2d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    bucket_spectrum_2d_json(spectrum_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Buckets two-dimensional spectra into a layer-major matrix.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, bucketing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = bucketSpectra2d)]
+pub fn bucket_spectra_2d(
+    spectra_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    bucket_spectra_2d_json(spectra_json, options_json).map_err(|error| js_error(&error))
 }

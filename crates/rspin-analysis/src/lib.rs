@@ -23,7 +23,8 @@ pub use assignments::{
     AssignedAtom, Assignment, AssignmentSet, AssignmentTarget, deterministic_assignment_id,
 };
 pub use buckets::{
-    BucketMatrix1D, BucketOptions1D, SpectralBucket1D, bucket_spectra_1d, bucket_spectrum_1d,
+    BucketMatrix1D, BucketMatrix2D, BucketOptions1D, BucketOptions2D, SpectralBucket1D,
+    SpectralBucket2D, bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d,
 };
 pub use couplings::{CouplingNode, JCoupling, JCouplingGraph, deterministic_j_coupling_id};
 pub use integration::{Integral, IntegralRegion, TrapezoidalIntegrator, integrate_region};
