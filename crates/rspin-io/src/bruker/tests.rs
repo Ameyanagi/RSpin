@@ -75,6 +75,11 @@ fn write_raw_fid(root: &Path, values: &[i32], byte_order: ByteOrder) -> anyhow::
 }
 
 fn write_raw_ser(root: &Path, rows: &[Vec<i32>], byte_order: ByteOrder) -> anyhow::Result<()> {
+    fs::write(root.join("ser"), raw_ser_bytes(rows, byte_order))?;
+    Ok(())
+}
+
+fn raw_ser_bytes(rows: &[Vec<i32>], byte_order: ByteOrder) -> Vec<u8> {
     let mut bytes = Vec::new();
     for row in rows {
         for value in row {
@@ -86,8 +91,7 @@ fn write_raw_ser(root: &Path, rows: &[Vec<i32>], byte_order: ByteOrder) -> anyho
         let padded_words = 256usize.saturating_sub(row.len());
         bytes.extend(std::iter::repeat_n(0, padded_words * 4));
     }
-    fs::write(root.join("ser"), bytes)?;
-    Ok(())
+    bytes
 }
 
 fn i32_bytes(values: &[i32], byte_order: ByteOrder) -> Vec<u8> {

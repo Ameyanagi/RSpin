@@ -60,9 +60,11 @@ pub use auto::{
 };
 pub use bruker::{
     BrukerFid1D, BrukerFid1DBytes, BrukerParameterFileInfo, BrukerProcessed1D,
-    BrukerProcessed1DBytes, BrukerProcessed2D, BrukerSer2D, inspect_bruker_parameter_file,
-    read_bruker_fid_1d_bytes, read_bruker_fid_1d_dir, read_bruker_processed_1d_bytes,
-    read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
+    BrukerProcessed1DBytes, BrukerProcessed2D, BrukerProcessed2DBytes, BrukerSer2D,
+    BrukerSer2DBytes, inspect_bruker_parameter_file, read_bruker_fid_1d_bytes,
+    read_bruker_fid_1d_dir, read_bruker_processed_1d_bytes, read_bruker_processed_1d_dir,
+    read_bruker_processed_2d_bytes, read_bruker_processed_2d_dir, read_bruker_ser_2d_bytes,
+    read_bruker_ser_2d_dir,
 };
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};

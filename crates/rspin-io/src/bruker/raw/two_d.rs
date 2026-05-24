@@ -42,6 +42,45 @@ impl SpectrumPathReader for BrukerSer2D {
     }
 }
 
+/// Byte-oriented reader for Bruker raw two-dimensional `ser` data.
+///
+/// This builder is useful when callers receive uploaded `acqus`, `acqu2s`,
+/// and `ser` payloads without a native directory tree.
+#[derive(Clone, Copy, Debug)]
+pub struct BrukerSer2DBytes<'a> {
+    direct_parameters: &'a str,
+    indirect_parameters: &'a str,
+    ser_bytes: &'a [u8],
+}
+
+impl<'a> BrukerSer2DBytes<'a> {
+    /// Creates a byte-oriented Bruker raw 2D reader.
+    #[must_use]
+    pub fn new(
+        direct_parameters: &'a str,
+        indirect_parameters: &'a str,
+        ser_bytes: &'a [u8],
+    ) -> Self {
+        Self {
+            direct_parameters,
+            indirect_parameters,
+            ser_bytes,
+        }
+    }
+
+    /// Reads the supplied `acqus`, `acqu2s`, and `ser` bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when metadata or binary data are missing, malformed, or
+    /// unsupported.
+    pub fn read(self) -> Result<Spectrum2D> {
+        let direct_parameters = parse_parameter_file_for_reader(self.direct_parameters)?;
+        let indirect_parameters = parse_parameter_file_for_reader(self.indirect_parameters)?;
+        build_ser_spectrum(&direct_parameters, &indirect_parameters, self.ser_bytes)
+    }
+}
+
 /// Reads a raw two-dimensional Bruker `ser` dataset.
 ///
 /// The path may point to the dataset directory or directly to `ser`.
@@ -65,8 +104,48 @@ pub fn read_bruker_ser_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
 }
 
+/// Reads a raw two-dimensional Bruker `ser` payload from parameter text and
+/// bytes.
+///
+/// # Errors
+///
+/// Returns an error when metadata or binary data are missing, malformed, or
+/// unsupported.
+pub fn read_bruker_ser_2d_bytes(
+    direct_parameters: &str,
+    indirect_parameters: &str,
+    ser_bytes: &[u8],
+) -> Result<Spectrum2D> {
+    BrukerSer2DBytes::new(direct_parameters, indirect_parameters, ser_bytes).read()
+}
+
+fn build_ser_spectrum(
+    direct_parameters: &BTreeMap<String, String>,
+    indirect_parameters: &BTreeMap<String, String>,
+    ser_bytes: &[u8],
+) -> Result<Spectrum2D> {
+    let (z, imaginary, x_count, y_count) = decode_ser_values(ser_bytes, direct_parameters)?;
+    validate_indirect_count(y_count, indirect_parameters)?;
+
+    let x = build_raw_axis(x_count, direct_parameters)?;
+    let y = build_indirect_axis(y_count, indirect_parameters)?;
+    let metadata = build_raw_metadata(direct_parameters)?;
+    Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
+}
+
 fn read_ser_values(
     path: &Path,
+    acqus: &BTreeMap<String, String>,
+) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
+    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
+        format: "Bruker",
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    decode_ser_values(&bytes, acqus)
+}
+
+fn decode_ser_values(
+    bytes: &[u8],
     acqus: &BTreeMap<String, String>,
 ) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
     ensure_i32_data(acqus)?;
@@ -82,10 +161,6 @@ fn read_ser_values(
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "Bruker raw 2D row length is too large".to_owned(),
         })?;
-    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
-        format: "Bruker",
-        message: format!("failed to read {}: {error}", path.display()),
-    })?;
     if bytes.len() % row_bytes != 0 {
         return Err(RSpinError::Parse {
             format: "Bruker",

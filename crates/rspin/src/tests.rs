@@ -237,6 +237,9 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     let bruker_error =
         read_bruker_fid_1d_bytes("", b"not fid").expect_err("invalid Bruker FID bytes should fail");
     assert!(matches!(bruker_error, RSpinError::Parse { .. }));
+    let bruker_ser_error = read_bruker_ser_2d_bytes("", "", b"not ser")
+        .expect_err("invalid Bruker SER bytes should fail");
+    assert!(matches!(bruker_ser_error, RSpinError::Parse { .. }));
     let jeol_version = JeolJdfVersion::new(1, 2);
     assert_eq!(jeol_version.raw, "1.2");
     assert!(jeol_version.is_supported_by_current_reader());

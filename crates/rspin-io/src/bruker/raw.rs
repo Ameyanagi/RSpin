@@ -18,7 +18,7 @@ use super::{
     read_text, required_usize, text_parameter,
 };
 
-pub use two_d::{BrukerSer2D, read_bruker_ser_2d_dir};
+pub use two_d::{BrukerSer2D, BrukerSer2DBytes, read_bruker_ser_2d_bytes, read_bruker_ser_2d_dir};
 
 /// Byte-oriented reader for Bruker raw one-dimensional FID data.
 ///

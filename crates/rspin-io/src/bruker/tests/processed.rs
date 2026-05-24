@@ -292,6 +292,72 @@ fn reads_processed_2d_dataset_root_with_imaginary_plane() -> anyhow::Result<()> 
 }
 
 #[test]
+fn reads_processed_2d_bytes_without_dataset_path() -> anyhow::Result<()> {
+    let direct_parameters = "\
+##$SI= 2
+##$BYTORDP= 0
+##$DTYPP= 0
+##$NC_proc= -1
+##$OFFSET= 10
+##$SW_p= 2000
+##$SF= 500
+##$AXNUC= <1H>
+";
+    let indirect_parameters = "\
+##$SI= 2
+##$OFFSET= 120
+##$SW_p= 2000
+##$SF= 100
+##$AXNUC= <13C>
+";
+    let spectrum = read_bruker_processed_2d_bytes(
+        direct_parameters,
+        indirect_parameters,
+        &i32_bytes(&[1, 2, 3, 4], ByteOrder::Little),
+    )?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.x.values, vec![10.0, 6.0]);
+    assert_eq!(spectrum.y.unit, Unit::Ppm);
+    assert_eq!(spectrum.y.values, vec![120.0, 100.0]);
+    assert_eq!(spectrum.z, vec![2.0, 4.0, 6.0, 8.0]);
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(500.0));
+
+    let acqus = "\
+##$SOLVENT= <DMSO>
+##$TE= 301
+##$OWNER= <processed 2d bytes fixture>
+";
+    let builder_spectrum = BrukerProcessed2DBytes::new(
+        direct_parameters,
+        indirect_parameters,
+        &i32_bytes(&[1, 2, 3, 4], ByteOrder::Little),
+    )
+    .with_acqus(acqus)
+    .with_imaginary(&i32_bytes(&[-1, -2, -3, -4], ByteOrder::Little))
+    .with_title("processed 2d bytes\n")
+    .read()?;
+
+    assert_eq!(
+        builder_spectrum.metadata.name.as_deref(),
+        Some("processed 2d bytes")
+    );
+    assert_eq!(builder_spectrum.metadata.solvent.as_deref(), Some("DMSO"));
+    assert_eq!(builder_spectrum.metadata.temperature_k, Some(301.0));
+    assert_eq!(
+        builder_spectrum.metadata.origin.as_deref(),
+        Some("processed 2d bytes fixture")
+    );
+    assert_eq!(
+        builder_spectrum.imaginary,
+        Some(vec![-2.0, -4.0, -6.0, -8.0])
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_processed_2d_truncated_matrix() -> anyhow::Result<()> {
     let root = synthetic_dataset("processed-2d-truncated")?;
     write_processed_2d_dir(

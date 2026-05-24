@@ -184,6 +184,69 @@ fn reads_raw_2d_ser_dataset_root() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_raw_2d_ser_bytes_without_dataset_path() -> anyhow::Result<()> {
+    let direct_parameters = "\
+##$TD= 4
+##$BYTORDA= 1
+##$DTYPA= 0
+##$NC= -1
+##$SW_h= 1000
+##$NUC1= <1H>
+##$SFO1= 400.25
+##$SOLVENT= <D2O>
+##$TE= 299
+##$OWNER= <ser bytes fixture>
+##$PULPROG= <hsqc>
+";
+    let indirect_parameters = "\
+##$TD= 2
+##$SW_h= 200
+##$FnMODE= 0
+";
+    let spectrum = read_bruker_ser_2d_bytes(
+        direct_parameters,
+        indirect_parameters,
+        &raw_ser_bytes(&[vec![1, 2, 3, 4], vec![5, 6, 7, 8]], ByteOrder::Big),
+    )?;
+
+    assert_eq!(spectrum.shape(), (2, 2));
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
+    assert_eq!(spectrum.x.values, vec![0.0, 0.001]);
+    assert_eq!(spectrum.y.values, vec![0.0, 0.005]);
+    assert_eq!(spectrum.z, vec![2.0, 6.0, 10.0, 14.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![4.0, 8.0, 12.0, 16.0]));
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("hsqc"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(spectrum.metadata.frequency_mhz, Some(400.25));
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("D2O"));
+    assert_eq!(spectrum.metadata.temperature_k, Some(299.0));
+    assert_eq!(
+        spectrum.metadata.origin.as_deref(),
+        Some("ser bytes fixture")
+    );
+
+    let builder_spectrum = BrukerSer2DBytes::new(
+        "\
+##$TD= 4
+##$BYTORDA= 0
+##$DTYPA= 0
+",
+        "\
+##$TD= 1
+##$FnMODE= 1
+",
+        &raw_ser_bytes(&[vec![1, -1, 2, -2]], ByteOrder::Little),
+    )
+    .read()?;
+    assert_eq!(builder_spectrum.shape(), (2, 1));
+    assert_eq!(builder_spectrum.y.unit, Unit::Points);
+    assert_eq!(builder_spectrum.z, vec![1.0, 2.0]);
+    assert_eq!(builder_spectrum.imaginary, Some(vec![-1.0, -2.0]));
+    Ok(())
+}
+
+#[test]
 fn rejects_raw_2d_ser_with_incomplete_padded_row() -> anyhow::Result<()> {
     let root = synthetic_dataset("raw-2d-short")?;
     write_text(

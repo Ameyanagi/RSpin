@@ -15,10 +15,13 @@ use crate::{JcampDxVersion, SpectrumPathReader, parse_jcamp_dx_version};
 mod processed_2d;
 mod raw;
 
-pub use processed_2d::{BrukerProcessed2D, read_bruker_processed_2d_dir};
+pub use processed_2d::{
+    BrukerProcessed2D, BrukerProcessed2DBytes, read_bruker_processed_2d_bytes,
+    read_bruker_processed_2d_dir,
+};
 pub use raw::{
-    BrukerFid1D, BrukerFid1DBytes, BrukerSer2D, read_bruker_fid_1d_bytes, read_bruker_fid_1d_dir,
-    read_bruker_ser_2d_dir,
+    BrukerFid1D, BrukerFid1DBytes, BrukerSer2D, BrukerSer2DBytes, read_bruker_fid_1d_bytes,
+    read_bruker_fid_1d_dir, read_bruker_ser_2d_bytes, read_bruker_ser_2d_dir,
 };
 
 /// Root metadata from a Bruker JCAMP-DX-style parameter file.
