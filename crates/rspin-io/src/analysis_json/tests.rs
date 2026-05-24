@@ -42,6 +42,15 @@ fn reads_one_dimensional_analysis_json_without_optimized_peaks() -> anyhow::Resu
         read_analysis1d_json(r#"{"peaks":[],"ranges":[],"multiplets":[],"signals":[]}"#)?;
 
     assert!(analysis.optimized_peaks.is_empty());
+    assert!(analysis.integrals.is_empty());
+    Ok(())
+}
+
+#[test]
+fn reads_two_dimensional_analysis_json_without_integrals() -> anyhow::Result<()> {
+    let analysis = read_analysis2d_json(r#"{"zones":[],"signals":[]}"#)?;
+
+    assert!(analysis.integrals.is_empty());
     Ok(())
 }
 

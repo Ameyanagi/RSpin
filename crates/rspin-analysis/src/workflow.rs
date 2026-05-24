@@ -5,11 +5,12 @@ use serde::{Deserialize, Serialize};
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, JCouplingGraph,
-    MultipletDetectionOptions, OptimizedPeak, Peak, PeakOptimizationOptions, PeakPickOptions,
-    RangeDetectionOptions, SignalSummary1D, SignalSummary2D, SignalSummary2DOptions,
-    SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets, detect_ranges, detect_zones,
-    optimize_peaks_quadratic, pick_peaks, summarize_signals_1d, summarize_signals_2d,
+    AssignmentSet, DetectedMultiplet, DetectedRange, DetectedZone, Integral, Integral2D,
+    JCouplingGraph, MultipletDetectionOptions, OptimizedPeak, Peak, PeakOptimizationOptions,
+    PeakPickOptions, RangeDetectionOptions, SignalSummary1D, SignalSummary2D,
+    SignalSummary2DOptions, SignalSummaryOptions, ZoneDetectionOptions, detect_multiplets,
+    detect_ranges, detect_zones, integrate_ranges, integrate_zones_2d, optimize_peaks_quadratic,
+    pick_peaks, summarize_signals_1d, summarize_signals_2d,
 };
 
 mod builder;
@@ -99,6 +100,9 @@ pub struct SpectrumAnalysis1D {
     pub optimized_peaks: Vec<OptimizedPeak>,
     /// Detected threshold ranges.
     pub ranges: Vec<DetectedRange>,
+    /// Integrals computed over detected range bounds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub integrals: Vec<Integral>,
     /// Multiplets grouped from picked peaks.
     pub multiplets: Vec<DetectedMultiplet>,
     /// Signal summaries assembled from ranges, multiplets, assignments, and couplings.
@@ -141,6 +145,9 @@ impl SpectrumAnalysis2DOptions {
 pub struct SpectrumAnalysis2D {
     /// Detected connected zones.
     pub zones: Vec<DetectedZone>,
+    /// Integrals computed over detected zone bounds.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub integrals: Vec<Integral2D>,
     /// Signal summaries assembled from zones and assignments.
     pub signals: Vec<SignalSummary2D>,
 }
@@ -183,6 +190,7 @@ pub fn analyze_assigned_spectrum_1d(
         None => Vec::new(),
     };
     let ranges = detect_ranges(spectrum, options.range_options)?;
+    let integrals = integrate_ranges(spectrum, &ranges)?;
     let multiplets = detect_multiplets(spectrum, &peaks, options.multiplet_options)?;
     let signals = summarize_signals_1d(
         spectrum,
@@ -197,6 +205,7 @@ pub fn analyze_assigned_spectrum_1d(
         peaks,
         optimized_peaks,
         ranges,
+        integrals,
         multiplets,
         signals,
     })
@@ -227,9 +236,14 @@ pub fn analyze_assigned_spectrum_2d(
     options: SpectrumAnalysis2DOptions,
 ) -> Result<SpectrumAnalysis2D> {
     let zones = detect_zones(spectrum, options.zone_options)?;
+    let integrals = integrate_zones_2d(spectrum, &zones)?;
     let signals = summarize_signals_2d(spectrum, &zones, assignments, options.signal_options)?;
 
-    Ok(SpectrumAnalysis2D { zones, signals })
+    Ok(SpectrumAnalysis2D {
+        zones,
+        integrals,
+        signals,
+    })
 }
 
 #[cfg(test)]

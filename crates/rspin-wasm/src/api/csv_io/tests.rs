@@ -78,6 +78,7 @@ fn writes_analysis_csv_json() -> anyhow::Result<()> {
         }],
         optimized_peaks: Vec::new(),
         ranges: Vec::new(),
+        integrals: Vec::new(),
         multiplets: Vec::new(),
         signals: Vec::new(),
     };
@@ -106,6 +107,7 @@ fn writes_analysis_csv_json() -> anyhow::Result<()> {
             sum_intensity: 3.0,
             sum_abs_intensity: 3.0,
         }],
+        integrals: Vec::new(),
         signals: Vec::new(),
     };
     let versioned_2d_json = rspin_io::write_analysis2d_json(&analysis_2d)?;

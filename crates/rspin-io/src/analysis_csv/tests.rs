@@ -49,6 +49,7 @@ fn writes_one_dimensional_analysis_csv() -> anyhow::Result<()> {
     assert!(csv.contains("# section=optimized_peaks\n"));
     assert!(csv.contains("optimized_x,optimized_intensity,delta_x,curvature,optimized"));
     assert!(csv.contains("# section=ranges\n"));
+    assert!(csv.contains("# section=integrals\n"));
     assert!(csv.contains("# section=multiplets\n"));
     assert!(csv.contains("# section=signals\n"));
     assert!(csv.contains("\"H,1\""));
@@ -84,6 +85,7 @@ fn writes_two_dimensional_analysis_csv() -> anyhow::Result<()> {
     assert!(csv.starts_with("# format=RSpin Analysis 2D CSV\n"));
     assert!(csv.contains("# section=zones\n"));
     assert!(csv.contains("id,x_start_index,x_end_index,y_start_index,y_end_index"));
+    assert!(csv.contains("# section=integrals\n"));
     assert!(csv.contains("# section=signals\n"));
     assert!(csv.contains("signal2d:zone:x0-0:y0-1"));
     assert!(csv.contains("C1H1"));
@@ -105,6 +107,7 @@ fn rejects_non_finite_analysis_values() {
         }],
         optimized_peaks: Vec::new(),
         ranges: Vec::new(),
+        integrals: Vec::new(),
         multiplets: Vec::new(),
         signals: Vec::new(),
     };

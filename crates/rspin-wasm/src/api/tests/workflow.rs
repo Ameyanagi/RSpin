@@ -20,6 +20,7 @@ fn analyzes_spectrum_1d_json() -> anyhow::Result<()> {
     assert_eq!(analysis.peaks.len(), 2);
     assert_eq!(analysis.optimized_peaks.len(), 2);
     assert_eq!(analysis.ranges.len(), 2);
+    assert_eq!(analysis.integrals.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
     Ok(())
 }
@@ -40,6 +41,7 @@ fn analyzes_spectrum_2d_json() -> anyhow::Result<()> {
     let analysis = rspin_io::read_analysis2d_json(&analysis_json)?;
 
     assert_eq!(analysis.zones.len(), 2);
+    assert_eq!(analysis.integrals.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
     Ok(())
 }

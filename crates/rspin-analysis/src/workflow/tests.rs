@@ -32,6 +32,7 @@ fn analyzes_one_dimensional_spectrum_with_defaults() -> anyhow::Result<()> {
     assert_eq!(analysis.peaks.len(), 2);
     assert!(analysis.optimized_peaks.is_empty());
     assert_eq!(analysis.ranges.len(), 2);
+    assert_eq!(analysis.integrals.len(), 2);
     assert_eq!(analysis.multiplets.len(), 1);
     assert_eq!(analysis.signals.len(), 2);
     assert_eq!(analysis.multiplets[0].estimated_j_hz, Some(800.0));
@@ -111,6 +112,26 @@ fn rejects_invalid_one_dimensional_options() -> anyhow::Result<()> {
     );
 
     assert!(result.is_err());
+    Ok(())
+}
+
+#[test]
+fn analyzes_one_dimensional_spectrum_with_range_integrals() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 6.0, 7)?,
+        vec![0.0, 2.0, 2.0, 0.0, 4.0, 4.0, 0.0],
+        Metadata::named("analysis-integrals"),
+    )?;
+    let analysis = analyze_spectrum_1d(
+        &spectrum,
+        SpectrumAnalysis1DOptions::new()
+            .with_range_options(RangeDetectionOptions::new().with_threshold_abs(1.0)),
+    )?;
+
+    assert_eq!(analysis.ranges.len(), 2);
+    assert_eq!(analysis.integrals.len(), 2);
+    assert!((analysis.integrals[0].area - 2.0).abs() < 1.0e-12);
+    assert!((analysis.integrals[1].area - 4.0).abs() < 1.0e-12);
     Ok(())
 }
 
@@ -237,6 +258,7 @@ fn analyzes_two_dimensional_spectrum_with_defaults() -> anyhow::Result<()> {
     let analysis = analyze_spectrum_2d(&spectrum, options)?;
 
     assert_eq!(analysis.zones.len(), 2);
+    assert_eq!(analysis.integrals.len(), 2);
     assert_eq!(analysis.signals.len(), 2);
     assert_eq!(analysis.signals[0].zone.id, "zone:x0-0:y0-1");
     Ok(())
@@ -274,6 +296,27 @@ fn rejects_invalid_two_dimensional_options() -> anyhow::Result<()> {
     );
 
     assert!(result.is_err());
+    Ok(())
+}
+
+#[test]
+fn analyzes_two_dimensional_spectrum_with_zone_integrals() -> anyhow::Result<()> {
+    let spectrum = Spectrum2D::new(
+        Axis::linear("1H", Unit::Ppm, 0.0, 4.0, 5)?,
+        Axis::linear("13C", Unit::Ppm, 0.0, 1.0, 2)?,
+        vec![1.0, 1.0, 0.0, 2.0, 2.0, 1.0, 1.0, 0.0, 2.0, 2.0],
+        Metadata::named("analysis-2d-integrals"),
+    )?;
+    let analysis = analyze_spectrum_2d(
+        &spectrum,
+        SpectrumAnalysis2DOptions::new()
+            .with_zone_options(ZoneDetectionOptions::new().with_threshold_abs(0.5)),
+    )?;
+
+    assert_eq!(analysis.zones.len(), 2);
+    assert_eq!(analysis.integrals.len(), 2);
+    assert!((analysis.integrals[0].volume - 1.0).abs() < 1.0e-12);
+    assert!((analysis.integrals[1].volume - 2.0).abs() < 1.0e-12);
     Ok(())
 }
 

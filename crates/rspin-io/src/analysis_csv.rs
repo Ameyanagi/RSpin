@@ -1,8 +1,8 @@
 //! CSV export for analysis workflow results.
 
 use rspin_analysis::{
-    DetectedMultiplet, DetectedRange, DetectedZone, OptimizedPeak, Peak, SignalSummary1D,
-    SignalSummary2D, SpectrumAnalysis1D, SpectrumAnalysis2D,
+    DetectedMultiplet, DetectedRange, DetectedZone, Integral, Integral2D, OptimizedPeak, Peak,
+    SignalSummary1D, SignalSummary2D, SpectrumAnalysis1D, SpectrumAnalysis2D,
 };
 use rspin_core::{RSpinError, Result};
 
@@ -31,8 +31,9 @@ impl SpectrumWriter<SpectrumAnalysis2D> for CsvAnalysis2D {
 /// Writes a one-dimensional analysis workflow result as multi-section CSV.
 ///
 /// The output contains separate `peaks`, `optimized_peaks`, `ranges`,
-/// `multiplets`, and `signals` sections, each with its own header row. Comment
-/// rows beginning with `#` identify the file format and section boundaries.
+/// `integrals`, `multiplets`, and `signals` sections, each with its own header
+/// row. Comment rows beginning with `#` identify the file format and section
+/// boundaries.
 ///
 /// # Errors
 ///
@@ -43,6 +44,7 @@ pub fn write_analysis1d_csv(analysis: &SpectrumAnalysis1D) -> Result<String> {
     write_peaks(&mut output, &analysis.peaks)?;
     write_optimized_peaks(&mut output, &analysis.optimized_peaks)?;
     write_ranges(&mut output, &analysis.ranges)?;
+    write_integrals_1d(&mut output, &analysis.integrals)?;
     write_multiplets(&mut output, &analysis.multiplets)?;
     write_signals_1d(&mut output, &analysis.signals)?;
     Ok(output)
@@ -50,9 +52,9 @@ pub fn write_analysis1d_csv(analysis: &SpectrumAnalysis1D) -> Result<String> {
 
 /// Writes a two-dimensional analysis workflow result as multi-section CSV.
 ///
-/// The output contains separate `zones` and `signals` sections, each with its
-/// own header row. Comment rows beginning with `#` identify the file format and
-/// section boundaries.
+/// The output contains separate `zones`, `integrals`, and `signals` sections,
+/// each with its own header row. Comment rows beginning with `#` identify the
+/// file format and section boundaries.
 ///
 /// # Errors
 ///
@@ -61,6 +63,7 @@ pub fn write_analysis2d_csv(analysis: &SpectrumAnalysis2D) -> Result<String> {
     let mut output = String::new();
     output.push_str("# format=RSpin Analysis 2D CSV\n");
     write_zones(&mut output, &analysis.zones)?;
+    write_integrals_2d(&mut output, &analysis.integrals)?;
     write_signals_2d(&mut output, &analysis.signals)?;
     Ok(output)
 }
@@ -144,6 +147,23 @@ fn write_ranges(output: &mut String, ranges: &[DetectedRange]) -> Result<()> {
                 range.active_points.to_string(),
                 finite("range max_abs_intensity", range.max_abs_intensity)?,
                 finite("range area", range.area)?,
+            ],
+        );
+    }
+    Ok(())
+}
+
+fn write_integrals_1d(output: &mut String, integrals: &[Integral]) -> Result<()> {
+    section(output, "integrals");
+    row(output, ["from", "to", "area", "segments"]);
+    for integral in integrals {
+        row(
+            output,
+            &[
+                finite("integral from", integral.region.from)?,
+                finite("integral to", integral.region.to)?,
+                finite("integral area", integral.area)?,
+                integral.segments.to_string(),
             ],
         );
     }
@@ -277,6 +297,28 @@ fn write_zones(output: &mut String, zones: &[DetectedZone]) -> Result<()> {
                 finite("zone max_abs_intensity", zone.max_abs_intensity)?,
                 finite("zone sum_intensity", zone.sum_intensity)?,
                 finite("zone sum_abs_intensity", zone.sum_abs_intensity)?,
+            ],
+        );
+    }
+    Ok(())
+}
+
+fn write_integrals_2d(output: &mut String, integrals: &[Integral2D]) -> Result<()> {
+    section(output, "integrals");
+    row(
+        output,
+        ["x_from", "x_to", "y_from", "y_to", "volume", "cells"],
+    );
+    for integral in integrals {
+        row(
+            output,
+            &[
+                finite("2D integral x_from", integral.region.x_from)?,
+                finite("2D integral x_to", integral.region.x_to)?,
+                finite("2D integral y_from", integral.region.y_from)?,
+                finite("2D integral y_to", integral.region.y_to)?,
+                finite("2D integral volume", integral.volume)?,
+                integral.cells.to_string(),
             ],
         );
     }
