@@ -7,6 +7,7 @@ use rspin_core::{RSpinError, Result};
 mod hamiltonian;
 mod model;
 mod spectrum;
+mod spectrum_2d;
 
 use hamiltonian::{basis_dimension, hamiltonian_matrix, observation_matrix, total_z_expectations};
 
@@ -14,6 +15,10 @@ pub use model::{ExactSpinOptions, ExactTransition, ScalarCoupling, SpinHalf, Spi
 pub use spectrum::{
     ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactTransitionContribution1D,
     decompose_exact_spin_half_1d, simulate_exact_spin_half_1d,
+};
+pub use spectrum_2d::{
+    ExactSpectrum2DOptions, ExactSpectrumDecomposition2D, ExactSpinPair,
+    ExactTransitionContribution2D, decompose_exact_spin_half_2d, simulate_exact_spin_half_2d,
 };
 
 /// Maximum number of spin-1/2 particles supported by the dense exact solver.

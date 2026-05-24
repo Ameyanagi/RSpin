@@ -1,9 +1,10 @@
-use rspin_core::Spectrum1D;
+use rspin_core::{Spectrum1D, Spectrum2D};
 
 #[cfg(feature = "first-order")]
 use super::super::simulate_first_order_multiplet_json;
 use super::super::{
-    decompose_exact_spin_half_spectrum_json, from_json, simulate_exact_spin_half_spectrum_json,
+    decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, from_json,
+    simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json,
 };
 
@@ -73,5 +74,32 @@ fn decomposes_exact_spectrum_json() -> anyhow::Result<()> {
         decomposition.contributions.len(),
         decomposition.transitions.len()
     );
+    Ok(())
+}
+
+#[test]
+fn simulates_exact_2d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = simulate_exact_spin_half_spectrum_2d_json(
+        r#"{"spins":[{"shift_ppm":1.0},{"shift_ppm":2.0}],"couplings":[]}"#,
+        r#"{"x_from_ppm":0.95,"x_to_ppm":1.05,"x_points":5,"y_from_ppm":1.95,"y_to_ppm":2.05,"y_points":5,"volume":1.0,"x_line_width_hz":1.0,"y_line_width_hz":1.0,"line_shape":"Lorentzian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10},"spin_pairs":[{"x_spin":0,"y_spin":1}]}"#,
+    )?;
+    let spectrum: Spectrum2D = from_json(&spectrum_json)?;
+
+    assert_eq!(spectrum.shape(), (5, 5));
+    assert!(spectrum.z[12] > spectrum.z[0]);
+    Ok(())
+}
+
+#[test]
+fn decomposes_exact_2d_spectrum_json() -> anyhow::Result<()> {
+    let decomposition_json = decompose_exact_spin_half_spectrum_2d_json(
+        r#"{"spins":[{"shift_ppm":7.0},{"shift_ppm":7.04}],"couplings":[{"spin_a":0,"spin_b":1,"j_hz":8.0}]}"#,
+        r#"{"x_from_ppm":6.95,"x_to_ppm":7.08,"x_points":16,"y_from_ppm":6.95,"y_to_ppm":7.08,"y_points":16,"volume":1.0,"x_line_width_hz":1.0,"y_line_width_hz":1.0,"line_shape":"Gaussian","transition_options":{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}}"#,
+    )?;
+    let decomposition: rspin_simulation::ExactSpectrumDecomposition2D =
+        from_json(&decomposition_json)?;
+
+    assert_eq!(decomposition.spectrum.shape(), (16, 16));
+    assert_eq!(decomposition.contributions.len(), 16);
     Ok(())
 }

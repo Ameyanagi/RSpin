@@ -31,13 +31,14 @@ pub use api::{
     cluster_bucket_matrix_1d_json, cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
     cluster_spectrum_matrix_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
     cut_cluster_result_at_distance_json, cut_cluster_result_to_count_json,
-    decompose_exact_spin_half_spectrum_json, detect_consensus_peaks_1d_json,
-    detect_consensus_ranges_1d_json, detect_multiplets_json, detect_ranges_json, detect_zones_json,
-    exponential_apodization_spectrum_1d_json, extract_contours_2d_json, fft_spectrum_1d_json,
-    fft_spectrum_2d_json, generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json,
-    integrate_region_2d_json, integrate_region_json, magnitude_spectrum_1d_json,
-    normalize_spectrum_1d_json, normalize_spectrum_2d_json, offset_spectrum_1d_json,
-    optimize_peaks_json, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
+    decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,
+    detect_consensus_peaks_1d_json, detect_consensus_ranges_1d_json, detect_multiplets_json,
+    detect_ranges_json, detect_zones_json, exponential_apodization_spectrum_1d_json,
+    extract_contours_2d_json, fft_spectrum_1d_json, fft_spectrum_2d_json,
+    generate_spectrum_matrix_1d_json, generate_spectrum_matrix_2d_json, integrate_region_2d_json,
+    integrate_region_json, magnitude_spectrum_1d_json, normalize_spectrum_1d_json,
+    normalize_spectrum_2d_json, offset_spectrum_1d_json, optimize_peaks_json,
+    pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
     pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, parse_jcamp_dx_1d_json,
     parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, pca_bucket_matrix_1d_json,
     pca_bucket_matrix_2d_json, pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json,
@@ -45,13 +46,14 @@ pub use api::{
     predict_molecule_with_element_rules_json, project_spectrum_2d_x_json,
     project_spectrum_2d_y_json, render_prediction_1d_json, render_prediction_2d_json,
     resample_spectrum_1d_json, resample_spectrum_2d_json, scale_spectrum_1d_json,
-    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, slice_spectrum_2d_x_at_y_index_json,
-    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
-    slice_spectrum_2d_y_at_x_json, subtract_baseline_spectrum_1d_json, summarize_signals_1d_json,
-    summarize_signals_2d_json, validate_assignment_set_json, validate_j_coupling_graph_json,
-    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
-    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
+    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_2d_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
+    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json,
+    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, summarize_signals_2d_json,
+    validate_assignment_set_json, validate_j_coupling_graph_json, validate_prediction_json,
+    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
+    zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
@@ -336,6 +338,36 @@ pub fn decompose_exact_spin_half_spectrum(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     decompose_exact_spin_half_spectrum_json(system_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Simulates an exact spin-1/2 system as a serialized two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, simulation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = simulateExactSpinHalfSpectrum2d)]
+pub fn simulate_exact_spin_half_spectrum_2d(
+    system_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    simulate_exact_spin_half_spectrum_2d_json(system_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Simulates exact spin-1/2 2D spectrum and contributions as JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, simulation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = decomposeExactSpinHalfSpectrum2d)]
+pub fn decompose_exact_spin_half_spectrum_2d(
+    system_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    decompose_exact_spin_half_spectrum_2d_json(system_json, options_json)
         .map_err(|error| js_error(&error))
 }
 

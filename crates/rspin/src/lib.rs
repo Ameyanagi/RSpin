@@ -71,10 +71,12 @@ pub use processing::{
     slice_y_at_x_index, subtract_baseline, zero_fill, zero_fill_2d,
 };
 pub use simulation::{
-    ExactSpectrumDecomposition1D, ExactSpectrumOptions, ExactSpinOptions, ExactTransition,
-    ExactTransitionContribution1D, LineShape, MAX_EXACT_SPINS, ScalarCoupling, Simulator, SpinHalf,
-    SpinHalfSystem, decompose_exact_spin_half_1d, exact_spin_half_transitions,
-    simulate_exact_spin_half_1d,
+    ExactSpectrum2DOptions, ExactSpectrumDecomposition1D, ExactSpectrumDecomposition2D,
+    ExactSpectrumOptions, ExactSpinOptions, ExactSpinPair, ExactTransition,
+    ExactTransitionContribution1D, ExactTransitionContribution2D, LineShape, MAX_EXACT_SPINS,
+    ScalarCoupling, Simulator, SpinHalf, SpinHalfSystem, decompose_exact_spin_half_1d,
+    decompose_exact_spin_half_2d, exact_spin_half_transitions, simulate_exact_spin_half_1d,
+    simulate_exact_spin_half_2d,
 };
 
 /// Common imports for routine `RSpin` library workflows.
@@ -90,38 +92,39 @@ pub mod prelude {
         BucketOptions2D, ClusterMerge, ConsensusPeak1D, ConsensusPeakMember1D,
         ConsensusPeakOptions, ConsensusRange1D, ConsensusRangeMember1D, ConsensusRangeOptions,
         Crop1D, Crop2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange,
-        DetectedZone, ElementShiftPredictor, ElementShiftRule, ExactSpectrumOptions,
-        ExactSpinOptions, ExactTransition, Experiment, FftDirection, Integral, Integral2D,
-        IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape, MatrixClusterCut,
-        MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
-        MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric,
-        MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult,
-        MatrixScaling, Metadata, Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak,
-        PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions, PeakPolarity,
-        PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
-        ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D,
-        ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions,
-        Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D, SignalSummary2D,
-        SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D, SpectralBucket2D,
-        Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D, SpectrumMatrix2D,
-        SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem, TrapezoidalIntegrator, Unit,
-        ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d, align_spectra_by_peak,
-        align_spectra_by_peak_to_matrix, apply_processing_recipe_1d,
+        DetectedZone, ElementShiftPredictor, ElementShiftRule, ExactSpectrum2DOptions,
+        ExactSpectrumOptions, ExactSpinOptions, ExactSpinPair, ExactTransition, Experiment,
+        FftDirection, Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling,
+        JCouplingGraph, LineShape, MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult,
+        MatrixClusteringOptions, MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage,
+        MatrixPairwiseMetric, MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions,
+        MatrixPcaResult, MatrixScaling, Metadata, Molecule, MultipletDetectionOptions,
+        MultipletKind, Nucleus, Peak, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions,
+        PeakPolarity, PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions,
+        PredictionSpectrumOptions, ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D,
+        ProcessingOperation2D, ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError,
+        RangeDetectionOptions, Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D,
+        SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D,
+        SpectralBucket2D, Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D,
+        SpectrumMatrix2D, SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem,
+        TrapezoidalIntegrator, Unit, ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d,
+        align_spectra_by_peak, align_spectra_by_peak_to_matrix, apply_processing_recipe_1d,
         apply_processing_recipe_1d_until, apply_processing_recipe_2d,
         apply_processing_recipe_2d_until, auto_phase_correct, auto_phase_correct_2d,
         bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d,
         cluster_bucket_matrix_1d, cluster_bucket_matrix_2d, cluster_matrix,
         cluster_spectrum_matrix_1d, cluster_spectrum_matrix_2d, crop_1d, crop_2d,
-        decompose_exact_spin_half_1d, detect_consensus_peaks_1d, detect_consensus_ranges_1d,
-        detect_multiplets, detect_ranges, detect_zones, exact_spin_half_transitions,
-        extract_contours, generate_spectrum_matrix_1d, generate_spectrum_matrix_2d,
-        integrate_region, integrate_region_2d, normalize_max_abs, pairwise_bucket_matrix_1d,
-        pairwise_bucket_matrix_2d, pairwise_matrix, pairwise_spectrum_matrix_1d,
-        pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d, pca_bucket_matrix_2d, pca_matrix,
-        pca_spectrum_matrix_1d, pca_spectrum_matrix_2d, pick_peaks, predict_molecule_with_rules,
-        read_jcamp_dx_1d, read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv,
-        read_spectrum2d_json, render_prediction_1d, render_prediction_2d, resample_1d, resample_2d,
-        scale_intensity, simulate_exact_spin_half_1d, slice_x_at_y, slice_y_at_x,
+        decompose_exact_spin_half_1d, decompose_exact_spin_half_2d, detect_consensus_peaks_1d,
+        detect_consensus_ranges_1d, detect_multiplets, detect_ranges, detect_zones,
+        exact_spin_half_transitions, extract_contours, generate_spectrum_matrix_1d,
+        generate_spectrum_matrix_2d, integrate_region, integrate_region_2d, normalize_max_abs,
+        pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d, pairwise_matrix,
+        pairwise_spectrum_matrix_1d, pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d,
+        pca_bucket_matrix_2d, pca_matrix, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
+        pick_peaks, predict_molecule_with_rules, read_jcamp_dx_1d, read_spectrum1d_csv,
+        read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d,
+        render_prediction_2d, resample_1d, resample_2d, scale_intensity,
+        simulate_exact_spin_half_1d, simulate_exact_spin_half_2d, slice_x_at_y, slice_y_at_x,
         subtract_baseline, summarize_signals_2d, write_jcamp_dx_1d, write_spectrum1d_csv,
         write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
     };
@@ -281,6 +284,23 @@ mod tests {
 
         assert_eq!(prediction.signals_1d.len(), 2);
         assert_eq!(prediction.correlations_2d.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prelude_supports_exact_2d_simulation() -> Result<()> {
+        let system = SpinHalfSystem::new().with_spin(1.0).with_spin(2.0);
+        let spectrum = simulate_exact_spin_half_2d(
+            &system,
+            &ExactSpectrum2DOptions::new()
+                .with_x_ppm_range(0.95, 1.05)
+                .with_y_ppm_range(1.95, 2.05)
+                .with_points(5, 5)
+                .with_spin_pair(0, 1),
+        )?;
+
+        assert_eq!(spectrum.shape(), (5, 5));
+        assert!(spectrum.z[12] > spectrum.z[0]);
         Ok(())
     }
 
