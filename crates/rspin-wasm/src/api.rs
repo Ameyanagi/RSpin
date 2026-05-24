@@ -26,7 +26,7 @@ use rspin_analysis::{
     summarize_signals_2d,
 };
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
-use rspin_io::read_jcamp_dx_1d;
+use rspin_io::{read_jcamp_dx_1d, read_nmrml_1d_str};
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
 pub use assignments::{
@@ -97,6 +97,16 @@ pub use workflow::{analyze_spectrum_1d_json, analyze_spectrum_2d_json};
 /// Returns an error when parsing or serialization fails.
 pub fn parse_jcamp_dx_1d_json(input: &str) -> Result<String> {
     let spectrum = read_jcamp_dx_1d(input)?;
+    to_json(&spectrum)
+}
+
+/// Parses nmrML text into serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_nmrml_1d_json(input: &str) -> Result<String> {
+    let spectrum = read_nmrml_1d_str(input)?;
     to_json(&spectrum)
 }
 

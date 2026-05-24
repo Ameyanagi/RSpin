@@ -32,6 +32,43 @@ fn parses_jcamp_to_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn parses_nmrml_to_json() -> anyhow::Result<()> {
+    let json = parse_nmrml_1d_json(
+        r#"
+        <nmrML version="v1.0.rc1" xmlns="http://nmrml.org/schema">
+          <acquisition>
+            <acquisition1D>
+              <acquisitionParameterSet numberOfScans="1" numberOfSteadyStateScans="0">
+                <sampleAcquisitionTemperature value="298.15" unitName="kelvin"/>
+                <DirectDimensionParameterSet decoupled="false" numberOfDataPoints="3">
+                  <acquisitionNucleus cvRef="CHEBI" accession="CHEBI:49637" name="hydrogen atom"/>
+                  <irradiationFrequency value="600.0" unitName="megaHertz"/>
+                </DirectDimensionParameterSet>
+              </acquisitionParameterSet>
+            </acquisition1D>
+          </acquisition>
+          <spectrumList>
+            <spectrum1D id="s1" numberOfDataPoints="3">
+              <spectrumDataArray compressed="true" encodedLength="28" byteFormat="float64">eJxjYACBD/YMEHAAQvE4AAAcPwI8</spectrumDataArray>
+              <xAxis unitName="parts per million" startValue="10.0" endValue="8.0"/>
+            </spectrum1D>
+          </spectrumList>
+        </nmrML>
+        "#,
+    )?;
+    let spectrum: Spectrum1D = from_json(&json)?;
+
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.x.values, vec![10.0, 9.0, 8.0]);
+    assert_eq!(spectrum.intensities, vec![1.0, -2.0, 3.5]);
+    assert_eq!(
+        spectrum.metadata.nucleus,
+        Some(rspin_core::Nucleus::Hydrogen1)
+    );
+    Ok(())
+}
+
+#[test]
 fn scales_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = parse_jcamp_dx_1d_json(
         "\
