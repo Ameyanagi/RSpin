@@ -25,6 +25,12 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 ```
 
+## Optional Features
+
+- `external-baselines`: enables the optional Git-pinned `baselines` crate for
+  additional baseline correction methods. It is off by default so the core
+  library dependency graph stays small and reviewable.
+
 ## License
 
 Licensed under either of:
@@ -33,4 +39,3 @@ Licensed under either of:
 - MIT license
 
 at your option.
-

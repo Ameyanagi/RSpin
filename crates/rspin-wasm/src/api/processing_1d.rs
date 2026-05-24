@@ -239,6 +239,13 @@ enum BaselineMethodJson {
         max_iter: usize,
         tolerance: f64,
     },
+    #[cfg(feature = "external-baselines")]
+    BaselinesAsls {
+        lambda: f64,
+        p: f64,
+        max_iter: usize,
+        tolerance: f64,
+    },
 }
 
 impl From<BaselineMethodJson> for BaselineMethod {
@@ -254,6 +261,18 @@ impl From<BaselineMethodJson> for BaselineMethod {
                 max_iter,
                 tolerance,
             } => Self::WhittakerAsls {
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            },
+            #[cfg(feature = "external-baselines")]
+            BaselineMethodJson::BaselinesAsls {
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            } => Self::BaselinesAsls {
                 lambda,
                 p,
                 max_iter,

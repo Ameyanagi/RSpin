@@ -66,6 +66,27 @@ fn whittaker_asls_estimates_under_positive_peak() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "external-baselines")]
+#[test]
+fn external_baselines_asls_is_feature_gated() -> anyhow::Result<()> {
+    let spectrum = spectrum(&[1.0, 1.0, 4.0, 1.0, 1.0])?;
+    let method = BaselineMethod::BaselinesAsls {
+        lambda: 1.0e4,
+        p: 0.01,
+        max_iter: 25,
+        tolerance: 1.0e-6,
+    };
+    let fit = fit_baseline(&spectrum, method)?;
+    let processed = subtract_baseline(&spectrum, method)?;
+    let json = serde_json::to_string(&method)?;
+
+    assert!(fit.baseline[2] < 4.0);
+    assert!(processed.intensities[2] > 2.0);
+    assert_eq!(processed.processing[0].operation, "baseline_baselines_asls");
+    assert!(json.contains("baselines_asls"));
+    Ok(())
+}
+
 #[test]
 fn rejects_invalid_whittaker_options() -> anyhow::Result<()> {
     let spectrum = spectrum(&[1.0, 2.0, 3.0])?;

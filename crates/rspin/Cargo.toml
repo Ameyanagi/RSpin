@@ -6,6 +6,10 @@ license.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
+[features]
+default = []
+external-baselines = ["rspin-processing/external-baselines"]
+
 [dependencies]
 rspin-analysis.workspace = true
 rspin-core.workspace = true
@@ -16,4 +20,3 @@ rspin-simulation.workspace = true
 
 [lints]
 workspace = true
-

@@ -155,6 +155,31 @@ fn apodizes_and_subtracts_baseline_json() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "external-baselines")]
+#[test]
+fn subtracts_external_baselines_asls_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&Spectrum1D::new(
+        Axis::linear("x", Unit::Ppm, 0.0, 4.0, 5)?,
+        vec![1.0, 1.0, 4.0, 1.0, 1.0],
+        Metadata::default(),
+    )?)?;
+    let corrected_json = subtract_baseline_spectrum_1d_json(
+        &spectrum_json,
+        r#"{"method":"baselines_asls","lambda":10000.0,"p":0.01,"max_iter":25,"tolerance":0.000001}"#,
+    )?;
+    let corrected: Spectrum1D = from_json(&corrected_json)?;
+
+    assert!(corrected.intensities[2] > 2.0);
+    assert_eq!(
+        corrected
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("baseline_baselines_asls")
+    );
+    Ok(())
+}
+
 #[test]
 fn applies_processing_recipe_1d_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&real_spectrum()?)?;

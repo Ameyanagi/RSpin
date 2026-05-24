@@ -6,7 +6,12 @@ license.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
+[features]
+default = []
+external-baselines = ["dep:baselines"]
+
 [dependencies]
+baselines = { workspace = true, optional = true }
 nalgebra.workspace = true
 rspin-core.workspace = true
 rustfft.workspace = true

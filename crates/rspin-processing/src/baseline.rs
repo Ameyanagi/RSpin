@@ -31,6 +31,18 @@ pub enum BaselineMethod {
         /// Relative weight-change tolerance.
         tolerance: f64,
     },
+    /// Asymmetric least-squares smoothing from the optional `baselines` crate.
+    #[cfg(feature = "external-baselines")]
+    BaselinesAsls {
+        /// Smoothness penalty. Larger values produce smoother baselines.
+        lambda: f64,
+        /// Asymmetry parameter in `(0, 1)`.
+        p: f64,
+        /// Maximum number of reweighting iterations.
+        max_iter: usize,
+        /// Relative weight-change tolerance.
+        tolerance: f64,
+    },
 }
 
 impl BaselineMethod {
@@ -50,27 +62,28 @@ impl BaselineMethod {
                 p,
                 max_iter,
                 tolerance,
-            } => {
-                if len < 3 {
-                    return Err(RSpinError::InvalidSpectrum {
-                        message: "Whittaker baseline correction requires at least three points"
-                            .to_owned(),
-                    });
-                }
-                ensure_positive("lambda", lambda)?;
-                if !p.is_finite() || p <= 0.0 || p >= 1.0 {
-                    return Err(RSpinError::InvalidSpectrum {
-                        message: "asymmetry parameter p must be finite and between 0 and 1"
-                            .to_owned(),
-                    });
-                }
-                if max_iter == 0 {
-                    return Err(RSpinError::InvalidSpectrum {
-                        message: "maximum iterations must be positive".to_owned(),
-                    });
-                }
-                ensure_positive("tolerance", tolerance)
-            }
+            } => validate_asls(
+                "Whittaker baseline correction",
+                len,
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            ),
+            #[cfg(feature = "external-baselines")]
+            Self::BaselinesAsls {
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            } => validate_asls(
+                "baselines AsLS correction",
+                len,
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            ),
         }
     }
 
@@ -79,6 +92,8 @@ impl BaselineMethod {
             Self::Constant { .. } => "baseline_constant",
             Self::MovingMinimum { .. } => "baseline_moving_minimum",
             Self::WhittakerAsls { .. } => "baseline_whittaker_asls",
+            #[cfg(feature = "external-baselines")]
+            Self::BaselinesAsls { .. } => "baseline_baselines_asls",
         }
     }
 
@@ -95,6 +110,15 @@ impl BaselineMethod {
                 tolerance,
             } => format!(
                 "method=whittaker_asls,lambda={lambda},p={p},max_iter={max_iter},tolerance={tolerance}"
+            ),
+            #[cfg(feature = "external-baselines")]
+            Self::BaselinesAsls {
+                lambda,
+                p,
+                max_iter,
+                tolerance,
+            } => format!(
+                "method=baselines_asls,lambda={lambda},p={p},max_iter={max_iter},tolerance={tolerance}"
             ),
         }
     }
@@ -179,6 +203,13 @@ pub fn fit_baseline(spectrum: &Spectrum1D, method: BaselineMethod) -> Result<Bas
             max_iter,
             tolerance,
         } => whittaker_asls_baseline(&spectrum.intensities, lambda, p, max_iter, tolerance)?,
+        #[cfg(feature = "external-baselines")]
+        BaselineMethod::BaselinesAsls {
+            lambda,
+            p,
+            max_iter,
+            tolerance,
+        } => baselines_asls_baseline(&spectrum.intensities, lambda, p, max_iter, tolerance)?,
     };
     let corrected = spectrum
         .intensities
@@ -317,6 +348,62 @@ fn relative_change(previous: &[f64], current: &[f64]) -> f64 {
         .sum::<f64>()
         .sqrt();
     numerator / denominator.max(f64::EPSILON)
+}
+
+#[cfg(feature = "external-baselines")]
+fn baselines_asls_baseline(
+    intensities: &[f64],
+    lambda: f64,
+    p: f64,
+    max_iter: usize,
+    tolerance: f64,
+) -> Result<(Vec<f64>, BaselineReport)> {
+    let fit = baselines::Baseline::new(intensities)
+        .asls()
+        .lambda(lambda)
+        .p(p)
+        .max_iter(max_iter)
+        .tol(tolerance)
+        .fit()
+        .map_err(|error| RSpinError::InvalidSpectrum {
+            message: format!("baselines AsLS correction failed: {error}"),
+        })?;
+
+    Ok((
+        fit.baseline,
+        BaselineReport {
+            iterations: fit.report.iterations,
+            converged: fit.report.converged,
+            tolerance: fit.report.tolerance,
+        },
+    ))
+}
+
+fn validate_asls(
+    method: &'static str,
+    len: usize,
+    lambda: f64,
+    p: f64,
+    max_iter: usize,
+    tolerance: f64,
+) -> Result<()> {
+    if len < 3 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!("{method} requires at least three points"),
+        });
+    }
+    ensure_positive("lambda", lambda)?;
+    if !p.is_finite() || p <= 0.0 || p >= 1.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "asymmetry parameter p must be finite and between 0 and 1".to_owned(),
+        });
+    }
+    if max_iter == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "maximum iterations must be positive".to_owned(),
+        });
+    }
+    ensure_positive("tolerance", tolerance)
 }
 
 fn ensure_finite(field: &'static str, value: f64) -> Result<()> {
