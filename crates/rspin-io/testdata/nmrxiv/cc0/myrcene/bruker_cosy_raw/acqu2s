@@ -1,0 +1,18 @@
+##TITLE= Parameter file, TOPSPIN		Version 2.1
+##JCAMPDX= 5.0
+##DATATYPE= Parameter Values
+##NPOINTS= 513	$$ modification sequence number
+##ORIGIN= Bruker BioSpin GmbH
+##OWNER= lankindc
+$$ 2019-01-09 09:37:49.378 -0600  lankindc@nmr900
+$$ /opt/topspin2/data/lankindc/nmr/DCL_0441_900_NanalysisSamples/11/acqu2s
+$$ process /opt/topspin2/prog/mod/go
+##$BF1= 900.074
+##$FnMODE= 1
+##$NUC1= <1H>
+##$O1= 2700.222
+##$SFO1= 900.076700222
+##$SW= 5.9861
+##$SW_h= 5387.94913519891
+##$TD= 512
+##END=
