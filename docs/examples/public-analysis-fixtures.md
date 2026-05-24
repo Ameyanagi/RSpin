@@ -112,3 +112,14 @@ fn analyze_and_export_csv(spectrum: &Spectrum1D) -> Result<String> {
     write_analysis1d_csv(&analysis)
 }
 ```
+
+Use JSON IO when an analysis result should round-trip without losing structure:
+
+```rust
+use rspin::prelude::*;
+
+fn save_and_load_analysis(analysis: &SpectrumAnalysis1D) -> Result<SpectrumAnalysis1D> {
+    let json = write_analysis1d_json(analysis)?;
+    read_analysis1d_json(&json)
+}
+```

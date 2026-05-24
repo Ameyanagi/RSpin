@@ -47,11 +47,12 @@ pub use core::{
     RSpinError, Result, Spectrum1D, Spectrum2D, SpectrumAnnotation, Unit,
 };
 pub use io::{
-    CsvAnalysis1D, CsvAnalysis2D, CsvSpectrum1D, CsvSpectrum2D, JcampDx, JsonSpectrum1D,
-    JsonSpectrum2D, SpectrumReader, SpectrumWriter, read_jcamp_dx_1d, read_spectrum1d_csv,
+    CsvAnalysis1D, CsvAnalysis2D, CsvSpectrum1D, CsvSpectrum2D, JcampDx, JsonAnalysis1D,
+    JsonAnalysis2D, JsonSpectrum1D, JsonSpectrum2D, SpectrumReader, SpectrumWriter,
+    read_analysis1d_json, read_analysis2d_json, read_jcamp_dx_1d, read_spectrum1d_csv,
     read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, write_analysis1d_csv,
-    write_analysis2d_csv, write_jcamp_dx_1d, write_spectrum1d_csv, write_spectrum1d_json,
-    write_spectrum2d_csv, write_spectrum2d_json,
+    write_analysis1d_json, write_analysis2d_csv, write_analysis2d_json, write_jcamp_dx_1d,
+    write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 pub use prediction::{
     BondCorrelationRule, ElementShiftPredictor, ElementShiftRule, Experiment,
@@ -103,8 +104,8 @@ pub mod prelude {
         DetectedMultiplet, DetectedRange, DetectedZone, ElementShiftPredictor, ElementShiftRule,
         ExactSpectrum2DOptions, ExactSpectrumOptions, ExactSpinOptions, ExactSpinPair,
         ExactTransition, Experiment, FftDirection, Integral, Integral2D, IntegralRegion,
-        IntegralRegion2D, JCoupling, JCouplingGraph, LineShape, MatrixClusterCut,
-        MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
+        IntegralRegion2D, JCoupling, JCouplingGraph, JsonAnalysis1D, JsonAnalysis2D, LineShape,
+        MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
         MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric,
         MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult,
         MatrixScaling, Metadata, Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak,
@@ -135,13 +136,13 @@ pub mod prelude {
         pairwise_bucket_matrix_1d, pairwise_bucket_matrix_2d, pairwise_matrix,
         pairwise_spectrum_matrix_1d, pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d,
         pca_bucket_matrix_2d, pca_matrix, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
-        pick_peaks, predict_molecule_with_rules, read_jcamp_dx_1d, read_spectrum1d_csv,
-        read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json, render_prediction_1d,
-        render_prediction_2d, resample_1d, resample_2d, scale_intensity,
-        simulate_exact_spin_half_1d, simulate_exact_spin_half_2d, slice_x_at_y, slice_y_at_x,
-        subtract_baseline, summarize_signals_2d, write_analysis1d_csv, write_analysis2d_csv,
-        write_jcamp_dx_1d, write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv,
-        write_spectrum2d_json,
+        pick_peaks, predict_molecule_with_rules, read_analysis1d_json, read_analysis2d_json,
+        read_jcamp_dx_1d, read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv,
+        read_spectrum2d_json, render_prediction_1d, render_prediction_2d, resample_1d, resample_2d,
+        scale_intensity, simulate_exact_spin_half_1d, simulate_exact_spin_half_2d, slice_x_at_y,
+        slice_y_at_x, subtract_baseline, summarize_signals_2d, write_analysis1d_csv,
+        write_analysis1d_json, write_analysis2d_csv, write_analysis2d_json, write_jcamp_dx_1d,
+        write_spectrum1d_csv, write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
     };
 }
 
