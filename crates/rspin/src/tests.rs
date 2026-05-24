@@ -259,12 +259,14 @@ H1/C1, I=1.0
     let signal_assignments =
         nmredata_1d_signals_to_assignment_set(&trait_record, Nucleus::Hydrogen1)?;
     assert_eq!(signal_assignments.len(), 1);
+    assert_eq!(analysis.signal_assignment_set, signal_assignments);
     assert!(matches!(
         signal_assignments.assignments[0].target,
         AssignmentTarget::Peak1D { index: 0, x } if (x - 4.2).abs() < 1.0e-12
     ));
     let signal_assignments_2d = nmredata_2d_signals_to_assignment_set(&trait_record)?;
     assert_eq!(signal_assignments_2d.len(), 1);
+    assert_eq!(analysis.signal_assignment_set_2d, signal_assignments_2d);
     assert_eq!(
         signal_assignments_2d.assignments[0].target,
         AssignmentTarget::Zone2D {

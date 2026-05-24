@@ -255,6 +255,7 @@ Hcombo/C2, I=2.4
     let free_signal_assignments =
         nmredata_1d_signals_to_assignment_set(&record, Nucleus::Hydrogen1)?;
     assert_eq!(free_signal_assignments, signal_assignments);
+    assert_eq!(analysis.signal_assignment_set, signal_assignments);
 
     let signal_assignments_2d = record.to_2d_signal_assignment_set()?;
     assert_eq!(signal_assignments_2d.len(), 2);
@@ -277,6 +278,7 @@ Hcombo/C2, I=2.4
     );
     let free_2d_signal_assignments = nmredata_2d_signals_to_assignment_set(&record)?;
     assert_eq!(free_2d_signal_assignments, signal_assignments_2d);
+    assert_eq!(analysis.signal_assignment_set_2d, signal_assignments_2d);
     Ok(())
 }
 
@@ -304,6 +306,10 @@ H2, H1, 7.0
     let error = duplicate_signal_labels
         .to_signal_assignment_set(Nucleus::Hydrogen1)
         .expect_err("duplicate signal labels should fail");
+    assert!(matches!(error, RSpinError::InvalidAssignment { .. }));
+    let error = duplicate_signal_labels
+        .to_analysis(Nucleus::Hydrogen1)
+        .expect_err("duplicate signal labels should fail in combined analysis");
     assert!(matches!(error, RSpinError::InvalidAssignment { .. }));
 
     let error = read_nmredata_str(

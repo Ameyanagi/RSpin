@@ -14,8 +14,14 @@ use super::NmreDataRecord;
 /// Analysis models derived from one parsed `NMReDATA` record.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct NmreDataAnalysis {
-    /// Converted one-dimensional assignment set.
+    /// Converted chemical-shift assignment set.
     pub assignment_set: AssignmentSet,
+    /// Converted one-dimensional signal assignment set.
+    #[serde(default)]
+    pub signal_assignment_set: AssignmentSet,
+    /// Converted two-dimensional signal assignment set.
+    #[serde(default)]
+    pub signal_assignment_set_2d: AssignmentSet,
     /// Converted J-coupling graph.
     pub j_coupling_graph: JCouplingGraph,
 }
@@ -98,6 +104,8 @@ pub fn nmredata_to_analysis(
     let nucleus = nucleus.into();
     Ok(NmreDataAnalysis {
         assignment_set: nmredata_assignments_to_assignment_set(record, nucleus.clone())?,
+        signal_assignment_set: nmredata_1d_signals_to_assignment_set(record, nucleus.clone())?,
+        signal_assignment_set_2d: nmredata_2d_signals_to_assignment_set(record)?,
         j_coupling_graph: nmredata_couplings_to_j_coupling_graph(record, nucleus)?,
     })
 }
