@@ -30,8 +30,8 @@ use rspin_io::{
     read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
     read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
     read_spectrum1d_json, read_spectrum1d_text, read_spectrum2d_json, read_spectrum2d_text,
-    write_assignment_set_json, write_j_coupling_graph_json, write_nmredata_record,
-    write_nmredata_record_json, write_nmredata_records,
+    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d,
+    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum1d_json, write_spectrum2d_json,
 };
@@ -108,6 +108,16 @@ pub use workflow::{analyze_spectrum_1d_json, analyze_spectrum_2d_json};
 pub fn parse_jcamp_dx_1d_json(input: &str) -> Result<String> {
     let spectrum = read_jcamp_dx_1d(input)?;
     spectrum1d_to_json(&spectrum)
+}
+
+/// Serializes `Spectrum1D` JSON into JCAMP-DX text.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or JCAMP-DX serialization fails.
+pub fn write_jcamp_dx_1d_json(spectrum_json: &str) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    write_jcamp_dx_1d(&spectrum)
 }
 
 /// Parses nmrML text into serialized `Spectrum1D` JSON.

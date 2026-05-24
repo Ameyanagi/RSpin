@@ -37,6 +37,25 @@ fn parses_jcamp_to_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn writes_jcamp_from_json() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new(
+        Axis::linear_ppm(10.0, 8.0, 3)?,
+        vec![1.0, -2.0, 3.5],
+        Metadata::named("wasm jcamp"),
+    )?;
+    let text = write_jcamp_dx_1d_json(&to_json(&spectrum)?)?;
+    let parsed_json = parse_jcamp_dx_1d_json(&text)?;
+    let parsed = spectrum1d_from_json(&parsed_json)?;
+
+    assert!(text.contains("##TITLE=wasm jcamp"));
+    assert!(text.contains("##JCAMP-DX=5.00"));
+    assert_eq!(parsed.x.unit, spectrum.x.unit);
+    assert_eq!(parsed.x.values, spectrum.x.values);
+    assert_eq!(parsed.intensities, spectrum.intensities);
+    Ok(())
+}
+
+#[test]
 fn parses_nmrml_to_json() -> anyhow::Result<()> {
     let json = parse_nmrml_1d_json(
         r#"

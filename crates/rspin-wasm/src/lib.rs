@@ -65,8 +65,8 @@ pub use api::{
     validate_assignment_set_json, validate_exact_spectrum_2d_options_json,
     validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
     validate_exact_spin_options_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_nmredata_json,
-    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
+    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_jcamp_dx_1d_json,
+    write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
     write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
     zero_fill_spectrum_2d_json,
 };
@@ -116,6 +116,16 @@ pub use workflow::{analyze_spectrum_1d, analyze_spectrum_2d};
 #[wasm_bindgen(js_name = parseJcampDx1d)]
 pub fn parse_jcamp_dx_1d(input: &str) -> std::result::Result<String, JsValue> {
     parse_jcamp_dx_1d_json(input).map_err(|error| js_error(&error))
+}
+
+/// Serializes one-dimensional spectrum JSON into JCAMP-DX text.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization or serialization fails.
+#[wasm_bindgen(js_name = writeJcampDx1d)]
+pub fn write_jcamp_dx_1d(spectrum_json: &str) -> std::result::Result<String, JsValue> {
+    write_jcamp_dx_1d_json(spectrum_json).map_err(|error| js_error(&error))
 }
 
 /// Picks peaks from a serialized one-dimensional spectrum.
