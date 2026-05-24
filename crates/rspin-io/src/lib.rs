@@ -45,17 +45,20 @@ pub use assignment_json::{
 };
 pub use auto::{
     AutoSpectrum1DPath, AutoSpectrum1DPathWriter, AutoSpectrum1DText, AutoSpectrum2DPath,
-    AutoSpectrum2DPathWriter, AutoSpectrum2DText, Spectrum1DPathFormat, Spectrum1DTextWriter,
-    Spectrum1DWriteFormat, Spectrum1DWritePathFormat, Spectrum2DPathFormat, Spectrum2DTextWriter,
+    AutoSpectrum2DPathWriter, AutoSpectrum2DText, Spectrum1DBytes, Spectrum1DBytesFormat,
+    Spectrum1DPathFormat, Spectrum1DTextWriter, Spectrum1DWriteFormat, Spectrum1DWritePathFormat,
+    Spectrum2DBytes, Spectrum2DBytesFormat, Spectrum2DPathFormat, Spectrum2DTextWriter,
     Spectrum2DWriteFormat, Spectrum2DWritePathFormat, SpectrumTextFormat,
     detect_spectrum_text_format, detect_spectrum1d_path_format,
     detect_spectrum1d_write_path_format, detect_spectrum2d_path_format,
-    detect_spectrum2d_write_path_format, parse_spectrum_text_format, parse_spectrum1d_path_format,
-    parse_spectrum1d_write_format, parse_spectrum1d_write_path_format,
+    detect_spectrum2d_write_path_format, parse_spectrum_text_format, parse_spectrum1d_bytes_format,
+    parse_spectrum1d_path_format, parse_spectrum1d_write_format,
+    parse_spectrum1d_write_path_format, parse_spectrum2d_bytes_format,
     parse_spectrum2d_path_format, parse_spectrum2d_write_format,
-    parse_spectrum2d_write_path_format, read_spectrum1d_path, read_spectrum1d_path_as,
-    read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_path, read_spectrum2d_path_as,
-    read_spectrum2d_text, read_spectrum2d_text_as, write_spectrum1d_path, write_spectrum1d_path_as,
+    parse_spectrum2d_write_path_format, read_spectrum1d_bytes_as, read_spectrum1d_path,
+    read_spectrum1d_path_as, read_spectrum1d_text, read_spectrum1d_text_as,
+    read_spectrum2d_bytes_as, read_spectrum2d_path, read_spectrum2d_path_as, read_spectrum2d_text,
+    read_spectrum2d_text_as, write_spectrum1d_path, write_spectrum1d_path_as,
     write_spectrum1d_text, write_spectrum2d_path, write_spectrum2d_path_as, write_spectrum2d_text,
 };
 pub use bruker::{

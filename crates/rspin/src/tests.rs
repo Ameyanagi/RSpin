@@ -231,15 +231,39 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
     let agilent_error = read_agilent_fid_1d_bytes("", b"not fid")
         .expect_err("invalid Agilent FID bytes should fail");
     assert!(matches!(agilent_error, RSpinError::Parse { .. }));
+    assert_eq!(
+        parse_spectrum1d_bytes_format("varian phasefile")?,
+        Spectrum1DBytesFormat::AgilentProcessed
+    );
     let bruker_info = inspect_bruker_parameter_file("##JCAMPDX= 5.00\n##DATATYPE= Parameters\n")?;
     assert_eq!(bruker_info.data_type.as_deref(), Some("Parameters"));
     assert!(bruker_info.is_supported_by_current_readers());
     let bruker_error =
         read_bruker_fid_1d_bytes("", b"not fid").expect_err("invalid Bruker FID bytes should fail");
     assert!(matches!(bruker_error, RSpinError::Parse { .. }));
+    assert_eq!(
+        "bruker 1r".parse::<Spectrum1DBytesFormat>()?,
+        Spectrum1DBytesFormat::BrukerProcessed
+    );
+    let routed_error = Spectrum1DBytes::new(Spectrum1DBytesFormat::BrukerFid, b"not fid")
+        .read()
+        .expect_err("missing routed Bruker parameters should fail");
+    assert!(matches!(routed_error, RSpinError::Parse { .. }));
     let bruker_ser_error = read_bruker_ser_2d_bytes("", "", b"not ser")
         .expect_err("invalid Bruker SER bytes should fail");
     assert!(matches!(bruker_ser_error, RSpinError::Parse { .. }));
+    assert_eq!(
+        parse_spectrum2d_bytes_format("ser")?,
+        Spectrum2DBytesFormat::BrukerSer
+    );
+    let routed_2d_error = read_spectrum2d_bytes_as(
+        b"not ser",
+        Spectrum2DBytesFormat::BrukerSer,
+        Some("##$TD= 4\n"),
+        None,
+    )
+    .expect_err("missing routed Bruker 2D indirect parameters should fail");
+    assert!(matches!(routed_2d_error, RSpinError::Parse { .. }));
     let jeol_version = JeolJdfVersion::new(1, 2);
     assert_eq!(jeol_version.raw, "1.2");
     assert!(jeol_version.is_supported_by_current_reader());

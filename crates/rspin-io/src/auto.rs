@@ -13,8 +13,14 @@ use crate::{
     read_spectrum2d_json,
 };
 
+mod bytes;
 mod writer;
 
+pub use bytes::{
+    Spectrum1DBytes, Spectrum1DBytesFormat, Spectrum2DBytes, Spectrum2DBytesFormat,
+    parse_spectrum1d_bytes_format, parse_spectrum2d_bytes_format, read_spectrum1d_bytes_as,
+    read_spectrum2d_bytes_as,
+};
 pub use writer::{
     Spectrum1DTextWriter, Spectrum1DWriteFormat, Spectrum2DTextWriter, Spectrum2DWriteFormat,
     parse_spectrum1d_write_format, parse_spectrum2d_write_format, write_spectrum1d_text,
