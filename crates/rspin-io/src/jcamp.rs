@@ -311,13 +311,28 @@ fn parse_float(field: &'static str, value: &str) -> Result<f64> {
 }
 
 fn parse_usize(field: &'static str, value: &str) -> Result<usize> {
-    value
-        .trim()
-        .parse::<usize>()
-        .map_err(|error| RSpinError::Parse {
-            format: "JCAMP-DX",
-            message: format!("{field}: {error}"),
-        })
+    let value = value.trim();
+    if let Ok(parsed) = value.parse::<usize>() {
+        return Ok(parsed);
+    }
+
+    parse_decimal_usize(value).ok_or_else(|| RSpinError::Parse {
+        format: "JCAMP-DX",
+        message: format!("{field}: expected a non-negative integer"),
+    })
+}
+
+fn parse_decimal_usize(value: &str) -> Option<usize> {
+    let unsigned = if let Some(value) = value.strip_prefix('+') {
+        value
+    } else {
+        value
+    };
+    let (whole, fraction) = unsigned.split_once('.')?;
+    if whole.is_empty() || !fraction.chars().all(|character| character == '0') {
+        return None;
+    }
+    whole.parse::<usize>().ok()
 }
 
 fn scale_value(field: &'static str, value: f64, factor: f64) -> Result<f64> {

@@ -54,6 +54,28 @@ fn applies_yfactor_to_xydata_values() -> anyhow::Result<()> {
 }
 
 #[test]
+fn accepts_integer_decimal_npoints_label() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=decimal count
+##XUNITS=PPM
+##FIRSTX=4
+##LASTX=1
+##NPOINTS=4.000000000
+##XYDATA=(X++(Y..Y))
+0 1 2
+2 3 4
+##END=
+";
+    let spectrum = read_jcamp_dx_1d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("decimal count"));
+    assert_eq!(spectrum.len(), 4);
+    assert_axis_close(&spectrum.x.values, &[4.0, 3.0, 2.0, 1.0]);
+    assert_eq!(spectrum.intensities, vec![1.0, 2.0, 3.0, 4.0]);
+    Ok(())
+}
+
+#[test]
 fn reads_scaled_xypoints_spectrum() -> anyhow::Result<()> {
     let input = "\
 ##TITLE=scaled points
