@@ -11,6 +11,7 @@ mod one_d;
 mod pipeline;
 mod pipeline_2d;
 mod resample_1d;
+mod resample_2d;
 mod traits;
 mod transform;
 mod transform_2d;
@@ -35,6 +36,7 @@ pub use one_d::{
 pub use pipeline::{ProcessSpectrum1D, Spectrum1DPipeline};
 pub use pipeline_2d::{ProcessSpectrum2D, Spectrum2DPipeline};
 pub use resample_1d::{Resample1D, resample_1d};
+pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
 pub use transform::{
     ExponentialApodization, Fft1D, FftDirection, Magnitude, PhaseCorrection,

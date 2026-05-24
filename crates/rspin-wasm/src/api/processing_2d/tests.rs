@@ -63,6 +63,39 @@ fn crops_2d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn resamples_2d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&grid_spectrum()?)?;
+    let columns_json = to_json(&Axis::linear("x", Unit::Ppm, 0.0, 2.0, 5)?)?;
+    let rows_json = to_json(&Axis::linear("y", Unit::Ppm, -1.0, 1.0, 3)?)?;
+    let resampled_json =
+        resample_spectrum_2d_json(&spectrum_json, &columns_json, &rows_json, -1.0)?;
+    let resampled: Spectrum2D = from_json(&resampled_json)?;
+
+    assert_eq!(resampled.shape(), (5, 3));
+    assert_vec_close(
+        &resampled.z,
+        &[
+            -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 4.5, 5.0, 5.5, 6.0,
+        ],
+    );
+    assert_option_vec_close(
+        resampled.imaginary.as_deref(),
+        &[
+            -1.0, -1.0, -1.0, -1.0, -1.0, 10.0, 10.5, 11.0, 11.5, 12.0, 13.0, 14.0, 15.0, 15.5,
+            16.0,
+        ],
+    );
+    assert_eq!(
+        resampled
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("resample_2d")
+    );
+    Ok(())
+}
+
+#[test]
 fn roundtrips_2d_fft_json() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let spectrum_json = to_json(&spectrum)?;

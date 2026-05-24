@@ -1,11 +1,11 @@
 //! Chainable two-dimensional processing pipelines.
 
-use rspin_core::{Result, Spectrum1D, Spectrum2D};
+use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
-    FftDirection, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Scale2D,
-    ZeroFill2D, project_x, project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
+    FftDirection, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Resample2D,
+    Scale2D, ZeroFill2D, project_x, project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x,
     slice_y_at_x_index,
 };
 
@@ -92,6 +92,18 @@ impl Spectrum2DPipeline {
             y_from,
             y_to,
         })
+    }
+
+    /// Bilinearly resamples real and imaginary matrices onto target axes.
+    #[must_use]
+    pub fn resample(self, target_x: Axis, target_y: Axis) -> Self {
+        self.then(Resample2D::new(target_x, target_y))
+    }
+
+    /// Bilinearly resamples onto target axes with an explicit outside value.
+    #[must_use]
+    pub fn resample_with_outside(self, target_x: Axis, target_y: Axis, outside_value: f64) -> Self {
+        self.then(Resample2D::new(target_x, target_y).with_outside_value(outside_value))
     }
 
     /// Applies separable exponential apodization.

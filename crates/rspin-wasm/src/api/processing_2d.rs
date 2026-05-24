@@ -2,11 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
-use rspin_core::{Result, Spectrum2D};
+use rspin_core::{Axis, Result, Spectrum2D};
 use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, auto_phase_correct_2d,
-    crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y, scale_2d,
-    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
+    crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y, resample_2d,
+    scale_2d, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, to_json};
@@ -62,6 +62,24 @@ pub fn crop_spectrum_2d_json(
 ) -> Result<String> {
     let spectrum: Spectrum2D = from_json(spectrum_json)?;
     let processed = crop_2d(&spectrum, x_from, x_to, y_from, y_to)?;
+    to_json(&processed)
+}
+
+/// Resamples serialized `Spectrum2D` JSON onto serialized target axes.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn resample_spectrum_2d_json(
+    spectrum_json: &str,
+    target_columns_json: &str,
+    target_rows_json: &str,
+    outside_value: f64,
+) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let target_x: Axis = from_json(target_columns_json)?;
+    let target_y: Axis = from_json(target_rows_json)?;
+    let processed = resample_2d(&spectrum, target_x, target_y, outside_value)?;
     to_json(&processed)
 }
 

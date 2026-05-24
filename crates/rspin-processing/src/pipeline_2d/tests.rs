@@ -9,6 +9,10 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
         .process()
         .scale(2.0)
         .crop(1.0, 2.0, 10.0, 11.0)
+        .resample(
+            Axis::linear("x", Unit::Ppm, 1.0, 2.0, 3)?,
+            Axis::linear("y", Unit::Ppm, 10.0, 11.0, 2)?,
+        )
         .zero_fill(4, 3)
         .normalize_max_abs()
         .finish()?;
@@ -18,12 +22,12 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
         &processed.z,
         &[
             -4.0 / 12.0,
+            1.0 / 12.0,
             6.0 / 12.0,
             0.0,
-            0.0,
             -10.0 / 12.0,
+            1.0 / 12.0,
             1.0,
-            0.0,
             0.0,
             0.0,
             0.0,
@@ -31,10 +35,11 @@ fn chains_common_2d_processing_steps() -> anyhow::Result<()> {
             0.0,
         ],
     );
-    assert_eq!(processed.processing.len(), 4);
+    assert_eq!(processed.processing.len(), 5);
     assert_eq!(processed.processing[0].operation, "scale_2d");
     assert_eq!(processed.processing[1].operation, "crop_2d");
-    assert_eq!(processed.processing[3].operation, "normalize_2d_max_abs");
+    assert_eq!(processed.processing[2].operation, "resample_2d");
+    assert_eq!(processed.processing[4].operation, "normalize_2d_max_abs");
     Ok(())
 }
 

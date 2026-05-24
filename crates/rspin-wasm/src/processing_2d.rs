@@ -5,9 +5,9 @@ use wasm_bindgen::prelude::*;
 use crate::{
     auto_phase_spectrum_2d_json, crop_spectrum_2d_json, fft_spectrum_2d_json, js_error,
     normalize_spectrum_2d_json, phase_spectrum_2d_json, project_spectrum_2d_x_json,
-    project_spectrum_2d_y_json, scale_spectrum_2d_json, slice_spectrum_2d_x_at_y_index_json,
-    slice_spectrum_2d_x_at_y_json, slice_spectrum_2d_y_at_x_index_json,
-    slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
+    project_spectrum_2d_y_json, resample_spectrum_2d_json, scale_spectrum_2d_json,
+    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_x_at_y_json,
+    slice_spectrum_2d_y_at_x_index_json, slice_spectrum_2d_y_at_x_json, zero_fill_spectrum_2d_json,
 };
 
 /// Scales a serialized two-dimensional spectrum.
@@ -64,6 +64,28 @@ pub fn crop_spectrum_2d(
 ) -> std::result::Result<String, JsValue> {
     crop_spectrum_2d_json(spectrum_json, x_from, x_to, y_from, y_to)
         .map_err(|error| js_error(&error))
+}
+
+/// Resamples a serialized two-dimensional spectrum onto serialized target axes.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = resampleSpectrum2d)]
+pub fn resample_spectrum_2d(
+    spectrum_json: &str,
+    target_columns_json: &str,
+    target_rows_json: &str,
+    outside_value: f64,
+) -> std::result::Result<String, JsValue> {
+    resample_spectrum_2d_json(
+        spectrum_json,
+        target_columns_json,
+        target_rows_json,
+        outside_value,
+    )
+    .map_err(|error| js_error(&error))
 }
 
 /// Applies a two-dimensional FFT to a serialized spectrum.
