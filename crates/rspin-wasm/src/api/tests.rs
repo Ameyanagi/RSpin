@@ -200,10 +200,11 @@ fn writes_nmrml_1d_from_json() -> anyhow::Result<()> {
 
 #[test]
 fn writes_nmrml_2d_from_json() -> anyhow::Result<()> {
-    let spectrum = Spectrum2D::new(
+    let spectrum = Spectrum2D::new_complex(
         Axis::linear_ppm(10.0, 8.0, 3)?,
         Axis::linear_ppm(120.0, 100.0, 2)?,
         vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+        Some(vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
         Metadata::named("wasm 2d"),
     )?;
     let text = write_nmrml_2d_json(&to_json(&spectrum)?)?;
@@ -211,9 +212,11 @@ fn writes_nmrml_2d_from_json() -> anyhow::Result<()> {
     let parsed = spectrum2d_from_json(&parsed_json)?;
 
     assert!(text.contains("<spectrumMultiD"));
+    assert!(text.contains("byteFormat=\"complex128\""));
     assert_eq!(parsed.x, spectrum.x);
     assert_eq!(parsed.y, spectrum.y);
     assert_eq!(parsed.z, spectrum.z);
+    assert_eq!(parsed.imaginary, spectrum.imaginary);
     Ok(())
 }
 

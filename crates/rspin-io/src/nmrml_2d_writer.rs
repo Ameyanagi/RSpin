@@ -41,13 +41,15 @@ impl SpectrumWriter<Spectrum2D> for NmrMl2D {
 
 /// Writes a two-dimensional spectrum to nmrML text.
 ///
-/// The focused writer emits processed real spectra as little-endian `float64`
-/// row-major matrices with direct and first indirect dimension metadata.
+/// The focused writer emits processed spectra as little-endian row-major
+/// matrices with direct and first indirect dimension metadata. Real spectra use
+/// `float64` values; complex spectra use interleaved `complex128`
+/// real/imaginary pairs.
 ///
 /// # Errors
 ///
-/// Returns an error when the spectrum contains non-finite values or cannot yet
-/// be represented by `RSpin`'s focused nmrML writer.
+/// Returns an error when the spectrum contains non-finite values or cannot be
+/// represented by `RSpin`'s focused nmrML writer.
 pub fn write_nmrml_2d(spectrum: &Spectrum2D) -> Result<String> {
     validate_exportable(spectrum)?;
 
@@ -94,10 +96,18 @@ fn validate_exportable(spectrum: &Spectrum2D) -> Result<()> {
             ),
         });
     }
-    if spectrum.imaginary.is_some() {
-        return Err(RSpinError::Unsupported {
-            feature: "complex nmrML 2D spectrum export",
-        });
+    if let Some(imaginary) = spectrum.imaginary.as_deref() {
+        if imaginary.len() != expected_len {
+            return Err(RSpinError::InvalidSpectrum {
+                message: format!(
+                    "imaginary matrix has {} values but axes require {expected_len}",
+                    imaginary.len()
+                ),
+            });
+        }
+        if !imaginary.iter().all(|value| value.is_finite()) {
+            return Err(RSpinError::NonFinite { field: "imaginary" });
+        }
     }
     if !has_uniform_spacing(&spectrum.x.values) || !has_uniform_spacing(&spectrum.y.values) {
         return Err(RSpinError::Unsupported {
@@ -180,11 +190,13 @@ fn write_spectrum(output: &mut String, spectrum: &Spectrum2D) -> Result<()> {
     }
     let _ = writeln!(output, " numberOfDataPoints=\"{}\">", spectrum.z.len());
 
-    let encoded = STANDARD.encode(spectrum_bytes(spectrum));
+    let binary = spectrum_binary(spectrum);
+    let encoded = STANDARD.encode(&binary.bytes);
     let _ = write!(
         output,
-        "      <spectrumDataArray compressed=\"false\" encodedLength=\"{}\" byteFormat=\"float64\">",
-        encoded.len()
+        "      <spectrumDataArray compressed=\"false\" encodedLength=\"{}\" byteFormat=\"{}\">",
+        encoded.len(),
+        binary.byte_format
     );
     output.push_str(&encoded);
     output.push_str("</spectrumDataArray>\n");
@@ -197,12 +209,32 @@ fn write_spectrum(output: &mut String, spectrum: &Spectrum2D) -> Result<()> {
     Ok(())
 }
 
-fn spectrum_bytes(spectrum: &Spectrum2D) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(spectrum.z.len() * 8);
-    for value in &spectrum.z {
-        bytes.extend_from_slice(&value.to_le_bytes());
+struct SpectrumBinary {
+    byte_format: &'static str,
+    bytes: Vec<u8>,
+}
+
+fn spectrum_binary(spectrum: &Spectrum2D) -> SpectrumBinary {
+    if let Some(imaginary) = spectrum.imaginary.as_deref() {
+        let mut bytes = Vec::with_capacity(spectrum.z.len() * 16);
+        for (real, imaginary) in spectrum.z.iter().copied().zip(imaginary.iter().copied()) {
+            bytes.extend_from_slice(&real.to_le_bytes());
+            bytes.extend_from_slice(&imaginary.to_le_bytes());
+        }
+        SpectrumBinary {
+            byte_format: "complex128",
+            bytes,
+        }
+    } else {
+        let mut bytes = Vec::with_capacity(spectrum.z.len() * 8);
+        for value in &spectrum.z {
+            bytes.extend_from_slice(&value.to_le_bytes());
+        }
+        SpectrumBinary {
+            byte_format: "float64",
+            bytes,
+        }
     }
-    bytes
 }
 
 fn write_axis(
@@ -319,6 +351,30 @@ mod tests {
     }
 
     #[test]
+    fn writes_complex128_2d_spectrum_round_trip() -> anyhow::Result<()> {
+        let spectrum = Spectrum2D::new_complex(
+            Axis::linear_ppm(10.0, 8.0, 3)?,
+            Axis::linear_ppm(120.0, 100.0, 2)?,
+            vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+            Some(vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+            Metadata::named("complex 2d").with_nucleus(Nucleus::Carbon13),
+        )?;
+
+        let text = write_nmrml_2d(&spectrum)?;
+        let parsed = read_nmrml_2d_str(&text)?;
+
+        assert!(text.contains("byteFormat=\"complex128\""));
+        assert_eq!(parsed.shape(), spectrum.shape());
+        assert_eq!(parsed.x, spectrum.x);
+        assert_eq!(parsed.y, spectrum.y);
+        assert_eq!(parsed.z, spectrum.z);
+        assert_eq!(parsed.imaginary, spectrum.imaginary);
+        assert_eq!(parsed.metadata.name.as_deref(), Some("complex 2d"));
+        assert_eq!(parsed.metadata.nucleus, Some(Nucleus::Carbon13));
+        Ok(())
+    }
+
+    #[test]
     fn writes_with_trait_api() -> anyhow::Result<()> {
         let spectrum = Spectrum2D::new(
             Axis::linear_ppm(1.0, 3.0, 3)?,
@@ -360,17 +416,7 @@ mod tests {
     }
 
     #[test]
-    fn rejects_complex_non_uniform_and_non_finite_metadata() -> anyhow::Result<()> {
-        let complex = Spectrum2D::new_complex(
-            Axis::linear_ppm(0.0, 1.0, 2)?,
-            Axis::linear_ppm(10.0, 11.0, 2)?,
-            vec![1.0, 2.0, 3.0, 4.0],
-            Some(vec![0.1, 0.2, 0.3, 0.4]),
-            Metadata::new(),
-        )?;
-        let error = write_nmrml_2d(&complex).expect_err("complex export should be explicit");
-        assert!(matches!(error, RSpinError::Unsupported { .. }));
-
+    fn rejects_non_uniform_and_non_finite_metadata() -> anyhow::Result<()> {
         let non_uniform = Spectrum2D::new(
             Axis::ppm(vec![0.0, 0.5, 2.0])?,
             Axis::linear_ppm(10.0, 11.0, 2)?,
