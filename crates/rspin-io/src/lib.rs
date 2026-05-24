@@ -103,7 +103,9 @@ pub use processing_json::{
     read_processing_recipe_2d_json, write_processing_recipe_1d_json,
     write_processing_recipe_2d_json,
 };
-pub use simulation_csv::{CsvExactTransitions, write_exact_transitions_csv};
+pub use simulation_csv::{
+    CsvExactTransitions, read_exact_transitions_csv, write_exact_transitions_csv,
+};
 pub use simulation_json::{
     EXACT_DECOMPOSITION_1D_JSON_FORMAT, EXACT_DECOMPOSITION_2D_JSON_FORMAT,
     EXACT_SPECTRUM_1D_OPTIONS_JSON_FORMAT, EXACT_SPECTRUM_2D_OPTIONS_JSON_FORMAT,

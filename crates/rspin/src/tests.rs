@@ -338,6 +338,12 @@ fn prelude_supports_exact_simulation_json() -> Result<()> {
     )?;
     assert!(transitions_csv.starts_with("# format=RSpin Exact Transitions CSV"));
     assert_eq!(transitions_csv, write_exact_transitions_csv(&transitions)?);
+    let parsed_csv = read_exact_transitions_csv(&transitions_csv)?;
+    assert_eq!(parsed_csv.len(), transitions.len());
+    assert!((parsed_csv[0].center_ppm - transitions[0].center_ppm).abs() < 1.0e-9);
+    let parsed_csv_trait: Vec<ExactTransition> =
+        SpectrumReader::read_str(&CsvExactTransitions, &transitions_csv)?;
+    assert_eq!(parsed_csv_trait.len(), transitions.len());
     Ok(())
 }
 

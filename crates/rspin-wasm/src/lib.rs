@@ -49,8 +49,9 @@ pub use api::{
     nmredata_to_analysis_json, normalize_spectrum_1d_area_json, normalize_spectrum_1d_json,
     normalize_spectrum_2d_json, normalize_spectrum_2d_volume_json, offset_spectrum_1d_json,
     optimize_peaks_json, pairwise_bucket_matrix_1d_json, pairwise_bucket_matrix_2d_json,
-    pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json, parse_jcamp_dx_1d_json,
-    parse_nmredata_json, parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
+    pairwise_spectrum_matrix_1d_json, pairwise_spectrum_matrix_2d_json,
+    parse_exact_transitions_csv_json, parse_jcamp_dx_1d_json, parse_nmredata_json,
+    parse_nmredata_records_json, parse_nmrml_1d_json, parse_nmrml_2d_json,
     parse_spectrum_1d_csv_json, parse_spectrum_1d_text_json, parse_spectrum_2d_csv_json,
     parse_spectrum_2d_text_json, pca_bucket_matrix_1d_json, pca_bucket_matrix_2d_json,
     pca_spectrum_matrix_1d_json, pca_spectrum_matrix_2d_json, phase_spectrum_1d_json,
@@ -106,10 +107,10 @@ pub use processing_2d::{
 };
 pub use simulation::{
     decompose_exact_spin_half_spectrum, decompose_exact_spin_half_spectrum_2d,
-    simulate_exact_spin_half_spectrum, simulate_exact_spin_half_spectrum_2d,
-    simulate_exact_spin_half_transitions, validate_exact_spectrum_2d_options,
-    validate_exact_spectrum_options, validate_exact_spin_half_system, validate_exact_spin_options,
-    write_exact_transitions_csv,
+    parse_exact_transitions_csv, simulate_exact_spin_half_spectrum,
+    simulate_exact_spin_half_spectrum_2d, simulate_exact_spin_half_transitions,
+    validate_exact_spectrum_2d_options, validate_exact_spectrum_options,
+    validate_exact_spin_half_system, validate_exact_spin_options, write_exact_transitions_csv,
 };
 pub use workflow::{analyze_spectrum_1d, analyze_spectrum_2d};
 

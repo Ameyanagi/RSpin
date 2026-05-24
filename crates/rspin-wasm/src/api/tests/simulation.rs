@@ -1,10 +1,10 @@
 use super::super::{
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, spectrum1d_from_json, spectrum2d_from_json,
-    validate_exact_spectrum_2d_options_json, validate_exact_spectrum_options_json,
-    validate_exact_spin_half_system_json, validate_exact_spin_options_json,
-    write_exact_transitions_csv_json,
+    parse_exact_transitions_csv_json, simulate_exact_spin_half_spectrum_2d_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    spectrum1d_from_json, spectrum2d_from_json, validate_exact_spectrum_2d_options_json,
+    validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
+    validate_exact_spin_options_json, write_exact_transitions_csv_json,
 };
 
 #[test]
@@ -85,10 +85,13 @@ fn writes_exact_transitions_csv_json() -> anyhow::Result<()> {
         r#"{"spectrometer_mhz":400.0,"intensity_threshold":1e-12,"frequency_tolerance_hz":1e-9,"max_spins":10}"#,
     )?;
     let csv = write_exact_transitions_csv_json(&transitions_json)?;
+    let reparsed_json = parse_exact_transitions_csv_json(&csv)?;
+    let reparsed = rspin_io::read_exact_transitions_json(&reparsed_json)?;
 
     assert!(csv.starts_with("# format=RSpin Exact Transitions CSV\n"));
     assert!(csv.contains("frequency_hz,offset_hz,center_ppm,intensity,contribution_count\n"));
     assert_eq!(csv.lines().count(), 6);
+    assert_eq!(reparsed.len(), 4);
     Ok(())
 }
 

@@ -4,10 +4,11 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, js_error,
-    simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
-    simulate_exact_spin_half_transitions_json, validate_exact_spectrum_2d_options_json,
-    validate_exact_spectrum_options_json, validate_exact_spin_half_system_json,
-    validate_exact_spin_options_json, write_exact_transitions_csv_json,
+    parse_exact_transitions_csv_json, simulate_exact_spin_half_spectrum_2d_json,
+    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
+    validate_exact_spectrum_2d_options_json, validate_exact_spectrum_options_json,
+    validate_exact_spin_half_system_json, validate_exact_spin_options_json,
+    write_exact_transitions_csv_json,
 };
 
 /// Validates exact spin-1/2 system JSON and returns normalized JSON.
@@ -69,6 +70,16 @@ pub fn simulate_exact_spin_half_transitions(
 ) -> std::result::Result<String, JsValue> {
     simulate_exact_spin_half_transitions_json(system_json, options_json)
         .map_err(|error| js_error(&error))
+}
+
+/// Parses exact spin-1/2 transition CSV as serialized JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when CSV parsing or serialization fails.
+#[wasm_bindgen(js_name = parseExactTransitionsCsv)]
+pub fn parse_exact_transitions_csv(input: &str) -> std::result::Result<String, JsValue> {
+    parse_exact_transitions_csv_json(input).map_err(|error| js_error(&error))
 }
 
 /// Converts exact spin-1/2 transition JSON to CSV.
