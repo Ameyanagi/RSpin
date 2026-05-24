@@ -48,7 +48,8 @@ pub use nmrml::{NmrMl1D, read_nmrml_1d_bytes, read_nmrml_1d_file, read_nmrml_1d_
 pub use nmrml_2d::{NmrMl2D, read_nmrml_2d_bytes, read_nmrml_2d_file, read_nmrml_2d_str};
 pub use nmrml_info::{
     NMRML_SCHEMA_DIRECTORY, NMRML_SCHEMA_REPOSITORY, NmrMlDocumentInfo, NmrMlSchemaLocation,
-    read_nmrml_document_info_bytes, read_nmrml_document_info_file, read_nmrml_document_info_str,
+    NmrMlVersion, parse_nmrml_version, read_nmrml_document_info_bytes,
+    read_nmrml_document_info_file, read_nmrml_document_info_str,
 };
 pub use processing_json::{
     JsonProcessingRecipe1D, JsonProcessingRecipe2D, PROCESSING_RECIPE_1D_FORMAT,

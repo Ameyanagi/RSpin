@@ -127,6 +127,9 @@ fn inspects_nmrml_document_info_json() -> anyhow::Result<()> {
 
     assert_eq!(value["version"], "v1.0.rc1");
     assert_eq!(value["normalized_version"], "1.0.rc1");
+    assert_eq!(value["parsed_version"]["major"], 1);
+    assert_eq!(value["parsed_version"]["minor"], 0);
+    assert_eq!(value["parsed_version"]["build"], "rc1");
     assert_eq!(value["namespace"], "http://nmrml.org/schema");
     assert_eq!(value["schema_locations"][0]["location"], "nmrML.xsd");
     Ok(())

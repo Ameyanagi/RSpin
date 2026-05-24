@@ -15,7 +15,7 @@ use quick_xml::{
 };
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 
-use crate::SpectrumReader;
+use crate::{SpectrumReader, nmrml_info::validate_nmrml_reader_version};
 
 const FORMAT: &str = "nmrML";
 
@@ -609,21 +609,7 @@ fn finite_value(field: &'static str, value: f64) -> Result<f64> {
 }
 
 fn validate_version(version: Option<&str>) -> Result<String> {
-    let version = version.ok_or_else(|| RSpinError::Parse {
-        format: FORMAT,
-        message: "missing required nmrML version".to_owned(),
-    })?;
-    let normalized = match version.trim().strip_prefix('v') {
-        Some(trimmed) => trimmed,
-        None => version.trim(),
-    };
-    if normalized.starts_with("1.0.") {
-        Ok(version.trim().to_owned())
-    } else {
-        Err(RSpinError::Unsupported {
-            feature: "nmrML document version",
-        })
-    }
+    validate_nmrml_reader_version(version)
 }
 
 fn parse_nucleus(value: &str) -> Result<Nucleus> {
@@ -898,6 +884,16 @@ mod tests {
         .expect_err("unsupported versions should be rejected");
 
         assert!(matches!(error, RSpinError::Unsupported { .. }));
+    }
+
+    #[test]
+    fn rejects_malformed_version() {
+        let error = read_nmrml_1d_str(
+            r#"<nmrML version="release"><spectrumDataArray compressed="false" encodedLength="0" byteFormat="float64"/></nmrML>"#,
+        )
+        .expect_err("malformed versions should be rejected");
+
+        assert!(matches!(error, RSpinError::Parse { .. }));
     }
 
     #[test]

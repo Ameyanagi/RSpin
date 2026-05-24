@@ -15,7 +15,7 @@ use quick_xml::{
 };
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum2D, Unit};
 
-use crate::SpectrumReader;
+use crate::{SpectrumReader, nmrml_info::validate_nmrml_reader_version};
 
 const FORMAT: &str = "nmrML";
 
@@ -870,21 +870,7 @@ fn axis_label(unit: Unit) -> &'static str {
 }
 
 fn validate_version(version: Option<&str>) -> Result<String> {
-    let version = version.ok_or_else(|| RSpinError::Parse {
-        format: FORMAT,
-        message: "missing required nmrML version".to_owned(),
-    })?;
-    let normalized = match version.trim().strip_prefix('v') {
-        Some(trimmed) => trimmed,
-        None => version.trim(),
-    };
-    if normalized.starts_with("1.0.") {
-        Ok(version.trim().to_owned())
-    } else {
-        Err(RSpinError::Unsupported {
-            feature: "nmrML document version",
-        })
-    }
+    validate_nmrml_reader_version(version)
 }
 
 fn parse_nucleus(value: &str) -> Result<Nucleus> {
