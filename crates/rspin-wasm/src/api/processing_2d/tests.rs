@@ -130,8 +130,23 @@ fn roundtrips_2d_fft_json() -> anyhow::Result<()> {
 }
 
 #[test]
-fn gaussian_apodizes_2d_spectrum_json() -> anyhow::Result<()> {
+fn apodizes_2d_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&complex_spectrum()?)?;
+    let exponential_json = exponential_apodization_spectrum_2d_json(
+        &spectrum_json,
+        r#"{"x_line_broadening_hz":1.0,"y_line_broadening_hz":1.0,"x_dwell_time_s":0.1,"y_dwell_time_s":0.1}"#,
+    )?;
+    let exponential: Spectrum2D = from_json(&exponential_json)?;
+    assert!(exponential.z[1].abs() < 2.0);
+    assert!(exponential.z[2].abs() < 3.0);
+    assert_eq!(
+        exponential
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("exponential_apodization_2d")
+    );
+
     let apodized_json = gaussian_apodization_spectrum_2d_json(
         &spectrum_json,
         r#"{"x_gaussian_broadening_hz":1.0,"y_gaussian_broadening_hz":1.0,"x_dwell_time_s":0.1,"y_dwell_time_s":0.1}"#,
@@ -293,6 +308,13 @@ fn rejects_invalid_2d_processing_json_options() -> anyhow::Result<()> {
     let error = phase_spectrum_2d_json(&spectrum_json, r#"{"x_pivot_fraction":1.5}"#)
         .expect_err("invalid phase pivot should fail");
     assert!(error.to_string().contains("pivot"));
+
+    let error = exponential_apodization_spectrum_2d_json(
+        &spectrum_json,
+        r#"{"x_line_broadening_hz":-1.0,"y_line_broadening_hz":1.0,"x_dwell_time_s":0.1,"y_dwell_time_s":0.1}"#,
+    )
+    .expect_err("negative exponential broadening should fail");
+    assert!(error.to_string().contains("x_line_broadening_hz"));
     Ok(())
 }
 

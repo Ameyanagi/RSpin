@@ -7,9 +7,9 @@ use rspin_io::read_processing_recipe_2d_json;
 use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, abs_2d,
     apply_processing_recipe_2d, apply_processing_recipe_2d_until, auto_phase_correct_2d, crop_2d,
-    fft_2d, gaussian_apodization_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y,
-    resample_2d, scale_2d, sine_bell_apodization_2d, slice_x_at_y, slice_x_at_y_index,
-    slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
+    exponential_apodization_2d, fft_2d, gaussian_apodization_2d, normalize_2d_max_abs,
+    phase_correct_2d, project_x, project_y, resample_2d, scale_2d, sine_bell_apodization_2d,
+    slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index, zero_fill_2d,
 };
 
 use super::{from_json, to_json};
@@ -108,6 +108,27 @@ pub fn fft_spectrum_2d_json(spectrum_json: &str, direction_json: &str) -> Result
     let spectrum: Spectrum2D = from_json(spectrum_json)?;
     let direction: FftDirectionJson = from_json(direction_json)?;
     let processed = fft_2d(&spectrum, direction.into())?;
+    to_json(&processed)
+}
+
+/// Applies separable exponential apodization to serialized `Spectrum2D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn exponential_apodization_spectrum_2d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let options: ExponentialApodization2DJson = from_json(options_json)?;
+    let processed = exponential_apodization_2d(
+        &spectrum,
+        options.x_line_broadening_hz,
+        options.y_line_broadening_hz,
+        options.x_dwell_time_s,
+        options.y_dwell_time_s,
+    )?;
     to_json(&processed)
 }
 
@@ -298,6 +319,14 @@ impl From<FftDirectionJson> for FftDirection {
             FftDirectionJson::Inverse => Self::Inverse,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct ExponentialApodization2DJson {
+    x_line_broadening_hz: f64,
+    y_line_broadening_hz: f64,
+    x_dwell_time_s: f64,
+    y_dwell_time_s: f64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]
