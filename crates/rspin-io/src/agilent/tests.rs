@@ -11,6 +11,85 @@ use crate::SpectrumPathReader;
 use super::*;
 
 #[test]
+fn inspects_procpar_routing_metadata() -> anyhow::Result<()> {
+    let info = inspect_agilent_procpar(
+        "\
+vnmrrev 2 2 32 0 0 2 1 0 1 64
+1 \"VnmrJ 4.2\"
+0
+seqfil 2 2 32 0 0 2 1 0 1 64
+1 \"hsqc\"
+0
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+array 2 2 256 0 0 2 1 1 1 64
+1 \"phase\"
+0
+arrayelemts 1 1 9.99999984307e+17 -9.99999984307e+17 0 2 1 0 1 64
+1 4
+0
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"H1\"
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 500.13
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+operator 2 2 8 0 0 2 1 0 1 64
+1 \"fixture user\"
+0
+",
+    )?;
+
+    assert_eq!(info.software_revision.as_deref(), Some("VnmrJ 4.2"));
+    assert_eq!(info.sequence.as_deref(), Some("hsqc"));
+    assert_eq!(info.acquisition_dimension, Some(2));
+    assert_eq!(info.array_parameter.as_deref(), Some("phase"));
+    assert_eq!(info.array_elements, Some(4));
+    assert_eq!(info.nucleus.as_deref(), Some("H1"));
+    assert_eq!(info.frequency_mhz, Some(500.13));
+    assert_eq!(info.spectral_width_hz, Some(1000.0));
+    assert_eq!(info.operator.as_deref(), Some("fixture user"));
+    assert!(info.is_supported_by_current_readers());
+    Ok(())
+}
+
+#[test]
+fn rejects_higher_dimensional_procpar_routing() -> anyhow::Result<()> {
+    let info = inspect_agilent_procpar(
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 3
+0
+",
+    )?;
+
+    assert_eq!(info.acquisition_dimension, Some(3));
+    assert!(!info.is_supported_by_current_readers());
+    let error = info
+        .validate_supported_by_current_readers()
+        .expect_err("three-dimensional Agilent procpar should be rejected");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_malformed_procpar_routing_numbers() {
+    let error = inspect_agilent_procpar(
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 not-a-number
+0
+",
+    )
+    .expect_err("malformed Agilent procpar acqdim should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+}
+
+#[test]
 fn reads_big_endian_i32_complex_fid() -> anyhow::Result<()> {
     let root = synthetic_dataset("big-i32")?;
     write_procpar(
@@ -274,6 +353,33 @@ fn rejects_arrayed_or_multidimensional_fid() -> anyhow::Result<()> {
 
     let error =
         read_agilent_fid_1d_dir(&root).expect_err("arrayed Agilent FID should be unsupported");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn rejects_higher_dimensional_procpar_for_1d_fid() -> anyhow::Result<()> {
+    let root = synthetic_dataset("procpar-3d")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 3
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Little,
+        DataForTest::I16(&[1, 2]),
+        1,
+        1,
+    )?;
+
+    let error =
+        read_agilent_fid_1d_dir(&root).expect_err("3D Agilent procpar should be unsupported");
     assert!(matches!(error, RSpinError::Unsupported { .. }));
 
     remove_dir(root)?;

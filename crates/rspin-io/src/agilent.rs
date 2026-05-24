@@ -8,6 +8,7 @@ use std::{
 };
 
 use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
+use serde::{Deserialize, Serialize};
 
 use crate::SpectrumPathReader;
 
@@ -20,6 +21,66 @@ const BLOCK_HEADER_LEN: usize = 28;
 const STATUS_FLOAT: i16 = 0x0008;
 const STATUS_COMPLEX: i16 = 0x0010;
 const STATUS_COMPLEX_ALT: i16 = 0x0040;
+
+/// Routing metadata from an Agilent/Varian `procpar` file.
+///
+/// `procpar` does not use one fixed schema version label across all variants,
+/// so `RSpin` preserves common software/provenance fields and exposes acquisition
+/// dimensionality for reader routing.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct AgilentProcparInfo {
+    /// Raw software/revision label, commonly `vnmrrev`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub software_revision: Option<String>,
+    /// Pulse sequence file, commonly `seqfil`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sequence: Option<String>,
+    /// Declared acquisition dimension from `acqdim`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub acquisition_dimension: Option<usize>,
+    /// Arrayed parameter name from `array`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub array_parameter: Option<String>,
+    /// Number of array elements from `arrayelemts`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub array_elements: Option<usize>,
+    /// Primary observed nucleus from `tn`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nucleus: Option<String>,
+    /// Direct-dimension spectrometer frequency from `sfrq`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frequency_mhz: Option<f64>,
+    /// Direct-dimension spectral width from `sw`, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spectral_width_hz: Option<f64>,
+    /// Operator or username provenance, when present.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator: Option<String>,
+}
+
+impl AgilentProcparInfo {
+    /// Returns true when the acquisition dimension is supported by current readers.
+    #[must_use]
+    pub fn is_supported_by_current_readers(&self) -> bool {
+        matches!(self.acquisition_dimension, None | Some(0..=2))
+    }
+
+    /// Validates that the acquisition dimension is supported by current readers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-feature error for three-or-higher-dimensional
+    /// acquisitions.
+    pub fn validate_supported_by_current_readers(&self) -> Result<()> {
+        if self.is_supported_by_current_readers() {
+            Ok(())
+        } else {
+            Err(RSpinError::Unsupported {
+                feature: "Agilent three-or-higher-dimensional acquisition",
+            })
+        }
+    }
+}
 
 /// Reader for Agilent/Varian raw one-dimensional FID directories.
 #[derive(Clone, Copy, Debug, Default)]
@@ -56,7 +117,8 @@ impl SpectrumPathReader for AgilentFid1D {
 /// unsupported data representation.
 pub fn read_agilent_fid_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     let dataset_dir = locate_dataset_dir(path.as_ref());
-    let procpar = parse_procpar(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?);
+    let procpar =
+        parse_procpar_for_reader(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?)?;
     let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
         format: "Agilent",
         message: format!("failed to read fid: {error}"),
@@ -111,7 +173,7 @@ pub fn read_agilent_processed_1d_dir(path: impl AsRef<Path>) -> Result<Spectrum1
     let path = path.as_ref();
     let phasefile_path = locate_phasefile_path(path)?;
     let procpar_path = locate_procpar_path(path, &phasefile_path)?;
-    let procpar = parse_procpar(&read_text(&procpar_path, "Agilent procpar")?);
+    let procpar = parse_procpar_for_reader(&read_text(&procpar_path, "Agilent procpar")?)?;
     let phasefile_bytes = fs::read(&phasefile_path).map_err(|error| RSpinError::Parse {
         format: "Agilent",
         message: format!(
@@ -165,7 +227,8 @@ impl SpectrumPathReader for AgilentFid2D {
 /// two-dimensional acquisition, or uses an unsupported data representation.
 pub fn read_agilent_fid_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     let dataset_dir = locate_dataset_dir(path.as_ref());
-    let procpar = parse_procpar(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?);
+    let procpar =
+        parse_procpar_for_reader(&read_text(&dataset_dir.join("procpar"), "Agilent procpar")?)?;
     validate_2d_procpar(&procpar)?;
     let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
         format: "Agilent",
@@ -222,7 +285,7 @@ pub fn read_agilent_processed_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2
     let path = path.as_ref();
     let phasefile_path = locate_phasefile_path(path)?;
     let procpar_path = locate_procpar_path(path, &phasefile_path)?;
-    let procpar = parse_procpar(&read_text(&procpar_path, "Agilent procpar")?);
+    let procpar = parse_procpar_for_reader(&read_text(&procpar_path, "Agilent procpar")?)?;
     validate_2d_procpar(&procpar)?;
     let phasefile_bytes = fs::read(&phasefile_path).map_err(|error| RSpinError::Parse {
         format: "Agilent",
@@ -289,6 +352,51 @@ fn locate_procpar_path(path: &Path, phasefile_path: &Path) -> Result<PathBuf> {
     Err(RSpinError::Parse {
         format: "Agilent",
         message: format!("missing Agilent procpar for {}", phasefile_path.display()),
+    })
+}
+
+/// Inspects routing metadata from Agilent/Varian `procpar` text.
+///
+/// # Errors
+///
+/// Returns an error when numeric routing fields are malformed.
+pub fn inspect_agilent_procpar(input: &str) -> Result<AgilentProcparInfo> {
+    let parameters = parse_procpar(input);
+    procpar_info(&parameters)
+}
+
+fn parse_procpar_for_reader(input: &str) -> Result<BTreeMap<String, Vec<String>>> {
+    let parameters = parse_procpar(input);
+    procpar_info(&parameters)?.validate_supported_by_current_readers()?;
+    Ok(parameters)
+}
+
+fn procpar_info(parameters: &BTreeMap<String, Vec<String>>) -> Result<AgilentProcparInfo> {
+    Ok(AgilentProcparInfo {
+        software_revision: first_non_empty_text(parameters, &["vnmrrev", "version", "revision"]),
+        sequence: first_text(parameters, "seqfil"),
+        acquisition_dimension: first_usize(parameters, "acqdim")?,
+        array_parameter: first_text(parameters, "array"),
+        array_elements: first_usize(parameters, "arrayelemts")?,
+        nucleus: first_text(parameters, "tn"),
+        frequency_mhz: first_f64(parameters, "sfrq")?,
+        spectral_width_hz: first_f64(parameters, "sw")?,
+        operator: first_text(parameters, "operator").or_else(|| first_text(parameters, "username")),
+    })
+}
+
+fn first_non_empty_text(
+    parameters: &BTreeMap<String, Vec<String>>,
+    keys: &[&str],
+) -> Option<String> {
+    keys.iter().find_map(|key| {
+        first_text(parameters, key).and_then(|value| {
+            if value.trim().is_empty() {
+                None
+            } else {
+                Some(value)
+            }
+        })
     })
 }
 
