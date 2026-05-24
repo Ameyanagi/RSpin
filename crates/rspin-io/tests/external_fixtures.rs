@@ -284,13 +284,43 @@ fn parses_external_nmrml_compressed_float64_fixture_when_available() -> anyhow::
     assert_close(spectrum.x.values.first().copied(), Some(11.099_15));
     assert_close(spectrum.x.values.last().copied(), Some(-0.901_812));
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
-    assert_close(spectrum.metadata.frequency_mhz, Some(500.16));
+    assert_close(spectrum.metadata.frequency_mhz, Some(500.162_500_8));
     assert_close(spectrum.metadata.temperature_k, Some(300.0));
     assert!(
         spectrum
             .intensities
             .iter()
             .any(|value| value.abs() > 1_000.0)
+    );
+    Ok(())
+}
+
+#[test]
+fn parses_external_nmrml_fid_fixture_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join("nmrml/examples/FAM013_AHTM.PROTON_04.nmrML");
+    require_fixture(&fixture)?;
+
+    let spectrum = read_nmrml_1d_file(&fixture)?;
+
+    assert_eq!(spectrum.len(), 32_768);
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert_close(spectrum.x.values.first().copied(), Some(0.0));
+    assert_close(
+        spectrum.x.values.last().copied(),
+        Some(2.726_214_400_006_979_2),
+    );
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(599.831_161_7));
+    assert_close(spectrum.metadata.temperature_k, Some(299.15));
+    assert!(spectrum.imaginary.is_some());
+    assert!(
+        spectrum
+            .intensities
+            .iter()
+            .any(|value| value.abs() > 100_000.0)
     );
     Ok(())
 }

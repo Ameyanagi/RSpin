@@ -1,4 +1,4 @@
-//! nmrML one-dimensional spectrum import.
+//! nmrML one-dimensional spectrum and FID import.
 
 use std::{
     fs,
@@ -19,16 +19,17 @@ use crate::SpectrumReader;
 
 const FORMAT: &str = "nmrML";
 
-/// Reader for processed one-dimensional nmrML spectra.
+/// Reader for one-dimensional nmrML spectra or FIDs.
 ///
 /// This focused reader supports schema version `1.0.*`, the 1D
 /// `spectrumDataArray` element, little-endian `float64`/`float32` y-value
-/// arrays, and little-endian `complex128`/`complex64` x-y pair arrays.
+/// arrays, little-endian `complex128`/`complex64` x-y pair arrays, and
+/// one-dimensional `fidData` complex arrays.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NmrMl1D;
 
 impl NmrMl1D {
-    /// Reads a processed one-dimensional spectrum from an nmrML file.
+    /// Reads a one-dimensional spectrum or FID from an nmrML file.
     ///
     /// # Errors
     ///
@@ -38,7 +39,7 @@ impl NmrMl1D {
         read_nmrml_1d_file(path)
     }
 
-    /// Reads a processed one-dimensional spectrum from UTF-8 nmrML bytes.
+    /// Reads a one-dimensional spectrum or FID from UTF-8 nmrML bytes.
     ///
     /// # Errors
     ///
@@ -57,7 +58,7 @@ impl SpectrumReader for NmrMl1D {
     }
 }
 
-/// Reads a processed one-dimensional spectrum from an nmrML file.
+/// Reads a one-dimensional spectrum or FID from an nmrML file.
 ///
 /// # Errors
 ///
@@ -72,7 +73,7 @@ pub fn read_nmrml_1d_file(path: impl AsRef<Path>) -> Result<Spectrum1D> {
     read_nmrml_1d_str(&input)
 }
 
-/// Reads a processed one-dimensional spectrum from UTF-8 nmrML bytes.
+/// Reads a one-dimensional spectrum or FID from UTF-8 nmrML bytes.
 ///
 /// # Errors
 ///
@@ -86,7 +87,7 @@ pub fn read_nmrml_1d_bytes(bytes: &[u8]) -> Result<Spectrum1D> {
     read_nmrml_1d_str(input)
 }
 
-/// Reads a processed one-dimensional spectrum from nmrML XML text.
+/// Reads a one-dimensional spectrum or FID from nmrML XML text.
 ///
 /// # Errors
 ///
@@ -103,6 +104,9 @@ struct RawNmrMl1D {
     spectrum_name: Option<String>,
     spectrum_id: Option<String>,
     spectrum_data: Option<BinaryDataArray>,
+    fid_data: Option<BinaryDataArray>,
+    fid_declared_points: Option<usize>,
+    sweep_width_hz: Option<f64>,
     x_axis: Option<AxisSpec>,
     nucleus: Option<Nucleus>,
     frequency_mhz: Option<f64>,
@@ -130,13 +134,23 @@ enum DecodedSpectrumData {
     Points { x: Vec<f64>, intensities: Vec<f64> },
 }
 
+enum ActiveBinaryKind {
+    Spectrum,
+    Fid,
+}
+
+struct ActiveBinary {
+    kind: ActiveBinaryKind,
+    data: BinaryDataArray,
+}
+
 fn parse_nmrml_1d(input: &str) -> Result<RawNmrMl1D> {
     let mut reader = Reader::from_str(input);
     reader.config_mut().trim_text(true);
 
     let mut raw = RawNmrMl1D::default();
     let mut buffer = Vec::new();
-    let mut active_binary: Option<BinaryDataArray> = None;
+    let mut active_binary: Option<ActiveBinary> = None;
     let mut active_text = String::new();
 
     loop {
@@ -151,10 +165,13 @@ fn parse_nmrml_1d(input: &str) -> Result<RawNmrMl1D> {
                     apply_root(&mut raw, &start)?;
                 } else if name == b"spectrum1D" {
                     apply_spectrum_1d(&mut raw, &start)?;
-                } else if name == b"spectrumDataArray" && active_binary.is_none() {
-                    active_binary = Some(binary_from_start(&start)?);
+                } else if is_binary_start(name) && active_binary.is_none() {
+                    active_binary = Some(ActiveBinary {
+                        kind: binary_kind(name),
+                        data: binary_from_start(&start)?,
+                    });
                     active_text.clear();
-                } else {
+                } else if active_binary.is_none() {
                     apply_empty_metadata(&mut raw, &start, name)?;
                 }
             }
@@ -167,6 +184,8 @@ fn parse_nmrml_1d(input: &str) -> Result<RawNmrMl1D> {
                     apply_spectrum_1d(&mut raw, &start)?;
                 } else if name == b"spectrumDataArray" && raw.spectrum_data.is_none() {
                     raw.spectrum_data = Some(binary_from_start(&start)?);
+                } else if name == b"fidData" && raw.fid_data.is_none() {
+                    raw.fid_data = Some(binary_from_start(&start)?);
                 } else {
                     apply_empty_metadata(&mut raw, &start, name)?;
                 }
@@ -187,11 +206,18 @@ fn parse_nmrml_1d(input: &str) -> Result<RawNmrMl1D> {
                     }
                 })?);
             }
-            Event::End(end) if local_name(end.name().as_ref()) == b"spectrumDataArray" => {
-                if let Some(mut binary) = active_binary.take() {
-                    if raw.spectrum_data.is_none() {
-                        binary.text.clone_from(&active_text);
-                        raw.spectrum_data = Some(binary);
+            Event::End(end) if is_binary_start(local_name(end.name().as_ref())) => {
+                if let Some(mut active) = active_binary.take() {
+                    match active.kind {
+                        ActiveBinaryKind::Spectrum if raw.spectrum_data.is_none() => {
+                            active.data.text.clone_from(&active_text);
+                            raw.spectrum_data = Some(active.data);
+                        }
+                        ActiveBinaryKind::Fid if raw.fid_data.is_none() => {
+                            active.data.text.clone_from(&active_text);
+                            raw.fid_data = Some(active.data);
+                        }
+                        _ => {}
                     }
                 }
                 active_text.clear();
@@ -205,8 +231,27 @@ fn parse_nmrml_1d(input: &str) -> Result<RawNmrMl1D> {
     Ok(raw)
 }
 
+fn is_binary_start(name: &[u8]) -> bool {
+    matches!(name, b"spectrumDataArray" | b"fidData")
+}
+
+fn binary_kind(name: &[u8]) -> ActiveBinaryKind {
+    if name == b"fidData" {
+        ActiveBinaryKind::Fid
+    } else {
+        ActiveBinaryKind::Spectrum
+    }
+}
+
 fn spectrum_from_raw(raw: RawNmrMl1D) -> Result<Spectrum1D> {
     let version = validate_version(raw.version.as_deref())?;
+    if raw.spectrum_data.is_some() {
+        return spectrum_from_frequency_domain(raw, &version);
+    }
+    fid_from_raw(raw, &version)
+}
+
+fn spectrum_from_frequency_domain(raw: RawNmrMl1D, version: &str) -> Result<Spectrum1D> {
     let binary = raw.spectrum_data.ok_or_else(|| RSpinError::Parse {
         format: FORMAT,
         message: "missing spectrumDataArray".to_owned(),
@@ -259,6 +304,26 @@ fn spectrum_from_raw(raw: RawNmrMl1D) -> Result<Spectrum1D> {
     Spectrum1D::new(axis, intensities, metadata)
 }
 
+fn fid_from_raw(raw: RawNmrMl1D, version: &str) -> Result<Spectrum1D> {
+    let binary = raw.fid_data.ok_or_else(|| RSpinError::Parse {
+        format: FORMAT,
+        message: "missing spectrumDataArray or fidData".to_owned(),
+    })?;
+    let (real, imaginary) = decode_fid_data(&binary, raw.fid_declared_points)?;
+    let axis = build_fid_axis(real.len(), raw.sweep_width_hz)?;
+    let metadata = Metadata {
+        name: raw.spectrum_name.or(raw.spectrum_id),
+        nucleus: raw.nucleus,
+        frequency_mhz: raw.frequency_mhz,
+        solvent: raw.solvent,
+        temperature_k: raw.temperature_k,
+        origin: Some(format!("nmrML {version}")),
+        molecules: Vec::new(),
+    };
+
+    Spectrum1D::new_complex(axis, real, imaginary, metadata)
+}
+
 fn apply_root(raw: &mut RawNmrMl1D, start: &BytesStart<'_>) -> Result<()> {
     if raw.version.is_none() {
         raw.version = attr_value(start, b"version")?;
@@ -281,17 +346,38 @@ fn apply_empty_metadata(raw: &mut RawNmrMl1D, start: &BytesStart<'_>, name: &[u8
         b"xAxis" if raw.x_axis.is_none() => {
             raw.x_axis = Some(axis_from_start(start)?);
         }
+        b"DirectDimensionParameterSet" | b"directDimensionParameterSet"
+            if raw.fid_declared_points.is_none() =>
+        {
+            raw.fid_declared_points =
+                optional_usize_attr(start, b"numberOfDataPoints", "numberOfDataPoints")?;
+        }
         b"acquisitionNucleus" if raw.nucleus.is_none() => {
             raw.nucleus = attr_value(start, b"name")?
                 .as_deref()
                 .map(parse_nucleus)
                 .transpose()?;
         }
-        b"effectiveExcitationField" | b"irradiationFrequency" if raw.frequency_mhz.is_none() => {
+        b"effectiveExcitationField" if raw.frequency_mhz.is_none() => {
             let value = optional_f64_attr(start, b"value", "frequency value")?;
             let unit_name = attr_value(start, b"unitName")?;
             raw.frequency_mhz =
                 value.and_then(|frequency| frequency_to_mhz(frequency, unit_name.as_deref()));
+        }
+        b"irradiationFrequency" => {
+            let value = optional_f64_attr(start, b"value", "frequency value")?;
+            let unit_name = attr_value(start, b"unitName")?;
+            if let Some(frequency) =
+                value.and_then(|frequency| frequency_to_mhz(frequency, unit_name.as_deref()))
+            {
+                raw.frequency_mhz = Some(frequency);
+            }
+        }
+        b"sweepWidth" if raw.sweep_width_hz.is_none() => {
+            let value = optional_f64_attr(start, b"value", "sweep width value")?;
+            let unit_name = attr_value(start, b"unitName")?;
+            raw.sweep_width_hz =
+                value.and_then(|sweep_width| frequency_to_hz(sweep_width, unit_name.as_deref()));
         }
         b"sampleAcquisitionTemperature" if raw.temperature_k.is_none() => {
             let value = optional_f64_attr(start, b"value", "temperature value")?;
@@ -356,6 +442,59 @@ fn decode_spectrum_data(binary: &BinaryDataArray) -> Result<DecodedSpectrumData>
         _ => Err(RSpinError::Unsupported {
             feature: "nmrML spectrumDataArray byteFormat",
         }),
+    }
+}
+
+fn decode_fid_data(
+    binary: &BinaryDataArray,
+    declared_points: Option<usize>,
+) -> Result<(Vec<f64>, Option<Vec<f64>>)> {
+    let payload = binary_payload(binary)?;
+    match normalize_token(&binary.byte_format).as_str() {
+        "complex128" if should_decode_fid_complex64(&payload, declared_points) => {
+            decode_f32_pairs(&payload, "fidData").map(|(real, imaginary)| (real, Some(imaginary)))
+        }
+        "complex128" => {
+            decode_f64_pairs(&payload, "fidData").map(|(real, imaginary)| (real, Some(imaginary)))
+        }
+        "complex64" => {
+            decode_f32_pairs(&payload, "fidData").map(|(real, imaginary)| (real, Some(imaginary)))
+        }
+        "float64" => decode_f64_values(&payload, "fidData").map(|real| (real, None)),
+        "float32" => decode_f32_values(&payload, "fidData").map(|real| (real, None)),
+        _ => Err(RSpinError::Unsupported {
+            feature: "nmrML fidData byteFormat",
+        }),
+    }
+}
+
+fn should_decode_fid_complex64(payload: &[u8], declared_points: Option<usize>) -> bool {
+    let Some(points) = declared_points else {
+        return false;
+    };
+    match points.checked_mul(4) {
+        Some(expected_bytes) => payload.len() == expected_bytes && payload.len() % 8 == 0,
+        None => false,
+    }
+}
+
+fn build_fid_axis(points: usize, sweep_width_hz: Option<f64>) -> Result<Axis> {
+    match sweep_width_hz {
+        Some(sweep_width) if sweep_width > 0.0 => {
+            let end = if points <= 1 {
+                0.0
+            } else {
+                let segments = u32::try_from(points - 1).map_err(|_| RSpinError::InvalidAxis {
+                    message: "nmrML FID point count is too large".to_owned(),
+                })?;
+                f64::from(segments) / sweep_width
+            };
+            Axis::linear("time", Unit::Seconds, 0.0, end, points)
+        }
+        _ => {
+            let end = u32::try_from(points.saturating_sub(1)).map_or(0.0, f64::from);
+            Axis::linear("point", Unit::Points, 0.0, end, points)
+        }
     }
 }
 
@@ -522,8 +661,19 @@ fn frequency_to_mhz(value: f64, unit_name: Option<&str>) -> Option<f64> {
     match unit_name.map(normalize_token).as_deref() {
         Some("megahertz" | "mhz") | None => Some(value),
         Some("kilohertz" | "khz") => Some(value / 1_000.0),
+        Some("hertz" | "hz") if value < 100_000.0 => Some(value),
         Some("hertz" | "hz") => Some(value / 1_000_000.0),
         Some("gigahertz" | "ghz") => Some(value * 1_000.0),
+        _ => None,
+    }
+}
+
+fn frequency_to_hz(value: f64, unit_name: Option<&str>) -> Option<f64> {
+    match unit_name.map(normalize_token).as_deref() {
+        Some("hertz" | "hz") | None => Some(value),
+        Some("kilohertz" | "khz") => Some(value * 1_000.0),
+        Some("megahertz" | "mhz") => Some(value * 1_000_000.0),
+        Some("gigahertz" | "ghz") => Some(value * 1_000_000_000.0),
         _ => None,
     }
 }
@@ -702,6 +852,41 @@ mod tests {
         assert_eq!(spectrum.x.values, vec![10.0, 9.0, 8.0]);
         assert_eq!(spectrum.intensities, vec![1.0, -2.0, 3.5]);
         assert_eq!(spectrum.metadata.origin.as_deref(), Some("nmrML 1.0.rc1"));
+        Ok(())
+    }
+
+    #[test]
+    fn reads_compressed_fid_data_with_complex64_fallback() -> Result<()> {
+        let input = r#"
+            <nmrML version="v1.0.rc1">
+              <acquisition>
+                <acquisition1D>
+                  <acquisitionParameterSet numberOfScans="1" numberOfSteadyStateScans="0">
+                    <sampleAcquisitionTemperature value="299.15" unitName="kelvin"/>
+                    <DirectDimensionParameterSet decoupled="false" numberOfDataPoints="6">
+                      <acquisitionNucleus cvRef="CHEBI" accession="CHEBI:49637" name="1H"/>
+                      <irradiationFrequency value="600.0" unitName="hertz"/>
+                      <sweepWidth value="2.0" unitName="hertz"/>
+                    </DirectDimensionParameterSet>
+                  </acquisitionParameterSet>
+                  <fidData compressed="true" encodedLength="40" byteFormat="Complex128">
+                    eJxjYGiwZ2Bo2M/AwOAAxAcYGBKAdMIBADTyBL8=
+                  </fidData>
+                </acquisition1D>
+              </acquisition>
+            </nmrML>
+        "#;
+
+        let spectrum = read_nmrml_1d_str(input)?;
+
+        assert_eq!(spectrum.len(), 3);
+        assert_eq!(spectrum.x.unit, Unit::Seconds);
+        assert_eq!(spectrum.x.values, vec![0.0, 0.5, 1.0]);
+        assert_eq!(spectrum.intensities, vec![1.0, 2.0, 3.5]);
+        assert_eq!(spectrum.imaginary, Some(vec![-1.0, -2.0, -3.5]));
+        assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+        assert_eq!(spectrum.metadata.frequency_mhz, Some(600.0));
+        assert_eq!(spectrum.metadata.temperature_k, Some(299.15));
         Ok(())
     }
 
