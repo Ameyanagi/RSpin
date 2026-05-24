@@ -47,10 +47,10 @@ pub use io::{
     write_spectrum1d_json, write_spectrum2d_csv, write_spectrum2d_json,
 };
 pub use prediction::{
-    ElementShiftPredictor, ElementShiftRule, Experiment, PredictedCorrelation2D, PredictedSignal1D,
-    PredictionLineShape, PredictionProvenance, PredictionSet, PredictionSpectrum2DOptions,
-    PredictionSpectrumOptions, Predictor, StaticPrediction, predict_molecule_with_rules,
-    render_prediction_1d, render_prediction_2d,
+    BondCorrelationRule, ElementShiftPredictor, ElementShiftRule, Experiment,
+    PredictedCorrelation2D, PredictedSignal1D, PredictionLineShape, PredictionProvenance,
+    PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions, Predictor,
+    StaticPrediction, predict_molecule_with_rules, render_prediction_1d, render_prediction_2d,
 };
 pub use processing::{
     Abs1D, Abs2D, AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection,
@@ -86,26 +86,27 @@ pub mod prelude {
     pub use crate::{
         Abs1D, Abs2D, AlignmentWindow, AnnotationTarget, AssignedAtom, Assignment, AssignmentSet,
         AssignmentTarget, Atom, AutoPhaseOptions, Axis, BaselineMethod, BilinearIntegrator2D, Bond,
-        BondOrder, BucketMatrix1D, BucketMatrix2D, BucketOptions1D, BucketOptions2D, ClusterMerge,
-        ConsensusPeak1D, ConsensusPeakMember1D, ConsensusPeakOptions, ConsensusRange1D,
-        ConsensusRangeMember1D, ConsensusRangeOptions, Crop1D, Crop2D, CsvSpectrum1D,
-        CsvSpectrum2D, DetectedMultiplet, DetectedRange, DetectedZone, ElementShiftPredictor,
-        ElementShiftRule, ExactSpectrumOptions, ExactSpinOptions, ExactTransition, Experiment,
-        FftDirection, Integral, Integral2D, IntegralRegion, IntegralRegion2D, JCoupling,
-        JCouplingGraph, LineShape, MatrixClusterCut, MatrixClusterMetric, MatrixClusterResult,
-        MatrixClusteringOptions, MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage,
-        MatrixPairwiseMetric, MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions,
-        MatrixPcaResult, MatrixScaling, Metadata, Molecule, MultipletDetectionOptions,
-        MultipletKind, Nucleus, Peak, PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions,
-        PeakPolarity, PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions,
-        PredictionSpectrumOptions, ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D,
-        ProcessingOperation2D, ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError,
-        RangeDetectionOptions, Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D,
-        SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D,
-        SpectralBucket2D, Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D,
-        SpectrumMatrix2D, SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem,
-        TrapezoidalIntegrator, Unit, ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d,
-        align_spectra_by_peak, align_spectra_by_peak_to_matrix, apply_processing_recipe_1d,
+        BondCorrelationRule, BondOrder, BucketMatrix1D, BucketMatrix2D, BucketOptions1D,
+        BucketOptions2D, ClusterMerge, ConsensusPeak1D, ConsensusPeakMember1D,
+        ConsensusPeakOptions, ConsensusRange1D, ConsensusRangeMember1D, ConsensusRangeOptions,
+        Crop1D, Crop2D, CsvSpectrum1D, CsvSpectrum2D, DetectedMultiplet, DetectedRange,
+        DetectedZone, ElementShiftPredictor, ElementShiftRule, ExactSpectrumOptions,
+        ExactSpinOptions, ExactTransition, Experiment, FftDirection, Integral, Integral2D,
+        IntegralRegion, IntegralRegion2D, JCoupling, JCouplingGraph, LineShape, MatrixClusterCut,
+        MatrixClusterMetric, MatrixClusterResult, MatrixClusteringOptions,
+        MatrixGeneration2DOptions, MatrixGenerationOptions, MatrixLinkage, MatrixPairwiseMetric,
+        MatrixPairwiseOptions, MatrixPairwiseResult, MatrixPcaOptions, MatrixPcaResult,
+        MatrixScaling, Metadata, Molecule, MultipletDetectionOptions, MultipletKind, Nucleus, Peak,
+        PeakAlignedMatrix1D, PeakAlignmentOptions, PeakPickOptions, PeakPolarity,
+        PredictionLineShape, PredictionSet, PredictionSpectrum2DOptions, PredictionSpectrumOptions,
+        ProcessSpectrum1D, ProcessSpectrum2D, ProcessingOperation1D, ProcessingOperation2D,
+        ProcessingRecipe1D, ProcessingRecipe2D, ProjectionMode, RSpinError, RangeDetectionOptions,
+        Resample1D, Resample2D, Result, ScalarCoupling, SignalSummary1D, SignalSummary2D,
+        SignalSummary2DOptions, SignalSummaryOptions, SpectralBucket1D, SpectralBucket2D,
+        Spectrum1D, Spectrum2D, SpectrumAnnotation, SpectrumMatrix1D, SpectrumMatrix2D,
+        SpectrumReader, SpectrumWriter, SpinHalf, SpinHalfSystem, TrapezoidalIntegrator, Unit,
+        ZoneConnectivity, ZoneDetectionOptions, abs_1d, abs_2d, align_spectra_by_peak,
+        align_spectra_by_peak_to_matrix, apply_processing_recipe_1d,
         apply_processing_recipe_1d_until, apply_processing_recipe_2d,
         apply_processing_recipe_2d_until, auto_phase_correct, auto_phase_correct_2d,
         bucket_spectra_1d, bucket_spectra_2d, bucket_spectrum_1d, bucket_spectrum_2d,
@@ -159,18 +160,6 @@ mod tests {
     fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
         let spectrum = read_spectrum1d_csv("x,intensity\n1,2\n2,4\n")?;
         assert_eq!(spectrum.len(), 2);
-
-        let molecule = Molecule::new("methane").with_atom(Atom::new("H1", "H"));
-        let prediction = predict_molecule_with_rules(
-            &molecule,
-            &ElementShiftPredictor::new().with_rule(ElementShiftRule::new(
-                "H",
-                Experiment::Proton1D,
-                Nucleus::Hydrogen1,
-                0.9,
-            )),
-        )?;
-        assert_eq!(prediction.signals_1d.len(), 1);
 
         let aligned = align_spectra_by_peak_to_matrix(
             &[
@@ -259,6 +248,39 @@ mod tests {
 
         assert_eq!(transitions.len(), 1);
         assert!((transitions[0].center_ppm - 1.0).abs() < 1.0e-12);
+        Ok(())
+    }
+
+    #[test]
+    fn prelude_supports_prediction_bond_correlations() -> Result<()> {
+        let molecule = Molecule::new("methanol")
+            .with_atom(Atom::new("H1", "H"))
+            .with_atom(Atom::new("C1", "C"))
+            .with_bond(Bond::new("C1", "H1"));
+        let prediction = predict_molecule_with_rules(
+            &molecule,
+            &ElementShiftPredictor::new()
+                .with_rule(ElementShiftRule::new(
+                    "H",
+                    Experiment::Proton1D,
+                    Nucleus::Hydrogen1,
+                    0.9,
+                ))
+                .with_rule(ElementShiftRule::new(
+                    "C",
+                    Experiment::Carbon13_1D,
+                    Nucleus::Carbon13,
+                    50.0,
+                ))
+                .with_correlation_rule(BondCorrelationRule::new(
+                    Experiment::Hsqc,
+                    Nucleus::Hydrogen1,
+                    Nucleus::Carbon13,
+                )),
+        )?;
+
+        assert_eq!(prediction.signals_1d.len(), 2);
+        assert_eq!(prediction.correlations_2d.len(), 1);
         Ok(())
     }
 

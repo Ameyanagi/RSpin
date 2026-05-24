@@ -19,15 +19,20 @@ fn validates_prediction_json() -> anyhow::Result<()> {
 #[test]
 fn predicts_molecule_with_element_rules_json() -> anyhow::Result<()> {
     let json = predict_molecule_with_element_rules_json(
-        r#"{"id":"ethanol","name":"ethanol","atoms":[{"id":"H1","element":"H","label":"H-a"},{"id":"C1","element":"C"},{"id":"O1","element":"O"}]}"#,
-        r#"{"rules":[{"element":"H","experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.25,"intensity":1.0,"confidence":0.8},{"element":"C","experiment":"Carbon13_1D","nucleus":"Carbon13","delta_ppm":63.0,"intensity":1.0}]}"#,
+        r#"{"id":"ethanol","name":"ethanol","atoms":[{"id":"H1","element":"H","label":"H-a"},{"id":"C1","element":"C"},{"id":"O1","element":"O"}],"bonds":[{"from_atom_id":"C1","to_atom_id":"H1","order":"single"}]}"#,
+        r#"{"rules":[{"element":"H","experiment":"Proton1D","nucleus":"Hydrogen1","delta_ppm":1.25,"intensity":1.0,"confidence":0.8},{"element":"C","experiment":"Carbon13_1D","nucleus":"Carbon13","delta_ppm":63.0,"intensity":1.0}],"correlation_rules":[{"experiment":"Hsqc","x_nucleus":"Hydrogen1","y_nucleus":"Carbon13","intensity":0.5,"confidence":0.7}]}"#,
     )?;
     let prediction: PredictionSet = from_json(&json)?;
 
     assert_eq!(prediction.name, Some("ethanol".to_owned()));
     assert_eq!(prediction.signals_1d.len(), 2);
+    assert_eq!(prediction.correlations_2d.len(), 1);
     assert_eq!(prediction.signals_1d[0].assignments, vec!["H-a".to_owned()]);
     assert_eq!(prediction.signals_1d[1].assignments, vec!["C1".to_owned()]);
+    assert_eq!(
+        prediction.correlations_2d[0].assignments,
+        vec!["H-a-C1".to_owned()]
+    );
     assert_eq!(
         prediction
             .provenance

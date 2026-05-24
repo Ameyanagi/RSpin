@@ -6,6 +6,11 @@ use rspin_core::{Atom, Molecule, Nucleus, RSpinError, Result};
 
 use crate::{Experiment, PredictedSignal1D, PredictionProvenance, PredictionSet, Predictor};
 
+mod correlations;
+
+pub use correlations::BondCorrelationRule;
+use correlations::{AtomSignal, correlations_for_molecule};
+
 /// Rule mapping molecule atoms to one-dimensional predicted signals.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ElementShiftRule {
@@ -132,6 +137,9 @@ pub struct ElementShiftPredictor {
     /// Element rules applied to each atom in stable molecule order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rules: Vec<ElementShiftRule>,
+    /// Bond correlation rules applied after atom shifts are predicted.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub correlation_rules: Vec<BondCorrelationRule>,
     /// Provenance attached to generated prediction payloads.
     #[serde(default = "default_provenance")]
     pub provenance: PredictionProvenance,
@@ -144,6 +152,7 @@ impl ElementShiftPredictor {
         Self {
             name: None,
             rules: Vec::new(),
+            correlation_rules: Vec::new(),
             provenance: default_provenance(),
         }
     }
@@ -183,6 +192,27 @@ impl ElementShiftPredictor {
         self
     }
 
+    /// Appends one bond correlation rule.
+    #[must_use]
+    pub fn with_correlation_rule(mut self, rule: BondCorrelationRule) -> Self {
+        self.correlation_rules.push(rule);
+        self
+    }
+
+    /// Replaces all bond correlation rules.
+    #[must_use]
+    pub fn with_correlation_rules(mut self, rules: Vec<BondCorrelationRule>) -> Self {
+        self.correlation_rules = rules;
+        self
+    }
+
+    /// Clears all bond correlation rules.
+    #[must_use]
+    pub fn without_correlation_rules(mut self) -> Self {
+        self.correlation_rules.clear();
+        self
+    }
+
     /// Sets prediction provenance.
     #[must_use]
     pub fn with_provenance(mut self, provenance: PredictionProvenance) -> Self {
@@ -200,9 +230,17 @@ impl ElementShiftPredictor {
         molecule.validate()?;
         self.validate()?;
 
+        let atom_signals = self.atom_signals_for_molecule(molecule);
+        let correlations =
+            correlations_for_molecule(molecule, &atom_signals, &self.correlation_rules)?;
+        let signals = atom_signals
+            .into_iter()
+            .map(|atom_signal| atom_signal.signal)
+            .collect();
         let mut prediction = PredictionSet::new()
             .with_provenance(self.provenance.clone())
-            .with_signals_1d(self.signals_for_molecule(molecule));
+            .with_signals_1d(signals)
+            .with_correlations_2d(correlations);
 
         prediction.name = Some(self.prediction_name(molecule));
         prediction.validate()?;
@@ -218,10 +256,13 @@ impl ElementShiftPredictor {
         for rule in &self.rules {
             rule.validate()?;
         }
+        for rule in &self.correlation_rules {
+            rule.validate()?;
+        }
         Ok(())
     }
 
-    fn signals_for_molecule(&self, molecule: &Molecule) -> Vec<PredictedSignal1D> {
+    fn atom_signals_for_molecule(&self, molecule: &Molecule) -> Vec<AtomSignal> {
         molecule
             .atoms
             .iter()
@@ -229,7 +270,10 @@ impl ElementShiftPredictor {
                 self.rules
                     .iter()
                     .filter(|rule| rule.matches_atom(atom))
-                    .map(|rule| rule.signal_for_atom(atom))
+                    .map(|rule| AtomSignal {
+                        atom_id: atom.id.clone(),
+                        signal: rule.signal_for_atom(atom),
+                    })
             })
             .collect()
     }
