@@ -6,10 +6,6 @@ license.workspace = true
 rust-version.workspace = true
 version.workspace = true
 
-[features]
-default = []
-first-order = []
-
 [dependencies]
 nalgebra.workspace = true
 rspin-core.workspace = true

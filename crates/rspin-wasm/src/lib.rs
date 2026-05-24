@@ -23,8 +23,6 @@ pub use analysis::{
     pairwise_spectrum_matrix_2d, pca_bucket_matrix_1d, pca_bucket_matrix_2d,
     pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
 };
-#[cfg(feature = "first-order")]
-pub use api::simulate_first_order_multiplet_json;
 pub use api::{
     abs_spectrum_1d_json, abs_spectrum_2d_json, align_spectra_by_peak_to_matrix_1d_json,
     align_spectra_by_zone_to_matrix_2d_json, analyze_spectrum_1d_json, analyze_spectrum_2d_json,
@@ -92,8 +90,6 @@ pub use processing_2d::{
     slice_spectrum_2d_x_at_y, slice_spectrum_2d_x_at_y_index, slice_spectrum_2d_y_at_x,
     slice_spectrum_2d_y_at_x_index, zero_fill_spectrum_2d,
 };
-#[cfg(feature = "first-order")]
-pub use simulation::simulate_first_order_multiplet;
 pub use simulation::{
     decompose_exact_spin_half_spectrum, decompose_exact_spin_half_spectrum_2d,
     simulate_exact_spin_half_spectrum, simulate_exact_spin_half_spectrum_2d,

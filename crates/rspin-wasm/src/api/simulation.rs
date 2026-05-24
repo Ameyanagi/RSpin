@@ -6,26 +6,8 @@ use rspin_simulation::{
     decompose_exact_spin_half_1d, decompose_exact_spin_half_2d, exact_spin_half_transitions,
     simulate_exact_spin_half_1d, simulate_exact_spin_half_2d,
 };
-#[cfg(feature = "first-order")]
-use rspin_simulation::{FirstOrderMultiplet, SimulationOptions, simulate_multiplet_1d};
 
 use super::{from_json, to_json};
-
-/// Simulates a serialized first-order multiplet and options into `Spectrum1D` JSON.
-///
-/// # Errors
-///
-/// Returns an error when deserialization, simulation, or serialization fails.
-#[cfg(feature = "first-order")]
-pub fn simulate_first_order_multiplet_json(
-    multiplet_json: &str,
-    options_json: &str,
-) -> Result<String> {
-    let multiplet: FirstOrderMultiplet = from_json(multiplet_json)?;
-    let options: SimulationOptions = from_json(options_json)?;
-    let spectrum = simulate_multiplet_1d(&multiplet, options)?;
-    to_json(&spectrum)
-}
 
 /// Simulates exact spin-1/2 transitions and returns serialized transition JSON.
 ///

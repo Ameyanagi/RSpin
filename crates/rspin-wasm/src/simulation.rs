@@ -8,22 +8,6 @@ use crate::{
     simulate_exact_spin_half_transitions_json,
 };
 
-/// Simulates a first-order multiplet as a serialized one-dimensional spectrum.
-///
-/// # Errors
-///
-/// Returns a JavaScript error string when deserialization, simulation, or
-/// serialization fails.
-#[cfg(feature = "first-order")]
-#[wasm_bindgen(js_name = simulateFirstOrderMultiplet)]
-pub fn simulate_first_order_multiplet(
-    multiplet_json: &str,
-    options_json: &str,
-) -> std::result::Result<String, JsValue> {
-    crate::simulate_first_order_multiplet_json(multiplet_json, options_json)
-        .map_err(|error| js_error(&error))
-}
-
 /// Simulates exact spin-1/2 transitions as serialized JSON.
 ///
 /// # Errors

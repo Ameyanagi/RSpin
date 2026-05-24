@@ -1,24 +1,10 @@
 use rspin_core::{Spectrum1D, Spectrum2D};
 
-#[cfg(feature = "first-order")]
-use super::super::simulate_first_order_multiplet_json;
 use super::super::{
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, from_json,
     simulate_exact_spin_half_spectrum_2d_json, simulate_exact_spin_half_spectrum_json,
     simulate_exact_spin_half_transitions_json,
 };
-
-#[cfg(feature = "first-order")]
-#[test]
-fn simulates_first_order_json() -> anyhow::Result<()> {
-    let spectrum_json = simulate_first_order_multiplet_json(
-        r#"{"center_ppm":7.0,"area":1.0,"couplings":[{"j_hz":8.0,"equivalent_spins":1}]}"#,
-        r#"{"from_ppm":6.95,"to_ppm":7.05,"points":16,"line_width_hz":1.0,"spectrometer_mhz":400.0,"line_shape":"Lorentzian"}"#,
-    )?;
-    let spectrum: Spectrum1D = from_json(&spectrum_json)?;
-    assert_eq!(spectrum.len(), 16);
-    Ok(())
-}
 
 #[test]
 fn simulates_exact_transitions_json() -> anyhow::Result<()> {
