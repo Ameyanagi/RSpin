@@ -1,6 +1,7 @@
 //! Minimal JCAMP-DX support for one-dimensional spectra.
 
 use rspin_core::{Axis, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use serde::{Deserialize, Serialize};
 
 use crate::{SpectrumReader, SpectrumWriter};
 
@@ -30,6 +31,7 @@ impl SpectrumWriter<Spectrum1D> for JcampDx {
 
 #[derive(Default)]
 struct RawJcamp {
+    version: Option<JcampDxVersion>,
     title: Option<String>,
     first_x: Option<f64>,
     last_x: Option<f64>,
@@ -46,6 +48,48 @@ struct RawJcamp {
     xy_values: Vec<f64>,
     imaginary_values: Vec<f64>,
     xy_points: Vec<(f64, f64)>,
+}
+
+/// Parsed JCAMP-DX version label.
+///
+/// JCAMP-DX files commonly use values such as `4.24` or `5.00`. `RSpin`
+/// preserves the raw label value and exposes numeric components so readers can
+/// reject unsupported future versions before interpreting data blocks.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JcampDxVersion {
+    /// Raw version string after trimming comments and whitespace.
+    pub raw: String,
+    /// Major JCAMP-DX version.
+    pub major: u32,
+    /// Minor JCAMP-DX version.
+    pub minor: u32,
+    /// Optional patch/build component after `major.minor`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub patch: Option<u32>,
+}
+
+impl JcampDxVersion {
+    /// Returns true when `RSpin`'s current JCAMP-DX reader supports this version.
+    #[must_use]
+    pub fn is_supported_by_current_reader(&self) -> bool {
+        matches!(self.major, 4 | 5)
+    }
+
+    /// Validates that the version is supported by `RSpin`'s current reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-feature error for future or otherwise unsupported
+    /// JCAMP-DX major versions.
+    pub fn validate_supported_by_current_reader(&self) -> Result<()> {
+        if self.is_supported_by_current_reader() {
+            Ok(())
+        } else {
+            Err(RSpinError::Unsupported {
+                feature: "JCAMP-DX version",
+            })
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -178,6 +222,82 @@ fn spectrum_from_xypoints(raw: RawJcamp) -> Result<Spectrum1D> {
 
     let axis = Axis::new("x", raw.x_unit, x_values)?;
     Spectrum1D::new(axis, intensities, metadata)
+}
+
+/// Parses a JCAMP-DX version label.
+///
+/// The parser accepts `major`, `major.minor`, and `major.minor.patch` numeric
+/// labels and strips a trailing `$$` comment before parsing.
+///
+/// # Errors
+///
+/// Returns a parse error when the label is empty, contains a non-numeric
+/// component, or has more than three numeric components.
+pub fn parse_jcamp_dx_version(input: &str) -> Result<JcampDxVersion> {
+    let raw = clean_label_value(input);
+    if raw.is_empty() {
+        return Err(RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: "JCAMP-DX version: empty version label".to_owned(),
+        });
+    }
+
+    let mut components = raw.split('.');
+    let major = parse_version_component("JCAMP-DX major version", components.next())?;
+    let minor = match components.next() {
+        Some(component) => parse_version_component("JCAMP-DX minor version", Some(component))?,
+        None => 0,
+    };
+    let patch = match components.next() {
+        Some(component) => Some(parse_version_component(
+            "JCAMP-DX patch version",
+            Some(component),
+        )?),
+        None => None,
+    };
+    if components.next().is_some() {
+        return Err(RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: "JCAMP-DX version: expected at most three numeric components".to_owned(),
+        });
+    }
+
+    Ok(JcampDxVersion {
+        raw: raw.to_owned(),
+        major,
+        minor,
+        patch,
+    })
+}
+
+fn parse_version_component(field: &'static str, component: Option<&str>) -> Result<u32> {
+    let component = component.ok_or_else(|| RSpinError::Parse {
+        format: "JCAMP-DX",
+        message: format!("{field}: missing component"),
+    })?;
+    if component.is_empty()
+        || !component
+            .chars()
+            .all(|character| character.is_ascii_digit())
+    {
+        return Err(RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: format!("{field}: expected a non-negative integer"),
+        });
+    }
+    component.parse::<u32>().map_err(|error| RSpinError::Parse {
+        format: "JCAMP-DX",
+        message: format!("{field}: {error}"),
+    })
+}
+
+fn clean_label_value(value: &str) -> &str {
+    let mut parts = value.split("$$");
+    if let Some(cleaned) = parts.next() {
+        cleaned.trim()
+    } else {
+        value.trim()
+    }
 }
 
 fn data_table_block(value: &str) -> Option<DataBlock> {

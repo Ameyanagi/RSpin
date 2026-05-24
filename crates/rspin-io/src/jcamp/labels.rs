@@ -2,10 +2,15 @@ use std::str::FromStr;
 
 use rspin_core::{Metadata, Nucleus, RSpinError, Result, Unit};
 
-use super::{RawJcamp, parse_float, parse_usize};
+use super::{RawJcamp, parse_float, parse_jcamp_dx_version, parse_usize};
 
 pub(super) fn apply_label(raw: &mut RawJcamp, key: &str, value: &str) -> Result<()> {
     match super::normalized_key(key).as_str() {
+        "JCAMPDX" => {
+            let version = parse_jcamp_dx_version(value)?;
+            version.validate_supported_by_current_reader()?;
+            raw.version = Some(version);
+        }
         "TITLE" => set_text(&mut raw.title, value),
         "ORIGIN" => set_text(&mut raw.origin, value),
         "SOLVENT" | "SOLVENTNAME" => set_text(&mut raw.solvent, value),
@@ -40,7 +45,7 @@ pub(super) fn apply_comment_assignment(raw: &mut RawJcamp, key: &str, value: &st
 }
 
 pub(super) fn metadata_from_raw(raw: &RawJcamp) -> Metadata {
-    Metadata {
+    let mut metadata = Metadata {
         name: raw.title.clone(),
         nucleus: raw.nucleus.clone(),
         frequency_mhz: raw.frequency_mhz,
@@ -48,7 +53,13 @@ pub(super) fn metadata_from_raw(raw: &RawJcamp) -> Metadata {
         temperature_k: raw.temperature_k,
         origin: raw.origin.clone(),
         ..Metadata::default()
+    };
+    if let Some(version) = raw.version.as_ref() {
+        metadata
+            .properties
+            .insert("jcamp_dx.version".to_owned(), version.raw.clone());
     }
+    metadata
 }
 
 fn apply_factor_label(raw: &mut RawJcamp, value: &str) -> Result<()> {

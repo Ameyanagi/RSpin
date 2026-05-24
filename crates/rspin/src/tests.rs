@@ -110,8 +110,6 @@ fn prelude_supports_processed_analysis_bridge() -> Result<()> {
 
 #[test]
 fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
-    let agilent_2d_reader = AgilentFid2D;
-    assert_eq!(format!("{agilent_2d_reader:?}"), "AgilentFid2D");
     let spectrum = read_spectrum1d_csv("x,intensity\n1,2\n2,4\n")?;
     assert_eq!(spectrum.len(), 2);
     let nmrml_version = parse_nmrml_version("v1.0.rc1")?;
@@ -214,6 +212,19 @@ fn prelude_supports_common_io_and_exact_simulation() -> Result<()> {
 
     assert_eq!(transitions.len(), 1);
     assert!((transitions[0].center_ppm - 1.0).abs() < 1.0e-12);
+    Ok(())
+}
+
+#[test]
+fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
+    let agilent_2d_reader = AgilentFid2D;
+    assert_eq!(format!("{agilent_2d_reader:?}"), "AgilentFid2D");
+    let jcamp_reader = JcampDx;
+    assert_eq!(format!("{jcamp_reader:?}"), "JcampDx");
+
+    let jcamp_version = parse_jcamp_dx_version("5.00")?;
+    assert_eq!(jcamp_version.major, 5);
+    assert!(jcamp_version.is_supported_by_current_reader());
     Ok(())
 }
 

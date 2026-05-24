@@ -24,12 +24,73 @@ fn reads_xydata_spectrum() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.name.as_deref(), Some("ethyl sample"));
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.frequency_mhz, Some(400.0));
+    assert_eq!(
+        spectrum
+            .metadata
+            .properties
+            .get("jcamp_dx.version")
+            .map(String::as_str),
+        Some("5.00")
+    );
     assert_axis_close(
         &spectrum.x.values,
         &[10.0, 9.333_333_333_333_334, 8.666_666_666_666_666, 8.0],
     );
     assert_eq!(spectrum.intensities, vec![1.0, 2.0, 3.0, 4.0]);
     Ok(())
+}
+
+#[test]
+fn parses_jcamp_dx_version_labels() -> anyhow::Result<()> {
+    let version = parse_jcamp_dx_version("5.00 $$ comment")?;
+    assert_eq!(
+        version,
+        JcampDxVersion {
+            raw: "5.00".to_owned(),
+            major: 5,
+            minor: 0,
+            patch: None,
+        }
+    );
+    assert!(version.is_supported_by_current_reader());
+
+    let patch = parse_jcamp_dx_version("4.24.1")?;
+    assert_eq!(patch.major, 4);
+    assert_eq!(patch.minor, 24);
+    assert_eq!(patch.patch, Some(1));
+    assert!(patch.is_supported_by_current_reader());
+
+    let future = parse_jcamp_dx_version("6.0")?;
+    assert!(!future.is_supported_by_current_reader());
+    let error = future
+        .validate_supported_by_current_reader()
+        .expect_err("future JCAMP-DX versions should be rejected");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
+    Ok(())
+}
+
+#[test]
+fn rejects_malformed_jcamp_dx_version_labels() {
+    let error =
+        parse_jcamp_dx_version("5.beta").expect_err("malformed JCAMP-DX version should fail");
+    assert!(matches!(error, RSpinError::Parse { .. }));
+}
+
+#[test]
+fn rejects_unsupported_jcamp_dx_version_label() {
+    let input = "\
+##TITLE=future
+##JCAMP-DX=6.00
+##XUNITS=PPM
+##FIRSTX=0
+##LASTX=1
+##NPOINTS=2
+##XYDATA=(X++(Y..Y))
+0 1 2
+##END=
+";
+    let error = read_jcamp_dx_1d(input).expect_err("unsupported JCAMP-DX version should fail");
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
 }
 
 #[test]
