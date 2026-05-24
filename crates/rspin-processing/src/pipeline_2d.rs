@@ -3,9 +3,9 @@
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    AutoPhase2DOptions, AutoPhaseCorrection2D, ExponentialApodization2D, Fft2D, FftDirection,
-    Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Scale2D, ZeroFill2D,
-    project_x, project_y, slice_x_at_y_index, slice_y_at_x_index,
+    AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
+    FftDirection, Normalize2DMaxAbs, PhaseCorrection2D, ProcessingStep, ProjectionMode, Scale2D,
+    ZeroFill2D, project_x, project_y, slice_x_at_y_index, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -79,6 +79,17 @@ impl Spectrum2DPipeline {
         self.then(ZeroFill2D {
             target_x_len: target_width,
             target_y_len: target_height,
+        })
+    }
+
+    /// Keeps points inside inclusive x and y coordinate windows.
+    #[must_use]
+    pub fn crop(self, x_from: f64, x_to: f64, y_from: f64, y_to: f64) -> Self {
+        self.then(Crop2D {
+            x_from,
+            x_to,
+            y_from,
+            y_to,
         })
     }
 
@@ -215,6 +226,7 @@ mod tests {
         let processed = spectrum
             .process()
             .scale(2.0)
+            .crop(1.0, 2.0, 10.0, 11.0)
             .zero_fill(4, 3)
             .normalize_max_abs()
             .finish()?;
@@ -223,11 +235,10 @@ mod tests {
         assert_vec_close(
             &processed.z,
             &[
-                2.0 / 12.0,
                 -4.0 / 12.0,
                 6.0 / 12.0,
                 0.0,
-                8.0 / 12.0,
+                0.0,
                 -10.0 / 12.0,
                 1.0,
                 0.0,
@@ -235,11 +246,13 @@ mod tests {
                 0.0,
                 0.0,
                 0.0,
+                0.0,
             ],
         );
-        assert_eq!(processed.processing.len(), 3);
+        assert_eq!(processed.processing.len(), 4);
         assert_eq!(processed.processing[0].operation, "scale_2d");
-        assert_eq!(processed.processing[2].operation, "normalize_2d_max_abs");
+        assert_eq!(processed.processing[1].operation, "crop_2d");
+        assert_eq!(processed.processing[3].operation, "normalize_2d_max_abs");
         Ok(())
     }
 

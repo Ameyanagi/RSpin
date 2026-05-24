@@ -5,6 +5,8 @@ mod auto_phase;
 mod auto_phase_2d;
 mod baseline;
 mod contours;
+mod crop_1d;
+mod crop_2d;
 mod one_d;
 mod pipeline;
 mod pipeline_2d;
@@ -23,6 +25,8 @@ pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
 };
 pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, extract_contours};
+pub use crop_1d::{Crop1D, crop_1d};
+pub use crop_2d::{Crop2D, crop_2d};
 pub use one_d::{
     NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill, normalize_max_abs,
     offset_intensity, scale_intensity, shift_axis, zero_fill,

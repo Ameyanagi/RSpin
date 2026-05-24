@@ -3,10 +3,10 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    auto_phase_spectrum_1d_json, exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
-    js_error, magnitude_spectrum_1d_json, normalize_spectrum_1d_json, offset_spectrum_1d_json,
-    phase_spectrum_1d_json, scale_spectrum_1d_json, shift_spectrum_1d_axis_json,
-    subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
+    auto_phase_spectrum_1d_json, crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json,
+    fft_spectrum_1d_json, js_error, magnitude_spectrum_1d_json, normalize_spectrum_1d_json,
+    offset_spectrum_1d_json, phase_spectrum_1d_json, scale_spectrum_1d_json,
+    shift_spectrum_1d_axis_json, subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 
 /// Scales a serialized one-dimensional spectrum.
@@ -71,6 +71,21 @@ pub fn zero_fill_spectrum_1d(
     target_len: usize,
 ) -> std::result::Result<String, JsValue> {
     zero_fill_spectrum_1d_json(spectrum_json, target_len).map_err(|error| js_error(&error))
+}
+
+/// Crops a serialized one-dimensional spectrum to an inclusive x-axis window.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = cropSpectrum1d)]
+pub fn crop_spectrum_1d(
+    spectrum_json: &str,
+    from: f64,
+    to: f64,
+) -> std::result::Result<String, JsValue> {
+    crop_spectrum_1d_json(spectrum_json, from, to).map_err(|error| js_error(&error))
 }
 
 /// Applies a one-dimensional FFT to a serialized spectrum.

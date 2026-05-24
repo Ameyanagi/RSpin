@@ -21,6 +21,25 @@ fn offsets_shifts_and_zero_fills_1d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn crops_1d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&complex_spectrum()?)?;
+    let cropped_json = crop_spectrum_1d_json(&spectrum_json, 1.0, 2.0)?;
+    let cropped: Spectrum1D = from_json(&cropped_json)?;
+
+    assert_vec_close(&cropped.x.values, &[1.0, 2.0]);
+    assert_vec_close(&cropped.intensities, &[-2.0, 3.0]);
+    assert_option_vec_close(cropped.imaginary.as_deref(), &[-1.0, 1.5]);
+    assert_eq!(
+        cropped
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("crop_1d")
+    );
+    Ok(())
+}
+
+#[test]
 fn roundtrips_1d_fft_json() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let spectrum_json = to_json(&spectrum)?;

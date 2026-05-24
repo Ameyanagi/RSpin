@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use rspin_core::{Result, Spectrum2D};
 use rspin_processing::{
     AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProjectionMode, auto_phase_correct_2d,
-    fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y, scale_2d,
+    crop_2d, fft_2d, normalize_2d_max_abs, phase_correct_2d, project_x, project_y, scale_2d,
     slice_x_at_y_index, slice_y_at_x_index, zero_fill_2d,
 };
 
@@ -45,6 +45,23 @@ pub fn zero_fill_spectrum_2d_json(
 ) -> Result<String> {
     let spectrum: Spectrum2D = from_json(spectrum_json)?;
     let processed = zero_fill_2d(&spectrum, target_width, target_height)?;
+    to_json(&processed)
+}
+
+/// Crops serialized `Spectrum2D` JSON to inclusive x and y windows.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn crop_spectrum_2d_json(
+    spectrum_json: &str,
+    x_from: f64,
+    x_to: f64,
+    y_from: f64,
+    y_to: f64,
+) -> Result<String> {
+    let spectrum: Spectrum2D = from_json(spectrum_json)?;
+    let processed = crop_2d(&spectrum, x_from, x_to, y_from, y_to)?;
     to_json(&processed)
 }
 

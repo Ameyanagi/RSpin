@@ -42,6 +42,27 @@ fn zero_fills_2d_spectrum_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn crops_2d_spectrum_json() -> anyhow::Result<()> {
+    let spectrum_json = to_json(&grid_spectrum()?)?;
+    let cropped_json = crop_spectrum_2d_json(&spectrum_json, 1.0, 2.0, 1.0, 1.0)?;
+    let cropped: Spectrum2D = from_json(&cropped_json)?;
+
+    assert_eq!(cropped.shape(), (2, 1));
+    assert_vec_close(&cropped.x.values, &[1.0, 2.0]);
+    assert_vec_close(&cropped.y.values, &[1.0]);
+    assert_vec_close(&cropped.z, &[5.0, 6.0]);
+    assert_option_vec_close(cropped.imaginary.as_deref(), &[15.0, 16.0]);
+    assert_eq!(
+        cropped
+            .processing
+            .last()
+            .map(|record| record.operation.as_str()),
+        Some("crop_2d")
+    );
+    Ok(())
+}
+
+#[test]
 fn roundtrips_2d_fft_json() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let spectrum_json = to_json(&spectrum)?;

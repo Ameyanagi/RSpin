@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use rspin_core::{Result, Spectrum1D};
 use rspin_processing::{
-    BaselineMethod, FftDirection, exponential_apodization, fft_1d, magnitude_spectrum,
+    BaselineMethod, FftDirection, crop_1d, exponential_apodization, fft_1d, magnitude_spectrum,
     offset_intensity, phase_correct, shift_axis, subtract_baseline, zero_fill,
 };
 
@@ -40,6 +40,17 @@ pub fn shift_spectrum_1d_axis_json(spectrum_json: &str, delta: f64) -> Result<St
 pub fn zero_fill_spectrum_1d_json(spectrum_json: &str, target_len: usize) -> Result<String> {
     let spectrum: Spectrum1D = from_json(spectrum_json)?;
     let processed = zero_fill(&spectrum, target_len)?;
+    to_json(&processed)
+}
+
+/// Crops serialized `Spectrum1D` JSON to an inclusive x-axis window.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn crop_spectrum_1d_json(spectrum_json: &str, from: f64, to: f64) -> Result<String> {
+    let spectrum: Spectrum1D = from_json(spectrum_json)?;
+    let processed = crop_1d(&spectrum, from, to)?;
     to_json(&processed)
 }
 

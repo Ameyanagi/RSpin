@@ -11,28 +11,28 @@ use wasm_bindgen::prelude::*;
 
 pub use analysis::{detect_ranges_1d, detect_zones_2d};
 pub use api::{
-    auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json,
-    decompose_exact_spin_half_spectrum_json, detect_multiplets_json, detect_ranges_json,
-    detect_zones_json, exponential_apodization_spectrum_1d_json, extract_contours_2d_json,
-    fft_spectrum_1d_json, fft_spectrum_2d_json, integrate_region_json, magnitude_spectrum_1d_json,
-    normalize_spectrum_1d_json, normalize_spectrum_2d_json, offset_spectrum_1d_json,
-    optimize_peaks_json, parse_jcamp_dx_1d_json, parse_spectrum_1d_csv_json,
-    parse_spectrum_2d_csv_json, phase_spectrum_1d_json, phase_spectrum_2d_json, pick_peaks_json,
-    project_spectrum_2d_x_json, project_spectrum_2d_y_json, render_prediction_1d_json,
-    scale_spectrum_1d_json, scale_spectrum_2d_json, shift_spectrum_1d_axis_json,
-    simulate_exact_spin_half_spectrum_json, simulate_exact_spin_half_transitions_json,
-    simulate_first_order_multiplet_json, slice_spectrum_2d_x_at_y_index_json,
-    slice_spectrum_2d_y_at_x_index_json, subtract_baseline_spectrum_1d_json,
-    summarize_signals_1d_json, validate_j_coupling_graph_json, validate_prediction_json,
-    write_spectrum_1d_csv_json, write_spectrum_2d_csv_json, zero_fill_spectrum_1d_json,
-    zero_fill_spectrum_2d_json,
+    auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json, crop_spectrum_1d_json,
+    crop_spectrum_2d_json, decompose_exact_spin_half_spectrum_json, detect_multiplets_json,
+    detect_ranges_json, detect_zones_json, exponential_apodization_spectrum_1d_json,
+    extract_contours_2d_json, fft_spectrum_1d_json, fft_spectrum_2d_json, integrate_region_json,
+    magnitude_spectrum_1d_json, normalize_spectrum_1d_json, normalize_spectrum_2d_json,
+    offset_spectrum_1d_json, optimize_peaks_json, parse_jcamp_dx_1d_json,
+    parse_spectrum_1d_csv_json, parse_spectrum_2d_csv_json, phase_spectrum_1d_json,
+    phase_spectrum_2d_json, pick_peaks_json, project_spectrum_2d_x_json,
+    project_spectrum_2d_y_json, render_prediction_1d_json, scale_spectrum_1d_json,
+    scale_spectrum_2d_json, shift_spectrum_1d_axis_json, simulate_exact_spin_half_spectrum_json,
+    simulate_exact_spin_half_transitions_json, simulate_first_order_multiplet_json,
+    slice_spectrum_2d_x_at_y_index_json, slice_spectrum_2d_y_at_x_index_json,
+    subtract_baseline_spectrum_1d_json, summarize_signals_1d_json, validate_j_coupling_graph_json,
+    validate_prediction_json, write_spectrum_1d_csv_json, write_spectrum_2d_csv_json,
+    zero_fill_spectrum_1d_json, zero_fill_spectrum_2d_json,
 };
 pub use contours::extract_contours_2d;
 pub use io::{
     parse_spectrum_1d_csv, parse_spectrum_2d_csv, write_spectrum_1d_csv, write_spectrum_2d_csv,
 };
 pub use processing_1d::{
-    auto_phase_spectrum_1d, exponential_apodization_spectrum_1d, fft_spectrum_1d,
+    auto_phase_spectrum_1d, crop_spectrum_1d, exponential_apodization_spectrum_1d, fft_spectrum_1d,
     magnitude_spectrum_1d, normalize_spectrum_1d, offset_spectrum_1d, phase_spectrum_1d,
     scale_spectrum_1d, shift_spectrum_1d_axis, subtract_baseline_spectrum_1d,
     zero_fill_spectrum_1d,
@@ -83,6 +83,24 @@ pub fn zero_fill_spectrum_2d(
     target_height: usize,
 ) -> std::result::Result<String, JsValue> {
     zero_fill_spectrum_2d_json(spectrum_json, target_width, target_height)
+        .map_err(|error| js_error(&error))
+}
+
+/// Crops a serialized two-dimensional spectrum to inclusive x and y windows.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = cropSpectrum2d)]
+pub fn crop_spectrum_2d(
+    spectrum_json: &str,
+    x_from: f64,
+    x_to: f64,
+    y_from: f64,
+    y_to: f64,
+) -> std::result::Result<String, JsValue> {
+    crop_spectrum_2d_json(spectrum_json, x_from, x_to, y_from, y_to)
         .map_err(|error| js_error(&error))
 }
 
