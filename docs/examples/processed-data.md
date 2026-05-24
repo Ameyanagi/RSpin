@@ -21,3 +21,20 @@ so the core RSpin library remains visualization-free. Its `ruviz` dependency is
 behind the explicit non-default `visualization-ruviz` feature gate. The local
 `deny.toml` in that example documents the additional permissive transitive
 licenses used only for PNG generation.
+
+Processing chains can be persisted separately from spectra with the recipe JSON
+codecs:
+
+```rust
+use rspin::prelude::*;
+
+let recipe = ProcessingRecipe1D::new()
+    .scale(2.0)
+    .absolute_value()
+    .normalize_max_abs();
+
+let json = write_processing_recipe_1d_json(&recipe)?;
+let decoded = read_processing_recipe_1d_json(&json)?;
+assert_eq!(decoded, recipe);
+# Ok::<(), RSpinError>(())
+```

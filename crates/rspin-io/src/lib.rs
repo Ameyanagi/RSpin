@@ -7,6 +7,7 @@ mod csv_2d;
 mod csv_common;
 mod jcamp;
 mod json;
+mod processing_json;
 mod traits;
 
 pub use analysis_csv::{CsvAnalysis1D, CsvAnalysis2D, write_analysis1d_csv, write_analysis2d_csv};
@@ -20,5 +21,10 @@ pub use jcamp::{JcampDx, read_jcamp_dx_1d, write_jcamp_dx_1d};
 pub use json::{
     JsonSpectrum1D, JsonSpectrum2D, read_spectrum1d_json, read_spectrum2d_json,
     write_spectrum1d_json, write_spectrum2d_json,
+};
+pub use processing_json::{
+    JsonProcessingRecipe1D, JsonProcessingRecipe2D, read_processing_recipe_1d_json,
+    read_processing_recipe_2d_json, write_processing_recipe_1d_json,
+    write_processing_recipe_2d_json,
 };
 pub use traits::{SpectrumReader, SpectrumWriter};

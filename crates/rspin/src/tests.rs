@@ -22,6 +22,21 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
 
     assert_eq!(processed.intensities, vec![0.5, 0.25, 1.0]);
     assert_eq!(processed.processing.len(), 5);
+
+    let recipe = ProcessingRecipe1D::new()
+        .scale(2.0)
+        .offset(-2.0)
+        .absolute_value()
+        .normalize_max_abs();
+    let recipe_json = write_processing_recipe_1d_json(&recipe)?;
+    assert_eq!(read_processing_recipe_1d_json(&recipe_json)?, recipe);
+
+    let recipe_2d = ProcessingRecipe2D::new()
+        .scale(2.0)
+        .zero_fill(4, 4)
+        .normalize_max_abs();
+    let recipe_2d_json = write_processing_recipe_2d_json(&recipe_2d)?;
+    assert_eq!(read_processing_recipe_2d_json(&recipe_2d_json)?, recipe_2d);
     Ok(())
 }
 
