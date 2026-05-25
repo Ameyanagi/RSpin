@@ -22,7 +22,7 @@ mod ruviz_example {
     use anyhow::{Context, Result};
     use rspin_analysis::{
         PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
-        SpectrumAnalysis1DOptions, analyze_spectrum_1d,
+        SpectrumAnalysis1DOptions, analyze_spectrum_1d, pick_peaks,
     };
     use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
@@ -36,6 +36,7 @@ mod ruviz_example {
         ProcessingRecipe1D, auto_phase_correct, fit_baseline,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
+    use ruviz::core::subplot::subplots;
 
     pub fn run() -> Result<()> {
         let root = repo_root()?;
@@ -164,7 +165,134 @@ mod ruviz_example {
         let raw = bundle.only_1d()?;
         write_auto_phase_plot(output_dir, raw)?;
         write_auto_phase_comparison_plot(output_dir, raw)?;
+        write_auto_phase_peak_zoom_plot(output_dir, raw)?;
         Ok(())
+    }
+
+    fn write_auto_phase_peak_zoom_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("auto-phase zoom target length overflow")?;
+        let complex_recipe = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs();
+        let unphased = complex_recipe.apply(raw)?;
+        let legacy = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default()
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false),
+        )?
+        .spectrum;
+        let acme_grid = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default()
+                .with_cost(AutoPhaseCost::AcmeEntropy)
+                .with_refine(false),
+        )?
+        .spectrum;
+        let acme_refined =
+            auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
+
+        let peaks = pick_peaks(
+            &acme_refined,
+            PeakPickOptions::new()
+                .with_min_abs_intensity(0.05)
+                .with_min_prominence(0.0)
+                .with_polarity(PeakPolarity::Positive),
+        )?;
+        let mut sorted_peaks = peaks.clone();
+        sorted_peaks.sort_by(|a, b| b.intensity.abs().total_cmp(&a.intensity.abs()));
+        let mut centers: Vec<f64> = Vec::new();
+        for peak in sorted_peaks {
+            if centers
+                .iter()
+                .all(|existing| (existing - peak.x).abs() > 0.25)
+            {
+                centers.push(peak.x);
+                if centers.len() == 9 {
+                    break;
+                }
+            }
+        }
+        centers.sort_by(|a, b| a.total_cmp(b));
+        if centers.is_empty() {
+            eprintln!("auto-phase peak zoom: no peaks found");
+            return Ok(());
+        }
+
+        let columns: usize = 3;
+        let rows = centers.len().div_ceil(columns);
+        let width = u32::try_from(columns * 480).unwrap_or(1440);
+        let height = u32::try_from(rows * 360).unwrap_or(1080);
+        let mut figure = subplots(rows, columns, width, height)?;
+        let half_window = 0.15_f64;
+
+        for (index, center) in centers.iter().enumerate() {
+            let lo = center - half_window;
+            let hi = center + half_window;
+            let title = format!("{center:.2} ppm");
+            let panel = Plot::new()
+                .title(&title)
+                .xlabel(axis_label(unphased.x.unit))
+                .ylabel("intensity")
+                .legend_position(LegendPosition::Best)
+                .line(
+                    &slice_window(&unphased.x.values, lo, hi),
+                    &slice_window_y(&unphased.x.values, &unphased.intensities, lo, hi),
+                )
+                .label("unphased")
+                .line(
+                    &slice_window(&legacy.x.values, lo, hi),
+                    &slice_window_y(&legacy.x.values, &legacy.intensities, lo, hi),
+                )
+                .label("legacy")
+                .line(
+                    &slice_window(&acme_grid.x.values, lo, hi),
+                    &slice_window_y(&acme_grid.x.values, &acme_grid.intensities, lo, hi),
+                )
+                .label("ACME")
+                .line(
+                    &slice_window(&acme_refined.x.values, lo, hi),
+                    &slice_window_y(
+                        &acme_refined.x.values,
+                        &acme_refined.intensities,
+                        lo,
+                        hi,
+                    ),
+                )
+                .label("ACME+refine");
+            figure = figure.subplot_at(index, panel.into())?;
+        }
+
+        figure.save(path_to_str(
+            &output_dir.join("auto_phase_peak_zoom.png"),
+        )?)?;
+        Ok(())
+    }
+
+    fn slice_window(values: &[f64], lo: f64, hi: f64) -> Vec<f64> {
+        values
+            .iter()
+            .filter(|value| **value >= lo && **value <= hi)
+            .copied()
+            .collect()
+    }
+
+    fn slice_window_y(x: &[f64], y: &[f64], lo: f64, hi: f64) -> Vec<f64> {
+        x.iter()
+            .zip(y)
+            .filter_map(|(xv, yv)| {
+                if *xv >= lo && *xv <= hi {
+                    Some(*yv)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn write_auto_phase_comparison_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
