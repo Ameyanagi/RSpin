@@ -223,6 +223,34 @@ fn direct_vendor_files_record_detected_source_format() -> anyhow::Result<()> {
         loaded_source_format(&agilent_raw, Path::new("fid"))?,
         "agilent_fid"
     );
+
+    let bruker_ser =
+        RSpinReader::new().read_path(nmrxiv_fixture_root().join("bruker_cosy_raw/ser"))?;
+    assert_eq!(
+        loaded_source_format(&bruker_ser, Path::new("ser"))?,
+        "bruker_ser"
+    );
+    assert_eq!(first_2d(&bruker_ser)?.shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
+fn direct_file_dimension_toggles_report_disabled_dimension() -> anyhow::Result<()> {
+    let one_d_disabled = RSpinReader::new()
+        .with_1d(false)
+        .read_path(fixture_root().join("bruker_without_expno/fid"));
+    let Err(error) = one_d_disabled else {
+        anyhow::bail!("direct one-dimensional file should not load when 1D is disabled");
+    };
+    assert_no_data_warning(&error, "one-dimensional spectrum candidates are disabled");
+
+    let two_d_disabled = RSpinReader::new()
+        .with_2d(false)
+        .read_path(nmrxiv_fixture_root().join("bruker_cosy_raw/ser"));
+    let Err(error) = two_d_disabled else {
+        anyhow::bail!("direct two-dimensional file should not load when 2D is disabled");
+    };
+    assert_no_data_warning(&error, "two-dimensional spectrum candidates are disabled");
     Ok(())
 }
 
@@ -565,6 +593,13 @@ fn first_1d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Sp
         .spectra_1d()
         .next()
         .ok_or_else(|| anyhow::anyhow!("missing one-dimensional spectrum"))
+}
+
+fn first_2d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Spectrum2D> {
+    bundle
+        .spectra_2d()
+        .next()
+        .ok_or_else(|| anyhow::anyhow!("missing two-dimensional spectrum"))
 }
 
 fn assert_source_path(loaded: &LoadedSpectrum, expected: &Path) {

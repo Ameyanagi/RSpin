@@ -679,6 +679,9 @@ impl SpectrumBundleLoader {
                 || read_spectrum_bundle_json_file(file),
             );
         }
+        if let Some(message) = self.disabled_dimension_file_message(file) {
+            return self.handle_error_message(bundle, root, file, message);
+        }
 
         self.add_1d_or_2d_result(
             bundle,
@@ -900,6 +903,22 @@ impl SpectrumBundleLoader {
         } else {
             Ok(())
         }
+    }
+
+    fn disabled_dimension_file_message(&self, path: &Path) -> Option<String> {
+        if !self.one_d.is_enabled() && crate::detect_spectrum1d_path_format(path).is_ok() {
+            return Some(format!(
+                "one-dimensional spectrum candidates are disabled for {}",
+                path.display()
+            ));
+        }
+        if !self.two_d.is_enabled() && crate::detect_spectrum2d_path_format(path).is_ok() {
+            return Some(format!(
+                "two-dimensional spectrum candidates are disabled for {}",
+                path.display()
+            ));
+        }
+        None
     }
 
     fn filter_bundle_dimensions(&self, bundle: &mut SpectrumBundle) {
