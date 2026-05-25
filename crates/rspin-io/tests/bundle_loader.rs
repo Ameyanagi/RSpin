@@ -10,7 +10,7 @@ use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
     load_spectra, load_spectra_many, load_spectrum_1d, load_spectrum_2d,
-    write_spectrum_bundle_json,
+    write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum2d_json,
 };
 
 #[test]
@@ -251,6 +251,40 @@ fn direct_file_dimension_toggles_report_disabled_dimension() -> anyhow::Result<(
         anyhow::bail!("direct two-dimensional file should not load when 2D is disabled");
     };
     assert_no_data_warning(&error, "two-dimensional spectrum candidates are disabled");
+    Ok(())
+}
+
+#[test]
+fn json_spectrum_dimension_toggles_report_disabled_dimension() -> anyhow::Result<()> {
+    let root = temp_dir("json-disabled-dimensions")?;
+
+    let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
+    let one_d_json = root.join("one.json");
+    fs::write(
+        &one_d_json,
+        write_spectrum1d_json(first_1d(&one_d_bundle)?)?,
+    )?;
+
+    let one_d_disabled = RSpinReader::new().with_1d(false).read_path(&one_d_json);
+    let Err(error) = one_d_disabled else {
+        anyhow::bail!("direct one-dimensional JSON should not load when 1D is disabled");
+    };
+    assert_no_data_warning(&error, "one-dimensional spectrum candidates are disabled");
+
+    let two_d_bundle = load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?;
+    let two_d_json = root.join("two.json");
+    fs::write(
+        &two_d_json,
+        write_spectrum2d_json(first_2d(&two_d_bundle)?)?,
+    )?;
+
+    let two_d_disabled = RSpinReader::new().with_2d(false).read_path(&two_d_json);
+    let Err(error) = two_d_disabled else {
+        anyhow::bail!("direct two-dimensional JSON should not load when 2D is disabled");
+    };
+    assert_no_data_warning(&error, "two-dimensional spectrum candidates are disabled");
+
+    remove_dir(root)?;
     Ok(())
 }
 

@@ -704,14 +704,45 @@ impl SpectrumBundleLoader {
     ) -> Result<()> {
         let format = format_from_file(path);
         match read_1d() {
-            Ok(spectrum) if self.one_d.is_enabled() => {
-                bundle.push_1d(
-                    spectrum,
-                    self.loaded_source(root, path, source_format_1d(path, format)),
-                );
-                return Ok(());
+            Ok(spectrum) => {
+                if self.one_d.is_enabled() {
+                    bundle.push_1d(
+                        spectrum,
+                        self.loaded_source(root, path, source_format_1d(path, format)),
+                    );
+                    return Ok(());
+                }
+
+                let first_error = disabled_dimension_error(path, "one-dimensional");
+                if self.two_d.is_enabled() {
+                    return match read_2d() {
+                        Ok(spectrum) => {
+                            bundle.push_2d(
+                                spectrum,
+                                self.loaded_source(root, path, source_format_2d(path, format)),
+                            );
+                            Ok(())
+                        }
+                        Err(second_error) => self.add_bundle_or_warning(
+                            bundle,
+                            root,
+                            path,
+                            read_bundle,
+                            Some(&first_error),
+                            Some(&second_error),
+                        ),
+                    };
+                }
+
+                self.add_bundle_or_warning(
+                    bundle,
+                    root,
+                    path,
+                    read_bundle,
+                    Some(&first_error),
+                    None,
+                )
             }
-            Ok(_) => {}
             Err(first_error) => {
                 if self.two_d.is_enabled() {
                     return match read_2d() {
@@ -732,38 +763,20 @@ impl SpectrumBundleLoader {
                         ),
                     };
                 }
-                return self.add_bundle_or_warning(
+                let second_error = match read_2d() {
+                    Ok(_) => disabled_dimension_error(path, "two-dimensional"),
+                    Err(error) => error,
+                };
+                self.add_bundle_or_warning(
                     bundle,
                     root,
                     path,
                     read_bundle,
                     Some(&first_error),
-                    None,
-                );
+                    Some(&second_error),
+                )
             }
         }
-
-        if self.two_d.is_enabled() {
-            return match read_2d() {
-                Ok(spectrum) => {
-                    bundle.push_2d(
-                        spectrum,
-                        self.loaded_source(root, path, source_format_2d(path, format)),
-                    );
-                    Ok(())
-                }
-                Err(second_error) => self.add_bundle_or_warning(
-                    bundle,
-                    root,
-                    path,
-                    read_bundle,
-                    None,
-                    Some(&second_error),
-                ),
-            };
-        }
-
-        self.add_bundle_or_warning(bundle, root, path, read_bundle, None, None)
     }
 
     fn add_bundle_or_warning(
@@ -907,16 +920,10 @@ impl SpectrumBundleLoader {
 
     fn disabled_dimension_file_message(&self, path: &Path) -> Option<String> {
         if !self.one_d.is_enabled() && crate::detect_spectrum1d_path_format(path).is_ok() {
-            return Some(format!(
-                "one-dimensional spectrum candidates are disabled for {}",
-                path.display()
-            ));
+            return Some(disabled_dimension_message(path, "one-dimensional"));
         }
         if !self.two_d.is_enabled() && crate::detect_spectrum2d_path_format(path).is_ok() {
-            return Some(format!(
-                "two-dimensional spectrum candidates are disabled for {}",
-                path.display()
-            ));
+            return Some(disabled_dimension_message(path, "two-dimensional"));
         }
         None
     }
@@ -1132,6 +1139,20 @@ fn fallback_message(
     }
     parts.push(format!("bundle fallback: {bundle_error}"));
     parts.join("; ")
+}
+
+fn disabled_dimension_error(path: &Path, dimension: &'static str) -> RSpinError {
+    RSpinError::Parse {
+        format: "spectrum bundle",
+        message: disabled_dimension_message(path, dimension),
+    }
+}
+
+fn disabled_dimension_message(path: &Path, dimension: &'static str) -> String {
+    format!(
+        "{dimension} spectrum candidates are disabled for {}",
+        path.display()
+    )
 }
 
 #[derive(Default)]
