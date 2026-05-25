@@ -24,6 +24,34 @@ fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
 }
 
 #[test]
+fn subsample_shift_is_inverse_of_remove_group_delay() -> anyhow::Result<()> {
+    // Apply a known fractional shift to a complex spectrum and verify
+    // that the inverse fractional shift undoes it (round-trip identity).
+    let axis = Axis::linear("shift", Unit::Ppm, -1.0, 1.0, 16)?;
+    let real = (0..16_i32)
+        .map(|i| (f64::from(i) * 0.5).sin())
+        .collect::<Vec<_>>();
+    let imag = (0..16_i32)
+        .map(|i| (f64::from(i) * 0.5).cos())
+        .collect::<Vec<_>>();
+    let spectrum =
+        Spectrum1D::new_complex(axis, real.clone(), Some(imag.clone()), Metadata::default())?;
+    let shifted = apply_subsample_shift(&spectrum, 0.4)?;
+    let recovered = apply_subsample_shift(&shifted, -0.4)?;
+    assert_vec_close(&recovered.intensities, &real);
+    assert_vec_close(require_imaginary(&recovered)?, &imag);
+    Ok(())
+}
+
+#[test]
+fn subsample_shift_rejects_real_only_spectrum() -> anyhow::Result<()> {
+    let axis = Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0, 2.0, 3.0, 4.0], Metadata::default())?;
+    assert!(apply_subsample_shift(&spectrum, 0.1).is_err());
+    Ok(())
+}
+
+#[test]
 fn remove_group_delay_rejects_invalid_input() -> anyhow::Result<()> {
     let axis = Axis::linear("time", Unit::Seconds, 0.0, 1.0, 2)?;
     let spectrum = Spectrum1D::new_complex(

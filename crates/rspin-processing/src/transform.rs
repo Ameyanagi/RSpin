@@ -478,6 +478,83 @@ pub fn remove_group_delay(spectrum: &Spectrum1D, samples: f64) -> Result<Spectru
     ))
 }
 
+/// Applies a fractional sub-sample shift as a frequency-domain linear phase.
+///
+/// Multiplies the complex spectrum by `exp(-2*pi*i * frac * (m - N/2) / N)`
+/// for each bin `m`. This is the canonical companion to a coarse
+/// integer-sample FID rotation (see [`remove_group_delay`]): a digital
+/// filter group delay of `g = floor(g) + frac` samples is removed by
+/// circularly shifting the FID left by `floor(g)` *and* applying this
+/// frequency-domain ramp after FFT (and after `fftshift`).
+///
+/// Following the rustfft forward convention (`exp(-2*pi*i*k*n/N)`), the
+/// sign matches what `nmrglue.bruker.rm_dig_filter` documents as
+/// `exp(+2*pi*i * grpdly * k / N)` once the convention difference is
+/// accounted for.
+///
+/// `frac` may be any finite value (typically in `(-1, 1)`); a value
+/// outside that range is interpreted modulo one sample.
+///
+/// # Errors
+///
+/// Returns an error when `frac` is non-finite or the spectrum has no
+/// imaginary channel (a sub-sample shift cannot be applied to a
+/// real-only spectrum).
+pub fn apply_subsample_shift(spectrum: &Spectrum1D, frac: f64) -> Result<Spectrum1D> {
+    if !frac.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "subsample_shift_frac",
+        });
+    }
+    if spectrum.imaginary.is_none() {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "sub-sample shift requires a complex spectrum".to_owned(),
+        });
+    }
+    let len = spectrum.len();
+    if len == 0 {
+        return Ok(spectrum.clone());
+    }
+    let len_u32 = u32::try_from(len).map_err(|_| RSpinError::InvalidSpectrum {
+        message: "spectrum too long for sub-sample shift".to_owned(),
+    })?;
+    let n_f = f64::from(len_u32);
+    let half = if len_u32 >= 2 {
+        f64::from(len_u32 / 2)
+    } else {
+        0.0
+    };
+
+    let mut real = spectrum.intensities.clone();
+    let mut imag = match spectrum.imaginary.as_ref() {
+        Some(values) => values.clone(),
+        None => vec![0.0; len],
+    };
+    for index in 0..len {
+        let m_u32 = u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+            message: "index too large for sub-sample shift".to_owned(),
+        })?;
+        let m_f = f64::from(m_u32);
+        let theta = -2.0 * PI * frac * (m_f - half) / n_f;
+        let cos_t = theta.cos();
+        let sin_t = theta.sin();
+        let re = real[index];
+        let im = imag[index];
+        real[index] = re * cos_t - im * sin_t;
+        imag[index] = re * sin_t + im * cos_t;
+    }
+    let mut processed = Spectrum1D::new_complex(
+        spectrum.x.clone(),
+        real,
+        Some(imag),
+        spectrum.metadata.clone(),
+    )?;
+    processed.processing.clone_from(&spectrum.processing);
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("apply_subsample_shift").with_details(format!("frac={frac}")),
+    ))
+}
+
 pub(crate) fn fftshift_in_place<T: Copy>(buffer: &mut [T]) {
     let n = buffer.len();
     if n < 2 {

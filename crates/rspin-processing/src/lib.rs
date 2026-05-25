@@ -64,12 +64,12 @@ pub use recipe_2d::{
 pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
-pub use transform::remove_group_delay;
 pub use transform::{
     ExponentialApodization, Fft1D, FftDirection, GaussianApodization, Magnitude, PhaseCorrection,
     SineBellApodization, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,
     phase_correct, sine_bell_apodization,
 };
+pub use transform::{apply_subsample_shift, remove_group_delay};
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{
     Normalize2DMaxAbs, Normalize2DVolume, Offset2D, ProjectionMode, Scale2D, Shift2DAxes,

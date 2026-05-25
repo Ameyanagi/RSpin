@@ -33,8 +33,8 @@ mod ruviz_example {
     };
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
-        ProcessSpectrum2D, ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks,
-        fit_baseline, remove_group_delay,
+        ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift, auto_phase_correct,
+        auto_phase_correct_with_peaks, fit_baseline, remove_group_delay,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -429,33 +429,47 @@ mod ruviz_example {
         Ok(())
     }
 
+    fn jeol_prepare_complex_spectrum(
+        spectrum: &Spectrum1D,
+        shift: f64,
+    ) -> Result<Spectrum1D> {
+        let integer = shift.trunc().max(0.0);
+        let frac = shift - integer;
+        let shifted = if integer > 0.0 {
+            remove_group_delay(spectrum, integer)?
+        } else {
+            spectrum.clone()
+        };
+        let post_fft = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL prep target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .apply(&shifted)?
+        } else {
+            shifted
+        };
+        let polished = if frac.abs() > 1.0e-6 {
+            apply_subsample_shift(&post_fft, frac)?
+        } else {
+            post_fft
+        };
+        let normalized = ProcessingRecipe1D::new()
+            .normalize_max_abs()
+            .apply(&polished)?;
+        Ok(relabel_hz_to_ppm(normalized))
+    }
+
     fn jeol_phase_with_opts(
         spectrum: &Spectrum1D,
         shift: f64,
         options: AutoPhaseOptions,
     ) -> Result<rspin_processing::AutoPhaseResult> {
-        let shifted = if shift > 0.0 {
-            remove_group_delay(spectrum, shift)?
-        } else {
-            spectrum.clone()
-        };
-        let prepared = if shifted.x.unit == Unit::Seconds {
-            let target_len = shifted
-                .len()
-                .checked_mul(2)
-                .context("JEOL auto-phase target length overflow")?;
-            ProcessingRecipe1D::new()
-                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
-                .zero_fill(target_len)
-                .fft(FftDirection::Forward)
-                .normalize_max_abs()
-                .apply(&shifted)?
-        } else {
-            ProcessingRecipe1D::new()
-                .normalize_max_abs()
-                .apply(&shifted)?
-        };
-        let prepared = relabel_hz_to_ppm(prepared);
+        let prepared = jeol_prepare_complex_spectrum(spectrum, shift)?;
         Ok(auto_phase_correct(&prepared, options)?)
     }
 
@@ -463,31 +477,11 @@ mod ruviz_example {
         spectrum: &Spectrum1D,
         shift: f64,
     ) -> Result<(Spectrum1D, rspin_processing::AutoPhaseResult)> {
-        let shifted = if shift > 0.0 {
-            remove_group_delay(spectrum, shift)?
-        } else {
-            spectrum.clone()
-        };
-        let magnitude = if shifted.x.unit == Unit::Seconds {
-            let target_len = shifted
-                .len()
-                .checked_mul(2)
-                .context("JEOL magnitude target length overflow")?;
-            ProcessingRecipe1D::new()
-                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
-                .zero_fill(target_len)
-                .fft(FftDirection::Forward)
-                .magnitude()
-                .normalize_max_abs()
-                .apply(&shifted)?
-        } else {
-            ProcessingRecipe1D::new()
-                .magnitude()
-                .normalize_max_abs()
-                .apply(&shifted)?
-        };
-        let magnitude = relabel_hz_to_ppm(magnitude);
-        // Return a dummy auto-phase result so the API matches jeol_phase_with_shift.
+        let prepared = jeol_prepare_complex_spectrum(spectrum, shift)?;
+        let magnitude = ProcessingRecipe1D::new()
+            .magnitude()
+            .normalize_max_abs()
+            .apply(&prepared)?;
         let dummy = rspin_processing::AutoPhaseResult {
             spectrum: magnitude.clone(),
             zero_order_deg: 0.0,
@@ -613,7 +607,23 @@ mod ruviz_example {
     fn parse_decimation_reg(raw: &str) -> Option<f64> {
         let trimmed = raw.trim();
         let after = trimmed.strip_prefix("r:")?.trim_start();
-        let first_token = after.split(|c: char| !c.is_ascii_digit()).next()?;
+        // Prefer the parenthesized "adjusted" value (e.g. "r: 834( 833)") —
+        // JEOL appears to track both the raw and effective FIR-tap counts
+        // here, and the adjusted value lines up with the true group delay.
+        if let Some(open) = after.find('(') {
+            let after_paren = &after[open + 1..];
+            let token = after_paren
+                .split(|c: char| !c.is_ascii_digit())
+                .find(|t| !t.is_empty());
+            if let Some(t) = token {
+                if let Ok(value) = t.parse::<f64>() {
+                    return Some(value);
+                }
+            }
+        }
+        let first_token = after
+            .split(|c: char| !c.is_ascii_digit())
+            .find(|t| !t.is_empty())?;
         first_token.parse::<f64>().ok()
     }
 
