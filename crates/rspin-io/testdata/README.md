@@ -10,9 +10,9 @@ or only acceptable for private comparison.
 - `zenodo_7100132/`: selected MIT-licensed software-record fixtures from
   Zenodo records `10.5281/zenodo.7100132` and `10.5281/zenodo.8338410`. See the
   nested README for authors, copyright, changes, and checksums.
-- `nmrxiv/cc0/`: selected CC0 NMRXiv CENAPTNMR/Myrcene fixtures. See the nested
-  README for study DOI, source URLs, authors, license URL, and file-level
-  provenance.
+- `nmrxiv/cc0/`: selected CC0 NMRXiv CENAPTNMR/Myrcene and Eucalyptol
+  fixtures. See the nested README for study DOI, source URLs, authors, license
+  URL, and file-level provenance.
 - `nmrxiv/cc-by-4.0/`: selected CC-BY-4.0 NMRXiv Varian fixtures. See the
   nested README for required attribution, source APIs, source URLs, changes, and
   checksums.

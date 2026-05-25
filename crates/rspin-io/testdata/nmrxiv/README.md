@@ -19,7 +19,7 @@ CC0 allows copying, modification, redistribution, and commercial use without
 permission. Author/source metadata is retained below for provenance and
 citation hygiene.
 
-## Source Study
+## Source Study: Myrcene
 
 - Study: Myrcene 60/400/900 MHz in CDCl3 NMR data
 - Study identifier: NMRXIV:S217
@@ -43,9 +43,36 @@ citation hygiene.
 | `cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx` | `Myrcene_100000ug700uL_CDCl3_1H_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s217.d1183 | JCAMP-DX 6.0 LINK 1D reader | Filename normalized |
 | `cc0/myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx` | `Mycene_3120ug200uL_CDCl3_13C_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s217.d1187 | JCAMP-DX 6.0 LINK 13C reader | Filename normalized |
 
+## Source Study: Eucalyptol
+
+- Study: Eucalyptol 400 MHz in CDCl3 NMR data
+- Study identifier: NMRXIV:S218
+- Study DOI: 10.57992/nmrxiv.p33.s218
+- Study URL: https://nmrxiv.org/sample/S218
+- Authors: Bisson J, McAlpine JB, Friesen JB, Chen SN, Graham J, Pauli GF.
+- Source APIs checked: https://nmrxiv.org/api/v1/S218 and https://nmrxiv.org/api/v1/P33
+- Access date: 2026-05-25
+- Original archive URL: https://s3.uni-jena.de/nmrxiv/production/archive/18c47f7f-69c0-4858-9d6d-f67e04099f92/%20Eucalyptol%20400%20MHz%20in%20CDCl3%20NMR%20data%20.zip
+- Original archive SHA-256: 30bc79d21902c3b94d9603f476a493c88bffc9fe3184eabef450a3c8ae3afba5
+
+| Local path | Original file | Source DOI | Purpose | Changes |
+| --- | --- | --- | --- | --- |
+| `cc0/eucalyptol/jeol/eucalyptol_qhnmr_400mhz.jdf` | `Eucalyptol_9070ug200uL_CDCl3_qHNMR_400MHz_Jeol.jdf` | 10.57992/nmrxiv.p33.s218.d1203 | JEOL 1D 1H JDF reader | Filename normalized |
+| `cc0/eucalyptol/jeol/eucalyptol_13cnmr_400mhz.jdf` | `Eucalyptol_9070ug200uL_CDCl3_13CNMR_400MHz_Jeol.jdf` | 10.57992/nmrxiv.p33.s218.d1201 | JEOL 1D 13C JDF reader | Filename normalized |
+| `cc0/eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf` | `Eucalyptol_9070ug200uL_CDCl3_HSQC_400MHz_Jeol.jdf` | 10.57992/nmrxiv.p33.s218.d1202 | JEOL 2D HSQC JDF reader | Filename normalized |
+| `cc0/eucalyptol/jcamp/eucalyptol_qh_400mhz_jcamp_dx_6_link.jdx` | `Eucalyptol_9070ug200uL_CDCl3_qHNMR_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s218.d1206 | JCAMP-DX 6.0 LINK 1D 1H reader | Filename normalized |
+| `cc0/eucalyptol/jcamp/eucalyptol_13c_400mhz_jcamp_dx_6_link.jdx` | `Eucalyptol_9070ug200uL_CDCl3_13CNMR_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s218.d1207 | JCAMP-DX 6.0 LINK 1D 13C reader | Filename normalized |
+| `cc0/eucalyptol/jcamp/eucalyptol_hsqc_400mhz_jcamp_dx_6_link.jdx` | `Eucalyptol_9070ug200uL_CDCl3_HSQC_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s218.d1199 | JCAMP-DX 6.0 LINK 2D HSQC reader | Filename normalized |
+
 ## CC0 Fixture Checksums
 
 ```text
+3ca0f67327a8a10ac2d674944f245f0265f5b0bd80f0f707c0aed36f92af8176  cc0/eucalyptol/jcamp/eucalyptol_qh_400mhz_jcamp_dx_6_link.jdx
+c51b192b6cb1a4e2983cc6fcf1db8eff235c0cca05c0508423944ebea2e1558f  cc0/eucalyptol/jcamp/eucalyptol_13c_400mhz_jcamp_dx_6_link.jdx
+588c1294dd1bb6bd963870622b2f3e71cf4024ce6fcc114221be8112e636ff9b  cc0/eucalyptol/jcamp/eucalyptol_hsqc_400mhz_jcamp_dx_6_link.jdx
+672ea4f438254ddcc190c7d82e5fe44b03256b3fdb9653dd3723f29caa769bca  cc0/eucalyptol/jeol/eucalyptol_qhnmr_400mhz.jdf
+99db1fbba394d88063ac45a3afd490e71eb991c51fbcab97c060ee8876c43186  cc0/eucalyptol/jeol/eucalyptol_13cnmr_400mhz.jdf
+1f0f0f973bb83d62381f834e5aa02cc5b0647349e01f5745f8c85b01721b0813  cc0/eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf
 2ac9051cdd709d6a83a04fdee2b4e888c7b1d9fbcfd299fc53a2b034eb8bc78f  cc0/myrcene/bruker_1h_raw/acqus
 11805b5f53539b497f1c2b8e0ae79f86d4c51bfe442890d6314f959474daba27  cc0/myrcene/bruker_1h_raw/fid
 e15f6d9f09307549153be80152a3f38bc08fe8dc8a9e6f8acd236c468d82104d  cc0/myrcene/bruker_cosy_raw/acqu2s

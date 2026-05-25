@@ -63,6 +63,84 @@ enum DataBlock2D {
     PageValues(Channel2D),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AxisLayout {
+    Declared,
+    Swapped,
+}
+
+impl AxisLayout {
+    fn direct_points(self, raw: &RawJcamp2D) -> Option<usize> {
+        match self {
+            Self::Declared => raw.x_points,
+            Self::Swapped => raw.y_points,
+        }
+    }
+
+    fn indirect_points(self, raw: &RawJcamp2D) -> Option<usize> {
+        match self {
+            Self::Declared => raw.y_points,
+            Self::Swapped => raw.x_points,
+        }
+    }
+
+    fn direct_unit(self, raw: &RawJcamp2D) -> Unit {
+        match self {
+            Self::Declared => raw.x_unit,
+            Self::Swapped => raw.y_unit,
+        }
+    }
+
+    fn indirect_unit(self, raw: &RawJcamp2D) -> Unit {
+        match self {
+            Self::Declared => raw.y_unit,
+            Self::Swapped => raw.x_unit,
+        }
+    }
+
+    fn direct_factor(self, raw: &RawJcamp2D) -> Option<f64> {
+        match self {
+            Self::Declared => raw.x_factor,
+            Self::Swapped => raw.y_axis_factor,
+        }
+    }
+
+    fn indirect_factor(self, raw: &RawJcamp2D) -> Option<f64> {
+        match self {
+            Self::Declared => raw.y_axis_factor,
+            Self::Swapped => raw.x_factor,
+        }
+    }
+
+    fn direct_first(self, raw: &RawJcamp2D) -> Option<f64> {
+        match self {
+            Self::Declared => raw.first_x,
+            Self::Swapped => raw.first_y,
+        }
+    }
+
+    fn direct_last(self, raw: &RawJcamp2D) -> Option<f64> {
+        match self {
+            Self::Declared => raw.last_x,
+            Self::Swapped => raw.last_y,
+        }
+    }
+
+    fn indirect_first(self, raw: &RawJcamp2D) -> Option<f64> {
+        match self {
+            Self::Declared => raw.first_y,
+            Self::Swapped => raw.first_x,
+        }
+    }
+
+    fn indirect_last(self, raw: &RawJcamp2D) -> Option<f64> {
+        match self {
+            Self::Declared => raw.last_y,
+            Self::Swapped => raw.last_x,
+        }
+    }
+}
+
 /// Reads a two-dimensional spectrum from JCAMP-DX text.
 ///
 /// This parser targets numeric or ASDF-compressed NTUPLES page data where each
@@ -239,7 +317,7 @@ fn apply_units(raw: &mut RawJcamp2D, value: &str) {
 
 fn data_table_block_2d(value: &str) -> Option<DataBlock2D> {
     let upper = value.to_ascii_uppercase();
-    if upper.contains("XYDATA") || upper.contains("PEAKS") {
+    if upper.contains("XYDATA") || upper.contains("PEAKS") || upper.contains("PROFILE") {
         Some(DataBlock2D::PageValues(data_table_channel_2d(value)))
     } else {
         None
@@ -283,11 +361,12 @@ fn spectrum_from_raw_2d(raw: &RawJcamp2D) -> Result<Spectrum2D> {
 
     let real_page_indices = page_indices(raw, Channel2D::Real);
     let imaginary_page_indices = page_indices(raw, Channel2D::Imaginary);
-    let width = infer_width(raw, &real_page_indices)?;
-    let height = infer_height(raw, real_page_indices.len())?;
+    let layout = infer_axis_layout(raw, &real_page_indices);
+    let width = infer_width(raw, &real_page_indices, layout)?;
+    let height = infer_height(raw, real_page_indices.len(), layout)?;
     validate_imaginary_pages(raw, &real_page_indices, &imaginary_page_indices)?;
-    let x_axis = x_axis(raw, width)?;
-    let y_axis = y_axis(raw, &real_page_indices, height)?;
+    let x_axis = x_axis(raw, width, layout)?;
+    let y_axis = y_axis(raw, &real_page_indices, height, layout)?;
     let metadata = metadata_from_raw_2d(raw);
     let z_factor = super::option_or(raw.z_factor, 1.0);
     let z = scaled_page_values(
@@ -326,23 +405,42 @@ fn page_indices(raw: &RawJcamp2D, channel: Channel2D) -> Vec<usize> {
         .collect()
 }
 
-fn infer_width(raw: &RawJcamp2D, page_indices: &[usize]) -> Result<usize> {
-    let width = match raw.x_points {
+fn infer_axis_layout(raw: &RawJcamp2D, page_indices: &[usize]) -> AxisLayout {
+    let page_count = page_indices.len();
+    let page_width = observed_page_width(raw, page_indices);
+    if let (Some(first_dim), Some(second_dim), Some(page_width)) =
+        (raw.x_points, raw.y_points, page_width)
+    {
+        let declared_layout_matches = first_dim == page_width && second_dim == page_count;
+        let swapped_layout_matches = first_dim == page_count && page_width >= second_dim;
+        if swapped_layout_matches && !declared_layout_matches {
+            return AxisLayout::Swapped;
+        }
+    }
+
+    AxisLayout::Declared
+}
+
+fn observed_page_width(raw: &RawJcamp2D, page_indices: &[usize]) -> Option<usize> {
+    page_indices
+        .iter()
+        .filter_map(|index| raw.pages.get(*index))
+        .find_map(|page| {
+            if page.values.is_empty() {
+                None
+            } else {
+                Some(page.values.len())
+            }
+        })
+}
+
+fn infer_width(raw: &RawJcamp2D, page_indices: &[usize], layout: AxisLayout) -> Result<usize> {
+    let width = match layout.direct_points(raw) {
         Some(points) => points,
-        None => page_indices
-            .iter()
-            .filter_map(|index| raw.pages.get(*index))
-            .find_map(|page| {
-                if page.values.is_empty() {
-                    None
-                } else {
-                    Some(page.values.len())
-                }
-            })
-            .ok_or_else(|| RSpinError::Parse {
-                format: "JCAMP-DX",
-                message: "missing 2D JCAMP-DX page values".to_owned(),
-            })?,
+        None => observed_page_width(raw, page_indices).ok_or_else(|| RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: "missing 2D JCAMP-DX page values".to_owned(),
+        })?,
     };
     if width == 0 {
         return Err(RSpinError::Parse {
@@ -350,10 +448,28 @@ fn infer_width(raw: &RawJcamp2D, page_indices: &[usize]) -> Result<usize> {
             message: "2D JCAMP-DX width must be positive".to_owned(),
         });
     }
+    for (row_index, page_index) in page_indices.iter().copied().enumerate() {
+        let Some(page) = raw.pages.get(page_index) else {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: "2D JCAMP-DX internal page index is invalid".to_owned(),
+            });
+        };
+        if page.values.len() < width {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: format!(
+                    "2D JCAMP-DX page {} has {} values but expected at least {width}",
+                    row_index + 1,
+                    page.values.len()
+                ),
+            });
+        }
+    }
     Ok(width)
 }
 
-fn infer_height(raw: &RawJcamp2D, real_page_count: usize) -> Result<usize> {
+fn infer_height(raw: &RawJcamp2D, real_page_count: usize, layout: AxisLayout) -> Result<usize> {
     let height = real_page_count;
     if height == 0 {
         return Err(RSpinError::Parse {
@@ -361,7 +477,7 @@ fn infer_height(raw: &RawJcamp2D, real_page_count: usize) -> Result<usize> {
             message: "2D JCAMP-DX requires at least one real page".to_owned(),
         });
     }
-    if let Some(declared) = raw.y_points {
+    if let Some(declared) = layout.indirect_points(raw) {
         if declared != height {
             return Err(RSpinError::Parse {
                 format: "JCAMP-DX",
@@ -374,40 +490,45 @@ fn infer_height(raw: &RawJcamp2D, real_page_count: usize) -> Result<usize> {
     Ok(height)
 }
 
-fn x_axis(raw: &RawJcamp2D, width: usize) -> Result<Axis> {
-    let factor = super::option_or(raw.x_factor, 1.0);
+fn x_axis(raw: &RawJcamp2D, width: usize, layout: AxisLayout) -> Result<Axis> {
+    let factor = super::option_or(layout.direct_factor(raw), 1.0);
     let first = super::scale_value(
         "2D JCAMP-DX first x",
-        super::option_or(raw.first_x, 0.0),
+        super::option_or(layout.direct_first(raw), 0.0),
         factor,
     )?;
     let last_default = u32::try_from(width - 1).map_or(0.0, f64::from);
     let last = super::scale_value(
         "2D JCAMP-DX last x",
-        super::option_or(raw.last_x, last_default),
+        super::option_or(layout.direct_last(raw), last_default),
         factor,
     )?;
-    Axis::linear("x", raw.x_unit, first, last, width)
+    Axis::linear("x", layout.direct_unit(raw), first, last, width)
 }
 
-fn y_axis(raw: &RawJcamp2D, page_indices: &[usize], height: usize) -> Result<Axis> {
-    let factor = super::option_or(raw.y_axis_factor, 1.0);
+fn y_axis(
+    raw: &RawJcamp2D,
+    page_indices: &[usize],
+    height: usize,
+    layout: AxisLayout,
+) -> Result<Axis> {
+    let factor = super::option_or(layout.indirect_factor(raw), 1.0);
     if let Some(values) = page_y_values(raw, page_indices, factor)? {
-        return Axis::new("y", raw.y_unit, values);
+        return Axis::new("y", layout.indirect_unit(raw), values);
     }
 
     let first = super::scale_value(
         "2D JCAMP-DX first y",
-        super::option_or(raw.first_y, 0.0),
+        super::option_or(layout.indirect_first(raw), 0.0),
         factor,
     )?;
     let last_default = u32::try_from(height - 1).map_or(0.0, f64::from);
     let last = super::scale_value(
         "2D JCAMP-DX last y",
-        super::option_or(raw.last_y, last_default),
+        super::option_or(layout.indirect_last(raw), last_default),
         factor,
     )?;
-    Axis::linear("y", raw.y_unit, first, last, height)
+    Axis::linear("y", layout.indirect_unit(raw), first, last, height)
 }
 
 fn page_y_values(

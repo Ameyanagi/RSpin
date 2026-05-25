@@ -346,6 +346,36 @@ fn reads_two_dimensional_pages_with_linear_indirect_axis() -> anyhow::Result<()>
 }
 
 #[test]
+fn reads_two_dimensional_profile_pages_with_swapped_var_dim() -> anyhow::Result<()> {
+    let input = "\
+##TITLE=profile pages
+##JCAMP-DX=6.0
+##UNITS=HZ, PPM, ARBITRARY UNITS
+##FACTOR=1,1,2
+##FIRST=100,10,0
+##LAST=200,12,0
+##VAR_DIM=2,3,6
+##PAGE=F1=100
+##DATA TABLE=(F2++(Y..Y)), PROFILE
+10 1 2 3
+##PAGE=F1=200
+##DATA TABLE=(F2++(Y..Y)), PROFILE
+10 4 5 6
+##END=
+";
+    let spectrum = read_jcamp_dx_2d(input)?;
+
+    assert_eq!(spectrum.metadata.name.as_deref(), Some("profile pages"));
+    assert_eq!(spectrum.shape(), (3, 2));
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_eq!(spectrum.y.unit, Unit::Hertz);
+    assert_axis_close(&spectrum.x.values, &[10.0, 11.0, 12.0]);
+    assert_axis_close(&spectrum.y.values, &[100.0, 200.0]);
+    assert_eq!(spectrum.z, vec![2.0, 4.0, 6.0, 8.0, 10.0, 12.0]);
+    Ok(())
+}
+
+#[test]
 fn rejects_incomplete_two_dimensional_pages() {
     let input = "\
 ##VAR_DIM=3,1,3
