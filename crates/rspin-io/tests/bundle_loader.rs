@@ -135,6 +135,47 @@ fn loader_can_disable_raw_or_processed_candidates() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
+    let bruker = fixture_root().join("bruker_without_expno");
+
+    let raw_only = RSpinReader::new().raw_only().read_path(&bruker)?;
+    assert_eq!(raw_only.len(), 1);
+    assert_eq!(first_1d(&raw_only)?.x.unit, Unit::Seconds);
+
+    let processed_only = RSpinReader::new().processed_only().read_path(&bruker)?;
+    assert_eq!(processed_only.len(), 1);
+    assert_eq!(first_1d(&processed_only)?.x.unit, Unit::Ppm);
+
+    let mixed = nmrxiv_fixture_root();
+    let one_d_only = RSpinReader::new().one_d_only().read_path(&mixed)?;
+    assert_eq!(one_d_only.len_1d(), 5);
+    assert_eq!(one_d_only.len_2d(), 0);
+
+    let two_d_only = RSpinReader::new().two_d_only().read_path(&mixed)?;
+    assert_eq!(two_d_only.len_1d(), 0);
+    assert_eq!(two_d_only.len_2d(), 2);
+
+    let no_sources = RSpinReader::new()
+        .without_source_paths()
+        .read_path(&bruker)?;
+    assert!(
+        no_sources
+            .spectra()
+            .iter()
+            .all(|loaded| loaded.source().path.is_none())
+    );
+
+    let strict_error = RSpinReader::new()
+        .strict()
+        .read_path(fixture_root().join("empty_jcamp/empty.jdx"));
+    let Err(error) = strict_error else {
+        anyhow::bail!("strict helper should fail on unreadable candidates");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 

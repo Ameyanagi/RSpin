@@ -58,9 +58,8 @@ use rspin::prelude::*;
 
 fn load_processed_only() -> Result<SpectrumBundle> {
     RSpinReader::new()
-        .with_raw(false)
-        .with_processed(true)
-        .with_strict(true)
+        .processed_only()
+        .strict()
         .read_path("data/bruker")
 }
 ```

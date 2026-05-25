@@ -508,6 +508,52 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Enables raw candidates and disables processed candidates.
+    #[must_use]
+    pub fn raw_only(mut self) -> Self {
+        self.raw = Toggle::Enabled;
+        self.processed = Toggle::Disabled;
+        self
+    }
+
+    /// Enables processed candidates and disables raw candidates.
+    #[must_use]
+    pub fn processed_only(mut self) -> Self {
+        self.raw = Toggle::Disabled;
+        self.processed = Toggle::Enabled;
+        self
+    }
+
+    /// Enables one-dimensional candidates and disables two-dimensional candidates.
+    #[must_use]
+    pub fn one_d_only(mut self) -> Self {
+        self.one_d = Toggle::Enabled;
+        self.two_d = Toggle::Disabled;
+        self
+    }
+
+    /// Enables two-dimensional candidates and disables one-dimensional candidates.
+    #[must_use]
+    pub fn two_d_only(mut self) -> Self {
+        self.one_d = Toggle::Disabled;
+        self.two_d = Toggle::Enabled;
+        self
+    }
+
+    /// Enables strict mode.
+    #[must_use]
+    pub fn strict(mut self) -> Self {
+        self.strict = Toggle::Enabled;
+        self
+    }
+
+    /// Disables source paths in loaded spectra and warnings.
+    #[must_use]
+    pub fn without_source_paths(mut self) -> Self {
+        self.source_paths = Toggle::Disabled;
+        self
+    }
+
     /// Loads all supported spectra from a file or directory path.
     ///
     /// # Errors
