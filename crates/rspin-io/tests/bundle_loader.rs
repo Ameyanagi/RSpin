@@ -135,6 +135,31 @@ fn loader_can_disable_raw_or_processed_candidates() -> anyhow::Result<()> {
 }
 
 #[test]
+fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+
+    let one_d_only = RSpinReader::new().with_2d(false).read_path(&mixed)?;
+    assert_eq!(one_d_only.spectra_1d().count(), 3);
+    assert_eq!(one_d_only.spectra_2d().count(), 0);
+    assert!(one_d_only.spectra().iter().all(LoadedSpectrum::is_1d));
+
+    let two_d_only = RSpinReader::new().with_1d(false).read_path(&mixed)?;
+    assert_eq!(two_d_only.spectra_1d().count(), 0);
+    assert_eq!(two_d_only.spectra_2d().count(), 2);
+    assert!(two_d_only.spectra().iter().all(LoadedSpectrum::is_2d));
+
+    let disabled_dimensions = RSpinReader::new()
+        .with_1d(false)
+        .with_2d(false)
+        .read_path(fixture_root().join("varian_1h"));
+    let Err(error) = disabled_dimensions else {
+        anyhow::bail!("disabled spectrum dimensions should leave no readable spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
+    Ok(())
+}
+
+#[test]
 fn loader_toggles_apply_to_direct_vendor_files() -> anyhow::Result<()> {
     let raw_file = fixture_root().join("bruker_without_expno/fid");
     let processed_file = fixture_root().join("bruker_without_expno/pdata/1/1r");
@@ -222,6 +247,31 @@ fn directory_loader_anchors_nested_bundle_json_sources() -> anyhow::Result<()> {
             .iter()
             .all(|loaded| loaded.source().path.is_none())
     );
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn loader_dimension_filters_apply_to_nested_bundle_json() -> anyhow::Result<()> {
+    let source_bundle = load_spectra(nmrxiv_fixture_root())?;
+    let root = temp_dir("dimension-filter-bundle")?;
+    fs::write(
+        root.join("bundle.json"),
+        write_spectrum_bundle_json(&source_bundle)?,
+    )?;
+
+    let loaded = RSpinReader::new().with_1d(false).read_path(&root)?;
+    assert_eq!(loaded.spectra_1d().count(), 0);
+    assert_eq!(loaded.spectra_2d().count(), 2);
+    assert!(loaded.spectra().iter().all(LoadedSpectrum::is_2d));
+    assert!(loaded.spectra().iter().all(|entry| {
+        entry
+            .source()
+            .path
+            .as_deref()
+            .is_some_and(|path| path.starts_with(Path::new("bundle.json")))
+    }));
 
     remove_dir(root)?;
     Ok(())

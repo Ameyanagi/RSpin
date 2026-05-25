@@ -351,6 +351,8 @@ impl SpectrumBundle {
 pub struct SpectrumBundleLoader {
     raw: Toggle,
     processed: Toggle,
+    one_d: Toggle,
+    two_d: Toggle,
     strict: Toggle,
     source_paths: Toggle,
 }
@@ -400,6 +402,20 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn with_processed(mut self, enabled: bool) -> Self {
         self.processed = Toggle::from_bool(enabled);
+        self
+    }
+
+    /// Enables or disables one-dimensional spectrum candidates.
+    #[must_use]
+    pub fn with_1d(mut self, enabled: bool) -> Self {
+        self.one_d = Toggle::from_bool(enabled);
+        self
+    }
+
+    /// Enables or disables two-dimensional spectrum candidates.
+    #[must_use]
+    pub fn with_2d(mut self, enabled: bool) -> Self {
+        self.two_d = Toggle::from_bool(enabled);
         self
     }
 
@@ -553,7 +569,7 @@ impl SpectrumBundleLoader {
         directory: &Path,
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
-        if self.raw.is_enabled() && is_bruker_ser_dir(directory) {
+        if self.raw.is_enabled() && self.two_d.is_enabled() && is_bruker_ser_dir(directory) {
             self.add_2d_result(
                 bundle,
                 root,
@@ -562,7 +578,7 @@ impl SpectrumBundleLoader {
                 read_bruker_ser_2d_dir(directory),
             )?;
         }
-        if self.raw.is_enabled() && is_bruker_fid_dir(directory) {
+        if self.raw.is_enabled() && self.one_d.is_enabled() && is_bruker_fid_dir(directory) {
             self.add_1d_result(
                 bundle,
                 root,
@@ -571,7 +587,10 @@ impl SpectrumBundleLoader {
                 read_bruker_fid_1d_dir(directory),
             )?;
         }
-        if self.processed.is_enabled() && is_bruker_processed_2d_dir(directory) {
+        if self.processed.is_enabled()
+            && self.two_d.is_enabled()
+            && is_bruker_processed_2d_dir(directory)
+        {
             self.add_2d_result(
                 bundle,
                 root,
@@ -580,7 +599,10 @@ impl SpectrumBundleLoader {
                 read_bruker_processed_2d_dir(directory),
             )?;
         }
-        if self.processed.is_enabled() && is_bruker_processed_1d_dir(directory) {
+        if self.processed.is_enabled()
+            && self.one_d.is_enabled()
+            && is_bruker_processed_1d_dir(directory)
+        {
             self.add_1d_result(
                 bundle,
                 root,
@@ -679,29 +701,78 @@ impl SpectrumBundleLoader {
     ) -> Result<()> {
         let format = format_from_file(path);
         match read_1d() {
-            Ok(spectrum) => {
+            Ok(spectrum) if self.one_d.is_enabled() => {
                 bundle.push_1d(spectrum, self.loaded_source(root, path, format));
-                Ok(())
+                return Ok(());
             }
-            Err(first_error) => match read_2d() {
+            Ok(_) => {}
+            Err(first_error) => {
+                if self.two_d.is_enabled() {
+                    return match read_2d() {
+                        Ok(spectrum) => {
+                            bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                            Ok(())
+                        }
+                        Err(second_error) => self.add_bundle_or_warning(
+                            bundle,
+                            root,
+                            path,
+                            read_bundle,
+                            Some(&first_error),
+                            Some(&second_error),
+                        ),
+                    };
+                }
+                return self.add_bundle_or_warning(
+                    bundle,
+                    root,
+                    path,
+                    read_bundle,
+                    Some(&first_error),
+                    None,
+                );
+            }
+        }
+
+        if self.two_d.is_enabled() {
+            return match read_2d() {
                 Ok(spectrum) => {
                     bundle.push_2d(spectrum, self.loaded_source(root, path, format));
                     Ok(())
                 }
-                Err(second_error) => match read_bundle() {
-                    Ok(loaded) => {
-                        let loaded = self.bundle_with_source_context(root, path, loaded);
-                        bundle.extend_bundle(loaded);
-                        Ok(())
-                    }
-                    Err(third_error) => {
-                        let message = format!(
-                            "{first_error}; two-dimensional fallback: {second_error}; bundle fallback: {third_error}"
-                        );
-                        self.handle_error_message(bundle, root, path, message)
-                    }
-                },
-            },
+                Err(second_error) => self.add_bundle_or_warning(
+                    bundle,
+                    root,
+                    path,
+                    read_bundle,
+                    None,
+                    Some(&second_error),
+                ),
+            };
+        }
+
+        self.add_bundle_or_warning(bundle, root, path, read_bundle, None, None)
+    }
+
+    fn add_bundle_or_warning(
+        &self,
+        bundle: &mut SpectrumBundle,
+        root: &Path,
+        path: &Path,
+        read_bundle: impl FnOnce() -> Result<SpectrumBundle>,
+        first_error: Option<&RSpinError>,
+        second_error: Option<&RSpinError>,
+    ) -> Result<()> {
+        match read_bundle() {
+            Ok(loaded) => {
+                let loaded = self.bundle_with_source_context(root, path, loaded);
+                bundle.extend_bundle(loaded);
+                Ok(())
+            }
+            Err(third_error) => {
+                let message = fallback_message(first_error, second_error, &third_error);
+                self.handle_error_message(bundle, root, path, message)
+            }
         }
     }
 
@@ -734,6 +805,9 @@ impl SpectrumBundleLoader {
         format: &'static str,
         result: Result<Spectrum1D>,
     ) -> Result<()> {
+        if !self.one_d.is_enabled() {
+            return Ok(());
+        }
         match result {
             Ok(spectrum) => {
                 bundle.push_1d(spectrum, self.loaded_source(root, path, format));
@@ -751,6 +825,9 @@ impl SpectrumBundleLoader {
         format: &'static str,
         result: Result<Spectrum2D>,
     ) -> Result<()> {
+        if !self.two_d.is_enabled() {
+            return Ok(());
+        }
         match result {
             Ok(spectrum) => {
                 bundle.push_2d(spectrum, self.loaded_source(root, path, format));
@@ -769,23 +846,51 @@ impl SpectrumBundleLoader {
         read_1d: impl FnOnce() -> Result<Spectrum1D>,
         read_2d: impl FnOnce() -> Result<Spectrum2D>,
     ) -> Result<()> {
-        match read_1d() {
-            Ok(spectrum) => {
-                bundle.push_1d(spectrum, self.loaded_source(root, path, format));
-                Ok(())
+        if self.one_d.is_enabled() {
+            match read_1d() {
+                Ok(spectrum) => {
+                    bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                    return Ok(());
+                }
+                Err(first_error) if !self.two_d.is_enabled() => {
+                    return self.handle_error(bundle, root, path, first_error);
+                }
+                Err(first_error) => {
+                    return match read_2d() {
+                        Ok(spectrum) => {
+                            bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                            Ok(())
+                        }
+                        Err(second_error) => {
+                            let message =
+                                format!("{first_error}; two-dimensional fallback: {second_error}");
+                            self.handle_error_message(bundle, root, path, message)
+                        }
+                    };
+                }
             }
-            Err(first_error) => match read_2d() {
+        }
+
+        if self.two_d.is_enabled() {
+            match read_2d() {
                 Ok(spectrum) => {
                     bundle.push_2d(spectrum, self.loaded_source(root, path, format));
                     Ok(())
                 }
-                Err(second_error) => {
-                    let message =
-                        format!("{first_error}; two-dimensional fallback: {second_error}");
-                    self.handle_error_message(bundle, root, path, message)
-                }
-            },
+                Err(error) => self.handle_error(bundle, root, path, error),
+            }
+        } else {
+            Ok(())
         }
+    }
+
+    fn filter_bundle_dimensions(&self, bundle: &mut SpectrumBundle) {
+        let include_1d = self.one_d.is_enabled();
+        let include_2d = self.two_d.is_enabled();
+        bundle.spectra.retain(|entry| match entry {
+            LoadedSpectrum::OneD { .. } => include_1d,
+            LoadedSpectrum::TwoD { .. } => include_2d,
+        });
     }
 
     fn handle_error(
@@ -830,6 +935,7 @@ impl SpectrumBundleLoader {
         path: &Path,
         mut bundle: SpectrumBundle,
     ) -> SpectrumBundle {
+        self.filter_bundle_dimensions(&mut bundle);
         if !self.source_paths.is_enabled() {
             clear_bundle_source_paths(&mut bundle);
             return bundle;
@@ -859,6 +965,8 @@ impl Default for SpectrumBundleLoader {
         Self {
             raw: Toggle::Enabled,
             processed: Toggle::Enabled,
+            one_d: Toggle::Enabled,
+            two_d: Toggle::Enabled,
             strict: Toggle::Disabled,
             source_paths: Toggle::Enabled,
         }
@@ -971,6 +1079,22 @@ fn no_data_error(mut message: String, bundle: &SpectrumBundle) -> RSpinError {
         format: "spectrum bundle",
         message,
     }
+}
+
+fn fallback_message(
+    first_error: Option<&RSpinError>,
+    second_error: Option<&RSpinError>,
+    bundle_error: &RSpinError,
+) -> String {
+    let mut parts = Vec::new();
+    if let Some(error) = first_error {
+        parts.push(error.to_string());
+    }
+    if let Some(error) = second_error {
+        parts.push(format!("two-dimensional fallback: {error}"));
+    }
+    parts.push(format!("bundle fallback: {bundle_error}"));
+    parts.join("; ")
 }
 
 #[derive(Default)]
