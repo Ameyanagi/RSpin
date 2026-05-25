@@ -372,6 +372,10 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));
     let exact = load_spectrum_1d_relative_to(&fixture_root, "varian_1h")?;
     assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (exact, source) = load_spectrum_1d_with_source_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.format(), "agilent_fid");
+    assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
 
     let agilent = bundle
         .spectra()

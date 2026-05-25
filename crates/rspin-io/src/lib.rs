@@ -79,8 +79,12 @@ pub use bundle::{
     SourceFormatCount, SourceVendorCount, SpectrumBundle, SpectrumBundleLoader,
     SpectrumBundleSummary, load_spectra, load_spectra_many, load_spectra_many_relative_to,
     load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_many,
-    load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to, load_spectrum_2d,
-    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_relative_to,
+    load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
+    load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_relative_to,
+    load_spectrum_1d_with_source, load_spectrum_1d_with_source_relative_to, load_spectrum_2d,
+    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_many_with_source,
+    load_spectrum_2d_many_with_source_relative_to, load_spectrum_2d_relative_to,
+    load_spectrum_2d_with_source, load_spectrum_2d_with_source_relative_to,
     parse_loaded_source_format, parse_loaded_source_vendor,
 };
 pub use bundle_json::{
