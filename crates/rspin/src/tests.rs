@@ -317,6 +317,17 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     assert_eq!(bundle.source_format_count("agilent_fid"), 1);
     assert_eq!(bundle.source_format_count("bruker_fid"), 1);
     assert_eq!(bundle.source_format_count("bruker_processed"), 1);
+    let source_format_counts = bundle.source_format_counts();
+    assert!(
+        source_format_counts
+            .iter()
+            .any(|count| { count.format() == "agilent_fid" && count.count() == 1 })
+    );
+    assert!(
+        source_format_counts
+            .iter()
+            .any(|count| { count.format() == "bruker_processed" && count.count() == 1 })
+    );
     assert_eq!(bundle.source_paths().count(), 3);
     assert!(bundle.has_source_path(std::path::Path::new("varian_1h")));
 

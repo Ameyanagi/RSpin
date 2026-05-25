@@ -55,6 +55,38 @@ impl LoadedSource {
     }
 }
 
+/// Deterministic count of loaded spectra for one source format.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceFormatCount {
+    /// Reader format.
+    pub format: String,
+    /// Number of loaded spectra with this format.
+    pub count: usize,
+}
+
+impl SourceFormatCount {
+    /// Creates a source format count.
+    #[must_use]
+    pub fn new(format: impl Into<String>, count: usize) -> Self {
+        Self {
+            format: format.into(),
+            count,
+        }
+    }
+
+    /// Returns the reader format.
+    #[must_use]
+    pub fn format(&self) -> &str {
+        &self.format
+    }
+
+    /// Returns the number of loaded spectra with this format.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+}
+
 /// A loaded one- or two-dimensional spectrum plus source metadata.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "dimension", rename_all = "snake_case")]
@@ -151,6 +183,18 @@ impl LoadWarning {
             path,
             message: message.into(),
         }
+    }
+
+    /// Returns the source path for the warning, if source path tracking was enabled.
+    #[must_use]
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    /// Returns the warning message.
+    #[must_use]
+    pub fn message(&self) -> &str {
+        &self.message
     }
 }
 
@@ -281,6 +325,29 @@ impl SpectrumBundle {
             .count()
     }
 
+    /// Returns true when a loaded spectrum was read with a source format.
+    #[must_use]
+    pub fn has_source_format(&self, format: &str) -> bool {
+        self.loaded_sources()
+            .any(|source| source.format() == format)
+    }
+
+    /// Returns deterministic source format counts in first-seen order.
+    #[must_use]
+    pub fn source_format_counts(&self) -> Vec<SourceFormatCount> {
+        let mut counts: Vec<SourceFormatCount> = Vec::new();
+        for source in self.loaded_sources() {
+            match counts
+                .iter_mut()
+                .find(|count| count.format() == source.format())
+            {
+                Some(count) => count.count += 1,
+                None => counts.push(SourceFormatCount::new(source.format(), 1)),
+            }
+        }
+        counts
+    }
+
     /// Returns a one-dimensional spectrum and source by source path, if present.
     #[must_use]
     pub fn loaded_1d_by_source_path(
@@ -311,7 +378,19 @@ impl SpectrumBundle {
         let path = path.as_ref().to_path_buf();
         self.warnings
             .iter()
-            .filter(move |warning| warning.path.as_deref() == Some(path.as_path()))
+            .filter(move |warning| warning.path() == Some(path.as_path()))
+    }
+
+    /// Returns an iterator over tracked source paths for loader warnings.
+    ///
+    /// Warnings emitted while source path tracking is disabled are skipped.
+    pub fn warning_paths(&self) -> impl Iterator<Item = &Path> {
+        self.warnings.iter().filter_map(LoadWarning::path)
+    }
+
+    /// Returns an iterator over loader warning messages.
+    pub fn warning_messages(&self) -> impl Iterator<Item = &str> {
+        self.warnings.iter().map(LoadWarning::message)
     }
 
     /// Consumes the bundle and returns loaded one-dimensional spectra with sources.

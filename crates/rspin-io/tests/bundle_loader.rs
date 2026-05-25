@@ -822,6 +822,22 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert_eq!(bundle.source_format_count("jcamp_dx"), 2);
     assert_eq!(bundle.source_format_count("jeol_jdf"), 3);
     assert_eq!(bundle.source_format_count("missing"), 0);
+    assert!(bundle.has_source_format("jcamp_dx"));
+    assert!(!bundle.has_source_format("missing"));
+
+    let source_format_counts = bundle.source_format_counts();
+    assert_eq!(
+        source_format_counts
+            .iter()
+            .map(|count| (count.format(), count.count()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("bruker_fid", 1),
+            ("bruker_ser", 1),
+            ("jcamp_dx", 2),
+            ("jeol_jdf", 3)
+        ]
+    );
 
     let source_formats = bundle.source_formats().collect::<Vec<_>>();
     assert_eq!(source_formats.len(), bundle.len());
@@ -873,12 +889,21 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     let warning = warnings
         .first()
         .ok_or_else(|| anyhow::anyhow!("missing lookup warning"))?;
-    assert!(warning.message.contains("missing XYDATA values"));
+    assert_eq!(warning.path(), Some(Path::new("empty_jcamp/empty.jdx")));
+    assert!(warning.message().contains("missing XYDATA values"));
+    assert_eq!(
+        bundle_with_warning.warning_paths().collect::<Vec<_>>(),
+        vec![Path::new("empty_jcamp/empty.jdx")]
+    );
+    let warning_messages = bundle_with_warning.warning_messages().collect::<Vec<_>>();
+    assert_eq!(warning_messages.len(), 1);
+    assert!(warning_messages[0].contains("missing XYDATA values"));
 
     let no_sources = RSpinReader::new()
         .without_source_paths()
         .read_path(nmrxiv_fixture_root())?;
     assert!(no_sources.loaded_by_source_path(jcamp_path).is_none());
+    assert!(no_sources.source_paths().next().is_none());
     Ok(())
 }
 
