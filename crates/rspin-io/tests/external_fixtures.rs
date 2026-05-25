@@ -12,10 +12,10 @@ use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     RSpinReader, Spectrum1DBytesFormat, Spectrum1DPathFormat, Spectrum2DBytesFormat,
     Spectrum2DPathFormat, detect_spectrum1d_path_format, detect_spectrum2d_path_format,
-    read_agilent_arrayed_fid_1d_dir, read_agilent_arrayed_fid_2d_dir, read_agilent_fid_1d_dir,
-    read_agilent_fid_2d_dir, read_bruker_fid_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d,
-    read_jeol_jdf_1d_file, read_jeol_jdf_2d_file, read_nmrml_1d_file, read_nmrml_2d_file,
-    read_spectrum1d_bytes_as, read_spectrum2d_bytes_as,
+    inspect_jeol_jdf_file, read_agilent_arrayed_fid_1d_dir, read_agilent_arrayed_fid_2d_dir,
+    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
+    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
+    read_nmrml_1d_file, read_nmrml_2d_file, read_spectrum1d_bytes_as, read_spectrum2d_bytes_as,
 };
 
 #[test]
@@ -416,6 +416,65 @@ fn routes_external_jeol_jdf_bytes_when_available() -> anyhow::Result<()> {
     assert_eq!(two_d.y.unit, Unit::Seconds);
     assert_eq!(two_d.metadata.origin.as_deref(), Some("JEOL"));
     assert!(two_d.imaginary.is_some());
+    Ok(())
+}
+
+#[test]
+fn parses_external_jeol_jdf_fixture_set_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let data_dir = root.join("unpacked/jeol-data-test-1.0.0/data");
+    require_path(&data_dir)?;
+
+    let mut fixtures = Vec::new();
+    for entry in fs::read_dir(&data_dir)? {
+        let path = entry?.path();
+        if path
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("jdf"))
+        {
+            fixtures.push(path);
+        }
+    }
+    fixtures.sort();
+    assert!(!fixtures.is_empty());
+
+    let mut one_dimensional = 0_usize;
+    let mut two_dimensional = 0_usize;
+    for fixture in fixtures {
+        let info = inspect_jeol_jdf_file(&fixture)?;
+        match info.dimension_count {
+            1 => {
+                let spectrum = read_jeol_jdf_1d_file(&fixture)?;
+                let Some(expected_points) = info.point_counts.first().copied() else {
+                    anyhow::bail!("missing 1D point count for {}", fixture.display());
+                };
+                assert_eq!(spectrum.len(), expected_points);
+                assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+                assert!(spectrum.intensities.iter().any(|value| value.abs() > 0.0));
+                one_dimensional += 1;
+            }
+            2 => {
+                let spectrum = read_jeol_jdf_2d_file(&fixture)?;
+                let [x_count, y_count, ..] = info.point_counts.as_slice() else {
+                    anyhow::bail!("missing 2D point counts for {}", fixture.display());
+                };
+                assert_eq!(spectrum.shape(), (*x_count, *y_count));
+                assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
+                assert!(spectrum.z.iter().any(|value| value.abs() > 0.0));
+                two_dimensional += 1;
+            }
+            _ => anyhow::bail!(
+                "unsupported JEOL fixture dimensionality {} at {}",
+                info.dimension_count,
+                fixture.display()
+            ),
+        }
+    }
+
+    assert!(one_dimensional > 0);
+    assert!(two_dimensional > 0);
     Ok(())
 }
 
