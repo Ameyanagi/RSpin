@@ -191,6 +191,47 @@ pub fn read_agilent_fid_1d_bytes(procpar: &str, fid_bytes: &[u8]) -> Result<Spec
     Spectrum1D::new_complex(axis, real, Some(imaginary), metadata)
 }
 
+/// Reads arrayed one-dimensional FIDs from an Agilent/Varian dataset directory.
+///
+/// The path may point to the dataset directory or directly to `fid`. Each
+/// binary trace is returned as one `Spectrum1D` with shared acquisition
+/// metadata and array index/count metadata properties.
+///
+/// # Errors
+///
+/// Returns an error when the dataset is missing, malformed, not a
+/// one-dimensional acquisition, or uses an unsupported data representation.
+pub fn read_agilent_arrayed_fid_1d_dir(path: impl AsRef<Path>) -> Result<Vec<Spectrum1D>> {
+    let dataset_dir = locate_dataset_dir(path.as_ref());
+    let procpar_text = read_text(&dataset_dir.join("procpar"), "Agilent procpar")?;
+    let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!("failed to read fid: {error}"),
+    })?;
+
+    read_agilent_arrayed_fid_1d_bytes(&procpar_text, &fid_bytes)
+}
+
+/// Reads arrayed one-dimensional FIDs from Agilent/Varian `procpar` text and
+/// FID bytes.
+///
+/// # Errors
+///
+/// Returns an error when the `procpar` text is malformed, declares a
+/// non-one-dimensional acquisition, or the FID bytes are malformed or
+/// unsupported.
+pub fn read_agilent_arrayed_fid_1d_bytes(
+    procpar: &str,
+    fid_bytes: &[u8],
+) -> Result<Vec<Spectrum1D>> {
+    let procpar = parse_procpar_for_reader(procpar)?;
+    validate_arrayed_1d_procpar(&procpar)?;
+    let (real, imaginary, x_count, spectrum_count) = read_arrayed_fid_values(fid_bytes)?;
+    let axis = build_axis(x_count, &procpar)?;
+    let metadata = build_metadata(&procpar);
+    build_arrayed_1d_spectra(&real, &imaginary, x_count, spectrum_count, &axis, &metadata)
+}
+
 /// Reader for Agilent/Varian processed one-dimensional `phasefile` datasets.
 ///
 /// The reader accepts the dataset directory, its `datdir` directory, or the
@@ -568,6 +609,12 @@ fn read_fid_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>)> {
     Ok((real, imaginary))
 }
 
+fn read_arrayed_fid_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
+    let header = FileHeader::parse(bytes)?;
+    header.validate_arrayed_1d()?;
+    read_complex_trace_matrix(bytes, &header)
+}
+
 fn read_fid_matrix_values(bytes: &[u8]) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
     let header = FileHeader::parse(bytes)?;
     header.validate_2d()?;
@@ -659,6 +706,59 @@ fn read_complex_trace_matrix(
         }
     }
     Ok((real, imaginary, x_count, y_count))
+}
+
+fn build_arrayed_1d_spectra(
+    real: &[f64],
+    imaginary: &[f64],
+    x_count: usize,
+    spectrum_count: usize,
+    axis: &Axis,
+    metadata: &Metadata,
+) -> Result<Vec<Spectrum1D>> {
+    if spectrum_count == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "Agilent arrayed FID must contain at least one trace".to_owned(),
+        });
+    }
+
+    let expected_len =
+        x_count
+            .checked_mul(spectrum_count)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent arrayed FID size overflow".to_owned(),
+            })?;
+    if real.len() != expected_len || imaginary.len() != expected_len {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "Agilent arrayed FID trace sizes are inconsistent".to_owned(),
+        });
+    }
+
+    let mut spectra = Vec::with_capacity(spectrum_count);
+    for spectrum_index in 0..spectrum_count {
+        let start =
+            spectrum_index
+                .checked_mul(x_count)
+                .ok_or_else(|| RSpinError::InvalidSpectrum {
+                    message: "Agilent arrayed FID trace offset overflow".to_owned(),
+                })?;
+        let end = start
+            .checked_add(x_count)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent arrayed FID trace end overflow".to_owned(),
+            })?;
+        let spectrum_metadata = metadata
+            .clone()
+            .with_property("agilent.array.index", spectrum_index.to_string())
+            .with_property("agilent.array.count", spectrum_count.to_string());
+        spectra.push(Spectrum1D::new_complex(
+            axis.clone(),
+            real[start..end].to_vec(),
+            Some(imaginary[start..end].to_vec()),
+            spectrum_metadata,
+        )?);
+    }
+    Ok(spectra)
 }
 
 fn first_trace<'a>(
@@ -803,6 +903,16 @@ impl FileHeader {
             });
         }
         self.validate_complex()?;
+        Ok(())
+    }
+
+    fn validate_arrayed_1d(self) -> Result<()> {
+        self.validate_complex()?;
+        if self.trace_count()? <= 1 {
+            return Err(RSpinError::Unsupported {
+                feature: "Agilent non-arrayed FID in arrayed 1D reader",
+            });
+        }
         Ok(())
     }
 
@@ -1158,6 +1268,18 @@ fn validate_2d_procpar(parameters: &BTreeMap<String, Vec<String>>) -> Result<()>
         Some(2) | None => Ok(()),
         Some(0 | 1) => Err(RSpinError::Unsupported {
             feature: "Agilent one-dimensional FID in 2D reader",
+        }),
+        Some(_) => Err(RSpinError::Unsupported {
+            feature: "Agilent three-or-higher-dimensional FID",
+        }),
+    }
+}
+
+fn validate_arrayed_1d_procpar(parameters: &BTreeMap<String, Vec<String>>) -> Result<()> {
+    match first_usize(parameters, "acqdim")? {
+        Some(0 | 1) | None => Ok(()),
+        Some(2) => Err(RSpinError::Unsupported {
+            feature: "Agilent two-dimensional FID in arrayed 1D reader",
         }),
         Some(_) => Err(RSpinError::Unsupported {
             feature: "Agilent three-or-higher-dimensional FID",

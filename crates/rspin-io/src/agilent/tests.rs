@@ -296,6 +296,77 @@ sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
 }
 
 #[test]
+fn reads_arrayed_1d_fid_as_spectrum_series() -> anyhow::Result<()> {
+    let root = synthetic_dataset("arrayed-1d")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 1
+0
+array 2 2 256 0 0 2 1 1 1 64
+1 \"delay\"
+0
+arrayelemts 1 1 9.99999984307e+17 -9.99999984307e+17 0 2 1 0 1 64
+1 2
+0
+tn 2 2 4 0 0 2 1 8 1 64
+1 \"C13\"
+0
+sfrq 1 1 1000000000 0 0 2 1 11 1 64
+1 125.5
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 500
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Little,
+        DataForTest::F32(&[0.5, -0.25, 1.5, -2.5, 3.0, 4.0, 5.0, 6.0]),
+        2,
+        1,
+    )?;
+
+    let spectra = read_agilent_arrayed_fid_1d_dir(&root)?;
+    let bytes_spectra = read_agilent_arrayed_fid_1d_bytes(
+        &fs::read_to_string(root.join("procpar"))?,
+        &fs::read(root.join("fid"))?,
+    )?;
+
+    assert_eq!(spectra, bytes_spectra);
+    assert_eq!(spectra.len(), 2);
+    assert_eq!(spectra[0].x.unit, Unit::Seconds);
+    assert_eq!(spectra[0].x.values, vec![0.0, 0.002]);
+    assert_eq!(spectra[0].intensities, vec![0.5, 1.5]);
+    assert_eq!(spectra[0].imaginary, Some(vec![-0.25, -2.5]));
+    assert_eq!(spectra[1].intensities, vec![3.0, 5.0]);
+    assert_eq!(spectra[1].imaginary, Some(vec![4.0, 6.0]));
+    assert_eq!(spectra[0].metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(spectra[0].metadata.frequency_mhz, Some(125.5));
+    assert_eq!(
+        spectra[0].metadata.property("agilent.array.index"),
+        Some("0")
+    );
+    assert_eq!(
+        spectra[1].metadata.property("agilent.array.index"),
+        Some("1")
+    );
+    assert_eq!(
+        spectra[1].metadata.property("agilent.array.count"),
+        Some("2")
+    );
+    assert_eq!(
+        spectra[0].metadata.property("agilent.procpar.array"),
+        Some("delay")
+    );
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn reads_big_endian_i32_processed_phasefile() -> anyhow::Result<()> {
     let root = synthetic_dataset("processed-phasefile")?;
     write_procpar(

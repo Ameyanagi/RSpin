@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     NmreDataRecord, Spectrum1DPathFormat, Spectrum2DPathFormat, SpectrumPathReader,
+    inspect_agilent_binary_file, inspect_agilent_procpar, read_agilent_arrayed_fid_1d_dir,
     read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_agilent_processed_1d_dir,
     read_agilent_processed_2d_dir, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
     read_bruker_processed_2d_dir, read_bruker_ser_2d_dir, read_nmredata_records_file,
@@ -612,6 +613,18 @@ impl SpectrumBundleLoader {
             )?;
         }
         if self.raw.is_enabled() && is_agilent_fid_dir(directory) {
+            if is_agilent_arrayed_1d_fid_path(directory) {
+                if self.one_d.is_enabled() {
+                    self.add_1d_results(
+                        bundle,
+                        root,
+                        directory,
+                        "agilent_fid",
+                        read_agilent_arrayed_fid_1d_dir(directory),
+                    )?;
+                }
+                return Ok(());
+            }
             self.add_1d_or_2d_result(
                 bundle,
                 root,
@@ -668,6 +681,23 @@ impl SpectrumBundleLoader {
 
         if is_nmredata_file(file) {
             return self.read_nmredata_candidate(root, file, bundle);
+        }
+        if self.raw.is_enabled() && is_agilent_arrayed_1d_fid_path(file) {
+            if !self.one_d.is_enabled() {
+                return self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    disabled_dimension_message(file, "one-dimensional"),
+                );
+            }
+            return self.add_1d_results(
+                bundle,
+                root,
+                file,
+                "agilent_fid",
+                read_agilent_arrayed_fid_1d_dir(file),
+            );
         }
         if is_json_file(file) {
             return self.add_1d_or_2d_or_bundle_result(
@@ -842,6 +872,28 @@ impl SpectrumBundleLoader {
         }
     }
 
+    fn add_1d_results(
+        &self,
+        bundle: &mut SpectrumBundle,
+        root: &Path,
+        path: &Path,
+        format: &'static str,
+        result: Result<Vec<Spectrum1D>>,
+    ) -> Result<()> {
+        if !self.one_d.is_enabled() {
+            return Ok(());
+        }
+        match result {
+            Ok(spectra) => {
+                for spectrum in spectra {
+                    bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                }
+                Ok(())
+            }
+            Err(error) => self.handle_error(bundle, root, path, error),
+        }
+    }
+
     fn add_2d_result(
         &self,
         bundle: &mut SpectrumBundle,
@@ -961,6 +1013,10 @@ impl SpectrumBundleLoader {
                 return Some(disabled_candidate_message(path, "processed spectrum"));
             }
             FileCandidateKind::Raw | FileCandidateKind::Processed | FileCandidateKind::Other => {}
+        }
+
+        if is_agilent_arrayed_1d_fid_path(path) && !self.one_d.is_enabled() {
+            return Some(disabled_dimension_message(path, "one-dimensional"));
         }
 
         self.disabled_dimension_file_message(path)
@@ -1257,6 +1313,38 @@ fn is_bruker_processed_2d_dir(path: &Path) -> bool {
 
 fn is_agilent_fid_dir(path: &Path) -> bool {
     path.join("fid").is_file() && path.join("procpar").is_file()
+}
+
+fn is_agilent_arrayed_1d_fid_path(path: &Path) -> bool {
+    let Some(dataset) = agilent_fid_dataset_dir(path) else {
+        return false;
+    };
+
+    let Ok(procpar) = fs::read_to_string(dataset.join("procpar")) else {
+        return false;
+    };
+    let Ok(procpar_info) = inspect_agilent_procpar(&procpar) else {
+        return false;
+    };
+    if !matches!(procpar_info.acquisition_dimension, Some(0 | 1)) {
+        return false;
+    }
+
+    inspect_agilent_binary_file(dataset.join("fid")).is_ok_and(|info| info.trace_count > 1)
+}
+
+fn agilent_fid_dataset_dir(path: &Path) -> Option<PathBuf> {
+    let dataset = if path.is_file() {
+        let file_name = path.file_name().and_then(std::ffi::OsStr::to_str)?;
+        if !file_name.eq_ignore_ascii_case("fid") {
+            return None;
+        }
+        path.parent()?.to_path_buf()
+    } else {
+        path.to_path_buf()
+    };
+
+    (dataset.join("fid").is_file() && dataset.join("procpar").is_file()).then_some(dataset)
 }
 
 fn is_agilent_processed_dir(path: &Path) -> bool {

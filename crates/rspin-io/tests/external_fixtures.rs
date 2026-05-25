@@ -12,9 +12,10 @@ use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     RSpinReader, Spectrum1DBytesFormat, Spectrum1DPathFormat, Spectrum2DBytesFormat,
     Spectrum2DPathFormat, detect_spectrum1d_path_format, detect_spectrum2d_path_format,
-    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
-    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
-    read_nmrml_1d_file, read_nmrml_2d_file, read_spectrum1d_bytes_as, read_spectrum2d_bytes_as,
+    read_agilent_arrayed_fid_1d_dir, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
+    read_bruker_fid_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
+    read_jeol_jdf_2d_file, read_nmrml_1d_file, read_nmrml_2d_file, read_spectrum1d_bytes_as,
+    read_spectrum2d_bytes_as,
 };
 
 #[test]
@@ -153,6 +154,64 @@ fn parses_external_agilent_2d_fid_when_available() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("none"));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.z.iter().any(|value| value.abs() > 1.0));
+    Ok(())
+}
+
+#[test]
+fn parses_external_varian_arrayed_1d_fids_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let fixture = root.join(
+        "unpacked/nmrglue-example-data-all-none/separate/separate_1d_varian/arrayed_data.dir",
+    );
+    require_fixture(&fixture.join("fid"))?;
+    require_fixture(&fixture.join("procpar"))?;
+
+    let spectra = read_agilent_arrayed_fid_1d_dir(&fixture)?;
+    let spectra_from_file = read_agilent_arrayed_fid_1d_dir(fixture.join("fid"))?;
+    let bundle = RSpinReader::new().read_path(&fixture)?;
+    let file_bundle = RSpinReader::new().read_path(fixture.join("fid"))?;
+
+    assert_eq!(spectra.len(), 26);
+    assert_eq!(spectra_from_file.len(), 26);
+    assert!(spectra.iter().all(|spectrum| spectrum.len() == 1500));
+    assert!(
+        spectra
+            .iter()
+            .all(|spectrum| spectrum.x.unit == Unit::Seconds)
+    );
+    assert!(
+        spectra
+            .iter()
+            .all(|spectrum| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+    );
+    assert_eq!(
+        spectra[0].metadata.property("agilent.array.index"),
+        Some("0")
+    );
+    assert_eq!(
+        spectra[25].metadata.property("agilent.array.index"),
+        Some("25")
+    );
+    assert_eq!(
+        spectra[25].metadata.property("agilent.array.count"),
+        Some("26")
+    );
+    assert!(
+        spectra
+            .iter()
+            .any(|spectrum| spectrum.intensities.iter().any(|value| value.abs() > 1.0))
+    );
+
+    assert_eq!(bundle.len(), 26);
+    assert_eq!(bundle.spectra_1d().count(), 26);
+    assert_eq!(bundle.spectra_2d().count(), 0);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(source_format_count(&bundle, "agilent_fid"), 26);
+    assert_eq!(file_bundle.len(), 26);
+    assert_eq!(file_bundle.spectra_1d().count(), 26);
+    assert!(file_bundle.warnings().is_empty());
     Ok(())
 }
 
