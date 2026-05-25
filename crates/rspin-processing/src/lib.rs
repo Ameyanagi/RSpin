@@ -11,6 +11,7 @@ mod builder_tests;
 mod contours;
 mod crop_1d;
 mod crop_2d;
+mod linear_prediction;
 mod one_d;
 mod pipeline;
 mod pipeline_2d;
@@ -46,6 +47,7 @@ pub use baseline::{
 pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, extract_contours};
 pub use crop_1d::{Crop1D, crop_1d};
 pub use crop_2d::{Crop2D, crop_2d};
+pub use linear_prediction::linear_prediction_extend;
 pub use one_d::{
     NormalizeArea, NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill,
     normalize_area, normalize_max_abs, offset_intensity, scale_intensity, shift_axis,

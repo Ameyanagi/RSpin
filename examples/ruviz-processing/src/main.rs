@@ -34,7 +34,8 @@ mod ruviz_example {
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
         ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift, auto_phase_correct,
-        auto_phase_correct_with_peaks, fit_baseline, remove_group_delay,
+        auto_phase_correct_with_peaks, fit_baseline, linear_prediction_extend,
+        remove_group_delay,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -437,6 +438,10 @@ mod ruviz_example {
     /// Line broadening (Hz) used for the visualisation spectrum.
     const DISPLAY_LINE_BROADENING_HZ: f64 = 1.0;
 
+    /// Burg AR order for FID extension. 32 captures the dominant lines of
+    /// the curated 1H/13C fixtures without overfitting the noise floor.
+    const LP_ORDER: usize = 32;
+
     fn jeol_prepare_complex_spectrum(
         spectrum: &Spectrum1D,
         shift: f64,
@@ -449,18 +454,26 @@ mod ruviz_example {
         } else {
             spectrum.clone()
         };
-        let post_fft = if shifted.x.unit == Unit::Seconds {
-            let target_len = shifted
+        // Linear-prediction forward extension to suppress sinc sidelobes
+        // before apodization. Extend by 25% of the FID length.
+        let extended = if shifted.x.unit == Unit::Seconds && shifted.len() > LP_ORDER * 4 {
+            let extra = shifted.len() / 4;
+            linear_prediction_extend(&shifted, LP_ORDER, extra)?
+        } else {
+            shifted
+        };
+        let post_fft = if extended.x.unit == Unit::Seconds {
+            let target_len = extended
                 .len()
                 .checked_mul(2)
                 .context("JEOL prep target length overflow")?;
             ProcessingRecipe1D::new()
-                .exponential_apodization(line_broadening_hz, dwell_time_seconds(&shifted)?)
+                .exponential_apodization(line_broadening_hz, dwell_time_seconds(&extended)?)
                 .zero_fill(target_len)
                 .fft(FftDirection::Forward)
-                .apply(&shifted)?
+                .apply(&extended)?
         } else {
-            shifted
+            extended
         };
         let polished = if frac.abs() > 1.0e-6 {
             apply_subsample_shift(&post_fft, frac)?
