@@ -292,6 +292,44 @@ fn reads_processed_2d_dataset_root_with_imaginary_plane() -> anyhow::Result<()> 
 }
 
 #[test]
+fn reads_processed_2d_fallback_companion_planes() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-2d-companion")?;
+    write_processed_2d_dir(
+        &root,
+        "\
+##$SI= 2
+##$BYTORDP= 0
+##$DTYPP= 0
+##$NC_proc= -1
+",
+        "\
+##$SI= 2
+",
+        &[1, 2, 3, 4],
+        None,
+        ByteOrder::Little,
+    )?;
+    fs::write(
+        root.join("pdata/1/2ir"),
+        i32_bytes(&[-1, -2, -3, -4], ByteOrder::Little),
+    )?;
+
+    let spectrum = read_bruker_processed_2d_dir(&root)?;
+
+    assert_eq!(spectrum.z, vec![2.0, 4.0, 6.0, 8.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-2.0, -4.0, -6.0, -8.0]));
+    assert_eq!(
+        spectrum
+            .metadata
+            .property("bruker.processed2d.companion_plane"),
+        Some("2ir")
+    );
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn reads_processed_2d_bytes_without_dataset_path() -> anyhow::Result<()> {
     let direct_parameters = "\
 ##$SI= 2

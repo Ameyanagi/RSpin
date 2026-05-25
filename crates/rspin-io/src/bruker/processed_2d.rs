@@ -15,8 +15,9 @@ use super::{
 /// Reader for Bruker processed two-dimensional datasets.
 ///
 /// The reader accepts either the dataset root containing `pdata/1` or the
-/// processed directory itself. It supports real `2rr` data and optional `2ri`
-/// data stored as 32-bit integers with Bruker `procs`/`proc2s` metadata.
+/// processed directory itself. It supports real `2rr` data and the first
+/// available companion plane from `2ri`, `2ir`, or `2ii` stored as 32-bit
+/// integers with Bruker `procs`/`proc2s` metadata.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BrukerProcessed2D;
 
@@ -143,10 +144,17 @@ pub fn read_bruker_processed_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D
     let point_count = processed_2d_point_count(x_count, y_count)?;
 
     let z = read_processed_i32_data(&processed_dir.join("2rr"), point_count, &direct_parameters)?;
-    let imaginary = read_optional_processed_plane(&processed_dir, point_count, &direct_parameters)?;
+    let (imaginary, companion_plane) =
+        read_optional_processed_plane(&processed_dir, point_count, &direct_parameters)?;
     let x = build_axis(&direct_parameters, x_count)?;
     let y = build_axis(&indirect_parameters, y_count)?;
-    let metadata = build_metadata(&direct_parameters, acqus.as_ref(), title)?;
+    let mut metadata = build_metadata(&direct_parameters, acqus.as_ref(), title)?;
+    if let Some(plane) = companion_plane {
+        metadata.properties.insert(
+            "bruker.processed2d.companion_plane".to_owned(),
+            plane.to_owned(),
+        );
+    }
 
     Spectrum2D::new_complex(x, y, z, imaginary, metadata)
 }
@@ -218,11 +226,13 @@ fn read_optional_processed_plane(
     processed_dir: &Path,
     point_count: usize,
     procs: &std::collections::BTreeMap<String, String>,
-) -> Result<Option<Vec<f64>>> {
-    let path = processed_dir.join("2ri");
-    if path.is_file() {
-        read_processed_i32_data(&path, point_count, procs).map(Some)
-    } else {
-        Ok(None)
+) -> Result<(Option<Vec<f64>>, Option<&'static str>)> {
+    for plane in ["2ri", "2ir", "2ii"] {
+        let path = processed_dir.join(plane);
+        if path.is_file() {
+            let values = read_processed_i32_data(&path, point_count, procs)?;
+            return Ok((Some(values), Some(plane)));
+        }
     }
+    Ok((None, None))
 }
