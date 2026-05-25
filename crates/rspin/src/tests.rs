@@ -301,6 +301,37 @@ fn prelude_supports_io_reader_markers_and_versions() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let bundle = load_spectra_many([
+        fixture_root.join("varian_1h"),
+        fixture_root.join("bruker_without_expno"),
+    ])?;
+
+    assert_eq!(bundle.len(), 3);
+    assert_eq!(bundle.spectra_1d().count(), 3);
+    assert_eq!(bundle.spectra_2d().count(), 0);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(source_format_count(&bundle, "agilent_fid"), 1);
+    assert_eq!(source_format_count(&bundle, "bruker_fid"), 1);
+    assert_eq!(source_format_count(&bundle, "bruker_processed"), 1);
+
+    let agilent = bundle
+        .spectra()
+        .iter()
+        .find(|loaded| loaded.source().format == "agilent_fid")
+        .and_then(LoadedSpectrum::as_1d)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "missing Agilent/Varian spectrum from facade bundle loader".to_owned(),
+        })?;
+    assert_eq!(agilent.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(agilent.x.unit, Unit::Seconds);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_batch_integration() -> Result<()> {
     let integrals = integrate_regions(
         &read_spectrum1d_csv("x,intensity\n0,0\n1,1\n2,2\n")?,
@@ -562,6 +593,14 @@ fn assert_j_coupling_json_round_trip(coupling_graph: &JCouplingGraph) -> Result<
     assert!(graph_json.contains(J_COUPLING_GRAPH_JSON_FORMAT));
     assert_eq!(read_j_coupling_graph_json(&graph_json)?, *coupling_graph);
     Ok(())
+}
+
+fn source_format_count(bundle: &SpectrumBundle, format: &str) -> usize {
+    bundle
+        .spectra()
+        .iter()
+        .filter(|spectrum| spectrum.source().format == format)
+        .count()
 }
 
 #[test]
