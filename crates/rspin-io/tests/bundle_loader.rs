@@ -593,6 +593,51 @@ fn scans_nmredata_directory_without_requiring_spectra() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_accessors_count_and_consume_loaded_dimensions() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    assert_eq!(bundle.len(), 7);
+    assert_eq!(bundle.len_1d(), 5);
+    assert_eq!(bundle.len_2d(), 2);
+    assert_eq!(bundle.molecule_count(), 0);
+    assert_eq!(bundle.warning_count(), 0);
+    assert!(!bundle.has_warnings());
+
+    let loaded_1d = bundle.clone().into_loaded_1d();
+    assert_eq!(loaded_1d.len(), 5);
+    assert!(loaded_1d.iter().any(|(spectrum, source)| {
+        spectrum.metadata.nucleus == Some(Nucleus::Carbon13)
+            && source.path.as_deref()
+                == Some(Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"))
+    }));
+
+    let spectra_1d = bundle.clone().into_spectra_1d();
+    assert_eq!(spectra_1d.len(), 5);
+    assert!(
+        spectra_1d
+            .iter()
+            .any(|spectrum| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+    );
+
+    let loaded_2d = bundle.clone().into_loaded_2d();
+    assert_eq!(loaded_2d.len(), 2);
+    assert!(
+        loaded_2d
+            .iter()
+            .any(|(spectrum, _)| spectrum.shape() == (2048, 512))
+    );
+
+    let spectra_2d = bundle.into_spectra_2d();
+    assert_eq!(spectra_2d.len(), 2);
+    assert!(
+        spectra_2d
+            .iter()
+            .any(|spectrum| spectrum.shape() == (1024, 32))
+    );
+    Ok(())
+}
+
+#[test]
 fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
 

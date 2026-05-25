@@ -39,6 +39,18 @@ fn load_selected_inputs() -> Result<SpectrumBundle> {
 }
 ```
 
+Bundles expose direct counts and owned extraction helpers for simple workflows:
+
+```rust,no_run
+use rspin::prelude::*;
+
+fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
+    let bundle = load_spectra("data/experiment")?;
+    println!("loaded {} 1D and {} 2D spectra", bundle.len_1d(), bundle.len_2d());
+    Ok(bundle.into_spectra_1d())
+}
+```
+
 `RSpinReader` exposes the same reader with chainable options:
 
 ```rust,no_run

@@ -229,6 +229,48 @@ impl SpectrumBundle {
         })
     }
 
+    /// Consumes the bundle and returns loaded one-dimensional spectra with sources.
+    #[must_use]
+    pub fn into_loaded_1d(self) -> Vec<(Spectrum1D, LoadedSource)> {
+        self.spectra
+            .into_iter()
+            .filter_map(|entry| match entry {
+                LoadedSpectrum::OneD { spectrum, source } => Some((spectrum, source)),
+                LoadedSpectrum::TwoD { .. } => None,
+            })
+            .collect()
+    }
+
+    /// Consumes the bundle and returns loaded two-dimensional spectra with sources.
+    #[must_use]
+    pub fn into_loaded_2d(self) -> Vec<(Spectrum2D, LoadedSource)> {
+        self.spectra
+            .into_iter()
+            .filter_map(|entry| match entry {
+                LoadedSpectrum::TwoD { spectrum, source } => Some((spectrum, source)),
+                LoadedSpectrum::OneD { .. } => None,
+            })
+            .collect()
+    }
+
+    /// Consumes the bundle and returns one-dimensional spectra without source metadata.
+    #[must_use]
+    pub fn into_spectra_1d(self) -> Vec<Spectrum1D> {
+        self.into_loaded_1d()
+            .into_iter()
+            .map(|(spectrum, _)| spectrum)
+            .collect()
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra without source metadata.
+    #[must_use]
+    pub fn into_spectra_2d(self) -> Vec<Spectrum2D> {
+        self.into_loaded_2d()
+            .into_iter()
+            .map(|(spectrum, _)| spectrum)
+            .collect()
+    }
+
     /// Returns the only loaded one-dimensional spectrum.
     ///
     /// # Errors
@@ -305,6 +347,36 @@ impl SpectrumBundle {
     #[must_use]
     pub fn len(&self) -> usize {
         self.spectra.len()
+    }
+
+    /// Returns the number of one-dimensional spectra in the bundle.
+    #[must_use]
+    pub fn len_1d(&self) -> usize {
+        self.spectra.iter().filter(|entry| entry.is_1d()).count()
+    }
+
+    /// Returns the number of two-dimensional spectra in the bundle.
+    #[must_use]
+    pub fn len_2d(&self) -> usize {
+        self.spectra.iter().filter(|entry| entry.is_2d()).count()
+    }
+
+    /// Returns the number of molecule metadata entries in the bundle.
+    #[must_use]
+    pub fn molecule_count(&self) -> usize {
+        self.molecules.len()
+    }
+
+    /// Returns the number of non-fatal loader warnings in the bundle.
+    #[must_use]
+    pub fn warning_count(&self) -> usize {
+        self.warnings.len()
+    }
+
+    /// Returns true when the bundle contains non-fatal loader warnings.
+    #[must_use]
+    pub fn has_warnings(&self) -> bool {
+        !self.warnings.is_empty()
     }
 
     /// Returns true when no spectra or molecules were loaded.
