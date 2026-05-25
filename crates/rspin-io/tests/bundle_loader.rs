@@ -9,8 +9,8 @@ use std::{
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
-    load_spectra, load_spectra_many, load_spectrum_1d, load_spectrum_2d,
-    write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum2d_json,
+    load_spectra, load_spectra_many, load_spectra_many_relative_to, load_spectrum_1d,
+    load_spectrum_2d, write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum2d_json,
 };
 
 #[test]
@@ -395,6 +395,43 @@ fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     assert!(has_source_path(&bundle, Path::new("varian_1h")));
     assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
     assert!(has_source_path(&bundle, Path::new("pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn multi_path_loader_can_anchor_sources_to_common_base() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let bundle = load_spectra_many_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+
+    assert_eq!(bundle.len(), 3);
+    assert_eq!(bundle.len_1d(), 3);
+    assert!(bundle.warnings().is_empty());
+    assert!(has_source_path(&bundle, Path::new("varian_1h")));
+    assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
+    assert!(has_source_path(
+        &bundle,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+
+    let bundle = RSpinReader::new().read_paths_relative_to(
+        &base,
+        [base.join("empty_jcamp/empty.jdx"), base.join("varian_1h")],
+    )?;
+    assert_eq!(bundle.len(), 1);
+    let warning = bundle
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing anchored warning"))?;
+    assert_eq!(
+        warning.path.as_deref(),
+        Some(Path::new("empty_jcamp/empty.jdx"))
+    );
+
+    let bad_base = load_spectra_many_relative_to(base.join("varian_1h/fid"), ["fid"]);
+    let Err(error) = bad_base else {
+        anyhow::bail!("file base should be rejected");
+    };
+    assert!(error.to_string().contains("is not a directory"));
     Ok(())
 }
 

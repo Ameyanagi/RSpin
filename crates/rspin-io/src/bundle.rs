@@ -570,7 +570,7 @@ impl SpectrumBundleLoader {
         }
 
         let mut bundle = SpectrumBundle::new();
-        self.read_existing_path_into(root, &mut bundle)?;
+        self.read_existing_path_into(root, root, &mut bundle)?;
         self.add_selected_path_disabled_warning(root, &mut bundle)?;
 
         if bundle.has_data() {
@@ -615,7 +615,7 @@ impl SpectrumBundleLoader {
 
             let data_before = bundle.spectra.len() + bundle.molecules.len();
             let warnings_before = bundle.warnings.len();
-            self.read_existing_path_into(path, &mut bundle)?;
+            self.read_existing_path_into(path, path, &mut bundle)?;
             let data_after = bundle.spectra.len() + bundle.molecules.len();
             let warnings_after = bundle.warnings.len();
             if data_after == data_before && warnings_after == warnings_before {
@@ -624,6 +624,87 @@ impl SpectrumBundleLoader {
                     None => format!("no readable bundle data found at {}", path.display()),
                 };
                 self.handle_error_message(&mut bundle, path, path, message)?;
+            }
+        }
+
+        if !saw_input {
+            return Err(RSpinError::Parse {
+                format: "spectrum bundle",
+                message: "no input paths provided".to_owned(),
+            });
+        }
+
+        if bundle.has_data() {
+            Ok(bundle)
+        } else {
+            Err(no_data_error_in_inputs(&bundle))
+        }
+    }
+
+    /// Loads selected paths while anchoring source paths to a common base directory.
+    ///
+    /// Relative input paths are resolved below `base`. Absolute input paths are
+    /// loaded as provided, and their source metadata is still expressed relative
+    /// to `base` when possible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `base` is missing or is not a directory, no input
+    /// paths are provided, strict mode rejects a path, or no readable bundle
+    /// data is found.
+    pub fn read_paths_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let base = base.as_ref();
+        if !base.exists() {
+            return Err(RSpinError::Parse {
+                format: "spectrum bundle",
+                message: format!("{} does not exist", base.display()),
+            });
+        }
+        if !base.is_dir() {
+            return Err(RSpinError::Parse {
+                format: "spectrum bundle",
+                message: format!("{} is not a directory", base.display()),
+            });
+        }
+
+        let mut bundle = SpectrumBundle::new();
+        let mut saw_input = false;
+
+        for path in paths {
+            saw_input = true;
+            let path = selected_path_from_base(base, path.as_ref());
+            if !path.exists() {
+                self.handle_error(
+                    &mut bundle,
+                    base,
+                    &path,
+                    RSpinError::Parse {
+                        format: "spectrum bundle",
+                        message: format!("{} does not exist", path.display()),
+                    },
+                )?;
+                continue;
+            }
+
+            let data_before = bundle.spectra.len() + bundle.molecules.len();
+            let warnings_before = bundle.warnings.len();
+            self.read_existing_path_into(base, &path, &mut bundle)?;
+            let data_after = bundle.spectra.len() + bundle.molecules.len();
+            let warnings_after = bundle.warnings.len();
+            if data_after == data_before && warnings_after == warnings_before {
+                let message = match self.disabled_selected_path_message(&path) {
+                    Some(message) => message,
+                    None => format!("no readable bundle data found at {}", path.display()),
+                };
+                self.handle_error_message(&mut bundle, base, &path, message)?;
             }
         }
 
@@ -661,24 +742,34 @@ impl SpectrumBundleLoader {
         self.read_path(path)?.into_only_2d()
     }
 
-    fn read_existing_path_into(&self, root: &Path, bundle: &mut SpectrumBundle) -> Result<()> {
-        if root.is_dir() {
-            self.read_directory(root, bundle)
+    fn read_existing_path_into(
+        &self,
+        source_root: &Path,
+        path: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        if path.is_dir() {
+            self.read_directory(source_root, path, bundle)
         } else {
-            self.read_file_candidate(root, root, bundle)
+            self.read_file_candidate(source_root, path, bundle)
         }
     }
 
-    fn read_directory(&self, root: &Path, bundle: &mut SpectrumBundle) -> Result<()> {
-        let tree = collect_tree(root)?;
+    fn read_directory(
+        &self,
+        source_root: &Path,
+        directory: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        let tree = collect_tree(directory)?;
         for directory in &tree.directories {
-            self.read_directory_candidate(root, directory, bundle)?;
+            self.read_directory_candidate(source_root, directory, bundle)?;
         }
         for file in &tree.files {
             if is_nmredata_file(file) {
-                self.read_nmredata_candidate(root, file, bundle)?;
+                self.read_nmredata_candidate(source_root, file, bundle)?;
             } else if is_standalone_spectrum_file(file) {
-                self.read_file_candidate(root, file, bundle)?;
+                self.read_file_candidate(source_root, file, bundle)?;
             }
         }
         Ok(())
@@ -1319,6 +1410,26 @@ where
     SpectrumBundleLoader::new().read_paths(paths)
 }
 
+/// Loads selected paths while anchoring source paths to a common base directory.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are loaded
+/// as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input paths
+/// are provided, or no readable bundle data is found.
+pub fn load_spectra_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_paths_relative_to(base, paths)
+}
+
 /// Loads exactly one one-dimensional spectrum from a file or directory path.
 ///
 /// # Errors
@@ -1673,6 +1784,14 @@ fn source_format_2d(path: &Path, fallback: &'static str) -> &'static str {
     match crate::detect_spectrum2d_path_format(path) {
         Ok(format) => format.as_str(),
         Err(_) => fallback,
+    }
+}
+
+fn selected_path_from_base(base: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base.join(path)
     }
 }
 

@@ -21,7 +21,9 @@ scope for now.
 
 Use the facade crate for normal loading. `load_spectra` accepts one supported
 file or directory, while `load_spectra_many` merges selected files and
-directories into one `SpectrumBundle`.
+directories into one `SpectrumBundle`. Use `load_spectra_many_relative_to` when
+selected paths should be resolved below one base directory and reported with
+stable relative source paths.
 
 ```rust,no_run
 use rspin::prelude::*;
@@ -36,6 +38,10 @@ fn load_selected_inputs() -> Result<SpectrumBundle> {
         "data/carbon.jdf",
         "data/bruker/pdata/1",
     ])
+}
+
+fn load_selected_inputs_with_stable_sources() -> Result<SpectrumBundle> {
+    load_spectra_many_relative_to("data", ["proton.fid", "carbon.jdf", "bruker/pdata/1"])
 }
 ```
 
@@ -74,6 +80,12 @@ The small committed loader fixtures under
 `crates/rspin-io/testdata/zenodo_7100132` come from the MIT-licensed Zenodo
 software record `https://doi.org/10.5281/zenodo.7100132`; see the fixture
 README for file-level provenance and checksums.
+
+The committed public parser fixtures under `crates/rspin-io/testdata/nmrxiv/cc0`
+come from a CC0 NMRXiv study; see the fixture README for source DOI, authors,
+license URL, and included-file provenance. Other public datasets should only be
+committed when redistribution is permitted and documented next to the files. The
+top-level `crates/rspin-io/testdata/README.md` records the fixture policy.
 
 ## Development
 
