@@ -191,3 +191,50 @@ fn assert_vec_close(actual: &[f64], expected: &[f64]) {
 fn assert_close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
 }
+
+#[test]
+fn fft_forward_relabels_time_axis_to_hertz() -> anyhow::Result<()> {
+    let dwell = 0.001_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        Metadata::default(),
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Hertz);
+    let sw = 1.0 / dwell;
+    let expected_first = -sw / 2.0;
+    assert_close(transformed.x.values[0], expected_first);
+    let dc_index = len / 2;
+    assert_close(transformed.x.values[dc_index], 0.0);
+    Ok(())
+}
+
+#[test]
+fn fft_forward_relabels_to_ppm_when_metadata_has_frequency() -> anyhow::Result<()> {
+    let dwell = 0.001_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    let metadata = Metadata::default().with_frequency_mhz(500.0);
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        metadata,
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Ppm);
+    let sw_hz = 1.0 / dwell;
+    let expected_first_ppm = -sw_hz / 2.0 / 500.0;
+    assert_close(transformed.x.values[0], expected_first_ppm);
+    Ok(())
+}

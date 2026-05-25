@@ -202,11 +202,14 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             &raw.intensities,
             "real",
         )?;
-        write_indexed_spectrum_plot(
+        write_spectrum_plot(
             &output_dir.join("processed_fft_magnitude.png"),
             "Oracle Varian/Agilent FFT Magnitude",
-            &processed,
+            axis_label(processed.x.unit),
             "normalized magnitude",
+            &processed.x.values,
+            &processed.intensities,
+            "spectrum",
         )?;
         Ok(())
     }
@@ -421,34 +424,6 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             .label(series_label)
             .save(path_to_str(path)?)?;
         Ok(())
-    }
-
-    fn write_indexed_spectrum_plot(
-        path: &Path,
-        title: &str,
-        spectrum: &Spectrum1D,
-        y_label: &str,
-    ) -> Result<()> {
-        let x = point_axis(spectrum.len())?;
-        write_spectrum_plot(
-            path,
-            title,
-            "point",
-            y_label,
-            &x,
-            &spectrum.intensities,
-            "spectrum",
-        )
-    }
-
-    fn point_axis(len: usize) -> Result<Vec<f64>> {
-        (0..len)
-            .map(|index| {
-                u32::try_from(index)
-                    .map(f64::from)
-                    .context("spectrum is too large for visual point axis")
-            })
-            .collect()
     }
 
     fn axis_label(unit: Unit) -> &'static str {

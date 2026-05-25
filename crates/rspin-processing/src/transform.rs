@@ -2,7 +2,7 @@
 
 use std::f64::consts::{LN_2, PI};
 
-use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
+use rspin_core::{Axis, ProcessingRecord, RSpinError, Result, Spectrum1D, Unit};
 use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 
@@ -385,36 +385,144 @@ pub fn magnitude_spectrum(spectrum: &Spectrum1D) -> Result<Spectrum1D> {
 /// Returns an error when the point count cannot be represented safely for
 /// normalization.
 pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum1D> {
+    let len = spectrum.len();
     let mut buffer = complex_buffer(spectrum);
     let mut planner = FftPlanner::<f64>::new();
     let fft = match direction {
         FftDirection::Forward => planner.plan_fft_forward(buffer.len()),
-        FftDirection::Inverse => planner.plan_fft_inverse(buffer.len()),
+        FftDirection::Inverse => {
+            ifftshift_in_place(&mut buffer);
+            planner.plan_fft_inverse(buffer.len())
+        }
     };
     fft.process(&mut buffer);
 
-    if direction == FftDirection::Inverse {
-        let len = u32::try_from(buffer.len()).map_err(|_| RSpinError::InvalidSpectrum {
-            message: "spectrum is too large to normalize inverse FFT".to_owned(),
-        })?;
-        let scale = 1.0 / f64::from(len);
-        for value in &mut buffer {
-            *value *= scale;
+    match direction {
+        FftDirection::Forward => fftshift_in_place(&mut buffer),
+        FftDirection::Inverse => {
+            let len_u32 = u32::try_from(buffer.len()).map_err(|_| RSpinError::InvalidSpectrum {
+                message: "spectrum is too large to normalize inverse FFT".to_owned(),
+            })?;
+            let scale = 1.0 / f64::from(len_u32);
+            for value in &mut buffer {
+                *value *= scale;
+            }
         }
     }
 
+    let new_axis = match direction {
+        FftDirection::Forward => frequency_axis_from_time(&spectrum.x, &spectrum.metadata, len)?,
+        FftDirection::Inverse => time_axis_from_frequency(&spectrum.x, &spectrum.metadata, len)?,
+    };
+
     let intensities = buffer.iter().map(|value| value.re).collect();
     let imaginary = Some(buffer.iter().map(|value| value.im).collect());
-    let mut processed = Spectrum1D::new_complex(
-        spectrum.x.clone(),
-        intensities,
-        imaginary,
-        spectrum.metadata.clone(),
-    )?;
+    let mut processed =
+        Spectrum1D::new_complex(new_axis, intensities, imaginary, spectrum.metadata.clone())?;
     processed.processing.clone_from(&spectrum.processing);
     Ok(processed.with_processing_record(
         ProcessingRecord::new("fft_1d").with_details(format!("direction={direction:?}")),
     ))
+}
+
+fn fftshift_in_place<T: Copy>(buffer: &mut [T]) {
+    let n = buffer.len();
+    if n < 2 {
+        return;
+    }
+    buffer.rotate_left(n - n / 2);
+}
+
+fn ifftshift_in_place<T: Copy>(buffer: &mut [T]) {
+    let n = buffer.len();
+    if n < 2 {
+        return;
+    }
+    buffer.rotate_left(n / 2);
+}
+
+fn uniform_step(values: &[f64]) -> Option<f64> {
+    if values.len() < 2 {
+        return None;
+    }
+    let step = values[1] - values[0];
+    if !step.is_finite() || step.abs() <= 0.0 {
+        return None;
+    }
+    for window in values.windows(2) {
+        let local = window[1] - window[0];
+        let tolerance = step.abs() * 1.0e-6;
+        if (local - step).abs() > tolerance {
+            return None;
+        }
+    }
+    Some(step)
+}
+
+fn safe_usize_to_f64(value: usize, field: &'static str) -> Result<f64> {
+    let value_u32 = u32::try_from(value).map_err(|_| RSpinError::InvalidSpectrum {
+        message: format!("{field} too large for FFT axis labeling"),
+    })?;
+    Ok(f64::from(value_u32))
+}
+
+fn frequency_axis_from_time(x: &Axis, metadata: &rspin_core::Metadata, len: usize) -> Result<Axis> {
+    if x.unit != Unit::Seconds {
+        return Ok(x.clone());
+    }
+    let Some(dwell) = uniform_step(&x.values).map(f64::abs) else {
+        return Ok(x.clone());
+    };
+    if dwell <= 0.0 || len == 0 {
+        return Ok(x.clone());
+    }
+    let sweep_width_hz = 1.0 / dwell;
+    let half = len / 2;
+    let n_f = safe_usize_to_f64(len, "spectrum length")?;
+    let mut hz_values = Vec::with_capacity(len);
+    for index in 0..len {
+        let index_f = safe_usize_to_f64(index, "spectrum index")?;
+        let half_f = safe_usize_to_f64(half, "spectrum index")?;
+        hz_values.push((index_f - half_f) * sweep_width_hz / n_f);
+    }
+    match metadata.frequency_mhz {
+        Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
+            let ppm_values: Vec<f64> = hz_values.iter().map(|hz| hz / freq_mhz).collect();
+            Axis::new("chemical shift", Unit::Ppm, ppm_values)
+        }
+        _ => Axis::new("frequency", Unit::Hertz, hz_values),
+    }
+}
+
+fn time_axis_from_frequency(x: &Axis, metadata: &rspin_core::Metadata, len: usize) -> Result<Axis> {
+    if !matches!(x.unit, Unit::Hertz | Unit::Ppm) {
+        return Ok(x.clone());
+    }
+    let Some(raw_step) = uniform_step(&x.values).map(f64::abs) else {
+        return Ok(x.clone());
+    };
+    let step_hz = match x.unit {
+        Unit::Hertz => raw_step,
+        Unit::Ppm => match metadata.frequency_mhz {
+            Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
+                raw_step * freq_mhz.abs()
+            }
+            _ => return Ok(x.clone()),
+        },
+        _ => return Ok(x.clone()),
+    };
+    let n_f = safe_usize_to_f64(len, "spectrum length")?;
+    let sweep_width_hz = step_hz * n_f;
+    if sweep_width_hz <= 0.0 {
+        return Ok(x.clone());
+    }
+    let dwell = 1.0 / sweep_width_hz;
+    let mut time_values = Vec::with_capacity(len);
+    for index in 0..len {
+        let index_f = safe_usize_to_f64(index, "spectrum index")?;
+        time_values.push(index_f * dwell);
+    }
+    Axis::new("time", Unit::Seconds, time_values)
 }
 
 /// Applies manual phase correction to a complex one-dimensional spectrum.
