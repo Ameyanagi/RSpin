@@ -31,7 +31,10 @@ mod ruviz_example {
         write_analysis1d_json, write_processing_recipe_1d_json, write_spectrum_bundle_json,
         write_spectrum1d_csv, write_spectrum1d_json,
     };
-    use rspin_processing::{BaselineMethod, FftDirection, ProcessingRecipe1D, fit_baseline};
+    use rspin_processing::{
+        AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingRecipe1D, auto_phase_correct,
+        fit_baseline,
+    };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
 
     pub fn run() -> Result<()> {
@@ -47,6 +50,9 @@ mod ruviz_example {
         write_recipe_chain_plot(&output_dir.join("processed_recipe_chain.png"))?;
         write_baseline_plot(&output_dir.join("processed_baseline.png"))?;
         write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))?;
+        write_curated_auto_phase_plot(&root, &output_dir)?;
+        let vendor_dir = output_dir.join("vendors");
+        write_vendor_showcase(&root, &vendor_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
         write_oracle_visual_artifacts(&root, &visual_output_dir)?;
 
@@ -152,6 +158,139 @@ mod ruviz_example {
         write_analysis_overlay_plot(path, "RSpin 1D Analysis", &spectrum, &analysis)
     }
 
+    fn write_curated_auto_phase_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        let fixture_root = root.join("crates/rspin-io/testdata/zenodo_7100132");
+        let bundle = load_spectra(fixture_root.join("varian_1h"))?;
+        let raw = bundle.only_1d()?;
+        write_auto_phase_plot(output_dir, raw)?;
+        Ok(())
+    }
+
+    fn write_vendor_showcase(root: &Path, output_dir: &Path) -> Result<()> {
+        fs::create_dir_all(output_dir).with_context(|| {
+            format!(
+                "failed to create vendor showcase directory {}",
+                output_dir.display()
+            )
+        })?;
+        let fixture_root = root.join("crates/rspin-io/testdata");
+
+        let entries: &[VendorShowcaseEntry] = &[
+            VendorShowcaseEntry {
+                vendor: "bruker",
+                stem: "processed_1h_zenodo",
+                title: "Bruker processed 1H (Zenodo MIT)",
+                fixture: "zenodo_7100132/bruker_without_expno",
+            },
+            VendorShowcaseEntry {
+                vendor: "bruker",
+                stem: "raw_1h_myrcene_nmrxiv",
+                title: "Bruker raw 1H FID (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/bruker_1h_raw",
+            },
+            VendorShowcaseEntry {
+                vendor: "varian",
+                stem: "raw_1h_zenodo",
+                title: "Varian/Agilent raw 1H FID (Zenodo MIT)",
+                fixture: "zenodo_7100132/varian_1h",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "myrcene_1h_nmrxiv",
+                title: "JEOL 1H (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "myrcene_13c_nmrxiv",
+                title: "JEOL 13C (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "rutin_qh_dataverse",
+                title: "JEOL 1H (Dataverse CC0 Rutin)",
+                fixture: "dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "myrcene_1h_nmrxiv",
+                title: "JCAMP-DX 1H (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "rutin_qh_dataverse",
+                title: "JCAMP-DX 1H (Dataverse CC0 Rutin)",
+                fixture: "dataverse/cc0/rutin/jcamp/rutin_qh_400mhz.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "nmrml",
+                stem: "mmbbi_10m12_mit",
+                title: "nmrML example (MIT)",
+                fixture: "nmrml/mit/MMBBI_10M12-CE01-1a.nmrML",
+            },
+        ];
+
+        for entry in entries {
+            let dir = output_dir.join(entry.vendor);
+            fs::create_dir_all(&dir).with_context(|| {
+                format!("failed to create vendor dir {}", dir.display())
+            })?;
+            write_vendor_showcase_entry(entry, &fixture_root, &dir)?;
+        }
+        Ok(())
+    }
+
+    struct VendorShowcaseEntry {
+        vendor: &'static str,
+        stem: &'static str,
+        title: &'static str,
+        fixture: &'static str,
+    }
+
+    fn write_vendor_showcase_entry(
+        entry: &VendorShowcaseEntry,
+        fixture_root: &Path,
+        out_dir: &Path,
+    ) -> Result<()> {
+        let bundle = load_spectra(fixture_root.join(entry.fixture))
+            .with_context(|| format!("failed to load fixture {}", entry.fixture))?;
+        let spectra: Vec<&Spectrum1D> = bundle.spectra_1d().collect();
+        let Some(spectrum) = spectra.first() else {
+            return Ok(());
+        };
+        let processed = if spectrum.x.unit == Unit::Seconds {
+            let target_len = spectrum
+                .len()
+                .checked_mul(2)
+                .context("vendor showcase target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(spectrum)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .magnitude()
+                .normalize_max_abs()
+                .apply(spectrum)?
+        } else {
+            ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(spectrum)?
+        };
+
+        let png_path = out_dir.join(format!("{}.png", entry.stem));
+        write_spectrum_plot(
+            &png_path,
+            entry.title,
+            axis_label(processed.x.unit),
+            "normalized intensity",
+            &processed.x.values,
+            &processed.intensities,
+            "spectrum",
+        )?;
+        Ok(())
+    }
+
     fn write_oracle_visual_artifacts(root: &Path, output_dir: &Path) -> Result<()> {
         fs::create_dir_all(output_dir).with_context(|| {
             format!(
@@ -211,6 +350,35 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             &processed.intensities,
             "spectrum",
         )?;
+        write_auto_phase_plot(output_dir, raw)?;
+        Ok(())
+    }
+
+    fn write_auto_phase_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("auto-phase target length overflow")?;
+        let complex_recipe = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs();
+        let unphased = complex_recipe.apply(raw)?;
+        let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
+
+        Plot::new()
+            .title("Oracle Varian/Agilent Auto-Phase")
+            .xlabel(axis_label(unphased.x.unit))
+            .ylabel("normalized intensity")
+            .max_resolution(1600, 1000)
+            .legend_position(LegendPosition::Best)
+            .line(&unphased.x.values, &unphased.intensities)
+            .label("unphased real")
+            .line(&phased.x.values, &phased.intensities)
+            .label("auto-phased real")
+            .save(path_to_str(&output_dir.join("processed_auto_phase.png"))?)?;
+
         Ok(())
     }
 
