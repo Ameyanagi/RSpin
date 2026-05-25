@@ -10,9 +10,10 @@ use std::{
 
 use rspin_core::{Nucleus, Unit};
 use rspin_io::{
-    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
-    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
-    read_nmrml_1d_file, read_nmrml_2d_file,
+    RSpinReader, Spectrum1DPathFormat, Spectrum2DPathFormat, detect_spectrum1d_path_format,
+    detect_spectrum2d_path_format, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
+    read_bruker_fid_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
+    read_jeol_jdf_2d_file, read_nmrml_1d_file, read_nmrml_2d_file,
 };
 
 #[test]
@@ -249,6 +250,122 @@ fn parses_external_jeol_2d_jdf_when_available() -> anyhow::Result<()> {
 }
 
 #[test]
+fn unified_loader_reads_external_vendor_paths_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let agilent_1d = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_1d");
+    let agilent_2d = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_2d");
+    let bruker_1d = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_1d");
+    let bruker_2d = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_2d");
+    let jeol_1d = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_qHNMR_400MHz_Jeol.jdf");
+    let jeol_2d = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_HSQC_400MHz_Jeol.jdf");
+
+    for path in [
+        &agilent_1d,
+        &agilent_2d,
+        &bruker_1d,
+        &bruker_2d,
+        &jeol_1d,
+        &jeol_2d,
+    ] {
+        require_path(path)?;
+    }
+
+    let bundle = RSpinReader::new().read_paths([
+        agilent_1d, agilent_2d, bruker_1d, bruker_2d, jeol_1d, jeol_2d,
+    ])?;
+
+    assert_eq!(bundle.len(), 6);
+    assert_eq!(bundle.spectra_1d().count(), 3);
+    assert_eq!(bundle.spectra_2d().count(), 3);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(source_format_count(&bundle, "agilent_fid"), 2);
+    assert_eq!(source_format_count(&bundle, "bruker_fid"), 1);
+    assert_eq!(source_format_count(&bundle, "bruker_ser"), 1);
+    assert_eq!(source_format_count(&bundle, "jeol_jdf"), 2);
+    Ok(())
+}
+
+#[test]
+fn auto_detects_external_vendor_path_formats_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let agilent_1d = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_1d");
+    let agilent_2d = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_2d");
+    let bruker_1d = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_1d");
+    let bruker_2d = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_2d");
+    let jeol_1d = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_qHNMR_400MHz_Jeol.jdf");
+    let jeol_2d = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_HSQC_400MHz_Jeol.jdf");
+
+    assert_eq!(
+        detect_spectrum1d_path_format(&agilent_1d)?,
+        Spectrum1DPathFormat::AgilentFid
+    );
+    assert_eq!(
+        detect_spectrum2d_path_format(&agilent_2d)?,
+        Spectrum2DPathFormat::AgilentFid
+    );
+    assert_eq!(
+        detect_spectrum1d_path_format(&bruker_1d)?,
+        Spectrum1DPathFormat::BrukerFid
+    );
+    assert_eq!(
+        detect_spectrum2d_path_format(&bruker_2d)?,
+        Spectrum2DPathFormat::BrukerSer
+    );
+    assert_eq!(
+        detect_spectrum1d_path_format(&jeol_1d)?,
+        Spectrum1DPathFormat::JeolJdf
+    );
+    assert_eq!(
+        detect_spectrum2d_path_format(&jeol_2d)?,
+        Spectrum2DPathFormat::JeolJdf
+    );
+    Ok(())
+}
+
+#[test]
+fn unified_loader_reads_external_nmrxiv_varian_fids_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let study = root.join("nmrxiv/cc-by-4.0/unpacked/S332_11a_Varian/11a_Varian");
+    require_path(&study)?;
+
+    let bundle = RSpinReader::new().read_path(&study)?;
+
+    assert_eq!(bundle.len(), 3);
+    assert_eq!(bundle.spectra_1d().count(), 3);
+    assert_eq!(bundle.spectra_2d().count(), 0);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(source_format_count(&bundle, "agilent_fid"), 3);
+    assert_eq!(
+        bundle
+            .spectra_1d()
+            .filter(|spectrum| spectrum.metadata.nucleus == Some(Nucleus::Hydrogen1))
+            .count(),
+        1
+    );
+    assert_eq!(
+        bundle
+            .spectra_1d()
+            .filter(|spectrum| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+            .count(),
+        2
+    );
+    assert!(bundle.spectra_1d().all(|spectrum| {
+        spectrum.imaginary.is_some() && spectrum.intensities.iter().any(|value| value.abs() > 1.0)
+    }));
+    Ok(())
+}
+
+#[test]
 fn parses_external_nmrml_complex128_fixture_when_available() -> anyhow::Result<()> {
     let Some(root) = external_testdata_root() else {
         return Ok(());
@@ -376,6 +493,25 @@ fn require_fixture(path: &Path) -> anyhow::Result<()> {
         "missing external fixture at {}; check RSPIN_EXTERNAL_TESTDATA",
         path.display()
     );
+}
+
+fn require_path(path: &Path) -> anyhow::Result<()> {
+    if path.exists() {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "missing external fixture path at {}; check RSPIN_EXTERNAL_TESTDATA",
+        path.display()
+    );
+}
+
+fn source_format_count(bundle: &rspin_io::SpectrumBundle, format: &str) -> usize {
+    bundle
+        .spectra()
+        .iter()
+        .filter(|spectrum| spectrum.source().format == format)
+        .count()
 }
 
 fn assert_close(actual: Option<f64>, expected: Option<f64>) {
