@@ -152,7 +152,7 @@ fn inspects_bruker_parameter_file_versions() -> anyhow::Result<()> {
 
 #[test]
 fn preserves_future_bruker_parameter_versions_for_routing() -> anyhow::Result<()> {
-    let info = inspect_bruker_parameter_file("##JCAMPDX= 6.00\n##$TD= 4\n")?;
+    let info = inspect_bruker_parameter_file("##JCAMPDX= 7.00\n##$TD= 4\n")?;
 
     assert!(!info.is_supported_by_current_readers());
     let error = info

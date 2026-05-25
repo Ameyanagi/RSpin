@@ -588,20 +588,10 @@ fn scans_nmredata_directory_without_requiring_spectra() -> anyhow::Result<()> {
 fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
 
-    assert_eq!(bundle.len(), 5);
-    assert_eq!(bundle.spectra_1d().count(), 3);
+    assert_eq!(bundle.len(), 6);
+    assert_eq!(bundle.spectra_1d().count(), 4);
     assert_eq!(bundle.spectra_2d().count(), 2);
-    assert_eq!(bundle.warnings().len(), 1);
-
-    let warning = bundle
-        .warnings()
-        .first()
-        .ok_or_else(|| anyhow::anyhow!("missing unsupported JCAMP-DX warning"))?;
-    assert_eq!(
-        warning.path.as_deref(),
-        Some(Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx"))
-    );
-    assert!(warning.message.contains("JCAMP-DX version"));
+    assert!(bundle.warnings().is_empty());
 
     let bruker_1h = loaded_1d_by_path(&bundle, Path::new("bruker_1h_raw"))?;
     assert_eq!(bruker_1h.len(), 108_399);
@@ -623,6 +613,20 @@ fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
 
     let jeol_13c = loaded_1d_by_path(&bundle, Path::new("jeol/myrcene_13c_400mhz.jdf"))?;
     assert_eq!(jeol_13c.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let jcamp_1h = loaded_1d_by_path(
+        &bundle,
+        Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    assert_eq!(jcamp_1h.len(), 104_858);
+    assert_eq!(jcamp_1h.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(
+        loaded_source_format(
+            &bundle,
+            Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
+        )?,
+        "jcamp_dx"
+    );
 
     let bruker_cosy = loaded_2d_by_path(&bundle, Path::new("bruker_cosy_raw"))?;
     assert_eq!(bruker_cosy.shape(), (2048, 512));

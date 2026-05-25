@@ -38,4 +38,4 @@ citation hygiene.
 | `cc0/myrcene/jeol/myrcene_1h_400mhz.jdf` | `Myrcene_100000ug700uL_CDCl3_1H_400MHz_Jeol.jdf` | 10.57992/nmrxiv.p33.s217.d1195 | JEOL 1D 1H JDF reader | Filename normalized |
 | `cc0/myrcene/jeol/myrcene_13c_400mhz.jdf` | `Mycene_3120ug200uL_CDCl3_13C_400MHz_Jeol.jdf` | 10.57992/nmrxiv.p33.s217.d1187 | JEOL 1D 13C JDF reader | Filename normalized |
 | `cc0/myrcene/jeol/myrcene_hsqc_400mhz.jdf` | `Mycene_3120ug200uL_CDCl3_HSQC_400MHz_Jeol.jdf` | 10.57992/nmrxiv.p33.s217.d1197 | JEOL 2D HSQC JDF reader | Filename normalized |
-| `cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx` | `Myrcene_100000ug700uL_CDCl3_1H_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s217.d1183 | JCAMP-DX 6.0 LINK routing fixture | Filename normalized |
+| `cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx` | `Myrcene_100000ug700uL_CDCl3_1H_400MHz_JDX.jdx` | 10.57992/nmrxiv.p33.s217.d1183 | JCAMP-DX 6.0 LINK 1D reader | Filename normalized |

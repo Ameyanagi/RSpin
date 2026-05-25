@@ -220,8 +220,22 @@ fn rejects_unsupported_processed_parameter_version() -> anyhow::Result<()> {
         ByteOrder::Little,
     )?;
 
+    let spectrum = read_bruker_processed_1d_dir(&root)?;
+    assert_eq!(spectrum.len(), 1);
+
+    write_processed_dir(
+        &root,
+        "\
+##JCAMPDX= 7.00
+##$SI= 1
+##$DTYPP= 0
+",
+        &[1],
+        ByteOrder::Little,
+    )?;
+
     let error = read_bruker_processed_1d_dir(&root)
-        .expect_err("unsupported Bruker parameter version should fail");
+        .expect_err("future Bruker parameter version should fail");
     assert!(matches!(error, RSpinError::Unsupported { .. }));
 
     remove_dir(root)?;

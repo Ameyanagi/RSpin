@@ -2,7 +2,7 @@
 
 use std::{fs, path::PathBuf};
 
-use rspin_core::{Nucleus, RSpinError, Unit};
+use rspin_core::{Nucleus, Unit};
 use rspin_io::{
     read_bruker_fid_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
     read_jeol_jdf_2d_file,
@@ -97,18 +97,26 @@ fn reads_nmrxiv_cc0_myrcene_jeol_hsqc_jdf() -> anyhow::Result<()> {
 }
 
 #[test]
-fn rejects_nmrxiv_cc0_myrcene_jcamp_dx_6_link_until_supported() -> anyhow::Result<()> {
+fn reads_nmrxiv_cc0_myrcene_jcamp_dx_6_link() -> anyhow::Result<()> {
     let fixture = fixture_root().join("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
     let input = fs::read_to_string(&fixture)?;
+    let spectrum = read_jcamp_dx_1d(&input)?;
 
-    match read_jcamp_dx_1d(&input) {
-        Ok(_) => anyhow::bail!("JCAMP-DX 6.0 LINK fixture should remain version-gated"),
-        Err(RSpinError::Unsupported { feature }) => {
-            assert_eq!(feature, "JCAMP-DX version");
-            Ok(())
-        }
-        Err(error) => Err(error.into()),
-    }
+    assert_eq!(spectrum.len(), 104_858);
+    assert_eq!(spectrum.x.unit, Unit::Hertz);
+    assert_close(
+        spectrum.x.values.first().copied(),
+        Some(4_996.512_910_356_473),
+    );
+    assert_close(
+        spectrum.x.values.last().copied(),
+        Some(-998.690_926_573_982_9),
+    );
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(399.782_198_378_25));
+    assert_eq!(spectrum.metadata.property("jcamp_dx.version"), Some("6.0"));
+    assert!(has_signal(&spectrum.intensities, 1.0e-6));
+    Ok(())
 }
 
 fn fixture_root() -> PathBuf {

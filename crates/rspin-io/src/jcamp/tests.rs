@@ -60,7 +60,11 @@ fn parses_jcamp_dx_version_labels() -> anyhow::Result<()> {
     assert_eq!(patch.patch, Some(1));
     assert!(patch.is_supported_by_current_reader());
 
-    let future = parse_jcamp_dx_version("6.0")?;
+    let current = parse_jcamp_dx_version("6.0")?;
+    assert_eq!(current.major, 6);
+    assert!(current.is_supported_by_current_reader());
+
+    let future = parse_jcamp_dx_version("7.0")?;
     assert!(!future.is_supported_by_current_reader());
     let error = future
         .validate_supported_by_current_reader()
@@ -80,7 +84,7 @@ fn rejects_malformed_jcamp_dx_version_labels() {
 fn rejects_unsupported_jcamp_dx_version_label() {
     let input = "\
 ##TITLE=future
-##JCAMP-DX=6.00
+##JCAMP-DX=7.00
 ##XUNITS=PPM
 ##FIRSTX=0
 ##LASTX=1

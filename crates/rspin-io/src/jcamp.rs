@@ -60,7 +60,7 @@ struct RawJcamp {
 
 /// Parsed JCAMP-DX version label.
 ///
-/// JCAMP-DX files commonly use values such as `4.24` or `5.00`. `RSpin`
+/// JCAMP-DX files commonly use values such as `4.24`, `5.00`, or `6.0`. `RSpin`
 /// preserves the raw label value and exposes numeric components so readers can
 /// reject unsupported future versions before interpreting data blocks.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,7 +80,7 @@ impl JcampDxVersion {
     /// Returns true when `RSpin`'s current JCAMP-DX reader supports this version.
     #[must_use]
     pub fn is_supported_by_current_reader(&self) -> bool {
-        matches!(self.major, 4 | 5)
+        matches!(self.major, 4..=6)
     }
 
     /// Validates that the version is supported by `RSpin`'s current reader.
