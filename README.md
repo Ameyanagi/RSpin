@@ -63,11 +63,14 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     let bundle = load_spectra("data/experiment")?;
     let summary = bundle.summary();
     println!("loaded {} 1D and {} 2D spectra", summary.spectra_1d(), summary.spectra_2d());
-    println!("loaded {} JCAMP-DX spectra", summary.source_format_count("jcamp_dx"));
+    println!(
+        "loaded {} JCAMP-DX spectra",
+        summary.source_format_count(LoadedSourceFormat::JcampDx)
+    );
     for count in &summary.source_formats {
         println!("{}: {}", count.format(), count.count());
     }
-    for (spectrum, source) in bundle.loaded_1d_by_source_format("jcamp_dx") {
+    for (spectrum, source) in bundle.loaded_1d_by_source_format(LoadedSourceFormat::JcampDx) {
         let label = source
             .path()
             .map_or_else(|| "<memory>".to_owned(), |path| path.display().to_string());

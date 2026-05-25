@@ -19,6 +19,9 @@ use crate::{
     read_spectrum2d_path,
 };
 
+mod source_format;
+pub use source_format::{LoadedSourceFormat, parse_loaded_source_format};
+
 /// High-level reader for supported `RSpin` spectrum inputs.
 pub type RSpinReader = SpectrumBundleLoader;
 
@@ -53,6 +56,18 @@ impl LoadedSource {
     pub fn format(&self) -> &str {
         &self.format
     }
+
+    /// Returns the known source format, if this source uses a built-in reader name.
+    #[must_use]
+    pub fn format_kind(&self) -> Option<LoadedSourceFormat> {
+        LoadedSourceFormat::parse(&self.format).ok()
+    }
+
+    /// Returns true when this source was read with a source format.
+    #[must_use]
+    pub fn is_format(&self, format: impl AsRef<str>) -> bool {
+        self.format() == format.as_ref()
+    }
 }
 
 /// Deterministic count of loaded spectra for one source format.
@@ -84,6 +99,12 @@ impl SourceFormatCount {
     #[must_use]
     pub fn count(&self) -> usize {
         self.count
+    }
+
+    /// Returns the known source format, if this count uses a built-in reader name.
+    #[must_use]
+    pub fn format_kind(&self) -> Option<LoadedSourceFormat> {
+        LoadedSourceFormat::parse(&self.format).ok()
     }
 }
 
@@ -157,7 +178,8 @@ impl SpectrumBundleSummary {
 
     /// Returns the number of loaded spectra read with a source format.
     #[must_use]
-    pub fn source_format_count(&self, format: &str) -> usize {
+    pub fn source_format_count(&self, format: impl AsRef<str>) -> usize {
+        let format = format.as_ref();
         self.source_formats
             .iter()
             .find(|count| count.format() == format)
@@ -166,7 +188,7 @@ impl SpectrumBundleSummary {
 
     /// Returns true when a loaded spectrum was read with a source format.
     #[must_use]
-    pub fn has_source_format(&self, format: &str) -> bool {
+    pub fn has_source_format(&self, format: impl AsRef<str>) -> bool {
         self.source_format_count(format) > 0
     }
 }
@@ -400,42 +422,46 @@ impl SpectrumBundle {
     }
 
     /// Returns loaded spectra read with a source format.
-    pub fn loaded_by_source_format<'a>(
-        &'a self,
-        format: &'a str,
-    ) -> impl Iterator<Item = &'a LoadedSpectrum> + 'a {
+    pub fn loaded_by_source_format(
+        &self,
+        format: impl AsRef<str>,
+    ) -> impl Iterator<Item = &LoadedSpectrum> + '_ {
+        let format = format.as_ref().to_owned();
         self.spectra
             .iter()
-            .filter(move |entry| entry.source().format() == format)
+            .filter(move |entry| entry.source().format() == format.as_str())
     }
 
     /// Returns one-dimensional spectra and sources read with a source format.
-    pub fn loaded_1d_by_source_format<'a>(
-        &'a self,
-        format: &'a str,
-    ) -> impl Iterator<Item = (&'a Spectrum1D, &'a LoadedSource)> + 'a {
+    pub fn loaded_1d_by_source_format(
+        &self,
+        format: impl AsRef<str>,
+    ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_ {
+        let format = format.as_ref().to_owned();
         self.loaded_1d()
-            .filter(move |(_, source)| source.format() == format)
+            .filter(move |(_, source)| source.format() == format.as_str())
     }
 
     /// Returns two-dimensional spectra and sources read with a source format.
-    pub fn loaded_2d_by_source_format<'a>(
-        &'a self,
-        format: &'a str,
-    ) -> impl Iterator<Item = (&'a Spectrum2D, &'a LoadedSource)> + 'a {
+    pub fn loaded_2d_by_source_format(
+        &self,
+        format: impl AsRef<str>,
+    ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_ {
+        let format = format.as_ref().to_owned();
         self.loaded_2d()
-            .filter(move |(_, source)| source.format() == format)
+            .filter(move |(_, source)| source.format() == format.as_str())
     }
 
     /// Returns tracked source paths for loaded spectra read with a source format.
     ///
     /// Spectra loaded while source path tracking is disabled are skipped.
-    pub fn source_paths_for_format<'a>(
-        &'a self,
-        format: &'a str,
-    ) -> impl Iterator<Item = &'a Path> + 'a {
+    pub fn source_paths_for_format(
+        &self,
+        format: impl AsRef<str>,
+    ) -> impl Iterator<Item = &Path> + '_ {
+        let format = format.as_ref().to_owned();
         self.loaded_sources()
-            .filter(move |source| source.format() == format)
+            .filter(move |source| source.format() == format.as_str())
             .filter_map(LoadedSource::path)
     }
 
@@ -456,7 +482,8 @@ impl SpectrumBundle {
 
     /// Returns the number of loaded spectra read with a source format.
     #[must_use]
-    pub fn source_format_count(&self, format: &str) -> usize {
+    pub fn source_format_count(&self, format: impl AsRef<str>) -> usize {
+        let format = format.as_ref();
         self.loaded_sources()
             .filter(|source| source.format() == format)
             .count()
@@ -464,7 +491,8 @@ impl SpectrumBundle {
 
     /// Returns true when a loaded spectrum was read with a source format.
     #[must_use]
-    pub fn has_source_format(&self, format: &str) -> bool {
+    pub fn has_source_format(&self, format: impl AsRef<str>) -> bool {
+        let format = format.as_ref();
         self.loaded_sources()
             .any(|source| source.format() == format)
     }

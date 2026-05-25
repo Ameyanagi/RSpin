@@ -8,12 +8,13 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
-    load_spectra, load_spectra_many, load_spectra_many_relative_to, load_spectra_relative_to,
-    load_spectrum_1d, load_spectrum_1d_many, load_spectrum_1d_many_relative_to,
-    load_spectrum_1d_relative_to, load_spectrum_2d, load_spectrum_2d_many,
-    load_spectrum_2d_many_relative_to, load_spectrum_2d_relative_to, write_spectrum_bundle_json,
-    write_spectrum1d_json, write_spectrum2d_json,
+    LoadedSourceFormat, LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader,
+    SpectrumPathReader, load_spectra, load_spectra_many, load_spectra_many_relative_to,
+    load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_many,
+    load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to, load_spectrum_2d,
+    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_relative_to,
+    parse_loaded_source_format, write_spectrum_bundle_json, write_spectrum1d_json,
+    write_spectrum2d_json,
 };
 
 #[test]
@@ -887,11 +888,15 @@ fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
 
     assert_eq!(bundle.source_format_count("bruker_fid"), 1);
     assert_eq!(bundle.source_format_count("bruker_ser"), 1);
-    assert_eq!(bundle.source_format_count("jcamp_dx"), 2);
-    assert_eq!(bundle.source_format_count("jeol_jdf"), 3);
+    assert_eq!(bundle.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(bundle.source_format_count(LoadedSourceFormat::JeolJdf), 3);
     assert_eq!(bundle.source_format_count("missing"), 0);
-    assert!(bundle.has_source_format("jcamp_dx"));
+    assert!(bundle.has_source_format(LoadedSourceFormat::JcampDx));
     assert!(!bundle.has_source_format("missing"));
+    assert_eq!(
+        parse_loaded_source_format("jdx")?,
+        LoadedSourceFormat::JcampDx
+    );
 
     let summary = bundle.summary();
     assert_eq!(summary.spectra(), 7);
@@ -899,8 +904,8 @@ fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
     assert_eq!(summary.spectra_2d(), 2);
     assert_eq!(summary.molecules(), 0);
     assert_eq!(summary.warnings(), 0);
-    assert_eq!(summary.source_format_count("jcamp_dx"), 2);
-    assert!(summary.has_source_format("jeol_jdf"));
+    assert_eq!(summary.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert!(summary.has_source_format(LoadedSourceFormat::JeolJdf));
     assert!(!summary.has_source_format("missing"));
 
     assert_eq!(
@@ -929,14 +934,14 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
     assert!(source_formats.contains(&"jeol_jdf"));
 
     let loaded_jcamp = bundle
-        .loaded_by_source_format("jcamp_dx")
+        .loaded_by_source_format(LoadedSourceFormat::JcampDx)
         .collect::<Vec<_>>();
     assert_eq!(loaded_jcamp.len(), 2);
     assert!(loaded_jcamp.iter().all(|entry| entry.is_1d()));
     assert!(bundle.loaded_by_source_format("missing").next().is_none());
 
     let jcamp_1d = bundle
-        .loaded_1d_by_source_format("jcamp_dx")
+        .loaded_1d_by_source_format(LoadedSourceFormat::JcampDx)
         .collect::<Vec<_>>();
     assert_eq!(jcamp_1d.len(), 2);
     assert!(
@@ -944,9 +949,19 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
             .iter()
             .any(|(spectrum, _)| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
     );
+    assert!(
+        jcamp_1d
+            .iter()
+            .all(|(_, source)| source.is_format(LoadedSourceFormat::JcampDx))
+    );
+    assert!(
+        jcamp_1d
+            .iter()
+            .all(|(_, source)| source.format_kind() == Some(LoadedSourceFormat::JcampDx))
+    );
     assert_eq!(
         bundle
-            .source_paths_for_format("jcamp_dx")
+            .source_paths_for_format(LoadedSourceFormat::JcampDx)
             .collect::<Vec<_>>(),
         vec![
             Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
@@ -955,7 +970,7 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
     );
     assert_eq!(
         bundle
-            .loaded_2d_by_source_format("jeol_jdf")
+            .loaded_2d_by_source_format(LoadedSourceFormat::JeolJdf)
             .collect::<Vec<_>>()
             .len(),
         1
