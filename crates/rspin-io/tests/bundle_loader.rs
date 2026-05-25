@@ -979,6 +979,77 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
+    let jcamp = RSpinReader::new()
+        .only_source_format(LoadedSourceFormat::JcampDx)
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(jcamp.len(), 2);
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert!(jcamp.warnings().is_empty());
+    assert!(
+        jcamp
+            .spectra()
+            .iter()
+            .all(|entry| entry.source().is_format(LoadedSourceFormat::JcampDx))
+    );
+
+    let alias = RSpinReader::new()
+        .only_source_format("jdx")
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(alias.len(), jcamp.len());
+
+    let selected = RSpinReader::new()
+        .only_source_formats([LoadedSourceFormat::JeolJdf, LoadedSourceFormat::BrukerSer])
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(selected.len(), 4);
+    assert_eq!(selected.len_1d(), 2);
+    assert_eq!(selected.len_2d(), 2);
+    assert_eq!(selected.source_format_count(LoadedSourceFormat::JeolJdf), 3);
+    assert_eq!(
+        selected.source_format_count(LoadedSourceFormat::BrukerSer),
+        1
+    );
+
+    let cleared = RSpinReader::new()
+        .only_source_format(LoadedSourceFormat::JcampDx)
+        .all_source_formats()
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(cleared.len(), 7);
+
+    let filtered_out = RSpinReader::new()
+        .only_source_format(LoadedSourceFormat::Csv)
+        .read_path(nmrxiv_fixture_root());
+    let Err(error) = filtered_out else {
+        anyhow::bail!("CSV-only source filter should leave no readable spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
+    Ok(())
+}
+
+#[test]
+fn loader_source_format_filter_applies_to_nested_bundle_json() -> anyhow::Result<()> {
+    let source_bundle = load_spectra(nmrxiv_fixture_root())?;
+    let root = temp_dir("source-format-bundle")?;
+    fs::write(
+        root.join("bundle.json"),
+        write_spectrum_bundle_json(&source_bundle)?,
+    )?;
+
+    let bundle = RSpinReader::new()
+        .only_source_format(LoadedSourceFormat::JcampDx)
+        .read_path(&root)?;
+    assert_eq!(bundle.len(), 2);
+    assert!(
+        bundle
+            .source_paths()
+            .all(|path| path.starts_with(Path::new("bundle.json/jcamp")))
+    );
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
 

@@ -759,6 +759,7 @@ pub struct SpectrumBundleLoader {
     two_d: Toggle,
     strict: Toggle,
     source_paths: Toggle,
+    source_formats: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -834,6 +835,36 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn with_source_paths(mut self, enabled: bool) -> Self {
         self.source_paths = Toggle::from_bool(enabled);
+        self
+    }
+
+    /// Restricts loading to spectra read with one source format.
+    ///
+    /// Use [`LoadedSourceFormat`] for built-in names, or pass a canonical
+    /// source format string for forward-compatible custom bundle data.
+    #[must_use]
+    pub fn only_source_format(mut self, format: impl AsRef<str>) -> Self {
+        self.source_formats = vec![canonical_source_format_filter(format.as_ref())];
+        self
+    }
+
+    /// Restricts loading to spectra read with any of the source formats.
+    ///
+    /// Passing an empty iterator clears the source-format filter.
+    #[must_use]
+    pub fn only_source_formats<I, F>(mut self, formats: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+        F: AsRef<str>,
+    {
+        self.source_formats = source_format_filters(formats);
+        self
+    }
+
+    /// Clears any source-format restriction.
+    #[must_use]
+    pub fn all_source_formats(mut self) -> Self {
+        self.source_formats.clear();
         self
     }
 
@@ -1220,7 +1251,22 @@ impl SpectrumBundleLoader {
         directory: &Path,
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
-        if self.raw.is_enabled() && self.two_d.is_enabled() && is_bruker_ser_dir(directory) {
+        self.read_bruker_directory_candidate(root, directory, bundle)?;
+        self.read_agilent_directory_candidate(root, directory, bundle)?;
+        Ok(())
+    }
+
+    fn read_bruker_directory_candidate(
+        &self,
+        root: &Path,
+        directory: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        if self.raw.is_enabled()
+            && self.two_d.is_enabled()
+            && self.allows_source_format("bruker_ser")
+            && is_bruker_ser_dir(directory)
+        {
             self.add_2d_result(
                 bundle,
                 root,
@@ -1229,7 +1275,11 @@ impl SpectrumBundleLoader {
                 read_bruker_ser_2d_dir(directory),
             )?;
         }
-        if self.raw.is_enabled() && self.one_d.is_enabled() && is_bruker_fid_dir(directory) {
+        if self.raw.is_enabled()
+            && self.one_d.is_enabled()
+            && self.allows_source_format("bruker_fid")
+            && is_bruker_fid_dir(directory)
+        {
             self.add_1d_result(
                 bundle,
                 root,
@@ -1240,6 +1290,7 @@ impl SpectrumBundleLoader {
         }
         if self.processed.is_enabled()
             && self.two_d.is_enabled()
+            && self.allows_source_format("bruker_processed")
             && is_bruker_processed_2d_dir(directory)
         {
             self.add_2d_result(
@@ -1252,6 +1303,7 @@ impl SpectrumBundleLoader {
         }
         if self.processed.is_enabled()
             && self.one_d.is_enabled()
+            && self.allows_source_format("bruker_processed")
             && is_bruker_processed_1d_dir(directory)
         {
             self.add_1d_result(
@@ -1262,7 +1314,19 @@ impl SpectrumBundleLoader {
                 read_bruker_processed_1d_dir(directory),
             )?;
         }
-        if self.raw.is_enabled() && is_agilent_fid_dir(directory) {
+        Ok(())
+    }
+
+    fn read_agilent_directory_candidate(
+        &self,
+        root: &Path,
+        directory: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        if self.raw.is_enabled()
+            && self.allows_source_format("agilent_fid")
+            && is_agilent_fid_dir(directory)
+        {
             if is_agilent_arrayed_2d_fid_path(directory) {
                 if self.two_d.is_enabled() {
                     self.add_2d_results(
@@ -1296,7 +1360,10 @@ impl SpectrumBundleLoader {
                 || read_agilent_fid_2d_dir(directory),
             )?;
         }
-        if self.processed.is_enabled() && is_agilent_processed_dir(directory) {
+        if self.processed.is_enabled()
+            && self.allows_source_format("agilent_processed")
+            && is_agilent_processed_dir(directory)
+        {
             self.add_1d_or_2d_result(
                 bundle,
                 root,
@@ -1344,7 +1411,10 @@ impl SpectrumBundleLoader {
         if is_nmredata_file(file) {
             return self.read_nmredata_candidate(root, file, bundle);
         }
-        if self.raw.is_enabled() && is_agilent_arrayed_1d_fid_path(file) {
+        if self.raw.is_enabled()
+            && self.allows_source_format("agilent_fid")
+            && is_agilent_arrayed_1d_fid_path(file)
+        {
             if !self.one_d.is_enabled() {
                 return self.handle_error_message(
                     bundle,
@@ -1361,7 +1431,10 @@ impl SpectrumBundleLoader {
                 read_agilent_arrayed_fid_1d_dir(file),
             );
         }
-        if self.raw.is_enabled() && is_agilent_arrayed_2d_fid_path(file) {
+        if self.raw.is_enabled()
+            && self.allows_source_format("agilent_fid")
+            && is_agilent_arrayed_2d_fid_path(file)
+        {
             if !self.two_d.is_enabled() {
                 return self.handle_error_message(
                     bundle,
@@ -1392,11 +1465,16 @@ impl SpectrumBundleLoader {
             return self.handle_error_message(bundle, root, file, message);
         }
 
+        let format = format_from_file(file);
+        if format != "auto" && !self.allows_source_format(format) {
+            return Ok(());
+        }
+
         self.add_1d_or_2d_result(
             bundle,
             root,
             file,
-            format_from_file(file),
+            format,
             || read_spectrum1d_path(file),
             || read_spectrum2d_path(file),
         )
@@ -1415,9 +1493,12 @@ impl SpectrumBundleLoader {
         match read_1d() {
             Ok(spectrum) => {
                 if self.one_d.is_enabled() {
-                    bundle.push_1d(
+                    self.push_1d_if_allowed(
+                        bundle,
+                        root,
+                        path,
+                        source_format_1d(path, format),
                         spectrum,
-                        self.loaded_source(root, path, source_format_1d(path, format)),
                     );
                     return Ok(());
                 }
@@ -1426,9 +1507,12 @@ impl SpectrumBundleLoader {
                 if self.two_d.is_enabled() {
                     return match read_2d() {
                         Ok(spectrum) => {
-                            bundle.push_2d(
+                            self.push_2d_if_allowed(
+                                bundle,
+                                root,
+                                path,
+                                source_format_2d(path, format),
                                 spectrum,
-                                self.loaded_source(root, path, source_format_2d(path, format)),
                             );
                             Ok(())
                         }
@@ -1456,9 +1540,12 @@ impl SpectrumBundleLoader {
                 if self.two_d.is_enabled() {
                     return match read_2d() {
                         Ok(spectrum) => {
-                            bundle.push_2d(
+                            self.push_2d_if_allowed(
+                                bundle,
+                                root,
+                                path,
+                                source_format_2d(path, format),
                                 spectrum,
-                                self.loaded_source(root, path, source_format_2d(path, format)),
                             );
                             Ok(())
                         }
@@ -1544,7 +1631,7 @@ impl SpectrumBundleLoader {
         }
         match result {
             Ok(spectrum) => {
-                bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                self.push_1d_if_allowed(bundle, root, path, format, spectrum);
                 Ok(())
             }
             Err(error) => self.handle_error(bundle, root, path, error),
@@ -1565,7 +1652,7 @@ impl SpectrumBundleLoader {
         match result {
             Ok(spectra) => {
                 for spectrum in spectra {
-                    bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                    self.push_1d_if_allowed(bundle, root, path, format, spectrum);
                 }
                 Ok(())
             }
@@ -1586,7 +1673,7 @@ impl SpectrumBundleLoader {
         }
         match result {
             Ok(spectrum) => {
-                bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                self.push_2d_if_allowed(bundle, root, path, format, spectrum);
                 Ok(())
             }
             Err(error) => self.handle_error(bundle, root, path, error),
@@ -1607,7 +1694,7 @@ impl SpectrumBundleLoader {
         match result {
             Ok(spectra) => {
                 for spectrum in spectra {
-                    bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                    self.push_2d_if_allowed(bundle, root, path, format, spectrum);
                 }
                 Ok(())
             }
@@ -1636,9 +1723,12 @@ impl SpectrumBundleLoader {
         if self.one_d.is_enabled() {
             match read_1d() {
                 Ok(spectrum) => {
-                    bundle.push_1d(
+                    self.push_1d_if_allowed(
+                        bundle,
+                        root,
+                        path,
+                        source_format_1d(path, format),
                         spectrum,
-                        self.loaded_source(root, path, source_format_1d(path, format)),
                     );
                     return Ok(());
                 }
@@ -1648,9 +1738,12 @@ impl SpectrumBundleLoader {
                 Err(first_error) => {
                     return match read_2d() {
                         Ok(spectrum) => {
-                            bundle.push_2d(
+                            self.push_2d_if_allowed(
+                                bundle,
+                                root,
+                                path,
+                                source_format_2d(path, format),
                                 spectrum,
-                                self.loaded_source(root, path, source_format_2d(path, format)),
                             );
                             Ok(())
                         }
@@ -1667,9 +1760,12 @@ impl SpectrumBundleLoader {
         if self.two_d.is_enabled() {
             match read_2d() {
                 Ok(spectrum) => {
-                    bundle.push_2d(
+                    self.push_2d_if_allowed(
+                        bundle,
+                        root,
+                        path,
+                        source_format_2d(path, format),
                         spectrum,
-                        self.loaded_source(root, path, source_format_2d(path, format)),
                     );
                     Ok(())
                 }
@@ -1733,8 +1829,12 @@ impl SpectrumBundleLoader {
         let include_1d = self.one_d.is_enabled();
         let include_2d = self.two_d.is_enabled();
         bundle.spectra.retain(|entry| match entry {
-            LoadedSpectrum::OneD { .. } => include_1d,
-            LoadedSpectrum::TwoD { .. } => include_2d,
+            LoadedSpectrum::OneD { source, .. } => {
+                include_1d && self.allows_source_format(source.format())
+            }
+            LoadedSpectrum::TwoD { source, .. } => {
+                include_2d && self.allows_source_format(source.format())
+            }
         });
     }
 
@@ -1772,6 +1872,37 @@ impl SpectrumBundleLoader {
 
     fn loaded_source(&self, root: &Path, path: &Path, format: impl Into<String>) -> LoadedSource {
         LoadedSource::new(self.source_path(root, path), format)
+    }
+
+    fn push_1d_if_allowed(
+        &self,
+        bundle: &mut SpectrumBundle,
+        root: &Path,
+        path: &Path,
+        format: &'static str,
+        spectrum: Spectrum1D,
+    ) {
+        if self.allows_source_format(format) {
+            bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+        }
+    }
+
+    fn push_2d_if_allowed(
+        &self,
+        bundle: &mut SpectrumBundle,
+        root: &Path,
+        path: &Path,
+        format: &'static str,
+        spectrum: Spectrum2D,
+    ) {
+        if self.allows_source_format(format) {
+            bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+        }
+    }
+
+    fn allows_source_format(&self, format: &str) -> bool {
+        self.source_formats.is_empty()
+            || self.source_formats.iter().any(|allowed| allowed == format)
     }
 
     fn bundle_with_source_context(
@@ -1814,6 +1945,7 @@ impl Default for SpectrumBundleLoader {
             two_d: Toggle::Enabled,
             strict: Toggle::Disabled,
             source_paths: Toggle::Enabled,
+            source_formats: Vec::new(),
         }
     }
 }
@@ -2011,6 +2143,28 @@ fn only_error_from_counts(expected: &'static str, one_d: usize, two_d: usize) ->
         message: format!(
             "expected exactly one {expected} spectrum, found {one_d} one-dimensional and {two_d} two-dimensional spectra"
         ),
+    }
+}
+
+fn source_format_filters<I, F>(formats: I) -> Vec<String>
+where
+    I: IntoIterator<Item = F>,
+    F: AsRef<str>,
+{
+    let mut filters = Vec::new();
+    for format in formats {
+        let format = canonical_source_format_filter(format.as_ref());
+        if !filters.iter().any(|existing| existing == &format) {
+            filters.push(format);
+        }
+    }
+    filters
+}
+
+fn canonical_source_format_filter(format: &str) -> String {
+    match LoadedSourceFormat::parse(format) {
+        Ok(format) => format.as_str().to_owned(),
+        Err(_) => format.trim().to_owned(),
     }
 }
 

@@ -346,6 +346,14 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
 
     let anchored = load_spectra_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(anchored.len(), 2);
+    let filtered = RSpinReader::new()
+        .only_source_format(LoadedSourceFormat::AgilentFid)
+        .read_path(fixture_root.join("varian_1h"))?;
+    assert_eq!(filtered.len(), 1);
+    assert_eq!(
+        filtered.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
 
     let exact = load_spectrum_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));
