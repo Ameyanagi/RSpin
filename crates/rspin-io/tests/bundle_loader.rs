@@ -843,19 +843,8 @@ fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
     assert_eq!(one_d.len(), 16_384);
     assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
 
-    let (one_d, source) = load_spectrum_1d_many_with_source([fixture_root().join("varian_1h")])?;
-    assert_eq!(one_d.len(), 16_384);
-    assert_eq!(source.format, "agilent_fid");
-    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
-
     let one_d = load_spectrum_1d_many_relative_to(fixture_root(), ["varian_1h"])?;
     assert_eq!(one_d.len(), 16_384);
-
-    let (one_d, source) =
-        load_spectrum_1d_many_with_source_relative_to(fixture_root(), ["varian_1h"])?;
-    assert_eq!(one_d.len(), 16_384);
-    assert_eq!(source.format, "agilent_fid");
-    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
 
     let one_d = RSpinReader::new().read_1d_paths([
         fixture_root().join("empty_jcamp/empty.jdx"),
@@ -866,20 +855,8 @@ fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
     let two_d = load_spectrum_2d_many([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
     assert_eq!(two_d.shape(), (2048, 512));
 
-    let (two_d, source) =
-        load_spectrum_2d_many_with_source([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
-    assert_eq!(two_d.shape(), (2048, 512));
-    assert_eq!(source.format, "bruker_ser");
-    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
-
     let two_d = load_spectrum_2d_many_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
     assert_eq!(two_d.shape(), (2048, 512));
-
-    let (two_d, source) =
-        load_spectrum_2d_many_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
-    assert_eq!(two_d.shape(), (2048, 512));
-    assert_eq!(source.format, "bruker_ser");
-    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
 
     let two_d = RSpinReader::new()
         .raw_only()
@@ -892,38 +869,11 @@ fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
     ])?;
     assert_eq!(one_d.len(), 16_384);
 
-    let (one_d, source) = RSpinReader::new().read_1d_many_with_source([
-        fixture_root().join("empty_jcamp/empty.jdx"),
-        fixture_root().join("varian_1h"),
-    ])?;
-    assert_eq!(one_d.len(), 16_384);
-    assert_eq!(source.format, "agilent_fid");
-    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
-
     let two_d = RSpinReader::new().read_2d_many([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
     assert_eq!(two_d.shape(), (2048, 512));
 
-    let (two_d, source) = RSpinReader::new()
-        .read_2d_many_with_source([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
-    assert_eq!(two_d.shape(), (2048, 512));
-    assert_eq!(source.format, "bruker_ser");
-    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
-
     let one_d = RSpinReader::new().read_1d_many_relative_to(fixture_root(), ["varian_1h"])?;
     assert_eq!(one_d.len(), 16_384);
-
-    let (one_d, source) =
-        RSpinReader::new().read_1d_many_with_source_relative_to(fixture_root(), ["varian_1h"])?;
-    assert_eq!(one_d.len(), 16_384);
-    assert_eq!(source.format, "agilent_fid");
-    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
-
-    let (two_d, source) = RSpinReader::new()
-        .raw_only()
-        .read_2d_many_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
-    assert_eq!(two_d.shape(), (2048, 512));
-    assert_eq!(source.format, "bruker_ser");
-    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
 
     let wrong_dimension = RSpinReader::new().read_2d_many([fixture_root().join("varian_1h")]);
     assert_single_error(
@@ -941,6 +891,87 @@ fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
         "expected exactly one one-dimensional spectrum",
         "found 3 one-dimensional and 0 two-dimensional spectra",
     )?;
+    Ok(())
+}
+
+#[test]
+fn exact_single_helpers_support_selected_path_sets_with_sources() -> anyhow::Result<()> {
+    let (one_d, source) = load_spectrum_1d_many_with_source([fixture_root().join("varian_1h")])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (one_d, source) =
+        load_spectrum_1d_many_with_source_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (one_d, source) = RSpinReader::new().read_1d_paths_with_source([
+        fixture_root().join("empty_jcamp/empty.jdx"),
+        fixture_root().join("varian_1h"),
+    ])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (one_d, source) = RSpinReader::new().read_1d_many_with_source([
+        fixture_root().join("empty_jcamp/empty.jdx"),
+        fixture_root().join("varian_1h"),
+    ])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (one_d, source) =
+        RSpinReader::new().read_1d_paths_with_source_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (one_d, source) =
+        RSpinReader::new().read_1d_many_with_source_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (two_d, source) =
+        load_spectrum_2d_many_with_source([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) =
+        load_spectrum_2d_many_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) = RSpinReader::new()
+        .read_2d_paths_with_source([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) = RSpinReader::new()
+        .read_2d_many_with_source([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) = RSpinReader::new()
+        .raw_only()
+        .read_2d_paths_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) = RSpinReader::new()
+        .raw_only()
+        .read_2d_many_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
 
     let ambiguous = RSpinReader::new().read_1d_many_with_source([
         fixture_root().join("varian_1h"),
