@@ -375,6 +375,13 @@ impl Toggle {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FileCandidateKind {
+    Raw,
+    Processed,
+    Other,
+}
+
 impl SpectrumBundleLoader {
     /// Creates a loader with raw and processed spectra enabled.
     #[must_use]
@@ -617,6 +624,32 @@ impl SpectrumBundleLoader {
         file: &Path,
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
+        match file_candidate_kind(file) {
+            FileCandidateKind::Raw if !self.raw.is_enabled() => {
+                return self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    format!(
+                        "raw spectrum candidates are disabled for {}",
+                        file.display()
+                    ),
+                );
+            }
+            FileCandidateKind::Processed if !self.processed.is_enabled() => {
+                return self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    format!(
+                        "processed spectrum candidates are disabled for {}",
+                        file.display()
+                    ),
+                );
+            }
+            FileCandidateKind::Raw | FileCandidateKind::Processed | FileCandidateKind::Other => {}
+        }
+
         if is_nmredata_file(file) {
             return self.read_nmredata_candidate(root, file, bundle);
         }
@@ -980,6 +1013,21 @@ fn is_json_file(path: &Path) -> bool {
     path.extension()
         .and_then(std::ffi::OsStr::to_str)
         .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+}
+
+fn file_candidate_kind(path: &Path) -> FileCandidateKind {
+    match path
+        .file_name()
+        .and_then(std::ffi::OsStr::to_str)
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("fid" | "ser") => FileCandidateKind::Raw,
+        Some("phasefile" | "1r" | "1i" | "2rr" | "2ri" | "2ir" | "2ii") => {
+            FileCandidateKind::Processed
+        }
+        _ => FileCandidateKind::Other,
+    }
 }
 
 fn format_from_file(path: &Path) -> &'static str {

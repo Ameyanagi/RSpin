@@ -80,6 +80,31 @@ fn reads_processed_directory_with_scaling_and_big_endian_data() -> anyhow::Resul
 }
 
 #[test]
+fn reads_processed_1d_file_path() -> anyhow::Result<()> {
+    let root = synthetic_dataset("processed-file")?;
+    write_processed_dir(
+        &root,
+        "\
+##$SI= 3
+##$BYTORDP= 0
+##$DTYPP= 0
+##$NC_proc= -1
+",
+        &[1, -2, 3],
+        ByteOrder::Little,
+    )?;
+    write_processed_1d_imaginary(&root, &[-1, 2, -3], ByteOrder::Little)?;
+
+    let spectrum = BrukerProcessed1D.read_path(&root.join("pdata/1/1r"))?;
+
+    assert_eq!(spectrum.intensities, vec![2.0, -4.0, 6.0]);
+    assert_eq!(spectrum.imaginary, Some(vec![-2.0, 4.0, -6.0]));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn reads_processed_1d_directory_with_imaginary_plane() -> anyhow::Result<()> {
     let root = synthetic_dataset("processed-1d-complex")?;
     write_processed_dir(

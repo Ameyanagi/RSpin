@@ -130,6 +130,49 @@ fn loader_can_disable_raw_or_processed_candidates() -> anyhow::Result<()> {
 }
 
 #[test]
+fn loader_toggles_apply_to_direct_vendor_files() -> anyhow::Result<()> {
+    let raw_file = fixture_root().join("bruker_without_expno/fid");
+    let processed_file = fixture_root().join("bruker_without_expno/pdata/1/1r");
+
+    let raw_disabled = RSpinReader::new()
+        .with_raw(false)
+        .read_paths([&raw_file, &processed_file])?;
+
+    assert_eq!(raw_disabled.len(), 1);
+    assert_eq!(first_1d(&raw_disabled)?.x.unit, Unit::Ppm);
+    assert!(has_source_path(&raw_disabled, Path::new("1r")));
+    let raw_warning = raw_disabled
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing disabled raw warning"))?;
+    assert_eq!(raw_warning.path.as_deref(), Some(Path::new("fid")));
+    assert!(
+        raw_warning
+            .message
+            .contains("raw spectrum candidates are disabled")
+    );
+
+    let processed_disabled = RSpinReader::new()
+        .with_processed(false)
+        .read_paths([&processed_file, &raw_file])?;
+
+    assert_eq!(processed_disabled.len(), 1);
+    assert_eq!(first_1d(&processed_disabled)?.x.unit, Unit::Seconds);
+    assert!(has_source_path(&processed_disabled, Path::new("fid")));
+    let processed_warning = processed_disabled
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing disabled processed warning"))?;
+    assert_eq!(processed_warning.path.as_deref(), Some(Path::new("1r")));
+    assert!(
+        processed_warning
+            .message
+            .contains("processed spectrum candidates are disabled")
+    );
+    Ok(())
+}
+
+#[test]
 fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra_many([
         fixture_root().join("varian_1h"),

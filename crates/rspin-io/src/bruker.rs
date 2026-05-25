@@ -174,7 +174,8 @@ impl<'a> BrukerProcessed1DBytes<'a> {
 
 /// Reads a processed one-dimensional spectrum from a Bruker dataset path.
 ///
-/// The path may point to the dataset root or directly to `pdata/1`.
+/// The path may point to the dataset root, directly to `pdata/1`, or to a
+/// processed data file such as `1r`.
 ///
 /// # Errors
 ///
@@ -213,6 +214,8 @@ pub fn read_bruker_processed_1d_bytes(procs: &str, real_bytes: &[u8]) -> Result<
 fn locate_processed_dir(path: &Path) -> PathBuf {
     if path.join("procs").is_file() && path.join("1r").is_file() {
         path.to_path_buf()
+    } else if path.is_file() {
+        path.parent().map_or_else(PathBuf::new, Path::to_path_buf)
     } else {
         path.join("pdata").join("1")
     }
