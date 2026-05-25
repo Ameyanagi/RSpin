@@ -10,7 +10,9 @@ use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
     load_spectra, load_spectra_many, load_spectra_many_relative_to, load_spectrum_1d,
-    load_spectrum_2d, write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum2d_json,
+    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_2d,
+    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, write_spectrum_bundle_json,
+    write_spectrum1d_json, write_spectrum2d_json,
 };
 
 #[test]
@@ -629,6 +631,51 @@ fn exact_single_helpers_reject_wrong_or_ambiguous_dimensions() -> anyhow::Result
         bundle.only_1d().map(rspin_core::Spectrum1D::len),
         "expected exactly one one-dimensional spectrum",
         "found 2 one-dimensional and 0 two-dimensional spectra",
+    )?;
+    Ok(())
+}
+
+#[test]
+fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
+    let one_d = load_spectrum_1d_many([fixture_root().join("varian_1h")])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let one_d = load_spectrum_1d_many_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(one_d.len(), 16_384);
+
+    let one_d = RSpinReader::new().read_1d_paths([
+        fixture_root().join("empty_jcamp/empty.jdx"),
+        fixture_root().join("varian_1h"),
+    ])?;
+    assert_eq!(one_d.len(), 16_384);
+
+    let two_d = load_spectrum_2d_many([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let two_d = load_spectrum_2d_many_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let two_d = RSpinReader::new()
+        .raw_only()
+        .read_2d_paths_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let wrong_dimension = RSpinReader::new().read_2d_paths([fixture_root().join("varian_1h")]);
+    assert_single_error(
+        wrong_dimension,
+        "expected exactly one two-dimensional spectrum",
+        "found 1 one-dimensional and 0 two-dimensional spectra",
+    )?;
+
+    let ambiguous = RSpinReader::new().read_1d_paths([
+        fixture_root().join("varian_1h"),
+        fixture_root().join("bruker_without_expno"),
+    ]);
+    assert_single_error(
+        ambiguous,
+        "expected exactly one one-dimensional spectrum",
+        "found 3 one-dimensional and 0 two-dimensional spectra",
     )?;
     Ok(())
 }

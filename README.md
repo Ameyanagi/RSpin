@@ -43,6 +43,10 @@ fn load_selected_inputs() -> Result<SpectrumBundle> {
 fn load_selected_inputs_with_stable_sources() -> Result<SpectrumBundle> {
     load_spectra_many_relative_to("data", ["proton.fid", "carbon.jdf", "bruker/pdata/1"])
 }
+
+fn load_exactly_one_selected_spectrum() -> Result<Spectrum1D> {
+    load_spectrum_1d_many_relative_to("data", ["proton.fid"])
+}
 ```
 
 Bundles expose direct counts and owned extraction helpers for simple workflows:

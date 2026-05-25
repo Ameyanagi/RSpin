@@ -784,6 +784,70 @@ impl SpectrumBundleLoader {
         self.read_path(path)?.into_only_2d()
     }
 
+    /// Loads exactly one one-dimensional spectrum from selected file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or the selected paths do not resolve
+    /// to exactly one one-dimensional spectrum.
+    pub fn read_1d_paths<I, P>(&self, paths: I) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths(paths)?.into_only_1d()
+    }
+
+    /// Loads exactly one two-dimensional spectrum from selected file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or the selected paths do not resolve
+    /// to exactly one two-dimensional spectrum.
+    pub fn read_2d_paths<I, P>(&self, paths: I) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths(paths)?.into_only_2d()
+    }
+
+    /// Loads exactly one one-dimensional spectrum from paths relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or the selected paths do not resolve
+    /// to exactly one one-dimensional spectrum.
+    pub fn read_1d_paths_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths_relative_to(base, paths)?.into_only_1d()
+    }
+
+    /// Loads exactly one two-dimensional spectrum from paths relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or the selected paths do not resolve
+    /// to exactly one two-dimensional spectrum.
+    pub fn read_2d_paths_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths_relative_to(base, paths)?.into_only_2d()
+    }
+
     fn read_existing_path_into(
         &self,
         source_root: &Path,
@@ -1490,6 +1554,68 @@ pub fn load_spectrum_1d(path: impl AsRef<Path>) -> Result<Spectrum1D> {
 /// one two-dimensional spectrum.
 pub fn load_spectrum_2d(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     SpectrumBundleLoader::new().read_2d(path)
+}
+
+/// Loads exactly one one-dimensional spectrum from selected file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one one-dimensional spectrum.
+pub fn load_spectrum_1d_many<I, P>(paths: I) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_1d_paths(paths)
+}
+
+/// Loads exactly one two-dimensional spectrum from selected file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one two-dimensional spectrum.
+pub fn load_spectrum_2d_many<I, P>(paths: I) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_2d_paths(paths)
+}
+
+/// Loads exactly one one-dimensional spectrum from paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one one-dimensional spectrum.
+pub fn load_spectrum_1d_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_1d_paths_relative_to(base, paths)
+}
+
+/// Loads exactly one two-dimensional spectrum from paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one two-dimensional spectrum.
+pub fn load_spectrum_2d_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_2d_paths_relative_to(base, paths)
 }
 
 fn spectrum_dimension_counts<'a>(
