@@ -690,6 +690,7 @@ impl SpectrumBundleLoader {
                 }
                 Err(second_error) => match read_bundle() {
                     Ok(loaded) => {
+                        let loaded = self.bundle_with_source_context(root, path, loaded);
                         bundle.extend_bundle(loaded);
                         Ok(())
                     }
@@ -821,6 +822,28 @@ impl SpectrumBundleLoader {
 
     fn loaded_source(&self, root: &Path, path: &Path, format: impl Into<String>) -> LoadedSource {
         LoadedSource::new(self.source_path(root, path), format)
+    }
+
+    fn bundle_with_source_context(
+        &self,
+        root: &Path,
+        path: &Path,
+        mut bundle: SpectrumBundle,
+    ) -> SpectrumBundle {
+        if !self.source_paths.is_enabled() {
+            clear_bundle_source_paths(&mut bundle);
+            return bundle;
+        }
+
+        if root == path {
+            return bundle;
+        }
+
+        let Some(container_path) = self.source_path(root, path) else {
+            return bundle;
+        };
+        prefix_bundle_source_paths(&mut bundle, &container_path);
+        bundle
     }
 
     fn source_path(&self, root: &Path, path: &Path) -> Option<PathBuf> {
@@ -1088,6 +1111,39 @@ fn relative_source_path(root: &Path, path: &Path) -> Option<PathBuf> {
 
 fn file_name_path(path: &Path) -> Option<PathBuf> {
     path.file_name().map(PathBuf::from)
+}
+
+fn clear_bundle_source_paths(bundle: &mut SpectrumBundle) {
+    for loaded in &mut bundle.spectra {
+        match loaded {
+            LoadedSpectrum::OneD { source, .. } | LoadedSpectrum::TwoD { source, .. } => {
+                source.path = None;
+            }
+        }
+    }
+    for warning in &mut bundle.warnings {
+        warning.path = None;
+    }
+}
+
+fn prefix_bundle_source_paths(bundle: &mut SpectrumBundle, container_path: &Path) {
+    for loaded in &mut bundle.spectra {
+        match loaded {
+            LoadedSpectrum::OneD { source, .. } | LoadedSpectrum::TwoD { source, .. } => {
+                source.path = Some(nested_source_path(container_path, source.path.take()));
+            }
+        }
+    }
+    for warning in &mut bundle.warnings {
+        warning.path = Some(nested_source_path(container_path, warning.path.take()));
+    }
+}
+
+fn nested_source_path(container_path: &Path, source_path: Option<PathBuf>) -> PathBuf {
+    match source_path {
+        Some(path) if !path.as_os_str().is_empty() => container_path.join(path),
+        Some(_) | None => container_path.to_path_buf(),
+    }
 }
 
 fn nmredata_record_molecule(

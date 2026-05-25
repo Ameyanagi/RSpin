@@ -1,11 +1,16 @@
 //! Integration tests for the unified spectrum bundle loader.
 
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
     load_spectra, load_spectra_many, load_spectrum_1d, load_spectrum_2d,
+    write_spectrum_bundle_json,
 };
 
 #[test]
@@ -186,6 +191,39 @@ fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     assert!(has_source_path(&bundle, Path::new("varian_1h")));
     assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
     assert!(has_source_path(&bundle, Path::new("pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn directory_loader_anchors_nested_bundle_json_sources() -> anyhow::Result<()> {
+    let source_bundle = load_spectra(fixture_root().join("varian_1h"))?;
+    let root = temp_dir("nested-bundle")?;
+    let nested = root.join("nested");
+    fs::create_dir_all(&nested)?;
+    fs::write(
+        nested.join("bundle.json"),
+        write_spectrum_bundle_json(&source_bundle)?,
+    )?;
+
+    let loaded = RSpinReader::new().read_path(&root)?;
+    assert_eq!(loaded.len(), 1);
+    let loaded_spectrum = loaded
+        .spectra()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing loaded bundle spectrum"))?;
+    assert_source_path(loaded_spectrum, Path::new("nested/bundle.json/varian_1h"));
+
+    let no_sources = RSpinReader::new()
+        .with_source_paths(false)
+        .read_path(&root)?;
+    assert!(
+        no_sources
+            .spectra()
+            .iter()
+            .all(|loaded| loaded.source().path.is_none())
+    );
+
+    remove_dir(root)?;
     Ok(())
 }
 
@@ -430,6 +468,22 @@ fn nmredata_fixture_root() -> PathBuf {
 
 fn nmrxiv_fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene")
+}
+
+fn temp_dir(name: &str) -> anyhow::Result<PathBuf> {
+    let nanos = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+    let mut path = std::env::temp_dir();
+    path.push(format!(
+        "rspin-bundle-{name}-{}-{nanos}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&path)?;
+    Ok(path)
+}
+
+fn remove_dir(path: PathBuf) -> anyhow::Result<()> {
+    fs::remove_dir_all(path)?;
+    Ok(())
 }
 
 fn first_1d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Spectrum1D> {
