@@ -34,6 +34,7 @@ mod ruviz_example {
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, BaselineMethod, FftDirection, ProcessSpectrum2D,
         ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks, fit_baseline,
+        remove_group_delay,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -199,68 +200,106 @@ mod ruviz_example {
                 );
                 continue;
             }
-            let unphased = if spectrum.x.unit == Unit::Seconds {
-                let target_len = spectrum
-                    .len()
-                    .checked_mul(2)
-                    .context("JEOL auto-phase target length overflow")?;
-                let recipe = ProcessingRecipe1D::new()
-                    .exponential_apodization(1.0, dwell_time_seconds(spectrum)?)
-                    .zero_fill(target_len)
-                    .fft(FftDirection::Forward)
-                    .normalize_max_abs();
-                recipe.apply(spectrum)?
-            } else {
-                ProcessingRecipe1D::new()
-                    .normalize_max_abs()
-                    .apply(spectrum)?
-            };
-            let unphased = relabel_hz_to_ppm(unphased);
-            let default_opts = AutoPhaseOptions::default();
-            let wide_opts = AutoPhaseOptions::default()
-                .first_order_range(-720.0, 720.0, 45.0);
-            let phased_default = auto_phase_correct(&unphased, default_opts)?;
-            let phased_wide = auto_phase_correct(&unphased, wide_opts)?;
-            let peak_centers = detect_peak_centers(&unphased)?;
-            let phased_peak = auto_phase_correct_with_peaks(
-                &unphased,
-                AutoPhaseOptions::default().first_order_range(-720.0, 720.0, 45.0),
-                &peak_centers,
-            )?;
-
-            let fmt = |stem: &str, r: &rspin_processing::AutoPhaseResult| {
-                format!(
-                    "{stem} ({:.1}\u{00B0}/{:.1}\u{00B0})",
-                    r.zero_order_deg, r.first_order_deg
-                )
-            };
-
+            let auto = jeol_group_delay(spectrum);
+            let shift_candidates: [f64; 5] = [0.0, auto, 32.0, 60.0, 73.0];
+            let mut traces: Vec<(Vec<f64>, Vec<f64>, String)> = Vec::new();
+            for &candidate in &shift_candidates {
+                let (_unphased, phased) = jeol_phase_with_shift(spectrum, candidate)?;
+                let neg = negative_fraction(&phased.spectrum.intensities);
+                let tag = if (candidate - auto).abs() < 0.5 && auto > 0.0 {
+                    format!("auto={candidate:.1}")
+                } else {
+                    format!("shift={candidate:.0}")
+                };
+                let label = format!(
+                    "{tag} ({:.0}\u{00B0}/{:.0}\u{00B0} neg={:.2})",
+                    phased.zero_order_deg, phased.first_order_deg, neg
+                );
+                traces.push((
+                    phased.spectrum.x.values.clone(),
+                    phased.spectrum.intensities.clone(),
+                    label,
+                ));
+            }
             Plot::new()
                 .title(*title)
-                .xlabel(axis_label(unphased.x.unit))
+                .xlabel("chemical shift / ppm")
                 .ylabel("normalized intensity")
                 .max_resolution(1600, 1000)
                 .legend_position(LegendPosition::Best)
-                .line(&unphased.x.values, &unphased.intensities)
-                .label("unphased real")
-                .line(
-                    &phased_default.spectrum.x.values,
-                    &phased_default.spectrum.intensities,
-                )
-                .label(&fmt("default", &phased_default))
-                .line(
-                    &phased_wide.spectrum.x.values,
-                    &phased_wide.spectrum.intensities,
-                )
-                .label(&fmt("wide ph1", &phased_wide))
-                .line(
-                    &phased_peak.spectrum.x.values,
-                    &phased_peak.spectrum.intensities,
-                )
-                .label(&fmt("peak-warmed", &phased_peak))
+                .line(&traces[0].0, &traces[0].1)
+                .label(&traces[0].2)
+                .line(&traces[1].0, &traces[1].1)
+                .label(&traces[1].2)
+                .line(&traces[2].0, &traces[2].1)
+                .label(&traces[2].2)
+                .line(&traces[3].0, &traces[3].1)
+                .label(&traces[3].2)
+                .line(&traces[4].0, &traces[4].1)
+                .label(&traces[4].2)
                 .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         }
         Ok(())
+    }
+
+    fn negative_fraction(values: &[f64]) -> f64 {
+        let neg: f64 = values
+            .iter()
+            .map(|v| if *v < 0.0 { v.abs() } else { 0.0 })
+            .sum();
+        let total: f64 = values.iter().map(|v| v.abs()).sum();
+        if total <= 0.0 { 0.0 } else { neg / total }
+    }
+
+    fn jeol_phase_with_shift(
+        spectrum: &Spectrum1D,
+        shift_samples: f64,
+    ) -> Result<(Spectrum1D, rspin_processing::AutoPhaseResult)> {
+        let shifted = if shift_samples > 0.0 {
+            remove_group_delay(spectrum, shift_samples)?
+        } else {
+            spectrum.clone()
+        };
+        let unphased = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL auto-phase target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs()
+                .apply(&shifted)?
+        } else {
+            ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        };
+        let unphased = relabel_hz_to_ppm(unphased);
+        let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?;
+        Ok((unphased, phased))
+    }
+
+    fn jeol_group_delay(spectrum: &Spectrum1D) -> f64 {
+        let props = &spectrum.metadata.properties;
+        let factor = props
+            .get("jeol.parameter.filter_factor")
+            .and_then(|v| v.parse::<f64>().ok());
+        let decim_raw = props
+            .get("jeol.parameter.decimation_reg")
+            .and_then(|v| parse_decimation_reg(v));
+        match (decim_raw, factor) {
+            (Some(raw), Some(f)) if f > 0.0 => raw / f,
+            _ => 0.0,
+        }
+    }
+
+    fn parse_decimation_reg(raw: &str) -> Option<f64> {
+        let trimmed = raw.trim();
+        let after = trimmed.strip_prefix("r:")?.trim_start();
+        let first_token = after.split(|c: char| !c.is_ascii_digit()).next()?;
+        first_token.parse::<f64>().ok()
     }
 
     fn write_auto_phase_peak_zoom_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {

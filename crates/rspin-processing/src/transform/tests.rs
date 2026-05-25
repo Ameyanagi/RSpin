@@ -5,6 +5,39 @@ use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 use super::*;
 
 #[test]
+fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 4.0, 5)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![10.0, 20.0, 30.0, 40.0, 50.0],
+        Some(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+        Metadata::default(),
+    )?;
+    let shifted = remove_group_delay(&spectrum, 2.0)?;
+    assert_eq!(shifted.intensities, vec![30.0, 40.0, 50.0, 10.0, 20.0]);
+    assert_eq!(shifted.imaginary, Some(vec![3.0, 4.0, 5.0, 1.0, 2.0]));
+    assert_eq!(
+        shifted.processing.last().map(|r| r.operation.as_str()),
+        Some("remove_group_delay")
+    );
+    Ok(())
+}
+
+#[test]
+fn remove_group_delay_rejects_invalid_input() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 1.0, 2)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 2.0],
+        Some(vec![0.0, 0.0]),
+        Metadata::default(),
+    )?;
+    assert!(remove_group_delay(&spectrum, -1.0).is_err());
+    assert!(remove_group_delay(&spectrum, f64::NAN).is_err());
+    Ok(())
+}
+
+#[test]
 fn apodization_decays_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = exponential_apodization(&spectrum, 1.0, 0.1)?;

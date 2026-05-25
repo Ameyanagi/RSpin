@@ -425,6 +425,59 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
     ))
 }
 
+/// Removes a digital-filter group delay from a time-domain spectrum.
+///
+/// Circularly shifts the FID samples left by `samples.trunc()` (so the
+/// early "pre-acquisition" points wrap to the end of the FID) and records
+/// the operation. The fractional part of `samples` is meant to be applied
+/// downstream as a frequency-domain linear phase
+/// `exp(-2*pi*frac*k/N)` after FFT; this function only handles the
+/// integer shift so the inverse `restore_group_delay` is a clean rotation.
+///
+/// `samples` must be finite and non-negative.
+///
+/// # Errors
+///
+/// Returns an error when `samples` is non-finite or negative.
+pub fn remove_group_delay(spectrum: &Spectrum1D, samples: f64) -> Result<Spectrum1D> {
+    if !samples.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "group_delay_samples",
+        });
+    }
+    if samples < 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "group delay samples must be non-negative".to_owned(),
+        });
+    }
+    let mut processed = spectrum.clone();
+    let len = processed.intensities.len();
+    if len == 0 {
+        return Ok(processed);
+    }
+    let mut integer_shift = 0_usize;
+    let truncated = samples.trunc();
+    if truncated > 0.0 {
+        let mut counter = 0.0_f64;
+        for _ in 0..len {
+            if counter >= truncated {
+                break;
+            }
+            counter += 1.0;
+            integer_shift += 1;
+        }
+    }
+    if integer_shift > 0 {
+        processed.intensities.rotate_left(integer_shift);
+        if let Some(imag) = processed.imaginary.as_mut() {
+            imag.rotate_left(integer_shift);
+        }
+    }
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("remove_group_delay").with_details(format!("samples={samples}")),
+    ))
+}
+
 pub(crate) fn fftshift_in_place<T: Copy>(buffer: &mut [T]) {
     let n = buffer.len();
     if n < 2 {
