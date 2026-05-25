@@ -17,6 +17,53 @@ scope for now.
 - `rspin-prediction`: prediction traits and adapter types.
 - `rspin-wasm`: WebAssembly bindings.
 
+## Unified IO
+
+Use the facade crate for normal loading. `load_spectra` accepts one supported
+file or directory, while `load_spectra_many` merges selected files and
+directories into one `SpectrumBundle`.
+
+```rust,no_run
+use rspin::prelude::*;
+
+fn load_one_dataset() -> Result<SpectrumBundle> {
+    load_spectra("data/experiment")
+}
+
+fn load_selected_inputs() -> Result<SpectrumBundle> {
+    load_spectra_many([
+        "data/proton.fid",
+        "data/carbon.jdf",
+        "data/bruker/pdata/1",
+    ])
+}
+```
+
+`RSpinReader` exposes the same reader with chainable options:
+
+```rust,no_run
+use rspin::prelude::*;
+
+fn load_processed_only() -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .with_raw(false)
+        .with_processed(true)
+        .with_strict(true)
+        .read_path("data/bruker")
+}
+```
+
+The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,
+JCAMP-DX, nmrML, NMReDATA, JSON, and CSV inputs without replacing the
+format-specific readers. Browser callers should parse uploaded bytes with the
+format-specific WASM helpers, then use `createSpectrumBundle` to assemble the
+same versioned bundle JSON used by native code.
+
+The small committed loader fixtures under
+`crates/rspin-io/testdata/zenodo_7100132` come from the MIT-licensed Zenodo
+software record `https://doi.org/10.5281/zenodo.7100132`; see the fixture
+README for file-level provenance and checksums.
+
 ## Development
 
 ```sh
