@@ -429,9 +429,18 @@ mod ruviz_example {
         Ok(())
     }
 
+    /// Line broadening (Hz) used when building the spectrum that the
+    /// auto-phase cost function inspects. Heavier apodization than the
+    /// final display spectrum suppresses truncation sidelobes that
+    /// would otherwise be interpreted as residual dispersion.
+    const PHASING_LINE_BROADENING_HZ: f64 = 5.0;
+    /// Line broadening (Hz) used for the visualisation spectrum.
+    const DISPLAY_LINE_BROADENING_HZ: f64 = 1.0;
+
     fn jeol_prepare_complex_spectrum(
         spectrum: &Spectrum1D,
         shift: f64,
+        line_broadening_hz: f64,
     ) -> Result<Spectrum1D> {
         let integer = shift.trunc().max(0.0);
         let frac = shift - integer;
@@ -446,7 +455,7 @@ mod ruviz_example {
                 .checked_mul(2)
                 .context("JEOL prep target length overflow")?;
             ProcessingRecipe1D::new()
-                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .exponential_apodization(line_broadening_hz, dwell_time_seconds(&shifted)?)
                 .zero_fill(target_len)
                 .fft(FftDirection::Forward)
                 .apply(&shifted)?
@@ -469,15 +478,35 @@ mod ruviz_example {
         shift: f64,
         options: AutoPhaseOptions,
     ) -> Result<rspin_processing::AutoPhaseResult> {
-        let prepared = jeol_prepare_complex_spectrum(spectrum, shift)?;
-        Ok(auto_phase_correct(&prepared, options)?)
+        // Run auto-phase on a *heavily* apodized copy so truncation
+        // sidelobes do not pollute the cost function, then re-apply the
+        // measured (ph0, ph1) to a lightly-apodized display spectrum.
+        let phasing_spectrum =
+            jeol_prepare_complex_spectrum(spectrum, shift, PHASING_LINE_BROADENING_HZ)?;
+        let phasing_result = auto_phase_correct(&phasing_spectrum, options)?;
+        let display_spectrum =
+            jeol_prepare_complex_spectrum(spectrum, shift, DISPLAY_LINE_BROADENING_HZ)?;
+        let pivot_fraction = options.pivot_fraction;
+        let display_phased = rspin_processing::phase_correct(
+            &display_spectrum,
+            phasing_result.zero_order_deg,
+            phasing_result.first_order_deg,
+            pivot_fraction,
+        )?;
+        Ok(rspin_processing::AutoPhaseResult {
+            spectrum: display_phased,
+            zero_order_deg: phasing_result.zero_order_deg,
+            first_order_deg: phasing_result.first_order_deg,
+            score: phasing_result.score,
+        })
     }
 
     fn jeol_magnitude(
         spectrum: &Spectrum1D,
         shift: f64,
     ) -> Result<(Spectrum1D, rspin_processing::AutoPhaseResult)> {
-        let prepared = jeol_prepare_complex_spectrum(spectrum, shift)?;
+        let prepared =
+            jeol_prepare_complex_spectrum(spectrum, shift, DISPLAY_LINE_BROADENING_HZ)?;
         let magnitude = ProcessingRecipe1D::new()
             .magnitude()
             .normalize_max_abs()
