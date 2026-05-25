@@ -28,6 +28,8 @@ cargo test --workspace --all-features
 ## Examples
 
 - Processing and analysis PNG examples: `docs/examples/processed-data.md`
+- Local visual artifacts from raw oracle fixtures:
+  `target/rspin-visual-tests` after running the feature-gated `ruviz` example.
 - Public analysis fixture sources and workflow snippets:
   `docs/examples/public-analysis-fixtures.md`
 

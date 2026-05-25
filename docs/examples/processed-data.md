@@ -19,6 +19,17 @@ Generated files:
   spectrum, runs the chain-friendly analysis workflow, and overlays detected
   threshold ranges and picked peaks.
 
+The same command also writes local visual-regression artifacts under
+`target/rspin-visual-tests`. That directory is ignored by git. It contains
+versioned bundle JSON, spectrum JSON, spectrum CSV, processing recipe JSON, and
+PNG plots generated from the committed raw oracle fixtures:
+
+- `target/rspin-visual-tests/varian_1h`: raw FID bundle, raw FID plot, FFT
+  magnitude processing recipe, processed JSON/CSV, and processed PNG.
+- `target/rspin-visual-tests/bruker_without_expno`: raw and vendor-processed
+  bundle outputs, normalized processed spectrum JSON/CSV, analysis JSON/CSV,
+  and peak/range overlay PNG.
+
 The example package is intentionally outside the main workspace dependency graph
 so the core RSpin library remains visualization-free. Its `ruviz` dependency is
 behind the explicit non-default `visualization-ruviz` feature gate. The local

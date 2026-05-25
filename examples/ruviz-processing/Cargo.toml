@@ -17,5 +17,6 @@ visualization-ruviz = ["dep:ruviz"]
 anyhow = "1.0"
 rspin-analysis = { path = "../../crates/rspin-analysis" }
 rspin-core = { path = "../../crates/rspin-core" }
+rspin-io = { path = "../../crates/rspin-io" }
 rspin-processing = { path = "../../crates/rspin-processing" }
 ruviz = { version = "=0.4.17", default-features = false, optional = true }
