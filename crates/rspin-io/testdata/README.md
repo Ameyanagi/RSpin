@@ -13,6 +13,9 @@ or only acceptable for private comparison.
 - `nmrxiv/cc0/`: selected CC0 NMRXiv CENAPTNMR/Myrcene fixtures. See the nested
   README for study DOI, source URLs, authors, license URL, and file-level
   provenance.
+- `nmrxiv/cc-by-4.0/`: selected CC-BY-4.0 NMRXiv Varian fixtures. See the
+  nested README for required attribution, source APIs, source URLs, changes, and
+  checksums.
 - `bundle_nmredata/`: small project-authored synthetic NMReDATA fixture for
   bundle metadata tests.
 

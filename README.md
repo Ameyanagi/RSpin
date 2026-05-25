@@ -81,11 +81,12 @@ The small committed loader fixtures under
 software record `https://doi.org/10.5281/zenodo.7100132`; see the fixture
 README for file-level provenance and checksums.
 
-The committed public parser fixtures under `crates/rspin-io/testdata/nmrxiv/cc0`
-come from a CC0 NMRXiv study; see the fixture README for source DOI, authors,
-license URL, and included-file provenance. Other public datasets should only be
-committed when redistribution is permitted and documented next to the files. The
-top-level `crates/rspin-io/testdata/README.md` records the fixture policy.
+The committed public parser fixtures under `crates/rspin-io/testdata/nmrxiv`
+come from CC0 and CC-BY-4.0 NMRXiv studies; see the fixture README for source
+DOIs, authors, license URLs, included-file provenance, changes, and checksums.
+Other public datasets should only be committed when redistribution is permitted
+and documented next to the files. The top-level
+`crates/rspin-io/testdata/README.md` records the fixture policy.
 
 ## Development
 
