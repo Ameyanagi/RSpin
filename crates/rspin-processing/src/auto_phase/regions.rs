@@ -11,8 +11,7 @@
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    clippy::needless_late_init,
-    clippy::manual_unwrap_or
+    clippy::needless_late_init
 )]
 
 //! Region-based automatic phase correction (Zorin, Bernstein, Cobas 2017).
@@ -189,27 +188,34 @@ pub fn auto_phase_correct_regions(
     // ── Stage 5: weighted linear regression with outlier rejection ──
     let global = global_phase_from_regions(&region_phases, options, spectrum.len())?;
 
+    // ── Stage 5b: canonicalize ph0 and pick the ph1 wrap whose phased real
+    //              part best matches the (phase-independent) magnitude. ──
+    let (zero_order_deg, first_order_deg) = resolve_wrap_ambiguity(
+        spectrum,
+        &magnitude,
+        canonicalize_phase(global.zero_order_deg),
+        global.first_order_deg,
+        options.pivot_fraction,
+    );
+
     let mut spectrum = phase_correct(
         spectrum,
-        global.zero_order_deg,
-        global.first_order_deg,
+        zero_order_deg,
+        first_order_deg,
         options.pivot_fraction,
     )?;
     spectrum.processing.pop();
     spectrum = spectrum.with_processing_record(
         ProcessingRecord::new("auto_phase_correct_regions").with_details(format!(
             "zero_order_deg={},first_order_deg={},regions={},r_squared={}",
-            global.zero_order_deg,
-            global.first_order_deg,
-            global.region_count,
-            global.regression_r_squared
+            zero_order_deg, first_order_deg, global.region_count, global.regression_r_squared,
         )),
     );
 
     Ok(RegionsResult {
         spectrum,
-        zero_order_deg: global.zero_order_deg,
-        first_order_deg: global.first_order_deg,
+        zero_order_deg,
+        first_order_deg,
         pivot_fraction: options.pivot_fraction,
         region_count: global.region_count,
         regression_r_squared: global.regression_r_squared,
@@ -590,9 +596,10 @@ fn global_phase_from_regions(
                 .collect();
             let total: f64 = kept.iter().map(|p| p.2).sum();
             let weighted_mean = if total <= 0.0 {
-                match kept.first() {
-                    Some(p) => p.1,
-                    None => 0.0,
+                if let Some(p) = kept.first() {
+                    p.1
+                } else {
+                    0.0
                 }
             } else {
                 kept.iter().map(|p| p.1 * p.2).sum::<f64>() / total
@@ -680,11 +687,136 @@ fn weighted_linear_fit(points: &[(f64, f64, f64)], active: &[bool]) -> (f64, f64
     (intercept, slope, r_sq)
 }
 
-fn safe_count_f64(value: usize) -> f64 {
-    let bounded = match u32::try_from(value) {
-        Ok(v) => v,
-        Err(_) => u32::MAX,
+/// Maps an angle in degrees to the canonical `(-180, 180]` window.
+fn canonicalize_phase(angle_deg: f64) -> f64 {
+    let mut value = angle_deg % 360.0;
+    if value > 180.0 {
+        value -= 360.0;
+    } else if value <= -180.0 {
+        value += 360.0;
+    }
+    value
+}
+
+/// Searches `ph1 + k * 360` over a small set of `k` and returns the
+/// `(ph0, ph1)` whose phased real spectrum best matches the magnitude
+/// envelope on high-magnitude points.
+///
+/// The magnitude spectrum is independent of phase, so it serves as a
+/// canonical absorption-mode target. Among all wrap-equivalent linear
+/// phase ramps the one that best reproduces the magnitude shape on the
+/// peaks is the most physically meaningful answer.
+/// Picks the `ph1 + k * 360` wrap that minimises a magnitude-target loss
+/// while always keeping ph0 inside the canonical `(-180, 180]` window.
+///
+/// At every peak position, candidates that differ by `k · 360°` in ph1
+/// produce *different* rotations away from the pivot, so they are
+/// genuinely distinct solutions. The candidate whose phased real part
+/// fits the (phase-independent) magnitude envelope best on its peaks is
+/// the most physically meaningful answer.
+fn resolve_wrap_ambiguity(
+    original: &Spectrum1D,
+    magnitude: &[f64],
+    ph0_canonical: f64,
+    ph1_fit: f64,
+    pivot_fraction: f64,
+) -> (f64, f64) {
+    // Trust the fit when it already lands inside the canonical
+    // [-180, 180] window — the wrap search adds candidates that aren't
+    // spectrum-equivalent and can pull a good fit off the answer.
+    if ph1_fit.abs() <= 180.0 {
+        return (ph0_canonical, ph1_fit);
+    }
+    let max_mag = magnitude.iter().copied().fold(0.0_f64, f64::max);
+    if max_mag <= 0.0 {
+        return (ph0_canonical, ph1_fit);
+    }
+    let threshold = 0.30 * max_mag;
+    let buffer = complex_buffer(original);
+    let fractions = index_fractions(buffer.len());
+
+    // Build wrap candidates around the original fit, plus the canonical
+    // wrap and one full turn either side of it. Out-of-window fits
+    // (typical JEOL after group-delay correction) are the only case
+    // where this search overrides the fit value.
+    let canonical_ph1 = canonicalize_phase(ph1_fit);
+    let mut candidates = vec![ph1_fit, canonical_ph1];
+    for k in [-1_i32, 1_i32] {
+        candidates.push(canonical_ph1 + f64::from(k) * 360.0);
+    }
+
+    let mut best = (ph0_canonical, ph1_fit, f64::INFINITY);
+    for candidate in candidates {
+        let loss = magnitude_target_loss(
+            &buffer,
+            &fractions,
+            magnitude,
+            threshold,
+            ph0_canonical,
+            candidate,
+            pivot_fraction,
+        );
+        if loss < best.2 {
+            best = (ph0_canonical, candidate, loss);
+        }
+    }
+    (best.0, best.1)
+}
+
+fn index_fractions(len: usize) -> Vec<f64> {
+    if len <= 1 {
+        return vec![0.0; len];
+    }
+    let denom = safe_count_f64(len - 1);
+    (0..len).map(|i| safe_count_f64(i) / denom).collect()
+}
+
+/// Magnitude-target loss used to choose between wrap-equivalent ph1
+/// candidates. Maximises the (peak-weighted) correlation between the
+/// rotated real part and the magnitude envelope while penalising any
+/// residual negative-going content on a peak.
+fn magnitude_target_loss(
+    buffer: &[Complex<f64>],
+    fractions: &[f64],
+    magnitude: &[f64],
+    threshold: f64,
+    ph0_deg: f64,
+    ph1_deg: f64,
+    pivot_fraction: f64,
+) -> f64 {
+    let mut numerator = 0.0_f64;
+    let mut neg_area = 0.0_f64;
+    let mut mag_norm = 0.0_f64;
+    let mut real_sq = 0.0_f64;
+    for ((value, fraction), m) in buffer.iter().zip(fractions).zip(magnitude) {
+        if *m < threshold {
+            continue;
+        }
+        let phase_rad = (ph0_deg + ph1_deg * (*fraction - pivot_fraction)).to_radians();
+        let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+        let real = (*value * rotation).re;
+        numerator += real * m;
+        if real < 0.0 {
+            neg_area += (-real) * m;
+        }
+        mag_norm += m * m;
+        real_sq += real * real;
+    }
+    let denom = (mag_norm * real_sq).sqrt();
+    if denom <= 0.0 {
+        return f64::INFINITY;
+    }
+    let correlation = numerator / denom;
+    let normalised_negativity = if mag_norm > 0.0 {
+        neg_area / mag_norm.sqrt()
+    } else {
+        0.0
     };
+    -correlation + 4.0 * normalised_negativity
+}
+
+fn safe_count_f64(value: usize) -> f64 {
+    let bounded: u32 = u32::try_from(value).ok().map_or(u32::MAX, |v| v);
     f64::from(bounded)
 }
 
@@ -692,10 +824,7 @@ fn u32_from_u64(value: u64) -> u32 {
     if value > u64::from(u32::MAX) {
         u32::MAX
     } else {
-        match u32::try_from(value) {
-            Ok(v) => v,
-            Err(_) => u32::MAX,
-        }
+        u32::try_from(value).ok().map_or(u32::MAX, |v| v)
     }
 }
 
