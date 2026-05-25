@@ -173,9 +173,38 @@ mod ruviz_example {
     }
 
     fn write_jeol_method_panels(root: &Path, output_dir: &Path) -> Result<()> {
-        let fixture =
-            root.join("crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf");
-        let bundle = load_spectra(&fixture)?;
+        let entries: &[(&str, &str, &str)] = &[
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+                "auto_phase_methods_jeol_13c",
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+            ),
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+                "auto_phase_methods_jeol_myrcene_1h",
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+            ),
+            (
+                "crates/rspin-io/testdata/dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
+                "auto_phase_methods_jeol_rutin",
+                "JEOL 1H Rutin (Dataverse CC0)",
+            ),
+        ];
+        for (path, stem, title) in entries {
+            write_jeol_method_panel(root, output_dir, path, stem, title)?;
+        }
+        write_varian_method_panel(root, output_dir)?;
+        Ok(())
+    }
+
+    fn write_jeol_method_panel(
+        root: &Path,
+        output_dir: &Path,
+        fixture: &str,
+        stem: &str,
+        title: &str,
+    ) -> Result<()> {
+        let bundle = load_spectra(root.join(fixture))?;
         let Some(spectrum) = bundle.spectra_1d().next() else {
             return Ok(());
         };
@@ -202,9 +231,80 @@ mod ruviz_example {
         )?;
         let regions = jeol_phase_with_opts(spectrum, auto, AutoPhaseOptions::default())?;
 
-        let mk = |title: String, xs: &Vec<f64>, ys: &Vec<f64>, label: &str| -> Plot {
+        save_method_panel(
+            output_dir,
+            stem,
+            title,
+            &magnitude,
+            &legacy,
+            &acme,
+            &regions,
+        )
+    }
+
+    fn write_varian_method_panel(root: &Path, output_dir: &Path) -> Result<()> {
+        let bundle =
+            load_spectra(root.join("crates/rspin-io/testdata/zenodo_7100132/varian_1h"))?;
+        let raw = bundle.only_1d()?;
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("varian method-panel target length overflow")?;
+        let magnitude = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .magnitude()
+            .normalize_max_abs()
+            .apply(raw)?;
+        let magnitude = relabel_hz_to_ppm(magnitude);
+
+        let prepare = |opts: AutoPhaseOptions| -> Result<rspin_processing::AutoPhaseResult> {
+            let complex_recipe = ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs();
+            let unphased = complex_recipe.apply(raw)?;
+            Ok(auto_phase_correct(&unphased, opts)?)
+        };
+
+        let legacy = prepare(
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false),
+        )?;
+        let acme = prepare(
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::AcmeEntropy),
+        )?;
+        let regions = prepare(AutoPhaseOptions::default())?;
+
+        save_method_panel(
+            output_dir,
+            "auto_phase_methods_varian_1h",
+            "Varian 1H (Zenodo MIT)",
+            &magnitude,
+            &legacy,
+            &acme,
+            &regions,
+        )
+    }
+
+    fn save_method_panel(
+        output_dir: &Path,
+        stem: &str,
+        title: &str,
+        magnitude: &Spectrum1D,
+        legacy: &rspin_processing::AutoPhaseResult,
+        acme: &rspin_processing::AutoPhaseResult,
+        regions: &rspin_processing::AutoPhaseResult,
+    ) -> Result<()> {
+        let mk = |panel_title: String, xs: &Vec<f64>, ys: &Vec<f64>, label: &str| -> Plot {
             Plot::new()
-                .title(&title)
+                .title(&panel_title)
                 .xlabel("chemical shift / ppm")
                 .ylabel("intensity")
                 .max_resolution(900, 600)
@@ -213,9 +313,8 @@ mod ruviz_example {
                 .label(label)
                 .into()
         };
-
         let magnitude_panel = mk(
-            "magnitude (reference)".to_owned(),
+            format!("{title} — magnitude (reference)"),
             &magnitude.x.values,
             &magnitude.intensities,
             "|spectrum|",
@@ -247,15 +346,12 @@ mod ruviz_example {
             &regions.spectrum.intensities,
             "real",
         );
-
         let figure = subplots(2, 2, 1800, 1200)?
             .subplot_at(0, magnitude_panel)?
             .subplot_at(1, legacy_panel)?
             .subplot_at(2, acme_panel)?
             .subplot_at(3, regions_panel)?;
-        figure.save(path_to_str(
-            &output_dir.join("auto_phase_methods_jeol_13c.png"),
-        )?)?;
+        figure.save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         Ok(())
     }
 
