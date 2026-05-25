@@ -61,9 +61,10 @@ use rspin::prelude::*;
 
 fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     let bundle = load_spectra("data/experiment")?;
-    println!("loaded {} 1D and {} 2D spectra", bundle.len_1d(), bundle.len_2d());
-    println!("loaded {} JCAMP-DX spectra", bundle.source_format_count("jcamp_dx"));
-    for count in bundle.source_format_counts() {
+    let summary = bundle.summary();
+    println!("loaded {} 1D and {} 2D spectra", summary.spectra_1d(), summary.spectra_2d());
+    println!("loaded {} JCAMP-DX spectra", summary.source_format_count("jcamp_dx"));
+    for count in &summary.source_formats {
         println!("{}: {}", count.format(), count.count());
     }
     Ok(bundle.into_spectra_1d())

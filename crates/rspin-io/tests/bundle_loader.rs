@@ -825,6 +825,16 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert!(bundle.has_source_format("jcamp_dx"));
     assert!(!bundle.has_source_format("missing"));
 
+    let summary = bundle.summary();
+    assert_eq!(summary.spectra(), 7);
+    assert_eq!(summary.spectra_1d(), 5);
+    assert_eq!(summary.spectra_2d(), 2);
+    assert_eq!(summary.molecules(), 0);
+    assert_eq!(summary.warnings(), 0);
+    assert_eq!(summary.source_format_count("jcamp_dx"), 2);
+    assert!(summary.has_source_format("jeol_jdf"));
+    assert!(!summary.has_source_format("missing"));
+
     let source_format_counts = bundle.source_format_counts();
     assert_eq!(
         source_format_counts

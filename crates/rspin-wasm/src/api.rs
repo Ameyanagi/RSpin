@@ -685,13 +685,7 @@ pub fn create_spectrum_bundle_json(input: &str) -> Result<String> {
 /// Returns an error when deserialization or serialization fails.
 pub fn spectrum_bundle_counts_json(input: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
-    to_json(&SpectrumBundleCounts {
-        spectra: bundle.len(),
-        spectra_1d: bundle.spectra_1d().count(),
-        spectra_2d: bundle.spectra_2d().count(),
-        molecules: bundle.molecules().len(),
-        warnings: bundle.warnings().len(),
-    })
+    to_json(&bundle.summary())
 }
 
 /// Extracts the only one-dimensional spectrum from bundle JSON.
@@ -989,15 +983,6 @@ fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
 
 fn agilent_fid_loaded_source() -> LoadedSource {
     LoadedSource::new(None::<PathBuf>, "agilent_fid")
-}
-
-#[derive(Debug, Serialize)]
-struct SpectrumBundleCounts {
-    spectra: usize,
-    spectra_1d: usize,
-    spectra_2d: usize,
-    molecules: usize,
-    warnings: usize,
 }
 
 #[derive(Debug, Deserialize)]

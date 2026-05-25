@@ -87,6 +87,90 @@ impl SourceFormatCount {
     }
 }
 
+/// Summary counts for a loaded spectrum bundle.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SpectrumBundleSummary {
+    /// Total number of loaded spectra.
+    pub spectra: usize,
+    /// Number of loaded one-dimensional spectra.
+    pub spectra_1d: usize,
+    /// Number of loaded two-dimensional spectra.
+    pub spectra_2d: usize,
+    /// Number of molecule metadata records.
+    pub molecules: usize,
+    /// Number of non-fatal loader warnings.
+    pub warnings: usize,
+    /// Counts of loaded spectra by reader format.
+    pub source_formats: Vec<SourceFormatCount>,
+}
+
+impl SpectrumBundleSummary {
+    /// Creates bundle summary counts.
+    #[must_use]
+    pub fn new(
+        spectra: usize,
+        spectra_1d: usize,
+        spectra_2d: usize,
+        molecules: usize,
+        warnings: usize,
+        source_formats: Vec<SourceFormatCount>,
+    ) -> Self {
+        Self {
+            spectra,
+            spectra_1d,
+            spectra_2d,
+            molecules,
+            warnings,
+            source_formats,
+        }
+    }
+
+    /// Returns the number of loaded spectra.
+    #[must_use]
+    pub fn spectra(&self) -> usize {
+        self.spectra
+    }
+
+    /// Returns the number of loaded one-dimensional spectra.
+    #[must_use]
+    pub fn spectra_1d(&self) -> usize {
+        self.spectra_1d
+    }
+
+    /// Returns the number of loaded two-dimensional spectra.
+    #[must_use]
+    pub fn spectra_2d(&self) -> usize {
+        self.spectra_2d
+    }
+
+    /// Returns the number of molecule metadata records.
+    #[must_use]
+    pub fn molecules(&self) -> usize {
+        self.molecules
+    }
+
+    /// Returns the number of non-fatal loader warnings.
+    #[must_use]
+    pub fn warnings(&self) -> usize {
+        self.warnings
+    }
+
+    /// Returns the number of loaded spectra read with a source format.
+    #[must_use]
+    pub fn source_format_count(&self, format: &str) -> usize {
+        self.source_formats
+            .iter()
+            .find(|count| count.format() == format)
+            .map_or(0, SourceFormatCount::count)
+    }
+
+    /// Returns true when a loaded spectrum was read with a source format.
+    #[must_use]
+    pub fn has_source_format(&self, format: &str) -> bool {
+        self.source_format_count(format) > 0
+    }
+}
+
 /// A loaded one- or two-dimensional spectrum plus source metadata.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "dimension", rename_all = "snake_case")]
@@ -257,6 +341,19 @@ impl SpectrumBundle {
     #[must_use]
     pub fn warnings(&self) -> &[LoadWarning] {
         &self.warnings
+    }
+
+    /// Returns serializable summary counts for this bundle.
+    #[must_use]
+    pub fn summary(&self) -> SpectrumBundleSummary {
+        SpectrumBundleSummary::new(
+            self.len(),
+            self.len_1d(),
+            self.len_2d(),
+            self.molecule_count(),
+            self.warning_count(),
+            self.source_format_counts(),
+        )
     }
 
     /// Returns an iterator over one-dimensional spectra.

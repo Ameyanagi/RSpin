@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
 use rspin_io::{
     ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, NMREDATA_RECORD_JSON_FORMAT,
-    NMREDATA_RECORDS_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_FORMAT,
+    NMREDATA_RECORDS_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_FORMAT, SpectrumBundleSummary,
 };
 
 use super::*;
@@ -21,15 +21,6 @@ mod pca;
 mod prediction;
 mod simulation;
 mod workflow;
-
-#[derive(Debug, serde::Deserialize)]
-struct TestBundleCounts {
-    spectra: usize,
-    spectra_1d: usize,
-    spectra_2d: usize,
-    molecules: usize,
-    warnings: usize,
-}
 
 fn io_fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../rspin-io/testdata")
@@ -173,12 +164,13 @@ fn validates_and_summarizes_spectrum_bundle_json() -> anyhow::Result<()> {
     assert!(reparsed.warnings().is_empty());
 
     let counts_json = spectrum_bundle_counts_json(&normalized_json)?;
-    let counts: TestBundleCounts = serde_json::from_str(&counts_json)?;
-    assert_eq!(counts.spectra, 0);
-    assert_eq!(counts.spectra_1d, 0);
-    assert_eq!(counts.spectra_2d, 0);
-    assert_eq!(counts.molecules, 1);
-    assert_eq!(counts.warnings, 0);
+    let counts: SpectrumBundleSummary = serde_json::from_str(&counts_json)?;
+    assert_eq!(counts.spectra(), 0);
+    assert_eq!(counts.spectra_1d(), 0);
+    assert_eq!(counts.spectra_2d(), 0);
+    assert_eq!(counts.molecules(), 1);
+    assert_eq!(counts.warnings(), 0);
+    assert!(counts.source_formats.is_empty());
     Ok(())
 }
 
@@ -212,12 +204,14 @@ fn creates_spectrum_bundle_json_from_spectrum_entries() -> anyhow::Result<()> {
     assert!(bundle_json.contains(SPECTRUM_BUNDLE_JSON_FORMAT));
 
     let counts_json = spectrum_bundle_counts_json(&bundle_json)?;
-    let counts: TestBundleCounts = serde_json::from_str(&counts_json)?;
-    assert_eq!(counts.spectra, 2);
-    assert_eq!(counts.spectra_1d, 1);
-    assert_eq!(counts.spectra_2d, 1);
-    assert_eq!(counts.molecules, 0);
-    assert_eq!(counts.warnings, 0);
+    let counts: SpectrumBundleSummary = serde_json::from_str(&counts_json)?;
+    assert_eq!(counts.spectra(), 2);
+    assert_eq!(counts.spectra_1d(), 1);
+    assert_eq!(counts.spectra_2d(), 1);
+    assert_eq!(counts.molecules(), 0);
+    assert_eq!(counts.warnings(), 0);
+    assert_eq!(counts.source_format_count("jcamp_dx"), 1);
+    assert_eq!(counts.source_format_count("jeol_jdf"), 1);
 
     let bundle = rspin_io::read_spectrum_bundle_json(&bundle_json)?;
     let sources = bundle

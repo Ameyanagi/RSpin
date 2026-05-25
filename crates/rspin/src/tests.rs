@@ -317,6 +317,12 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     assert_eq!(bundle.source_format_count("agilent_fid"), 1);
     assert_eq!(bundle.source_format_count("bruker_fid"), 1);
     assert_eq!(bundle.source_format_count("bruker_processed"), 1);
+    let summary = bundle.summary();
+    assert_eq!(summary.spectra(), 3);
+    assert_eq!(summary.spectra_1d(), 3);
+    assert_eq!(summary.spectra_2d(), 0);
+    assert!(summary.has_source_format("agilent_fid"));
+    assert_eq!(summary.source_format_count("bruker_processed"), 1);
     let source_format_counts = bundle.source_format_counts();
     assert!(
         source_format_counts

@@ -76,10 +76,11 @@ pub use bruker::{
 };
 pub use bundle::{
     LoadWarning, LoadedSource, LoadedSpectrum, RSpinReader, SourceFormatCount, SpectrumBundle,
-    SpectrumBundleLoader, load_spectra, load_spectra_many, load_spectra_many_relative_to,
-    load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_many,
-    load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to, load_spectrum_2d,
-    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_relative_to,
+    SpectrumBundleLoader, SpectrumBundleSummary, load_spectra, load_spectra_many,
+    load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
+    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to,
+    load_spectrum_2d, load_spectrum_2d_many, load_spectrum_2d_many_relative_to,
+    load_spectrum_2d_relative_to,
 };
 pub use bundle_json::{
     JsonSpectrumBundle, SPECTRUM_BUNDLE_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_VERSION,
