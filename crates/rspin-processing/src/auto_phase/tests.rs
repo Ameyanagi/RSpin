@@ -301,6 +301,34 @@ fn auto_phase_with_peaks_matches_default_quality() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn regularizer_prefers_small_ph1_over_wrap_equivalent() -> anyhow::Result<()> {
+    let spectrum = isolated_two_peak_spectrum(1024, 0.04)?;
+    let phased = phase_correct(&spectrum, 20.0, 30.0, 0.5)?;
+    let with = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default().first_order_range(-720.0, 720.0, 45.0),
+    )?;
+    let without = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default()
+            .first_order_range(-720.0, 720.0, 45.0)
+            .with_regularization_weight(0.0),
+    )?;
+    assert!(
+        with.first_order_deg.abs() <= without.first_order_deg.abs() + 1.0e-9,
+        "regularizer should prefer smaller |ph1|: with={} without={}",
+        with.first_order_deg,
+        without.first_order_deg
+    );
+    assert!(
+        with.first_order_deg.abs() < 200.0,
+        "regularized ph1 should stay near the small-|ph1| solution, got {}",
+        with.first_order_deg
+    );
+    Ok(())
+}
+
 fn isolated_two_peak_spectrum(
     point_count: usize,
     half_width_ppm: f64,

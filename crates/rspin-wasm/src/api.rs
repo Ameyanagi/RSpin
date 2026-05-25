@@ -1057,6 +1057,12 @@ struct AutoPhaseOptionsJson {
     negative_weight: f64,
     cost: rspin_processing::AutoPhaseCost,
     refine: bool,
+    #[serde(default = "default_regularization_weight")]
+    regularization_weight: f64,
+}
+
+fn default_regularization_weight() -> f64 {
+    AutoPhaseOptions::default().regularization_weight
 }
 
 impl Default for AutoPhaseOptionsJson {
@@ -1076,6 +1082,7 @@ impl Default for AutoPhaseOptionsJson {
             negative_weight: options.negative_weight,
             cost: options.cost,
             refine: options.refine,
+            regularization_weight: options.regularization_weight,
         }
     }
 }
@@ -1096,6 +1103,7 @@ impl From<AutoPhaseOptionsJson> for AutoPhaseOptions {
             negative_weight: options.negative_weight,
             cost: options.cost,
             refine: options.refine,
+            regularization_weight: options.regularization_weight,
         }
     }
 }

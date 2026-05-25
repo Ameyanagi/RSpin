@@ -51,6 +51,13 @@ pub struct AutoPhaseOptions {
     pub cost: AutoPhaseCost,
     /// Polish the best grid candidate with a Nelder-Mead simplex search.
     pub refine: bool,
+    /// Weight that penalizes large `|ph0|` and `|ph1|`.
+    ///
+    /// The cost adds `regularization_weight * ((ph0/180)^2 + (ph1/180)^2)`
+    /// so that wrap-equivalent solutions (e.g. `ph1 = -720`) are not selected
+    /// over their small-`|ph1|` equivalents when the entropy or negativity
+    /// terms are nearly tied.
+    pub regularization_weight: f64,
 }
 
 impl Default for AutoPhaseOptions {
@@ -69,6 +76,7 @@ impl Default for AutoPhaseOptions {
             negative_weight: 1000.0,
             cost: AutoPhaseCost::AcmeEntropy,
             refine: true,
+            regularization_weight: 0.05,
         }
     }
 }
@@ -118,6 +126,13 @@ impl AutoPhaseOptions {
     #[must_use]
     pub fn with_refine(mut self, refine: bool) -> Self {
         self.refine = refine;
+        self
+    }
+
+    /// Returns options with a chosen `|ph0|`+`|ph1|` regularizer weight.
+    #[must_use]
+    pub fn with_regularization_weight(mut self, weight: f64) -> Self {
+        self.regularization_weight = weight;
         self
     }
 

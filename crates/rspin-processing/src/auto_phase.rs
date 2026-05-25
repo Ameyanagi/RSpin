@@ -320,7 +320,7 @@ fn score_candidate(
     first_order_deg: f64,
     options: AutoPhaseOptions,
 ) -> f64 {
-    match options.cost {
+    let base = match options.cost {
         AutoPhaseCost::LegacyImagNegArea => legacy_cost(
             buffer,
             fractions,
@@ -337,11 +337,24 @@ fn score_candidate(
             first_order_deg,
             options,
         ),
+    };
+    let weight = options.regularization_weight.max(0.0);
+    if weight <= 0.0 {
+        return base;
     }
+    let ph0_norm = zero_order_deg / 180.0;
+    let ph1_norm = first_order_deg / 180.0;
+    base + weight * (ph0_norm * ph0_norm + ph1_norm * ph1_norm)
 }
 
 fn is_active(mask: Option<&[bool]>, index: usize) -> bool {
-    mask.is_none_or(|m| m.get(index).copied().unwrap_or(false))
+    match mask {
+        None => true,
+        Some(m) => match m.get(index) {
+            Some(active) => *active,
+            None => false,
+        },
+    }
 }
 
 fn legacy_cost(
@@ -526,7 +539,10 @@ pub fn peak_based_phase_estimate(
     if span.abs() <= f64::EPSILON {
         return Ok((unwrapped[0].1, 0.0));
     }
-    let pivot = pivot_value.unwrap_or_else(|| f64::midpoint(first, last));
+    let pivot = match pivot_value {
+        Some(value) => value,
+        None => f64::midpoint(first, last),
+    };
 
     let count = unwrapped.len();
     let count_u32 = u32::try_from(count).map_err(|_| RSpinError::InvalidSpectrum {

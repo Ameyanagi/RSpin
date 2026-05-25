@@ -216,11 +216,24 @@ mod ruviz_example {
                     .apply(spectrum)?
             };
             let unphased = relabel_hz_to_ppm(unphased);
-            let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?;
-            let label = format!(
-                "auto-phased ({:.1}\u{00B0}/{:.1}\u{00B0})",
-                phased.zero_order_deg, phased.first_order_deg
-            );
+            let default_opts = AutoPhaseOptions::default();
+            let wide_opts = AutoPhaseOptions::default()
+                .first_order_range(-720.0, 720.0, 45.0);
+            let phased_default = auto_phase_correct(&unphased, default_opts)?;
+            let phased_wide = auto_phase_correct(&unphased, wide_opts)?;
+            let peak_centers = detect_peak_centers(&unphased)?;
+            let phased_peak = auto_phase_correct_with_peaks(
+                &unphased,
+                AutoPhaseOptions::default().first_order_range(-720.0, 720.0, 45.0),
+                &peak_centers,
+            )?;
+
+            let fmt = |stem: &str, r: &rspin_processing::AutoPhaseResult| {
+                format!(
+                    "{stem} ({:.1}\u{00B0}/{:.1}\u{00B0})",
+                    r.zero_order_deg, r.first_order_deg
+                )
+            };
 
             Plot::new()
                 .title(*title)
@@ -230,8 +243,21 @@ mod ruviz_example {
                 .legend_position(LegendPosition::Best)
                 .line(&unphased.x.values, &unphased.intensities)
                 .label("unphased real")
-                .line(&phased.spectrum.x.values, &phased.spectrum.intensities)
-                .label(&label)
+                .line(
+                    &phased_default.spectrum.x.values,
+                    &phased_default.spectrum.intensities,
+                )
+                .label(&fmt("default", &phased_default))
+                .line(
+                    &phased_wide.spectrum.x.values,
+                    &phased_wide.spectrum.intensities,
+                )
+                .label(&fmt("wide ph1", &phased_wide))
+                .line(
+                    &phased_peak.spectrum.x.values,
+                    &phased_peak.spectrum.intensities,
+                )
+                .label(&fmt("peak-warmed", &phased_peak))
                 .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         }
         Ok(())
