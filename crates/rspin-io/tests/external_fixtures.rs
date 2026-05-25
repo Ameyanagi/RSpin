@@ -8,7 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use rspin_core::{Nucleus, Unit};
+use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     RSpinReader, Spectrum1DPathFormat, Spectrum2DPathFormat, detect_spectrum1d_path_format,
     detect_spectrum2d_path_format, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
@@ -307,10 +307,16 @@ fn auto_detects_external_vendor_path_formats_when_available() -> anyhow::Result<
         detect_spectrum1d_path_format(&agilent_1d)?,
         Spectrum1DPathFormat::AgilentFid
     );
+    let wrong_dimension = detect_spectrum2d_path_format(&agilent_1d)
+        .expect_err("one-dimensional Agilent FID should not route to 2D");
+    assert_unsupported(&wrong_dimension);
     assert_eq!(
         detect_spectrum2d_path_format(&agilent_2d)?,
         Spectrum2DPathFormat::AgilentFid
     );
+    let wrong_dimension = detect_spectrum1d_path_format(&agilent_2d)
+        .expect_err("two-dimensional Agilent FID should not route to 1D");
+    assert_unsupported(&wrong_dimension);
     assert_eq!(
         detect_spectrum1d_path_format(&bruker_1d)?,
         Spectrum1DPathFormat::BrukerFid
@@ -323,10 +329,16 @@ fn auto_detects_external_vendor_path_formats_when_available() -> anyhow::Result<
         detect_spectrum1d_path_format(&jeol_1d)?,
         Spectrum1DPathFormat::JeolJdf
     );
+    let wrong_dimension = detect_spectrum2d_path_format(&jeol_1d)
+        .expect_err("one-dimensional JEOL JDF should not route to 2D");
+    assert_unsupported(&wrong_dimension);
     assert_eq!(
         detect_spectrum2d_path_format(&jeol_2d)?,
         Spectrum2DPathFormat::JeolJdf
     );
+    let wrong_dimension = detect_spectrum1d_path_format(&jeol_2d)
+        .expect_err("two-dimensional JEOL JDF should not route to 1D");
+    assert_unsupported(&wrong_dimension);
     Ok(())
 }
 
@@ -519,4 +531,8 @@ fn assert_close(actual: Option<f64>, expected: Option<f64>) {
         (Some(left), Some(right)) => assert!((left - right).abs() < 1e-12, "{left} != {right}"),
         (left, right) => assert_eq!(left, right),
     }
+}
+
+fn assert_unsupported(error: &RSpinError) {
+    assert!(matches!(error, RSpinError::Unsupported { .. }));
 }

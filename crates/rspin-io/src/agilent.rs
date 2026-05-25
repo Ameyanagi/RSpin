@@ -3,6 +3,7 @@
 use std::{
     collections::BTreeMap,
     fs,
+    io::Read,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -79,6 +80,53 @@ impl AgilentProcparInfo {
                 feature: "Agilent three-or-higher-dimensional acquisition",
             })
         }
+    }
+}
+
+/// Routing metadata from an Agilent/Varian binary `fid` or `phasefile` header.
+///
+/// The header does not distinguish raw and processed payloads by itself, but it
+/// does expose byte order, numeric representation, trace layout, and whether the
+/// payload should route to one- or two-dimensional readers.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgilentBinaryFileInfo {
+    /// Header endianness label, `big` or `little`.
+    pub endian: String,
+    /// Number of binary blocks.
+    pub blocks: usize,
+    /// Number of traces stored in each block.
+    pub traces_per_block: usize,
+    /// Number of numeric values in each trace.
+    pub values_per_trace: usize,
+    /// Number of bytes per numeric value.
+    pub element_bytes: usize,
+    /// Number of bytes in each trace.
+    pub trace_bytes: usize,
+    /// Number of bytes in each block.
+    pub block_bytes: usize,
+    /// Number of block headers per block.
+    pub block_header_count: usize,
+    /// True when the status word marks values as floating point.
+    pub is_float: bool,
+    /// True when the status word marks traces as complex/interleaved.
+    pub is_complex: bool,
+    /// Total trace count across all blocks.
+    pub trace_count: usize,
+    /// Reader dimensionality inferred from the trace layout.
+    pub dimension_count: usize,
+}
+
+impl AgilentBinaryFileInfo {
+    /// Returns true when the binary trace layout routes to a 1D reader.
+    #[must_use]
+    pub fn is_one_dimensional(&self) -> bool {
+        self.dimension_count == 1
+    }
+
+    /// Returns true when the binary trace layout routes to a 2D reader.
+    #[must_use]
+    pub fn is_two_dimensional(&self) -> bool {
+        self.dimension_count == 2
     }
 }
 
@@ -420,6 +468,46 @@ pub fn inspect_agilent_procpar(input: &str) -> Result<AgilentProcparInfo> {
     procpar_info(&parameters)
 }
 
+/// Inspects routing metadata from an Agilent/Varian binary header.
+///
+/// The input may be a complete `fid`/`phasefile` payload or just the first
+/// 32-byte file header.
+///
+/// # Errors
+///
+/// Returns an error when the binary header is missing or not recognized.
+pub fn inspect_agilent_binary_bytes(bytes: &[u8]) -> Result<AgilentBinaryFileInfo> {
+    let header = FileHeader::parse(bytes)?;
+    agilent_binary_info(header)
+}
+
+/// Inspects routing metadata from an Agilent/Varian binary `fid` or `phasefile`.
+///
+/// This reads only the fixed-size file header, so callers can route large
+/// vendor files without loading the whole payload.
+///
+/// # Errors
+///
+/// Returns an error when the file is missing, unreadable, or has an invalid
+/// binary header.
+pub fn inspect_agilent_binary_file(path: impl AsRef<Path>) -> Result<AgilentBinaryFileInfo> {
+    let path = path.as_ref();
+    let mut file = fs::File::open(path).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!("failed to open binary file at {}: {error}", path.display()),
+    })?;
+    let mut header = [0_u8; FILE_HEADER_LEN];
+    file.read_exact(&mut header)
+        .map_err(|error| RSpinError::Parse {
+            format: "Agilent",
+            message: format!(
+                "failed to read binary file header at {}: {error}",
+                path.display()
+            ),
+        })?;
+    inspect_agilent_binary_bytes(&header)
+}
+
 fn parse_procpar_for_reader(input: &str) -> Result<BTreeMap<String, Vec<String>>> {
     let parameters = parse_procpar(input);
     procpar_info(&parameters)?.validate_supported_by_current_readers()?;
@@ -437,6 +525,24 @@ fn procpar_info(parameters: &BTreeMap<String, Vec<String>>) -> Result<AgilentPro
         frequency_mhz: first_f64(parameters, "sfrq")?,
         spectral_width_hz: first_f64(parameters, "sw")?,
         operator: first_text(parameters, "operator").or_else(|| first_text(parameters, "username")),
+    })
+}
+
+fn agilent_binary_info(header: FileHeader) -> Result<AgilentBinaryFileInfo> {
+    let trace_count = header.trace_count()?;
+    Ok(AgilentBinaryFileInfo {
+        endian: header.endian.as_str().to_owned(),
+        blocks: header.nblocks,
+        traces_per_block: header.ntraces,
+        values_per_trace: header.np_values,
+        element_bytes: header.ebytes,
+        trace_bytes: header.tbytes,
+        block_bytes: header.bbytes,
+        block_header_count: header.nbheaders,
+        is_float: header.is_float(),
+        is_complex: header.is_complex(),
+        trace_count,
+        dimension_count: if trace_count > 1 { 2 } else { 1 },
     })
 }
 
@@ -778,6 +884,13 @@ enum Endian {
 }
 
 impl Endian {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Big => "big",
+            Self::Little => "little",
+        }
+    }
+
     fn i16_at(self, bytes: &[u8], offset: usize) -> Option<i16> {
         let bytes = bytes.get(offset..offset.checked_add(2)?)?;
         Some(match self {

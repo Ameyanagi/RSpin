@@ -29,7 +29,8 @@ mod simulation_json;
 mod traits;
 
 pub use agilent::{
-    AgilentFid1D, AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D, AgilentProcparInfo,
+    AgilentBinaryFileInfo, AgilentFid1D, AgilentFid2D, AgilentProcessed1D, AgilentProcessed2D,
+    AgilentProcparInfo, inspect_agilent_binary_bytes, inspect_agilent_binary_file,
     inspect_agilent_procpar, read_agilent_fid_1d_bytes, read_agilent_fid_1d_dir,
     read_agilent_fid_2d_bytes, read_agilent_fid_2d_dir, read_agilent_processed_1d_bytes,
     read_agilent_processed_1d_dir, read_agilent_processed_2d_bytes, read_agilent_processed_2d_dir,

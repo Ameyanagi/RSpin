@@ -5,7 +5,8 @@ use std::{fmt, fs, path::Path, str::FromStr};
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
-    SpectrumPathReader, SpectrumReader, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
+    SpectrumPathReader, SpectrumReader, inspect_agilent_binary_file, inspect_agilent_procpar,
+    inspect_jeol_jdf_file, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
     read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
     read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
     read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
@@ -539,12 +540,19 @@ pub fn detect_spectrum1d_path_format(path: impl AsRef<Path>) -> Result<Spectrum1
         return Ok(Spectrum1DPathFormat::BrukerFid);
     }
     if looks_like_agilent_processed_1d(path) {
+        ensure_agilent_path_dimension(
+            path,
+            AgilentPathKind::Processed,
+            DetectedPathDimension::OneD,
+        )?;
         return Ok(Spectrum1DPathFormat::AgilentProcessed);
     }
     if looks_like_agilent_fid(path) {
+        ensure_agilent_path_dimension(path, AgilentPathKind::Fid, DetectedPathDimension::OneD)?;
         return Ok(Spectrum1DPathFormat::AgilentFid);
     }
     if is_extension(path, &["jdf"]) {
+        ensure_jeol_path_dimension(path, DetectedPathDimension::OneD)?;
         return Ok(Spectrum1DPathFormat::JeolJdf);
     }
 
@@ -602,12 +610,19 @@ pub fn detect_spectrum2d_path_format(path: impl AsRef<Path>) -> Result<Spectrum2
         return Ok(Spectrum2DPathFormat::BrukerSer);
     }
     if looks_like_agilent_processed(path) {
+        ensure_agilent_path_dimension(
+            path,
+            AgilentPathKind::Processed,
+            DetectedPathDimension::TwoD,
+        )?;
         return Ok(Spectrum2DPathFormat::AgilentProcessed);
     }
     if looks_like_agilent_fid(path) {
+        ensure_agilent_path_dimension(path, AgilentPathKind::Fid, DetectedPathDimension::TwoD)?;
         return Ok(Spectrum2DPathFormat::AgilentFid);
     }
     if is_extension(path, &["jdf"]) {
+        ensure_jeol_path_dimension(path, DetectedPathDimension::TwoD)?;
         return Ok(Spectrum2DPathFormat::JeolJdf);
     }
 
@@ -952,6 +967,127 @@ fn write_text_file(path: &Path, payload: &str) -> Result<()> {
     })
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DetectedPathDimension {
+    OneD,
+    TwoD,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AgilentPathKind {
+    Fid,
+    Processed,
+}
+
+fn ensure_agilent_path_dimension(
+    path: &Path,
+    kind: AgilentPathKind,
+    expected: DetectedPathDimension,
+) -> Result<()> {
+    validate_agilent_procpar_supported(path, kind)?;
+    let Some(binary_path) = agilent_binary_path(path, kind) else {
+        return Ok(());
+    };
+    let info = inspect_agilent_binary_file(binary_path)?;
+    let detected = if info.is_two_dimensional() {
+        DetectedPathDimension::TwoD
+    } else {
+        DetectedPathDimension::OneD
+    };
+    ensure_detected_dimension(detected, expected, "Agilent")
+}
+
+fn validate_agilent_procpar_supported(path: &Path, kind: AgilentPathKind) -> Result<()> {
+    let Some(procpar_path) = agilent_procpar_path(path, kind) else {
+        return Ok(());
+    };
+    let text = fs::read_to_string(&procpar_path).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!(
+            "failed to read procpar at {}: {error}",
+            procpar_path.display()
+        ),
+    })?;
+    inspect_agilent_procpar(&text)?.validate_supported_by_current_readers()
+}
+
+fn agilent_binary_path(path: &Path, kind: AgilentPathKind) -> Option<std::path::PathBuf> {
+    match kind {
+        AgilentPathKind::Fid if looks_like_agilent_fid(path) => Some(dataset_dir(path).join("fid")),
+        AgilentPathKind::Processed if looks_like_agilent_processed(path) => {
+            Some(if path.is_file() {
+                path.to_path_buf()
+            } else if path.join("datdir").join("phasefile").is_file() {
+                path.join("datdir").join("phasefile")
+            } else {
+                path.join("phasefile")
+            })
+        }
+        AgilentPathKind::Fid | AgilentPathKind::Processed => None,
+    }
+}
+
+fn agilent_procpar_path(path: &Path, kind: AgilentPathKind) -> Option<std::path::PathBuf> {
+    match kind {
+        AgilentPathKind::Fid if looks_like_agilent_fid(path) => {
+            Some(dataset_dir(path).join("procpar"))
+        }
+        AgilentPathKind::Processed if looks_like_agilent_processed(path) => {
+            if path.is_file() {
+                agilent_phasefile_procpar_candidates(path)
+                    .into_iter()
+                    .find(|candidate| candidate.is_file())
+            } else {
+                Some(path.join("procpar"))
+            }
+        }
+        AgilentPathKind::Fid | AgilentPathKind::Processed => None,
+    }
+}
+
+fn ensure_jeol_path_dimension(path: &Path, expected: DetectedPathDimension) -> Result<()> {
+    let info = inspect_jeol_jdf_file(path)?;
+    info.validate_supported_by_current_readers()?;
+    let detected = match info.dimension_count {
+        1 => DetectedPathDimension::OneD,
+        2 => DetectedPathDimension::TwoD,
+        _ => {
+            return Err(RSpinError::Unsupported {
+                feature: "JEOL JDF dimensionality",
+            });
+        }
+    };
+    ensure_detected_dimension(detected, expected, "JEOL JDF")
+}
+
+fn ensure_detected_dimension(
+    detected: DetectedPathDimension,
+    expected: DetectedPathDimension,
+    format: &'static str,
+) -> Result<()> {
+    if detected == expected {
+        return Ok(());
+    }
+
+    Err(RSpinError::Unsupported {
+        feature: match (format, detected, expected) {
+            ("Agilent", DetectedPathDimension::TwoD, DetectedPathDimension::OneD) => {
+                "two-dimensional Agilent path in one-dimensional reader"
+            }
+            ("Agilent", DetectedPathDimension::OneD, DetectedPathDimension::TwoD) => {
+                "one-dimensional Agilent path in two-dimensional reader"
+            }
+            ("JEOL JDF", DetectedPathDimension::TwoD, DetectedPathDimension::OneD) => {
+                "two-dimensional JEOL JDF in one-dimensional reader"
+            }
+            ("JEOL JDF", DetectedPathDimension::OneD, DetectedPathDimension::TwoD) => {
+                "one-dimensional JEOL JDF in two-dimensional reader"
+            }
+            _ => "vendor path dimensionality",
+        },
+    })
+}
+
 fn looks_like_bruker_processed_1d(path: &Path) -> bool {
     let processed = processed_dir(path);
     processed.join("procs").is_file() && processed.join("1r").is_file()
@@ -1048,7 +1184,7 @@ mod tests {
         time::{SystemTime, UNIX_EPOCH},
     };
 
-    use rspin_core::{Axis, Metadata, Unit};
+    use rspin_core::{Axis, Metadata, RSpinError, Unit};
 
     use super::*;
     use crate::{write_spectrum1d_json, write_spectrum2d_json};
@@ -1601,6 +1737,9 @@ rfp 1 1 1000000000 -1000000000 0 2 1 11 1 64
             detect_spectrum1d_path_format(&root)?,
             Spectrum1DPathFormat::AgilentProcessed
         );
+        let wrong_dimension = detect_spectrum2d_path_format(&root)
+            .expect_err("one-dimensional Agilent phasefile should not route to 2D");
+        assert_unsupported(&wrong_dimension);
         let parsed = read_spectrum1d_path(root.join("datdir/phasefile"))?;
 
         assert_eq!(parsed.x.unit, Unit::Ppm);
@@ -1656,6 +1795,9 @@ rfp1 1 1 1000000000 -1000000000 0 2 1 11 1 64
             detect_spectrum2d_path_format(&root)?,
             Spectrum2DPathFormat::AgilentProcessed
         );
+        let wrong_dimension = detect_spectrum1d_path_format(&root)
+            .expect_err("two-dimensional Agilent phasefile should not route to 1D");
+        assert_unsupported(&wrong_dimension);
         let parsed = read_spectrum2d_path(root.join("datdir/phasefile"))?;
 
         assert_eq!(parsed.shape(), (2, 2));
@@ -1666,6 +1808,31 @@ rfp1 1 1 1000000000 -1000000000 0 2 1 11 1 64
         assert_eq!(parsed.z, vec![1.0, 2.0, 3.0, 4.0]);
 
         remove_dir(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn routes_jeol_jdf_paths_by_header_dimension() -> anyhow::Result<()> {
+        let root =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene/jeol");
+        let one_d_path = root.join("myrcene_1h_400mhz.jdf");
+        let two_d_path = root.join("myrcene_hsqc_400mhz.jdf");
+
+        assert_eq!(
+            detect_spectrum1d_path_format(&one_d_path)?,
+            Spectrum1DPathFormat::JeolJdf
+        );
+        assert_eq!(
+            detect_spectrum2d_path_format(&two_d_path)?,
+            Spectrum2DPathFormat::JeolJdf
+        );
+        let wrong_dimension = detect_spectrum2d_path_format(&one_d_path)
+            .expect_err("one-dimensional JEOL JDF should not route to 2D");
+        assert_unsupported(&wrong_dimension);
+        let wrong_dimension = detect_spectrum1d_path_format(&two_d_path)
+            .expect_err("two-dimensional JEOL JDF should not route to 1D");
+        assert_unsupported(&wrong_dimension);
+
         Ok(())
     }
 
@@ -1680,6 +1847,10 @@ rfp1 1 1 1000000000 -1000000000 0 2 1 11 1 64
     fn remove_dir(path: PathBuf) -> anyhow::Result<()> {
         fs::remove_dir_all(path)?;
         Ok(())
+    }
+
+    fn assert_unsupported(error: &RSpinError) {
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
     }
 
     fn i32_bytes(values: &[i32]) -> Vec<u8> {

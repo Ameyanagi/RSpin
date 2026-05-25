@@ -90,6 +90,57 @@ acqdim 7 1 32767 0 0 2 1 0 1 64
 }
 
 #[test]
+fn inspects_binary_file_routing_metadata() -> anyhow::Result<()> {
+    let one_d_root = synthetic_dataset("inspect-binary-1d")?;
+    write_fid(
+        &one_d_root,
+        EndianForTest::Little,
+        DataForTest::F32(&[0.5, -0.25, 1.5, -2.5]),
+        1,
+        1,
+    )?;
+
+    let one_d_info = inspect_agilent_binary_file(one_d_root.join("fid"))?;
+    let one_d_bytes_info = inspect_agilent_binary_bytes(&fs::read(one_d_root.join("fid"))?)?;
+    assert_eq!(one_d_info, one_d_bytes_info);
+    assert_eq!(one_d_info.endian, "little");
+    assert_eq!(one_d_info.blocks, 1);
+    assert_eq!(one_d_info.traces_per_block, 1);
+    assert_eq!(one_d_info.values_per_trace, 4);
+    assert_eq!(one_d_info.element_bytes, 4);
+    assert!(one_d_info.is_float);
+    assert!(one_d_info.is_complex);
+    assert_eq!(one_d_info.trace_count, 1);
+    assert!(one_d_info.is_one_dimensional());
+    assert!(!one_d_info.is_two_dimensional());
+
+    let two_d_root = synthetic_dataset("inspect-binary-2d")?;
+    write_fid(
+        &two_d_root,
+        EndianForTest::Big,
+        DataForTest::I16(&[1, -1, 2, -2, 3, -3, 4, -4]),
+        2,
+        1,
+    )?;
+
+    let two_d_info = inspect_agilent_binary_file(two_d_root.join("fid"))?;
+    assert_eq!(two_d_info.endian, "big");
+    assert_eq!(two_d_info.blocks, 2);
+    assert_eq!(two_d_info.traces_per_block, 1);
+    assert_eq!(two_d_info.values_per_trace, 4);
+    assert_eq!(two_d_info.element_bytes, 2);
+    assert!(!two_d_info.is_float);
+    assert!(two_d_info.is_complex);
+    assert_eq!(two_d_info.trace_count, 2);
+    assert!(two_d_info.is_two_dimensional());
+    assert!(!two_d_info.is_one_dimensional());
+
+    remove_dir(one_d_root)?;
+    remove_dir(two_d_root)?;
+    Ok(())
+}
+
+#[test]
 fn reads_big_endian_i32_complex_fid() -> anyhow::Result<()> {
     let root = synthetic_dataset("big-i32")?;
     write_procpar(
