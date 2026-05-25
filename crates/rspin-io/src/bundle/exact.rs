@@ -574,6 +574,110 @@ pub fn load_spectrum_2d_with_source(path: impl AsRef<Path>) -> Result<(Spectrum2
     SpectrumBundleLoader::new().read_2d_with_source(path)
 }
 
+/// Loads exactly one one-dimensional spectrum read with a source format.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_by_source_format(
+    path: impl AsRef<Path>,
+    format: impl AsRef<str>,
+) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_1d_by_source_format(path, format)
+}
+
+/// Loads exactly one one-dimensional spectrum and source read with a source format.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_with_source_by_source_format(
+    path: impl AsRef<Path>,
+    format: impl AsRef<str>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_1d_with_source_by_source_format(path, format)
+}
+
+/// Loads exactly one two-dimensional spectrum read with a source format.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_by_source_format(
+    path: impl AsRef<Path>,
+    format: impl AsRef<str>,
+) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_2d_by_source_format(path, format)
+}
+
+/// Loads exactly one two-dimensional spectrum and source read with a source format.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_with_source_by_source_format(
+    path: impl AsRef<Path>,
+    format: impl AsRef<str>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_2d_with_source_by_source_format(path, format)
+}
+
+/// Loads exactly one one-dimensional spectrum read with a vendor-specific reader.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_by_source_vendor(
+    path: impl AsRef<Path>,
+    vendor: impl AsRef<str>,
+) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_1d_by_source_vendor(path, vendor)
+}
+
+/// Loads exactly one one-dimensional spectrum and source read with a vendor-specific reader.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_with_source_by_source_vendor(
+    path: impl AsRef<Path>,
+    vendor: impl AsRef<str>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_1d_with_source_by_source_vendor(path, vendor)
+}
+
+/// Loads exactly one two-dimensional spectrum read with a vendor-specific reader.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_by_source_vendor(
+    path: impl AsRef<Path>,
+    vendor: impl AsRef<str>,
+) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_2d_by_source_vendor(path, vendor)
+}
+
+/// Loads exactly one two-dimensional spectrum and source read with a vendor-specific reader.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_with_source_by_source_vendor(
+    path: impl AsRef<Path>,
+    vendor: impl AsRef<str>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_2d_with_source_by_source_vendor(path, vendor)
+}
+
 /// Loads exactly one one-dimensional spectrum from a path relative to a base directory.
 ///
 /// # Errors

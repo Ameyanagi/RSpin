@@ -23,16 +23,20 @@ mod exact;
 mod selectors;
 mod source_format;
 pub use exact::{
-    load_spectrum_1d, load_spectrum_1d_many, load_spectrum_1d_many_relative_to,
-    load_spectrum_1d_many_with_source, load_spectrum_1d_many_with_source_relative_to,
-    load_spectrum_1d_paths, load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
+    load_spectrum_1d, load_spectrum_1d_by_source_format, load_spectrum_1d_by_source_vendor,
+    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
+    load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
+    load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
     load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
-    load_spectrum_1d_with_source, load_spectrum_1d_with_source_relative_to, load_spectrum_2d,
+    load_spectrum_1d_with_source, load_spectrum_1d_with_source_by_source_format,
+    load_spectrum_1d_with_source_by_source_vendor, load_spectrum_1d_with_source_relative_to,
+    load_spectrum_2d, load_spectrum_2d_by_source_format, load_spectrum_2d_by_source_vendor,
     load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_many_with_source,
     load_spectrum_2d_many_with_source_relative_to, load_spectrum_2d_paths,
     load_spectrum_2d_paths_relative_to, load_spectrum_2d_paths_with_source,
     load_spectrum_2d_paths_with_source_relative_to, load_spectrum_2d_relative_to,
-    load_spectrum_2d_with_source, load_spectrum_2d_with_source_relative_to,
+    load_spectrum_2d_with_source, load_spectrum_2d_with_source_by_source_format,
+    load_spectrum_2d_with_source_by_source_vendor, load_spectrum_2d_with_source_relative_to,
 };
 pub use source_format::{
     LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_format, parse_loaded_source_vendor,
