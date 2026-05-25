@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSpectrum, RSpinReader, SpectrumBundleLoader, load_spectra, load_spectrum_1d,
-    load_spectrum_2d,
+    LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, load_spectra,
+    load_spectrum_1d, load_spectrum_2d,
 };
 
 #[test]
@@ -230,12 +230,70 @@ fn scans_nmredata_directory_without_requiring_spectra() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    assert_eq!(bundle.len(), 5);
+    assert_eq!(bundle.spectra_1d().count(), 3);
+    assert_eq!(bundle.spectra_2d().count(), 2);
+    assert_eq!(bundle.warnings().len(), 1);
+
+    let warning = bundle
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing unsupported JCAMP-DX warning"))?;
+    assert_eq!(
+        warning.path.as_deref(),
+        Some(Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx"))
+    );
+    assert!(warning.message.contains("JCAMP-DX version"));
+
+    let bruker_1h = loaded_1d_by_path(&bundle, Path::new("bruker_1h_raw"))?;
+    assert_eq!(bruker_1h.len(), 108_399);
+    assert_eq!(bruker_1h.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(bruker_1h.metadata.solvent.as_deref(), Some("CDCl3"));
+    assert_eq!(
+        loaded_source_format(&bundle, Path::new("bruker_1h_raw"))?,
+        "bruker_fid"
+    );
+
+    let jeol_1h = loaded_1d_by_path(&bundle, Path::new("jeol/myrcene_1h_400mhz.jdf"))?;
+    assert_eq!(jeol_1h.len(), 65_536);
+    assert_eq!(jeol_1h.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(jeol_1h.metadata.origin.as_deref(), Some("JEOL"));
+    assert_eq!(
+        loaded_source_format(&bundle, Path::new("jeol/myrcene_1h_400mhz.jdf"))?,
+        "jeol_jdf"
+    );
+
+    let jeol_13c = loaded_1d_by_path(&bundle, Path::new("jeol/myrcene_13c_400mhz.jdf"))?;
+    assert_eq!(jeol_13c.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let bruker_cosy = loaded_2d_by_path(&bundle, Path::new("bruker_cosy_raw"))?;
+    assert_eq!(bruker_cosy.shape(), (2048, 512));
+    assert_eq!(bruker_cosy.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(
+        loaded_source_format(&bundle, Path::new("bruker_cosy_raw"))?,
+        "bruker_ser"
+    );
+
+    let jeol_hsqc = loaded_2d_by_path(&bundle, Path::new("jeol/myrcene_hsqc_400mhz.jdf"))?;
+    assert_eq!(jeol_hsqc.shape(), (1024, 32));
+    assert_eq!(jeol_hsqc.metadata.origin.as_deref(), Some("JEOL"));
+    Ok(())
+}
+
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/zenodo_7100132")
 }
 
 fn nmredata_fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/bundle_nmredata")
+}
+
+fn nmrxiv_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene")
 }
 
 fn first_1d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Spectrum1D> {
@@ -247,6 +305,37 @@ fn first_1d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Sp
 
 fn assert_source_path(loaded: &LoadedSpectrum, expected: &Path) {
     assert_eq!(loaded.source().path.as_deref(), Some(expected));
+}
+
+fn loaded_1d_by_path<'a>(
+    bundle: &'a SpectrumBundle,
+    path: &Path,
+) -> anyhow::Result<&'a rspin_core::Spectrum1D> {
+    bundle
+        .loaded_1d()
+        .find(|(_, source)| source.path.as_deref() == Some(path))
+        .map(|(spectrum, _)| spectrum)
+        .ok_or_else(|| anyhow::anyhow!("missing one-dimensional spectrum at {}", path.display()))
+}
+
+fn loaded_2d_by_path<'a>(
+    bundle: &'a SpectrumBundle,
+    path: &Path,
+) -> anyhow::Result<&'a rspin_core::Spectrum2D> {
+    bundle
+        .loaded_2d()
+        .find(|(_, source)| source.path.as_deref() == Some(path))
+        .map(|(spectrum, _)| spectrum)
+        .ok_or_else(|| anyhow::anyhow!("missing two-dimensional spectrum at {}", path.display()))
+}
+
+fn loaded_source_format<'a>(bundle: &'a SpectrumBundle, path: &Path) -> anyhow::Result<&'a str> {
+    bundle
+        .spectra()
+        .iter()
+        .find(|loaded| loaded.source().path.as_deref() == Some(path))
+        .map(|loaded| loaded.source().format.as_str())
+        .ok_or_else(|| anyhow::anyhow!("missing loaded source at {}", path.display()))
 }
 
 fn assert_close(actual: Option<f64>, expected: Option<f64>) {
