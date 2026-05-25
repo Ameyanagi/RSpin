@@ -425,7 +425,7 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
     ))
 }
 
-fn fftshift_in_place<T: Copy>(buffer: &mut [T]) {
+pub(crate) fn fftshift_in_place<T: Copy>(buffer: &mut [T]) {
     let n = buffer.len();
     if n < 2 {
         return;
@@ -433,7 +433,7 @@ fn fftshift_in_place<T: Copy>(buffer: &mut [T]) {
     buffer.rotate_left(n - n / 2);
 }
 
-fn ifftshift_in_place<T: Copy>(buffer: &mut [T]) {
+pub(crate) fn ifftshift_in_place<T: Copy>(buffer: &mut [T]) {
     let n = buffer.len();
     if n < 2 {
         return;
@@ -466,7 +466,11 @@ fn safe_usize_to_f64(value: usize, field: &'static str) -> Result<f64> {
     Ok(f64::from(value_u32))
 }
 
-fn frequency_axis_from_time(x: &Axis, metadata: &rspin_core::Metadata, len: usize) -> Result<Axis> {
+pub(crate) fn frequency_axis_from_time(
+    x: &Axis,
+    metadata: &rspin_core::Metadata,
+    len: usize,
+) -> Result<Axis> {
     if x.unit != Unit::Seconds {
         return Ok(x.clone());
     }
@@ -494,7 +498,11 @@ fn frequency_axis_from_time(x: &Axis, metadata: &rspin_core::Metadata, len: usiz
     }
 }
 
-fn time_axis_from_frequency(x: &Axis, metadata: &rspin_core::Metadata, len: usize) -> Result<Axis> {
+pub(crate) fn time_axis_from_frequency(
+    x: &Axis,
+    metadata: &rspin_core::Metadata,
+    len: usize,
+) -> Result<Axis> {
     if !matches!(x.unit, Unit::Hertz | Unit::Ppm) {
         return Ok(x.clone());
     }

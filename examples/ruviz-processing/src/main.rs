@@ -24,7 +24,7 @@ mod ruviz_example {
         PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
         SpectrumAnalysis1DOptions, analyze_spectrum_1d,
     };
-    use rspin_core::{Axis, Metadata, Spectrum1D, Unit};
+    use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
         SpectrumBundle, load_spectra, read_analysis1d_json, read_processing_recipe_1d_json,
         read_spectrum_bundle_json, read_spectrum1d_csv, read_spectrum1d_json, write_analysis1d_csv,
@@ -32,8 +32,8 @@ mod ruviz_example {
         write_spectrum1d_csv, write_spectrum1d_json,
     };
     use rspin_processing::{
-        AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingRecipe1D, auto_phase_correct,
-        fit_baseline,
+        AutoPhaseOptions, BaselineMethod, FftDirection, ProcessSpectrum2D, ProcessingRecipe1D,
+        auto_phase_correct, fit_baseline,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
 
@@ -166,6 +166,74 @@ mod ruviz_example {
         Ok(())
     }
 
+    struct VendorContourEntry {
+        vendor: &'static str,
+        stem: &'static str,
+        title: &'static str,
+        fixture: &'static str,
+    }
+
+    fn write_vendor_contour_entry(
+        entry: &VendorContourEntry,
+        fixture_root: &Path,
+        out_dir: &Path,
+    ) -> Result<()> {
+        let bundle = load_spectra(fixture_root.join(entry.fixture))
+            .with_context(|| format!("failed to load 2D fixture {}", entry.fixture))?;
+        let spectra: Vec<&Spectrum2D> = bundle.spectra_2d().collect();
+        let Some(spectrum) = spectra.first() else {
+            return Ok(());
+        };
+        let processed = process_2d_for_contour(spectrum)?;
+        let png_path = out_dir.join(format!("{}.png", entry.stem));
+        write_contour_plot(
+            &png_path,
+            entry.title,
+            axis_label(processed.x.unit),
+            axis_label(processed.y.unit),
+            &processed,
+        )?;
+        Ok(())
+    }
+
+    fn process_2d_for_contour(spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        if spectrum.x.unit == Unit::Seconds || spectrum.y.unit == Unit::Seconds {
+            spectrum
+                .process()
+                .fft(FftDirection::Forward)
+                .absolute_value()
+                .normalize_max_abs()
+                .finish()
+                .context("2D contour FFT pipeline failed")
+        } else {
+            spectrum
+                .process()
+                .absolute_value()
+                .normalize_max_abs()
+                .finish()
+                .context("2D contour normalization failed")
+        }
+    }
+
+    fn write_contour_plot(
+        path: &Path,
+        title: &str,
+        x_label: &str,
+        y_label: &str,
+        spectrum: &Spectrum2D,
+    ) -> Result<()> {
+        Plot::new()
+            .title(title)
+            .xlabel(x_label)
+            .ylabel(y_label)
+            .max_resolution(1400, 1200)
+            .contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
+            .levels(12)
+            .filled(false)
+            .save(path_to_str(path)?)?;
+        Ok(())
+    }
+
     fn write_vendor_showcase(root: &Path, output_dir: &Path) -> Result<()> {
         fs::create_dir_all(output_dir).with_context(|| {
             format!(
@@ -238,6 +306,28 @@ mod ruviz_example {
                 format!("failed to create vendor dir {}", dir.display())
             })?;
             write_vendor_showcase_entry(entry, &fixture_root, &dir)?;
+        }
+
+        let contour_entries: &[VendorContourEntry] = &[
+            VendorContourEntry {
+                vendor: "bruker",
+                stem: "cosy_2d_myrcene_nmrxiv",
+                title: "Bruker raw COSY 2D (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/bruker_cosy_raw",
+            },
+            VendorContourEntry {
+                vendor: "jeol",
+                stem: "hsqc_2d_myrcene_nmrxiv",
+                title: "JEOL HSQC 2D (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_hsqc_400mhz.jdf",
+            },
+        ];
+        for entry in contour_entries {
+            let dir = output_dir.join(entry.vendor);
+            fs::create_dir_all(&dir).with_context(|| {
+                format!("failed to create vendor dir {}", dir.display())
+            })?;
+            write_vendor_contour_entry(entry, &fixture_root, &dir)?;
         }
         Ok(())
     }
