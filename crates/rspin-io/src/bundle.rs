@@ -9,10 +9,10 @@ use rspin_core::{Molecule, RSpinError, Result, Spectrum1D, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_agilent_processed_1d_dir,
-    read_agilent_processed_2d_dir, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
-    read_bruker_processed_2d_dir, read_bruker_ser_2d_dir, read_spectrum1d_path,
-    read_spectrum2d_path,
+    NmreDataRecord, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
+    read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
+    read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
+    read_nmredata_records_file, read_spectrum1d_path, read_spectrum2d_path,
 };
 
 /// High-level reader for supported `RSpin` spectrum inputs.
@@ -273,10 +273,10 @@ impl SpectrumBundle {
         self.spectra.len()
     }
 
-    /// Returns true when no spectra were loaded.
+    /// Returns true when no spectra or molecules were loaded.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.spectra.is_empty()
+        !self.has_data()
     }
 
     fn push_1d(&mut self, spectrum: Spectrum1D, source: LoadedSource) {
@@ -287,8 +287,16 @@ impl SpectrumBundle {
         self.spectra.push(LoadedSpectrum::TwoD { spectrum, source });
     }
 
+    fn push_molecule(&mut self, molecule: Molecule) {
+        self.molecules.push(molecule);
+    }
+
     fn push_warning(&mut self, warning: LoadWarning) {
         self.warnings.push(warning);
+    }
+
+    fn has_data(&self) -> bool {
+        !self.spectra.is_empty() || !self.molecules.is_empty()
     }
 
     fn only_error(&self, expected: &'static str) -> RSpinError {
@@ -383,13 +391,13 @@ impl SpectrumBundleLoader {
             self.read_file_candidate(root, root, &mut bundle)?;
         }
 
-        if bundle.is_empty() {
+        if bundle.has_data() {
+            Ok(bundle)
+        } else {
             Err(RSpinError::Parse {
                 format: "spectrum bundle",
-                message: format!("no readable spectra found at {}", root.display()),
+                message: format!("no readable bundle data found at {}", root.display()),
             })
-        } else {
-            Ok(bundle)
         }
     }
 
@@ -419,7 +427,9 @@ impl SpectrumBundleLoader {
             self.read_directory_candidate(root, directory, bundle)?;
         }
         for file in &tree.files {
-            if is_standalone_spectrum_file(file) {
+            if is_nmredata_file(file) {
+                self.read_nmredata_candidate(root, file, bundle)?;
+            } else if is_standalone_spectrum_file(file) {
                 self.read_file_candidate(root, file, bundle)?;
             }
         }
@@ -497,6 +507,10 @@ impl SpectrumBundleLoader {
         file: &Path,
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
+        if is_nmredata_file(file) {
+            return self.read_nmredata_candidate(root, file, bundle);
+        }
+
         self.add_1d_or_2d_result(
             bundle,
             root,
@@ -505,6 +519,27 @@ impl SpectrumBundleLoader {
             || read_spectrum1d_path(file),
             || read_spectrum2d_path(file),
         )
+    }
+
+    fn read_nmredata_candidate(
+        &self,
+        root: &Path,
+        file: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        match read_nmredata_records_file(file) {
+            Ok(records) => {
+                for (record_index, record) in records.iter().enumerate() {
+                    if let Some(molecule) =
+                        nmredata_record_molecule(root, file, record_index, record)
+                    {
+                        bundle.push_molecule(molecule);
+                    }
+                }
+                Ok(())
+            }
+            Err(error) => self.handle_error(bundle, root, file, error),
+        }
     }
 
     fn add_1d_result(
@@ -752,6 +787,17 @@ fn is_standalone_spectrum_file(path: &Path) -> bool {
         })
 }
 
+fn is_nmredata_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .is_some_and(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "sdf" | "sd" | "nmredata"
+            )
+        })
+}
+
 fn format_from_file(path: &Path) -> &'static str {
     match path
         .extension()
@@ -780,4 +826,27 @@ fn relative_source_path(root: &Path, path: &Path) -> Option<PathBuf> {
 
 fn file_name_path(path: &Path) -> Option<PathBuf> {
     path.file_name().map(PathBuf::from)
+}
+
+fn nmredata_record_molecule(
+    root: &Path,
+    path: &Path,
+    record_index: usize,
+    record: &NmreDataRecord,
+) -> Option<Molecule> {
+    let formula = record.formula.as_ref()?;
+    let id = nmredata_molecule_id(root, path, record_index);
+
+    match Molecule::from_formula(id.clone(), formula.clone()) {
+        Ok(molecule) => Some(molecule),
+        Err(_) => Some(Molecule::new(id).with_formula(formula.clone())),
+    }
+}
+
+fn nmredata_molecule_id(root: &Path, path: &Path, record_index: usize) -> String {
+    let source = match relative_source_path(root, path) {
+        Some(path) => path.to_string_lossy().replace('\\', "/"),
+        None => "record".to_owned(),
+    };
+    format!("nmredata:{source}:{}", record_index + 1)
 }

@@ -1,0 +1,20 @@
+RSpin NMReDATA bundle fixture
+
+
+>  <NMREDATA_VERSION>
+1.1
+
+>  <NMREDATA_FORMULA>
+C2H6O
+
+>  <NMREDATA_SMILES>
+CCO
+
+>  <NMREDATA_SOLVENT>
+CDCl3
+
+>  <NMREDATA_1D_1H>
+Larmor=500.0
+1.20, L=H1
+
+$$$$

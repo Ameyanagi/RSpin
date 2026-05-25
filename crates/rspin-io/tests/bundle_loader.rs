@@ -193,8 +193,49 @@ fn exact_single_helpers_reject_wrong_or_ambiguous_dimensions() -> anyhow::Result
     Ok(())
 }
 
+#[test]
+fn loads_nmredata_file_as_bundle_molecule_metadata() -> anyhow::Result<()> {
+    let fixture = nmredata_fixture_root().join("ethanol.sdf");
+
+    let bundle = load_spectra(&fixture)?;
+    assert_eq!(bundle.len(), 0);
+    assert!(!bundle.is_empty());
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(bundle.molecules().len(), 1);
+
+    let molecule = bundle
+        .molecules()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing NMReDATA molecule"))?;
+    assert_eq!(molecule.id, "nmredata:ethanol.sdf:1");
+    assert_eq!(molecule.formula.as_deref(), Some("C2H6O"));
+    assert_eq!(molecule.atoms.len(), 9);
+    assert_eq!(molecule.atoms[0].id, "C1");
+    assert_eq!(molecule.atoms[8].id, "O1");
+    Ok(())
+}
+
+#[test]
+fn scans_nmredata_directory_without_requiring_spectra() -> anyhow::Result<()> {
+    let bundle = RSpinReader::new().read_path(nmredata_fixture_root())?;
+
+    assert_eq!(bundle.len(), 0);
+    assert!(!bundle.is_empty());
+    assert_eq!(bundle.molecules().len(), 1);
+    assert_eq!(
+        bundle.molecules()[0].id,
+        "nmredata:ethanol.sdf:1",
+        "directory scans should use relative source paths in stable molecule ids"
+    );
+    Ok(())
+}
+
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/zenodo_7100132")
+}
+
+fn nmredata_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/bundle_nmredata")
 }
 
 fn first_1d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Spectrum1D> {
