@@ -119,6 +119,29 @@ fn reads_nmrxiv_cc0_myrcene_jcamp_dx_6_link() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn reads_nmrxiv_cc0_myrcene_13c_jcamp_dx_6_link() -> anyhow::Result<()> {
+    let fixture = fixture_root().join("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let input = fs::read_to_string(&fixture)?;
+    let spectrum = read_jcamp_dx_1d(&input)?;
+
+    assert_eq!(spectrum.len(), 104_858);
+    assert_eq!(spectrum.x.unit, Unit::Hertz);
+    assert_close(
+        spectrum.x.values.first().copied(),
+        Some(22_678.792_958_779_2),
+    );
+    assert_close(
+        spectrum.x.values.last().copied(),
+        Some(-2_573.732_293_746_08),
+    );
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_close(spectrum.metadata.frequency_mhz, Some(100.525_303_325_165));
+    assert_eq!(spectrum.metadata.property("jcamp_dx.version"), Some("6.0"));
+    assert!(has_signal(&spectrum.intensities, 1.0e-6));
+    Ok(())
+}
+
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene")
 }

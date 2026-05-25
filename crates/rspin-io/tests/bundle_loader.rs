@@ -588,8 +588,8 @@ fn scans_nmredata_directory_without_requiring_spectra() -> anyhow::Result<()> {
 fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
 
-    assert_eq!(bundle.len(), 6);
-    assert_eq!(bundle.spectra_1d().count(), 4);
+    assert_eq!(bundle.len(), 7);
+    assert_eq!(bundle.spectra_1d().count(), 5);
     assert_eq!(bundle.spectra_2d().count(), 2);
     assert!(bundle.warnings().is_empty());
 
@@ -624,6 +624,20 @@ fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
         loaded_source_format(
             &bundle,
             Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
+        )?,
+        "jcamp_dx"
+    );
+
+    let jcamp_13c = loaded_1d_by_path(
+        &bundle,
+        Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    assert_eq!(jcamp_13c.len(), 104_858);
+    assert_eq!(jcamp_13c.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(
+        loaded_source_format(
+            &bundle,
+            Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx")
         )?,
         "jcamp_dx"
     );
