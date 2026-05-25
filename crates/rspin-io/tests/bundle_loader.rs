@@ -203,6 +203,30 @@ fn loader_toggles_apply_to_direct_vendor_files() -> anyhow::Result<()> {
 }
 
 #[test]
+fn direct_vendor_files_record_detected_source_format() -> anyhow::Result<()> {
+    let bruker_raw =
+        RSpinReader::new().read_path(fixture_root().join("bruker_without_expno/fid"))?;
+    assert_eq!(
+        loaded_source_format(&bruker_raw, Path::new("fid"))?,
+        "bruker_fid"
+    );
+
+    let bruker_processed =
+        RSpinReader::new().read_path(fixture_root().join("bruker_without_expno/pdata/1/1r"))?;
+    assert_eq!(
+        loaded_source_format(&bruker_processed, Path::new("1r"))?,
+        "bruker_processed"
+    );
+
+    let agilent_raw = RSpinReader::new().read_path(fixture_root().join("varian_1h/fid"))?;
+    assert_eq!(
+        loaded_source_format(&agilent_raw, Path::new("fid"))?,
+        "agilent_fid"
+    );
+    Ok(())
+}
+
+#[test]
 fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra_many([
         fixture_root().join("varian_1h"),

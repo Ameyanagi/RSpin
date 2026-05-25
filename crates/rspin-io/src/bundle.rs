@@ -702,7 +702,10 @@ impl SpectrumBundleLoader {
         let format = format_from_file(path);
         match read_1d() {
             Ok(spectrum) if self.one_d.is_enabled() => {
-                bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                bundle.push_1d(
+                    spectrum,
+                    self.loaded_source(root, path, source_format_1d(path, format)),
+                );
                 return Ok(());
             }
             Ok(_) => {}
@@ -710,7 +713,10 @@ impl SpectrumBundleLoader {
                 if self.two_d.is_enabled() {
                     return match read_2d() {
                         Ok(spectrum) => {
-                            bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                            bundle.push_2d(
+                                spectrum,
+                                self.loaded_source(root, path, source_format_2d(path, format)),
+                            );
                             Ok(())
                         }
                         Err(second_error) => self.add_bundle_or_warning(
@@ -737,7 +743,10 @@ impl SpectrumBundleLoader {
         if self.two_d.is_enabled() {
             return match read_2d() {
                 Ok(spectrum) => {
-                    bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                    bundle.push_2d(
+                        spectrum,
+                        self.loaded_source(root, path, source_format_2d(path, format)),
+                    );
                     Ok(())
                 }
                 Err(second_error) => self.add_bundle_or_warning(
@@ -849,7 +858,10 @@ impl SpectrumBundleLoader {
         if self.one_d.is_enabled() {
             match read_1d() {
                 Ok(spectrum) => {
-                    bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                    bundle.push_1d(
+                        spectrum,
+                        self.loaded_source(root, path, source_format_1d(path, format)),
+                    );
                     return Ok(());
                 }
                 Err(first_error) if !self.two_d.is_enabled() => {
@@ -858,7 +870,10 @@ impl SpectrumBundleLoader {
                 Err(first_error) => {
                     return match read_2d() {
                         Ok(spectrum) => {
-                            bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                            bundle.push_2d(
+                                spectrum,
+                                self.loaded_source(root, path, source_format_2d(path, format)),
+                            );
                             Ok(())
                         }
                         Err(second_error) => {
@@ -874,7 +889,10 @@ impl SpectrumBundleLoader {
         if self.two_d.is_enabled() {
             match read_2d() {
                 Ok(spectrum) => {
-                    bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                    bundle.push_2d(
+                        spectrum,
+                        self.loaded_source(root, path, source_format_2d(path, format)),
+                    );
                     Ok(())
                 }
                 Err(error) => self.handle_error(bundle, root, path, error),
@@ -1219,6 +1237,28 @@ fn format_from_file(path: &Path) -> &'static str {
         Some(extension) if extension == "json" => "json",
         Some(extension) if extension == "csv" => "csv",
         _ => "auto",
+    }
+}
+
+fn source_format_1d(path: &Path, fallback: &'static str) -> &'static str {
+    if fallback != "auto" {
+        return fallback;
+    }
+
+    match crate::detect_spectrum1d_path_format(path) {
+        Ok(format) => format.as_str(),
+        Err(_) => fallback,
+    }
+}
+
+fn source_format_2d(path: &Path, fallback: &'static str) -> &'static str {
+    if fallback != "auto" {
+        return fallback;
+    }
+
+    match crate::detect_spectrum2d_path_format(path) {
+        Ok(format) => format.as_str(),
+        Err(_) => fallback,
     }
 }
 
