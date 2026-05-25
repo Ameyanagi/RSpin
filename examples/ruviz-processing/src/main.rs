@@ -401,6 +401,7 @@ mod ruviz_example {
                 .normalize_max_abs()
                 .apply(spectrum)?
         };
+        let processed = relabel_hz_to_ppm(processed);
 
         let png_path = out_dir.join(format!("{}.png", entry.stem));
         write_spectrum_plot(
@@ -413,6 +414,24 @@ mod ruviz_example {
             "spectrum",
         )?;
         Ok(())
+    }
+
+    fn relabel_hz_to_ppm(mut spectrum: Spectrum1D) -> Spectrum1D {
+        if spectrum.x.unit != Unit::Hertz {
+            return spectrum;
+        }
+        let Some(freq_mhz) = spectrum.metadata.frequency_mhz else {
+            return spectrum;
+        };
+        if !freq_mhz.is_finite() || freq_mhz.abs() <= 0.0 {
+            return spectrum;
+        }
+        spectrum.x.unit = Unit::Ppm;
+        spectrum.x.label = "chemical shift".to_owned();
+        for value in &mut spectrum.x.values {
+            *value /= freq_mhz;
+        }
+        spectrum
     }
 
     fn write_oracle_visual_artifacts(root: &Path, output_dir: &Path) -> Result<()> {
