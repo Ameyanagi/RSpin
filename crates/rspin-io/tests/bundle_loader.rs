@@ -541,6 +541,62 @@ fn loader_dimension_filters_apply_to_nested_bundle_json() -> anyhow::Result<()> 
 }
 
 #[test]
+fn loader_raw_processed_filters_apply_to_nested_bundle_json() -> anyhow::Result<()> {
+    let source_bundle = load_spectra(fixture_root().join("bruker_without_expno"))?;
+    assert_eq!(source_bundle.len(), 2);
+
+    let root = temp_dir("raw-processed-filter-bundle")?;
+    fs::write(
+        root.join("bundle.json"),
+        write_spectrum_bundle_json(&source_bundle)?,
+    )?;
+
+    let raw_only = RSpinReader::new().raw_only().read_path(&root)?;
+    assert_eq!(raw_only.len(), 1);
+    assert_eq!(first_1d(&raw_only)?.x.unit, Unit::Seconds);
+    assert_eq!(
+        raw_only.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert_eq!(
+        raw_only.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        0
+    );
+    assert!(has_source_path(
+        &raw_only,
+        Path::new("bundle.json/bruker_without_expno")
+    ));
+
+    let processed_only = RSpinReader::new().processed_only().read_path(&root)?;
+    assert_eq!(processed_only.len(), 1);
+    assert_eq!(first_1d(&processed_only)?.x.unit, Unit::Ppm);
+    assert_eq!(
+        processed_only.source_format_count(LoadedSourceFormat::BrukerFid),
+        0
+    );
+    assert_eq!(
+        processed_only.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+    assert!(has_source_path(
+        &processed_only,
+        Path::new("bundle.json/pdata/1")
+    ));
+
+    let none = RSpinReader::new()
+        .with_raw(false)
+        .with_processed(false)
+        .read_path(&root);
+    let Err(error) = none else {
+        anyhow::bail!("disabling raw and processed should filter nested vendor bundle spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn bundle_loader_implements_path_reader_trait() -> anyhow::Result<()> {
     fn read_with_trait<R>(reader: &R, path: &Path) -> rspin_core::Result<SpectrumBundle>
     where

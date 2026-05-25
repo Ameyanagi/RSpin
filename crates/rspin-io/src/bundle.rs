@@ -2035,10 +2035,14 @@ impl SpectrumBundleLoader {
         let include_2d = self.two_d.is_enabled();
         bundle.spectra.retain(|entry| match entry {
             LoadedSpectrum::OneD { source, .. } => {
-                include_1d && self.allows_source_format(source.format())
+                include_1d
+                    && self.allows_source_format(source.format())
+                    && self.allows_source_candidate_kind(source.format())
             }
             LoadedSpectrum::TwoD { source, .. } => {
-                include_2d && self.allows_source_format(source.format())
+                include_2d
+                    && self.allows_source_format(source.format())
+                    && self.allows_source_candidate_kind(source.format())
             }
         });
     }
@@ -2111,6 +2115,14 @@ impl SpectrumBundleLoader {
                 .source_formats
                 .iter()
                 .any(|allowed| source_format_matches(format, allowed))
+    }
+
+    fn allows_source_candidate_kind(&self, format: &str) -> bool {
+        match source_format_candidate_kind(format) {
+            FileCandidateKind::Raw => self.raw.is_enabled(),
+            FileCandidateKind::Processed => self.processed.is_enabled(),
+            FileCandidateKind::Other => true,
+        }
     }
 
     fn bundle_with_source_context(
@@ -2382,6 +2394,20 @@ fn source_format_count_name(format: &str) -> &str {
     match LoadedSourceFormat::parse(format) {
         Ok(format) => format.as_str(),
         Err(_) => format.trim(),
+    }
+}
+
+fn source_format_candidate_kind(format: &str) -> FileCandidateKind {
+    match LoadedSourceFormat::parse(format) {
+        Ok(
+            LoadedSourceFormat::BrukerFid
+            | LoadedSourceFormat::BrukerSer
+            | LoadedSourceFormat::AgilentFid,
+        ) => FileCandidateKind::Raw,
+        Ok(LoadedSourceFormat::BrukerProcessed | LoadedSourceFormat::AgilentProcessed) => {
+            FileCandidateKind::Processed
+        }
+        Ok(_) | Err(_) => FileCandidateKind::Other,
     }
 }
 
