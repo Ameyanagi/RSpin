@@ -1,6 +1,7 @@
 use rspin_core::{Nucleus, RSpinError, Unit};
 
 use super::super::{
+    parse_agilent_arrayed_fid_1d_bytes_json, parse_agilent_arrayed_fid_2d_bytes_json,
     parse_agilent_fid_1d_bytes_json, parse_agilent_fid_2d_bytes_json,
     parse_agilent_processed_1d_bytes_json, parse_agilent_processed_2d_bytes_json,
     spectrum1d_from_json, spectrum2d_from_json,
@@ -64,6 +65,107 @@ sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
     assert_eq!(two_d.y.values, vec![0.0, 0.005]);
     assert_eq!(two_d.z, vec![1.0, 2.0, 3.0, 4.0]);
     assert_eq!(two_d.imaginary, Some(vec![-1.0, -2.0, -3.0, -4.0]));
+    Ok(())
+}
+
+#[test]
+fn parses_agilent_arrayed_fid_bytes_to_bundle_json() -> anyhow::Result<()> {
+    let one_d_json = parse_agilent_arrayed_fid_1d_bytes_json(
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 1
+0
+array 2 2 256 0 0 2 1 1 1 64
+1 \"delay\"
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 500
+0
+",
+        &agilent_fid_bytes(
+            EndianForTest::Little,
+            DataForTest::F32(&[0.5, -0.25, 1.5, -2.5, 3.0, 4.0, 5.0, 6.0]),
+            2,
+            1,
+        )?,
+    )?;
+    let one_d_bundle = rspin_io::read_spectrum_bundle_json(&one_d_json)?;
+    let one_d_spectra = one_d_bundle.spectra_1d().collect::<Vec<_>>();
+    let first_one_d = one_d_spectra
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing first arrayed 1D spectrum"))?;
+
+    assert_eq!(one_d_bundle.len(), 2);
+    assert_eq!(one_d_bundle.spectra_2d().count(), 0);
+    assert!(one_d_bundle.warnings().is_empty());
+    assert!(
+        one_d_bundle
+            .spectra()
+            .iter()
+            .all(|entry| entry.source().format.as_str() == "agilent_fid")
+    );
+    assert_eq!(first_one_d.x.unit, Unit::Seconds);
+    assert_eq!(first_one_d.intensities, vec![0.5, 1.5]);
+    assert_eq!(first_one_d.imaginary, Some(vec![-0.25, -2.5]));
+    assert_eq!(
+        first_one_d.metadata.property("agilent.array.index"),
+        Some("0")
+    );
+
+    let two_d_json = parse_agilent_arrayed_fid_2d_bytes_json(
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+array 2 2 256 0 0 2 1 1 1 64
+1 \"mix\"
+0
+ni 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 200
+0
+",
+        &agilent_fid_bytes(
+            EndianForTest::Little,
+            DataForTest::F32(&[
+                0.5, -0.5, 1.5, -1.5, 2.5, -2.5, 3.5, -3.5, 4.5, -4.5, 5.5, -5.5, 6.5, -6.5, 7.5,
+                -7.5,
+            ]),
+            4,
+            1,
+        )?,
+    )?;
+    let two_d_bundle = rspin_io::read_spectrum_bundle_json(&two_d_json)?;
+    let two_d_spectra = two_d_bundle.spectra_2d().collect::<Vec<_>>();
+    let first_two_d = two_d_spectra
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing first arrayed 2D spectrum"))?;
+
+    assert_eq!(two_d_bundle.len(), 2);
+    assert_eq!(two_d_bundle.spectra_1d().count(), 0);
+    assert!(two_d_bundle.warnings().is_empty());
+    assert!(
+        two_d_bundle
+            .spectra()
+            .iter()
+            .all(|entry| entry.source().format.as_str() == "agilent_fid")
+    );
+    assert_eq!(first_two_d.shape(), (2, 2));
+    assert_eq!(first_two_d.x.unit, Unit::Seconds);
+    assert_eq!(first_two_d.y.unit, Unit::Points);
+    assert_eq!(first_two_d.z, vec![0.5, 1.5, 2.5, 3.5]);
+    assert_eq!(first_two_d.imaginary, Some(vec![-0.5, -1.5, -2.5, -3.5]));
+    assert_eq!(
+        first_two_d
+            .metadata
+            .property("agilent.array.traces_per_spectrum"),
+        Some("2")
+    );
     Ok(())
 }
 

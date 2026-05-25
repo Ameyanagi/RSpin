@@ -32,16 +32,17 @@ use rspin_io::{
     LoadedSource, SpectrumBundle, inspect_agilent_procpar, inspect_bruker_parameter_file,
     inspect_jeol_jdf_bytes, parse_jcamp_dx_version, parse_nmrml_version,
     parse_spectrum_text_format, parse_spectrum1d_bytes_format, parse_spectrum1d_write_format,
-    parse_spectrum2d_bytes_format, parse_spectrum2d_write_format, read_agilent_fid_1d_bytes,
-    read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes,
-    read_assignment_set_json, read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes,
-    read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes, read_j_coupling_graph_json,
-    read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
-    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
-    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
-    read_spectrum_bundle_json, read_spectrum1d_bytes_as, read_spectrum1d_json,
-    read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as, read_spectrum2d_json,
-    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
+    parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
+    read_agilent_arrayed_fid_1d_bytes, read_agilent_arrayed_fid_2d_bytes,
+    read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes,
+    read_agilent_processed_2d_bytes, read_assignment_set_json, read_bruker_fid_1d_bytes,
+    read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes,
+    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_bytes,
+    read_jeol_jdf_2d_bytes, read_nmredata_record_json, read_nmredata_records_json,
+    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum_bundle_json, read_spectrum1d_bytes_as,
+    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as,
+    read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
     write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record,
     write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
@@ -146,6 +147,23 @@ pub fn parse_agilent_fid_1d_bytes_json(procpar: &str, fid_bytes: &[u8]) -> Resul
     spectrum1d_to_json(&spectrum)
 }
 
+/// Parses arrayed Agilent/Varian raw one-dimensional FID bytes into serialized
+/// `SpectrumBundle` JSON.
+///
+/// Each array member is returned as one one-dimensional bundle entry.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_agilent_arrayed_fid_1d_bytes_json(procpar: &str, fid_bytes: &[u8]) -> Result<String> {
+    let spectra = read_agilent_arrayed_fid_1d_bytes(procpar, fid_bytes)?;
+    let mut bundle = SpectrumBundle::new();
+    for spectrum in spectra {
+        bundle.push_1d(spectrum, agilent_fid_loaded_source());
+    }
+    write_spectrum_bundle_json(&bundle)
+}
+
 /// Parses Agilent/Varian processed one-dimensional phasefile bytes into
 /// serialized `Spectrum1D` JSON.
 ///
@@ -169,6 +187,23 @@ pub fn parse_agilent_processed_1d_bytes_json(
 pub fn parse_agilent_fid_2d_bytes_json(procpar: &str, fid_bytes: &[u8]) -> Result<String> {
     let spectrum = read_agilent_fid_2d_bytes(procpar, fid_bytes)?;
     spectrum2d_to_json(&spectrum)
+}
+
+/// Parses arrayed Agilent/Varian raw two-dimensional FID bytes into serialized
+/// `SpectrumBundle` JSON.
+///
+/// Each array member is returned as one two-dimensional bundle entry.
+///
+/// # Errors
+///
+/// Returns an error when parsing or serialization fails.
+pub fn parse_agilent_arrayed_fid_2d_bytes_json(procpar: &str, fid_bytes: &[u8]) -> Result<String> {
+    let spectra = read_agilent_arrayed_fid_2d_bytes(procpar, fid_bytes)?;
+    let mut bundle = SpectrumBundle::new();
+    for spectrum in spectra {
+        bundle.push_2d(spectrum, agilent_fid_loaded_source());
+    }
+    write_spectrum_bundle_json(&bundle)
 }
 
 /// Parses Agilent/Varian processed two-dimensional phasefile bytes into
@@ -950,6 +985,10 @@ fn spectrum1d_to_json(spectrum: &Spectrum1D) -> Result<String> {
 
 fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
     write_spectrum2d_json(spectrum)
+}
+
+fn agilent_fid_loaded_source() -> LoadedSource {
+    LoadedSource::new(None::<PathBuf>, "agilent_fid")
 }
 
 #[derive(Debug, Serialize)]
