@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, load_spectra,
-    load_spectra_many, load_spectrum_1d, load_spectrum_2d,
+    LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
+    load_spectra, load_spectra_many, load_spectrum_1d, load_spectrum_2d,
 };
 
 #[test]
@@ -142,6 +142,24 @@ fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     assert!(bundle.spectra_2d().next().is_none());
     assert!(has_source_path(&bundle, Path::new("varian_1h")));
     assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
+    assert!(has_source_path(&bundle, Path::new("pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn bundle_loader_implements_path_reader_trait() -> anyhow::Result<()> {
+    fn read_with_trait<R>(reader: &R, path: &Path) -> rspin_core::Result<SpectrumBundle>
+    where
+        R: SpectrumPathReader<Output = SpectrumBundle>,
+    {
+        reader.read_path(path)
+    }
+
+    let fixture = fixture_root().join("bruker_without_expno");
+    let bundle = read_with_trait(&RSpinReader::new().with_raw(false), &fixture)?;
+
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(first_1d(&bundle)?.x.unit, Unit::Ppm);
     assert!(has_source_path(&bundle, Path::new("pdata/1")));
     Ok(())
 }

@@ -9,7 +9,7 @@ use rspin_core::{Molecule, RSpinError, Result, Spectrum1D, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    NmreDataRecord, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
+    NmreDataRecord, SpectrumPathReader, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
     read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
     read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
     read_nmredata_records_file, read_spectrum_bundle_json_file, read_spectrum1d_path,
@@ -812,6 +812,14 @@ impl Default for SpectrumBundleLoader {
             strict: Toggle::Disabled,
             source_paths: Toggle::Enabled,
         }
+    }
+}
+
+impl SpectrumPathReader for SpectrumBundleLoader {
+    type Output = SpectrumBundle;
+
+    fn read_path(&self, path: &Path) -> Result<Self::Output> {
+        SpectrumBundleLoader::read_path(self, path)
     }
 }
 
