@@ -8,13 +8,13 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSourceFormat, LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader,
-    SpectrumPathReader, load_spectra, load_spectra_many, load_spectra_many_relative_to,
-    load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_many,
-    load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to, load_spectrum_2d,
-    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_relative_to,
-    parse_loaded_source_format, write_spectrum_bundle_json, write_spectrum1d_json,
-    write_spectrum2d_json,
+    LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum, RSpinReader, SpectrumBundle,
+    SpectrumBundleLoader, SpectrumPathReader, load_spectra, load_spectra_many,
+    load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
+    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to,
+    load_spectrum_2d, load_spectrum_2d_many, load_spectrum_2d_many_relative_to,
+    load_spectrum_2d_relative_to, parse_loaded_source_format, parse_loaded_source_vendor,
+    write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum2d_json,
 };
 
 #[test]
@@ -979,6 +979,87 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_source_vendor_helpers_group_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    assert_eq!(
+        parse_loaded_source_vendor("bruker")?,
+        LoadedSourceVendor::Bruker
+    );
+    assert_eq!(bundle.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert_eq!(bundle.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+    assert_eq!(
+        bundle.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        0
+    );
+    assert!(bundle.has_source_vendor(LoadedSourceVendor::Jeol));
+    assert!(!bundle.has_source_vendor("agilent"));
+
+    let summary = bundle.summary();
+    assert_eq!(summary.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert!(summary.has_source_vendor(LoadedSourceVendor::Jeol));
+    assert!(!summary.has_source_vendor(LoadedSourceVendor::AgilentVarian));
+
+    let vendors = bundle.source_vendors().collect::<Vec<_>>();
+    assert_eq!(vendors.len(), 5);
+    assert!(vendors.contains(&LoadedSourceVendor::Bruker));
+    assert!(vendors.contains(&LoadedSourceVendor::Jeol));
+
+    let bruker = bundle
+        .loaded_by_source_vendor(LoadedSourceVendor::Bruker)
+        .collect::<Vec<_>>();
+    assert_eq!(bruker.len(), 2);
+    assert!(
+        bruker
+            .iter()
+            .all(|entry| entry.source().is_vendor(LoadedSourceVendor::Bruker))
+    );
+    assert_eq!(
+        bundle
+            .loaded_1d_by_source_vendor(LoadedSourceVendor::Jeol)
+            .collect::<Vec<_>>()
+            .len(),
+        2
+    );
+    assert_eq!(
+        bundle
+            .loaded_2d_by_source_vendor(LoadedSourceVendor::Jeol)
+            .collect::<Vec<_>>()
+            .len(),
+        1
+    );
+    assert_eq!(
+        bundle
+            .source_paths_for_vendor(LoadedSourceVendor::Jeol)
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("jeol/myrcene_13c_400mhz.jdf"),
+            Path::new("jeol/myrcene_1h_400mhz.jdf"),
+            Path::new("jeol/myrcene_hsqc_400mhz.jdf")
+        ]
+    );
+    assert!(
+        bundle
+            .loaded_by_source_vendor("jcamp")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    assert!(
+        bundle
+            .loaded_1d_by_source_vendor("csv")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    assert!(
+        bundle
+            .source_paths_for_vendor("unknown-vendor")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
 fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
     let jcamp = RSpinReader::new()
         .only_source_format(LoadedSourceFormat::JcampDx)
@@ -1021,6 +1102,52 @@ fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
         .read_path(nmrxiv_fixture_root());
     let Err(error) = filtered_out else {
         anyhow::bail!("CSV-only source filter should leave no readable spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
+    Ok(())
+}
+
+#[test]
+fn loader_can_restrict_source_vendors() -> anyhow::Result<()> {
+    let bruker = RSpinReader::new()
+        .only_source_vendor(LoadedSourceVendor::Bruker)
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(bruker.len(), 2);
+    assert_eq!(bruker.len_1d(), 1);
+    assert_eq!(bruker.len_2d(), 1);
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let jeol = RSpinReader::new()
+        .only_source_vendor("jeol")
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(jeol.len(), 3);
+    assert!(jeol.has_source_vendor(LoadedSourceVendor::Jeol));
+    assert!(
+        jeol.spectra()
+            .iter()
+            .all(|entry| entry.source().vendor() == Some(LoadedSourceVendor::Jeol))
+    );
+
+    let selected = RSpinReader::new()
+        .only_source_vendors([LoadedSourceVendor::Bruker, LoadedSourceVendor::Jeol])
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(selected.len(), 5);
+    assert_eq!(selected.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert_eq!(selected.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+
+    let filtered_out = RSpinReader::new()
+        .only_source_vendor(LoadedSourceVendor::AgilentVarian)
+        .read_path(nmrxiv_fixture_root());
+    let Err(error) = filtered_out else {
+        anyhow::bail!("Agilent/Varian-only vendor filter should leave no readable spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
+
+    let invalid_vendor = RSpinReader::new()
+        .only_source_vendor("jcamp")
+        .read_path(nmrxiv_fixture_root());
+    let Err(error) = invalid_vendor else {
+        anyhow::bail!("unknown vendor filter should not fall back to a source format");
     };
     assert!(error.to_string().contains("no readable bundle data found"));
     Ok(())

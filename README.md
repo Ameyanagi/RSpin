@@ -108,6 +108,12 @@ fn load_jcamp_only() -> Result<SpectrumBundle> {
         .only_source_format(LoadedSourceFormat::JcampDx)
         .read_path("data/mixed-vendor")
 }
+
+fn load_bruker_only() -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .only_source_vendor(LoadedSourceVendor::Bruker)
+        .read_path("data/mixed-vendor")
+}
 ```
 
 The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,

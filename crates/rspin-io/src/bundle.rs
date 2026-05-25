@@ -20,7 +20,9 @@ use crate::{
 };
 
 mod source_format;
-pub use source_format::{LoadedSourceFormat, parse_loaded_source_format};
+pub use source_format::{
+    LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_format, parse_loaded_source_vendor,
+};
 
 /// High-level reader for supported `RSpin` spectrum inputs.
 pub type RSpinReader = SpectrumBundleLoader;
@@ -63,10 +65,25 @@ impl LoadedSource {
         LoadedSourceFormat::parse(&self.format).ok()
     }
 
+    /// Returns the source vendor family for vendor-specific reader formats.
+    #[must_use]
+    pub fn vendor(&self) -> Option<LoadedSourceVendor> {
+        self.format_kind().and_then(LoadedSourceFormat::vendor)
+    }
+
     /// Returns true when this source was read with a source format.
     #[must_use]
     pub fn is_format(&self, format: impl AsRef<str>) -> bool {
         self.format() == format.as_ref()
+    }
+
+    /// Returns true when this source was read with a vendor-specific reader.
+    #[must_use]
+    pub fn is_vendor(&self, vendor: impl AsRef<str>) -> bool {
+        let Ok(vendor) = LoadedSourceVendor::parse(vendor.as_ref()) else {
+            return false;
+        };
+        self.vendor() == Some(vendor)
     }
 }
 
@@ -105,6 +122,12 @@ impl SourceFormatCount {
     #[must_use]
     pub fn format_kind(&self) -> Option<LoadedSourceFormat> {
         LoadedSourceFormat::parse(&self.format).ok()
+    }
+
+    /// Returns the source vendor family for vendor-specific reader formats.
+    #[must_use]
+    pub fn vendor(&self) -> Option<LoadedSourceVendor> {
+        self.format_kind().and_then(LoadedSourceFormat::vendor)
     }
 }
 
@@ -190,6 +213,25 @@ impl SpectrumBundleSummary {
     #[must_use]
     pub fn has_source_format(&self, format: impl AsRef<str>) -> bool {
         self.source_format_count(format) > 0
+    }
+
+    /// Returns the number of loaded spectra read with a vendor-specific reader.
+    #[must_use]
+    pub fn source_vendor_count(&self, vendor: impl AsRef<str>) -> usize {
+        let Ok(vendor) = LoadedSourceVendor::parse(vendor.as_ref()) else {
+            return 0;
+        };
+        self.source_formats
+            .iter()
+            .filter(|count| count.vendor() == Some(vendor))
+            .map(SourceFormatCount::count)
+            .sum()
+    }
+
+    /// Returns true when a loaded spectrum was read with a vendor-specific reader.
+    #[must_use]
+    pub fn has_source_vendor(&self, vendor: impl AsRef<str>) -> bool {
+        self.source_vendor_count(vendor) > 0
     }
 }
 
@@ -421,6 +463,11 @@ impl SpectrumBundle {
         self.loaded_sources().map(LoadedSource::format)
     }
 
+    /// Returns an iterator over vendor families for vendor-specific spectra.
+    pub fn source_vendors(&self) -> impl Iterator<Item = LoadedSourceVendor> + '_ {
+        self.loaded_sources().filter_map(LoadedSource::vendor)
+    }
+
     /// Returns loaded spectra read with a source format.
     pub fn loaded_by_source_format(
         &self,
@@ -465,6 +512,58 @@ impl SpectrumBundle {
             .filter_map(LoadedSource::path)
     }
 
+    /// Returns loaded spectra read with a vendor-specific reader.
+    pub fn loaded_by_source_vendor(
+        &self,
+        vendor: impl AsRef<str>,
+    ) -> impl Iterator<Item = &LoadedSpectrum> + '_ {
+        let vendor = LoadedSourceVendor::parse(vendor.as_ref()).ok();
+        self.spectra.iter().filter(move |entry| match vendor {
+            Some(vendor) => entry.source().vendor() == Some(vendor),
+            None => false,
+        })
+    }
+
+    /// Returns one-dimensional spectra and sources read with a vendor-specific reader.
+    pub fn loaded_1d_by_source_vendor(
+        &self,
+        vendor: impl AsRef<str>,
+    ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_ {
+        let vendor = LoadedSourceVendor::parse(vendor.as_ref()).ok();
+        self.loaded_1d().filter(move |(_, source)| match vendor {
+            Some(vendor) => source.vendor() == Some(vendor),
+            None => false,
+        })
+    }
+
+    /// Returns two-dimensional spectra and sources read with a vendor-specific reader.
+    pub fn loaded_2d_by_source_vendor(
+        &self,
+        vendor: impl AsRef<str>,
+    ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_ {
+        let vendor = LoadedSourceVendor::parse(vendor.as_ref()).ok();
+        self.loaded_2d().filter(move |(_, source)| match vendor {
+            Some(vendor) => source.vendor() == Some(vendor),
+            None => false,
+        })
+    }
+
+    /// Returns tracked source paths for spectra read with a vendor-specific reader.
+    ///
+    /// Spectra loaded while source path tracking is disabled are skipped.
+    pub fn source_paths_for_vendor(
+        &self,
+        vendor: impl AsRef<str>,
+    ) -> impl Iterator<Item = &Path> + '_ {
+        let vendor = LoadedSourceVendor::parse(vendor.as_ref()).ok();
+        self.loaded_sources()
+            .filter(move |source| match vendor {
+                Some(vendor) => source.vendor() == Some(vendor),
+                None => false,
+            })
+            .filter_map(LoadedSource::path)
+    }
+
     /// Returns a loaded spectrum by its source path, if present.
     #[must_use]
     pub fn loaded_by_source_path(&self, path: impl AsRef<Path>) -> Option<&LoadedSpectrum> {
@@ -495,6 +594,23 @@ impl SpectrumBundle {
         let format = format.as_ref();
         self.loaded_sources()
             .any(|source| source.format() == format)
+    }
+
+    /// Returns the number of loaded spectra read with a vendor-specific reader.
+    #[must_use]
+    pub fn source_vendor_count(&self, vendor: impl AsRef<str>) -> usize {
+        let Ok(vendor) = LoadedSourceVendor::parse(vendor.as_ref()) else {
+            return 0;
+        };
+        self.loaded_sources()
+            .filter(|source| source.vendor() == Some(vendor))
+            .count()
+    }
+
+    /// Returns true when a loaded spectrum was read with a vendor-specific reader.
+    #[must_use]
+    pub fn has_source_vendor(&self, vendor: impl AsRef<str>) -> bool {
+        self.source_vendor_count(vendor) > 0
     }
 
     /// Returns deterministic source format counts in first-seen order.
@@ -858,6 +974,26 @@ impl SpectrumBundleLoader {
         F: AsRef<str>,
     {
         self.source_formats = source_format_filters(formats);
+        self
+    }
+
+    /// Restricts loading to spectra read with one vendor-specific reader family.
+    #[must_use]
+    pub fn only_source_vendor(mut self, vendor: impl AsRef<str>) -> Self {
+        self.source_formats = source_vendor_filters([vendor]);
+        self
+    }
+
+    /// Restricts loading to spectra read with any of the vendor-specific reader families.
+    ///
+    /// Passing an empty iterator clears the source-format filter.
+    #[must_use]
+    pub fn only_source_vendors<I, V>(mut self, vendors: I) -> Self
+    where
+        I: IntoIterator<Item = V>,
+        V: AsRef<str>,
+    {
+        self.source_formats = source_vendor_filters(vendors);
         self
     }
 
@@ -2153,9 +2289,25 @@ where
 {
     let mut filters = Vec::new();
     for format in formats {
-        let format = canonical_source_format_filter(format.as_ref());
-        if !filters.iter().any(|existing| existing == &format) {
-            filters.push(format);
+        push_unique_filter(&mut filters, format.as_ref());
+    }
+    filters
+}
+
+fn source_vendor_filters<I, V>(vendors: I) -> Vec<String>
+where
+    I: IntoIterator<Item = V>,
+    V: AsRef<str>,
+{
+    let mut filters = Vec::new();
+    for vendor in vendors {
+        match LoadedSourceVendor::parse(vendor.as_ref()) {
+            Ok(vendor) => {
+                for format in vendor.source_formats() {
+                    push_unique_filter(&mut filters, format.as_str());
+                }
+            }
+            Err(_) => push_invalid_vendor_filter(&mut filters, vendor.as_ref()),
         }
     }
     filters
@@ -2165,6 +2317,21 @@ fn canonical_source_format_filter(format: &str) -> String {
     match LoadedSourceFormat::parse(format) {
         Ok(format) => format.as_str().to_owned(),
         Err(_) => format.trim().to_owned(),
+    }
+}
+
+fn push_unique_filter(filters: &mut Vec<String>, format: &str) {
+    let format = canonical_source_format_filter(format);
+    if !filters.iter().any(|existing| existing == &format) {
+        filters.push(format);
+    }
+}
+
+fn push_invalid_vendor_filter(filters: &mut Vec<String>, vendor: &str) {
+    let vendor = vendor.trim();
+    let filter = format!("source_vendor:{vendor}");
+    if !filters.iter().any(|existing| existing == &filter) {
+        filters.push(filter);
     }
 }
 

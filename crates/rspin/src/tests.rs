@@ -327,8 +327,17 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     assert!(summary.has_source_format(LoadedSourceFormat::AgilentFid));
     assert_eq!(summary.source_format_count("bruker_processed"), 1);
     assert_eq!(
+        summary.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(bundle.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert_eq!(
         parse_loaded_source_format("varian fid")?,
         LoadedSourceFormat::AgilentFid
+    );
+    assert_eq!(
+        parse_loaded_source_vendor("varian")?,
+        LoadedSourceVendor::AgilentVarian
     );
     let source_format_counts = bundle.source_format_counts();
     assert!(
@@ -354,6 +363,10 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
         filtered.source_format_count(LoadedSourceFormat::AgilentFid),
         1
     );
+    let vendor_filtered = RSpinReader::new()
+        .only_source_vendor(LoadedSourceVendor::AgilentVarian)
+        .read_path(fixture_root.join("varian_1h"))?;
+    assert_eq!(vendor_filtered.len(), 1);
 
     let exact = load_spectrum_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));
