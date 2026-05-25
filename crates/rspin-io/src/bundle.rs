@@ -392,11 +392,7 @@ impl SpectrumBundleLoader {
         }
 
         let mut bundle = SpectrumBundle::new();
-        if root.is_dir() {
-            self.read_directory(root, &mut bundle)?;
-        } else {
-            self.read_file_candidate(root, root, &mut bundle)?;
-        }
+        self.read_existing_path_into(root, &mut bundle)?;
 
         if bundle.has_data() {
             Ok(bundle)
@@ -404,6 +400,71 @@ impl SpectrumBundleLoader {
             Err(RSpinError::Parse {
                 format: "spectrum bundle",
                 message: format!("no readable bundle data found at {}", root.display()),
+            })
+        }
+    }
+
+    /// Loads supported spectra from multiple file or directory paths.
+    ///
+    /// Non-strict mode records unreadable input paths as warnings and continues
+    /// loading later paths. Strict mode aborts at the first unreadable path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no input paths are provided, strict mode rejects a
+    /// path, or no readable bundle data is found.
+    pub fn read_paths<I, P>(&self, paths: I) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let mut bundle = SpectrumBundle::new();
+        let mut saw_input = false;
+
+        for path in paths {
+            saw_input = true;
+            let path = path.as_ref();
+            if !path.exists() {
+                self.handle_error(
+                    &mut bundle,
+                    path,
+                    path,
+                    RSpinError::Parse {
+                        format: "spectrum bundle",
+                        message: format!("{} does not exist", path.display()),
+                    },
+                )?;
+                continue;
+            }
+
+            let data_before = bundle.spectra.len() + bundle.molecules.len();
+            let warnings_before = bundle.warnings.len();
+            self.read_existing_path_into(path, &mut bundle)?;
+            let data_after = bundle.spectra.len() + bundle.molecules.len();
+            let warnings_after = bundle.warnings.len();
+            if data_after == data_before && warnings_after == warnings_before {
+                self.handle_error_message(
+                    &mut bundle,
+                    path,
+                    path,
+                    format!("no readable bundle data found at {}", path.display()),
+                )?;
+            }
+        }
+
+        if !saw_input {
+            return Err(RSpinError::Parse {
+                format: "spectrum bundle",
+                message: "no input paths provided".to_owned(),
+            });
+        }
+
+        if bundle.has_data() {
+            Ok(bundle)
+        } else {
+            Err(RSpinError::Parse {
+                format: "spectrum bundle",
+                message: "no readable bundle data found in input paths".to_owned(),
             })
         }
     }
@@ -426,6 +487,14 @@ impl SpectrumBundleLoader {
     /// exactly one two-dimensional spectrum.
     pub fn read_2d(&self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
         self.read_path(path)?.into_only_2d()
+    }
+
+    fn read_existing_path_into(&self, root: &Path, bundle: &mut SpectrumBundle) -> Result<()> {
+        if root.is_dir() {
+            self.read_directory(root, bundle)
+        } else {
+            self.read_file_candidate(root, root, bundle)
+        }
     }
 
     fn read_directory(&self, root: &Path, bundle: &mut SpectrumBundle) -> Result<()> {
@@ -719,6 +788,20 @@ impl Default for SpectrumBundleLoader {
 /// Returns an error when the path is missing or no readable bundle data is found.
 pub fn load_spectra(path: impl AsRef<Path>) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path(path)
+}
+
+/// Loads supported spectra from multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no readable bundle data
+/// is found.
+pub fn load_spectra_many<I, P>(paths: I) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_paths(paths)
 }
 
 /// Loads exactly one one-dimensional spectrum from a file or directory path.

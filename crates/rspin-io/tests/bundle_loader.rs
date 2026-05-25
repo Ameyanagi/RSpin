@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, load_spectra,
-    load_spectrum_1d, load_spectrum_2d,
+    load_spectra_many, load_spectrum_1d, load_spectrum_2d,
 };
 
 #[test]
@@ -127,6 +127,62 @@ fn loader_can_disable_raw_or_processed_candidates() -> anyhow::Result<()> {
     assert_eq!(processed_only.len(), 1);
     assert_eq!(first_1d(&processed_only)?.x.unit, Unit::Ppm);
     Ok(())
+}
+
+#[test]
+fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
+    let bundle = load_spectra_many([
+        fixture_root().join("varian_1h"),
+        fixture_root().join("bruker_without_expno"),
+    ])?;
+
+    assert_eq!(bundle.len(), 3);
+    assert_eq!(bundle.spectra_1d().count(), 3);
+    assert!(bundle.warnings().is_empty());
+    assert!(bundle.spectra_2d().next().is_none());
+    assert!(has_source_path(&bundle, Path::new("varian_1h")));
+    assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
+    assert!(has_source_path(&bundle, Path::new("pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn multi_path_loader_records_bad_selected_paths_in_non_strict_mode() -> anyhow::Result<()> {
+    let bundle = RSpinReader::new().read_paths([
+        fixture_root().join("varian_1h"),
+        fixture_root().join("empty_jcamp/empty.jdx"),
+    ])?;
+
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(bundle.warnings().len(), 1);
+    let warning = bundle
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing warning for bad selected path"))?;
+    assert_eq!(warning.path.as_deref(), Some(Path::new("empty.jdx")));
+    assert!(warning.message.contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
+fn multi_path_loader_rejects_bad_selected_paths_in_strict_mode() -> anyhow::Result<()> {
+    let result = RSpinReader::new().with_strict(true).read_paths([
+        fixture_root().join("varian_1h"),
+        fixture_root().join("empty_jcamp/empty.jdx"),
+    ]);
+
+    let Err(error) = result else {
+        anyhow::bail!("strict multi-path loader should reject bad selected path");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
+fn multi_path_loader_rejects_empty_input() {
+    let empty: Vec<PathBuf> = Vec::new();
+    let result = RSpinReader::new().read_paths(empty);
+    assert!(matches!(result, Err(RSpinError::Parse { .. })));
 }
 
 #[test]
@@ -305,6 +361,13 @@ fn first_1d(bundle: &rspin_io::SpectrumBundle) -> anyhow::Result<&rspin_core::Sp
 
 fn assert_source_path(loaded: &LoadedSpectrum, expected: &Path) {
     assert_eq!(loaded.source().path.as_deref(), Some(expected));
+}
+
+fn has_source_path(bundle: &SpectrumBundle, path: &Path) -> bool {
+    bundle
+        .spectra()
+        .iter()
+        .any(|loaded| loaded.source().path.as_deref() == Some(path))
 }
 
 fn loaded_1d_by_path<'a>(
