@@ -9,9 +9,10 @@ use std::{
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
-    load_spectra, load_spectra_many, load_spectra_many_relative_to, load_spectrum_1d,
-    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_2d,
-    load_spectrum_2d_many, load_spectrum_2d_many_relative_to, write_spectrum_bundle_json,
+    load_spectra, load_spectra_many, load_spectra_many_relative_to, load_spectra_relative_to,
+    load_spectrum_1d, load_spectrum_1d_many, load_spectrum_1d_many_relative_to,
+    load_spectrum_1d_relative_to, load_spectrum_2d, load_spectrum_2d_many,
+    load_spectrum_2d_many_relative_to, load_spectrum_2d_relative_to, write_spectrum_bundle_json,
     write_spectrum1d_json, write_spectrum2d_json,
 };
 
@@ -434,6 +435,49 @@ fn multi_path_loader_can_anchor_sources_to_common_base() -> anyhow::Result<()> {
         anyhow::bail!("file base should be rejected");
     };
     assert!(error.to_string().contains("is not a directory"));
+    Ok(())
+}
+
+#[test]
+fn single_path_relative_helpers_anchor_sources_to_common_base() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let bundle = load_spectra_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(bundle.len(), 2);
+    assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
+    assert!(has_source_path(
+        &bundle,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+
+    let processed = RSpinReader::new()
+        .processed_only()
+        .read_path_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(processed.len(), 1);
+    assert!(has_source_path(
+        &processed,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+
+    let one_d = load_spectrum_1d_relative_to(&base, "varian_1h")?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let one_d = RSpinReader::new().read_1d_relative_to(&base, "varian_1h")?;
+    assert_eq!(one_d.len(), 16_384);
+
+    let two_d = load_spectrum_2d_relative_to(nmrxiv_fixture_root(), "bruker_cosy_raw")?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let two_d = RSpinReader::new().read_2d_relative_to(nmrxiv_fixture_root(), "bruker_cosy_raw")?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let empty = RSpinReader::new().read_path_relative_to(&base, "empty_jcamp/empty.jdx");
+    let Err(error) = empty else {
+        anyhow::bail!("empty JCAMP-DX relative path should fail");
+    };
+    assert_no_data_warning(&error, "missing XYDATA values");
+    assert!(error.to_string().contains("empty_jcamp/empty.jdx"));
     Ok(())
 }
 

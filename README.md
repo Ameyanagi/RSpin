@@ -20,16 +20,21 @@ scope for now.
 ## Unified IO
 
 Use the facade crate for normal loading. `load_spectra` accepts one supported
-file or directory, while `load_spectra_many` merges selected files and
-directories into one `SpectrumBundle`. Use `load_spectra_many_relative_to` when
-selected paths should be resolved below one base directory and reported with
-stable relative source paths.
+file or directory, while `load_spectra_relative_to` resolves one selected path
+below a base directory and reports stable relative source paths.
+`load_spectra_many` merges selected files and directories into one
+`SpectrumBundle`. Use `load_spectra_many_relative_to` when multiple selected
+paths should share one base directory.
 
 ```rust,no_run
 use rspin::prelude::*;
 
 fn load_one_dataset() -> Result<SpectrumBundle> {
     load_spectra("data/experiment")
+}
+
+fn load_one_dataset_with_stable_sources() -> Result<SpectrumBundle> {
+    load_spectra_relative_to("data", "experiment")
 }
 
 fn load_selected_inputs() -> Result<SpectrumBundle> {
@@ -45,7 +50,7 @@ fn load_selected_inputs_with_stable_sources() -> Result<SpectrumBundle> {
 }
 
 fn load_exactly_one_selected_spectrum() -> Result<Spectrum1D> {
-    load_spectrum_1d_many_relative_to("data", ["proton.fid"])
+    load_spectrum_1d_relative_to("data", "proton.fid")
 }
 ```
 

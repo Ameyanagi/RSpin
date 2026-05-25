@@ -622,6 +622,24 @@ impl SpectrumBundleLoader {
         }
     }
 
+    /// Loads one selected file or directory path while anchoring source paths to a base directory.
+    ///
+    /// Relative input paths are resolved below `base`. Absolute input paths are
+    /// loaded as provided, and their source metadata is still expressed relative
+    /// to `base` when possible.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `base` is missing or is not a directory, the path
+    /// is unreadable in strict mode, or no readable bundle data is found.
+    pub fn read_path_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<SpectrumBundle> {
+        self.read_paths_relative_to(base, [path])
+    }
+
     /// Loads supported spectra from multiple file or directory paths.
     ///
     /// Non-strict mode records unreadable input paths as warnings and continues
@@ -782,6 +800,34 @@ impl SpectrumBundleLoader {
     /// exactly one two-dimensional spectrum.
     pub fn read_2d(&self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
         self.read_path(path)?.into_only_2d()
+    }
+
+    /// Loads exactly one one-dimensional spectrum from a path relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or the path does not resolve to
+    /// exactly one one-dimensional spectrum.
+    pub fn read_1d_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<Spectrum1D> {
+        self.read_path_relative_to(base, path)?.into_only_1d()
+    }
+
+    /// Loads exactly one two-dimensional spectrum from a path relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or the path does not resolve to
+    /// exactly one two-dimensional spectrum.
+    pub fn read_2d_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<Spectrum2D> {
+        self.read_path_relative_to(base, path)?.into_only_2d()
     }
 
     /// Loads exactly one one-dimensional spectrum from selected file or directory paths.
@@ -1502,6 +1548,22 @@ pub fn load_spectra(path: impl AsRef<Path>) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path(path)
 }
 
+/// Loads one selected path while anchoring source paths to a common base directory.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are loaded
+/// as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no readable bundle data is found.
+pub fn load_spectra_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new().read_path_relative_to(base, path)
+}
+
 /// Loads supported spectra from multiple file or directory paths.
 ///
 /// # Errors
@@ -1554,6 +1616,32 @@ pub fn load_spectrum_1d(path: impl AsRef<Path>) -> Result<Spectrum1D> {
 /// one two-dimensional spectrum.
 pub fn load_spectrum_2d(path: impl AsRef<Path>) -> Result<Spectrum2D> {
     SpectrumBundleLoader::new().read_2d(path)
+}
+
+/// Loads exactly one one-dimensional spectrum from a path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the path does not resolve to exactly
+/// one one-dimensional spectrum.
+pub fn load_spectrum_1d_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_1d_relative_to(base, path)
+}
+
+/// Loads exactly one two-dimensional spectrum from a path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the path does not resolve to exactly
+/// one two-dimensional spectrum.
+pub fn load_spectrum_2d_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_2d_relative_to(base, path)
 }
 
 /// Loads exactly one one-dimensional spectrum from selected file or directory paths.
