@@ -196,6 +196,20 @@ mod ruviz_example {
         .spectrum;
         let acme_refined =
             auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
+        let pivot_ppm = 2.7_f64;
+        let active_region = (1.0_f64, 3.5_f64);
+        let acme_pivot = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default().with_pivot_value(pivot_ppm),
+        )?
+        .spectrum;
+        let acme_active = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default()
+                .with_pivot_value(pivot_ppm)
+                .with_active_region(active_region.0, active_region.1),
+        )?
+        .spectrum;
 
         let peaks = pick_peaks(
             &acme_refined,
@@ -264,7 +278,17 @@ mod ruviz_example {
                         hi,
                     ),
                 )
-                .label("ACME+refine");
+                .label("ACME+refine")
+                .line(
+                    &slice_window(&acme_pivot.x.values, lo, hi),
+                    &slice_window_y(&acme_pivot.x.values, &acme_pivot.intensities, lo, hi),
+                )
+                .label("+pivot")
+                .line(
+                    &slice_window(&acme_active.x.values, lo, hi),
+                    &slice_window_y(&acme_active.x.values, &acme_active.intensities, lo, hi),
+                )
+                .label("+active");
             figure = figure.subplot_at(index, panel.into())?;
         }
 
@@ -307,6 +331,9 @@ mod ruviz_example {
             .normalize_max_abs();
         let unphased = complex_recipe.apply(raw)?;
 
+        let pivot_ppm = 2.7_f64;
+        let active_region = (1.0_f64, 3.5_f64);
+
         let legacy = AutoPhaseOptions::default()
             .with_cost(AutoPhaseCost::LegacyImagNegArea)
             .with_refine(false);
@@ -314,23 +341,23 @@ mod ruviz_example {
             .with_cost(AutoPhaseCost::AcmeEntropy)
             .with_refine(false);
         let acme_refined = AutoPhaseOptions::default();
+        let acme_pivot = AutoPhaseOptions::default().with_pivot_value(pivot_ppm);
+        let acme_active = AutoPhaseOptions::default()
+            .with_pivot_value(pivot_ppm)
+            .with_active_region(active_region.0, active_region.1);
 
         let legacy_result = auto_phase_correct(&unphased, legacy)?;
         let acme_grid_result = auto_phase_correct(&unphased, acme_grid)?;
         let acme_refined_result = auto_phase_correct(&unphased, acme_refined)?;
+        let acme_pivot_result = auto_phase_correct(&unphased, acme_pivot)?;
+        let acme_active_result = auto_phase_correct(&unphased, acme_active)?;
 
-        let legacy_label = format!(
-            "legacy ({:.1}\u{00B0}/{:.1}\u{00B0})",
-            legacy_result.zero_order_deg, legacy_result.first_order_deg
-        );
-        let acme_grid_label = format!(
-            "ACME grid ({:.1}\u{00B0}/{:.1}\u{00B0})",
-            acme_grid_result.zero_order_deg, acme_grid_result.first_order_deg
-        );
-        let acme_refined_label = format!(
-            "ACME + refine ({:.1}\u{00B0}/{:.1}\u{00B0})",
-            acme_refined_result.zero_order_deg, acme_refined_result.first_order_deg
-        );
+        let fmt_label = |stem: &str, r: &rspin_processing::AutoPhaseResult| {
+            format!(
+                "{stem} ({:.1}\u{00B0}/{:.1}\u{00B0})",
+                r.zero_order_deg, r.first_order_deg
+            )
+        };
 
         Plot::new()
             .title("Auto-Phase Comparison (Varian/Agilent 1H)")
@@ -344,20 +371,28 @@ mod ruviz_example {
                 &legacy_result.spectrum.x.values,
                 &legacy_result.spectrum.intensities,
             )
-            .label(&legacy_label)
+            .label(&fmt_label("legacy", &legacy_result))
             .line(
                 &acme_grid_result.spectrum.x.values,
                 &acme_grid_result.spectrum.intensities,
             )
-            .label(&acme_grid_label)
+            .label(&fmt_label("ACME grid", &acme_grid_result))
             .line(
                 &acme_refined_result.spectrum.x.values,
                 &acme_refined_result.spectrum.intensities,
             )
-            .label(&acme_refined_label)
-            .save(path_to_str(
-                &output_dir.join("auto_phase_comparison.png"),
-            )?)?;
+            .label(&fmt_label("ACME + refine", &acme_refined_result))
+            .line(
+                &acme_pivot_result.spectrum.x.values,
+                &acme_pivot_result.spectrum.intensities,
+            )
+            .label(&fmt_label("+ pivot 2.7 ppm", &acme_pivot_result))
+            .line(
+                &acme_active_result.spectrum.x.values,
+                &acme_active_result.spectrum.intensities,
+            )
+            .label(&fmt_label("+ active 1-3.5 ppm", &acme_active_result))
+            .save(path_to_str(&output_dir.join("auto_phase_comparison.png"))?)?;
 
         Ok(())
     }
