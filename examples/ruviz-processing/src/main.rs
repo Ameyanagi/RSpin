@@ -32,8 +32,8 @@ mod ruviz_example {
         write_spectrum1d_csv, write_spectrum1d_json,
     };
     use rspin_processing::{
-        AutoPhaseOptions, BaselineMethod, FftDirection, ProcessSpectrum2D, ProcessingRecipe1D,
-        auto_phase_correct, fit_baseline,
+        AutoPhaseCost, AutoPhaseOptions, BaselineMethod, FftDirection, ProcessSpectrum2D,
+        ProcessingRecipe1D, auto_phase_correct, fit_baseline,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
 
@@ -163,6 +163,74 @@ mod ruviz_example {
         let bundle = load_spectra(fixture_root.join("varian_1h"))?;
         let raw = bundle.only_1d()?;
         write_auto_phase_plot(output_dir, raw)?;
+        write_auto_phase_comparison_plot(output_dir, raw)?;
+        Ok(())
+    }
+
+    fn write_auto_phase_comparison_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("auto-phase comparison target length overflow")?;
+        let complex_recipe = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs();
+        let unphased = complex_recipe.apply(raw)?;
+
+        let legacy = AutoPhaseOptions::default()
+            .with_cost(AutoPhaseCost::LegacyImagNegArea)
+            .with_refine(false);
+        let acme_grid = AutoPhaseOptions::default()
+            .with_cost(AutoPhaseCost::AcmeEntropy)
+            .with_refine(false);
+        let acme_refined = AutoPhaseOptions::default();
+
+        let legacy_result = auto_phase_correct(&unphased, legacy)?;
+        let acme_grid_result = auto_phase_correct(&unphased, acme_grid)?;
+        let acme_refined_result = auto_phase_correct(&unphased, acme_refined)?;
+
+        let legacy_label = format!(
+            "legacy ({:.1}\u{00B0}/{:.1}\u{00B0})",
+            legacy_result.zero_order_deg, legacy_result.first_order_deg
+        );
+        let acme_grid_label = format!(
+            "ACME grid ({:.1}\u{00B0}/{:.1}\u{00B0})",
+            acme_grid_result.zero_order_deg, acme_grid_result.first_order_deg
+        );
+        let acme_refined_label = format!(
+            "ACME + refine ({:.1}\u{00B0}/{:.1}\u{00B0})",
+            acme_refined_result.zero_order_deg, acme_refined_result.first_order_deg
+        );
+
+        Plot::new()
+            .title("Auto-Phase Comparison (Varian/Agilent 1H)")
+            .xlabel(axis_label(unphased.x.unit))
+            .ylabel("normalized intensity")
+            .max_resolution(1600, 1000)
+            .legend_position(LegendPosition::Best)
+            .line(&unphased.x.values, &unphased.intensities)
+            .label("unphased real")
+            .line(
+                &legacy_result.spectrum.x.values,
+                &legacy_result.spectrum.intensities,
+            )
+            .label(&legacy_label)
+            .line(
+                &acme_grid_result.spectrum.x.values,
+                &acme_grid_result.spectrum.intensities,
+            )
+            .label(&acme_grid_label)
+            .line(
+                &acme_refined_result.spectrum.x.values,
+                &acme_refined_result.spectrum.intensities,
+            )
+            .label(&acme_refined_label)
+            .save(path_to_str(
+                &output_dir.join("auto_phase_comparison.png"),
+            )?)?;
+
         Ok(())
     }
 
