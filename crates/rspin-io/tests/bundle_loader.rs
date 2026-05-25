@@ -12,10 +12,14 @@ use rspin_io::{
     SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra, load_spectra_many,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
-    load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_relative_to,
+    load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
+    load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
+    load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
     load_spectrum_1d_with_source, load_spectrum_1d_with_source_relative_to, load_spectrum_2d,
     load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_many_with_source,
-    load_spectrum_2d_many_with_source_relative_to, load_spectrum_2d_relative_to,
+    load_spectrum_2d_many_with_source_relative_to, load_spectrum_2d_paths,
+    load_spectrum_2d_paths_relative_to, load_spectrum_2d_paths_with_source,
+    load_spectrum_2d_paths_with_source_relative_to, load_spectrum_2d_relative_to,
     load_spectrum_2d_with_source_relative_to, parse_loaded_source_format,
     parse_loaded_source_vendor, write_spectrum_bundle_json, write_spectrum1d_json,
     write_spectrum2d_json,
@@ -843,7 +847,13 @@ fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
     assert_eq!(one_d.len(), 16_384);
     assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
 
+    let one_d = load_spectrum_1d_paths([fixture_root().join("varian_1h")])?;
+    assert_eq!(one_d.len(), 16_384);
+
     let one_d = load_spectrum_1d_many_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(one_d.len(), 16_384);
+
+    let one_d = load_spectrum_1d_paths_relative_to(fixture_root(), ["varian_1h"])?;
     assert_eq!(one_d.len(), 16_384);
 
     let one_d = RSpinReader::new().read_1d_paths([
@@ -855,7 +865,13 @@ fn exact_single_helpers_support_selected_path_sets() -> anyhow::Result<()> {
     let two_d = load_spectrum_2d_many([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
     assert_eq!(two_d.shape(), (2048, 512));
 
+    let two_d = load_spectrum_2d_paths([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
     let two_d = load_spectrum_2d_many_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let two_d = load_spectrum_2d_paths_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
     assert_eq!(two_d.shape(), (2048, 512));
 
     let two_d = RSpinReader::new()
@@ -901,8 +917,19 @@ fn exact_single_helpers_support_selected_path_sets_with_sources() -> anyhow::Res
     assert_eq!(source.format, "agilent_fid");
     assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
 
+    let (one_d, source) = load_spectrum_1d_paths_with_source([fixture_root().join("varian_1h")])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
     let (one_d, source) =
         load_spectrum_1d_many_with_source_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(one_d.len(), 16_384);
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (one_d, source) =
+        load_spectrum_1d_paths_with_source_relative_to(fixture_root(), ["varian_1h"])?;
     assert_eq!(one_d.len(), 16_384);
     assert_eq!(source.format, "agilent_fid");
     assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
@@ -942,7 +969,19 @@ fn exact_single_helpers_support_selected_path_sets_with_sources() -> anyhow::Res
     assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
 
     let (two_d, source) =
+        load_spectrum_2d_paths_with_source([nmrxiv_fixture_root().join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) =
         load_spectrum_2d_many_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (two_d, source) =
+        load_spectrum_2d_paths_with_source_relative_to(nmrxiv_fixture_root(), ["bruker_cosy_raw"])?;
     assert_eq!(two_d.shape(), (2048, 512));
     assert_eq!(source.format, "bruker_ser");
     assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));

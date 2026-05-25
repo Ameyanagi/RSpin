@@ -500,6 +500,22 @@ where
     SpectrumBundleLoader::new().read_1d_many(paths)
 }
 
+/// Loads exactly one one-dimensional spectrum from selected file or directory paths.
+///
+/// This is a spelling alias for [`load_spectrum_1d_many`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one one-dimensional spectrum.
+pub fn load_spectrum_1d_paths<I, P>(paths: I) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_1d_paths(paths)
+}
+
 /// Loads exactly one one-dimensional spectrum with source metadata from selected file or directory paths.
 ///
 /// # Errors
@@ -512,6 +528,22 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_1d_many_with_source(paths)
+}
+
+/// Loads exactly one one-dimensional spectrum with source metadata from selected file or directory paths.
+///
+/// This is a spelling alias for [`load_spectrum_1d_many_with_source`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one one-dimensional spectrum.
+pub fn load_spectrum_1d_paths_with_source<I, P>(paths: I) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_1d_paths_with_source(paths)
 }
 
 /// Loads exactly one two-dimensional spectrum from selected file or directory paths.
@@ -528,6 +560,22 @@ where
     SpectrumBundleLoader::new().read_2d_many(paths)
 }
 
+/// Loads exactly one two-dimensional spectrum from selected file or directory paths.
+///
+/// This is a spelling alias for [`load_spectrum_2d_many`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one two-dimensional spectrum.
+pub fn load_spectrum_2d_paths<I, P>(paths: I) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_2d_paths(paths)
+}
+
 /// Loads exactly one two-dimensional spectrum with source metadata from selected file or directory paths.
 ///
 /// # Errors
@@ -540,6 +588,22 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_2d_many_with_source(paths)
+}
+
+/// Loads exactly one two-dimensional spectrum with source metadata from selected file or directory paths.
+///
+/// This is a spelling alias for [`load_spectrum_2d_many_with_source`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one two-dimensional spectrum.
+pub fn load_spectrum_2d_paths_with_source<I, P>(paths: I) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_2d_paths_with_source(paths)
 }
 
 /// Loads exactly one one-dimensional spectrum from paths relative to a base directory.
@@ -559,6 +623,25 @@ where
     SpectrumBundleLoader::new().read_1d_many_relative_to(base, paths)
 }
 
+/// Loads exactly one one-dimensional spectrum from paths relative to a base directory.
+///
+/// This is a spelling alias for [`load_spectrum_1d_many_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one one-dimensional spectrum.
+pub fn load_spectrum_1d_paths_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_1d_paths_relative_to(base, paths)
+}
+
 /// Loads exactly one one-dimensional spectrum with source metadata from paths relative to a base directory.
 ///
 /// # Errors
@@ -574,6 +657,25 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_1d_many_with_source_relative_to(base, paths)
+}
+
+/// Loads exactly one one-dimensional spectrum with source metadata from paths relative to a base directory.
+///
+/// This is a spelling alias for [`load_spectrum_1d_many_with_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one one-dimensional spectrum.
+pub fn load_spectrum_1d_paths_with_source_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_1d_paths_with_source_relative_to(base, paths)
 }
 
 /// Loads exactly one two-dimensional spectrum from paths relative to a base directory.
@@ -593,6 +695,25 @@ where
     SpectrumBundleLoader::new().read_2d_many_relative_to(base, paths)
 }
 
+/// Loads exactly one two-dimensional spectrum from paths relative to a base directory.
+///
+/// This is a spelling alias for [`load_spectrum_2d_many_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one two-dimensional spectrum.
+pub fn load_spectrum_2d_paths_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_2d_paths_relative_to(base, paths)
+}
+
 /// Loads exactly one two-dimensional spectrum with source metadata from paths relative to a base directory.
 ///
 /// # Errors
@@ -608,4 +729,23 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_2d_many_with_source_relative_to(base, paths)
+}
+
+/// Loads exactly one two-dimensional spectrum with source metadata from paths relative to a base directory.
+///
+/// This is a spelling alias for [`load_spectrum_2d_many_with_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected paths do not resolve to
+/// exactly one two-dimensional spectrum.
+pub fn load_spectrum_2d_paths_with_source_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_2d_paths_with_source_relative_to(base, paths)
 }
