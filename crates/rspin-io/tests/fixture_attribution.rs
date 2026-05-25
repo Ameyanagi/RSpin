@@ -13,6 +13,7 @@ fn redistributed_fixture_files_are_documented() -> anyhow::Result<()> {
     assert!(top_readme.contains("zenodo_7100132/"));
     assert!(top_readme.contains("nmrxiv/cc0/"));
     assert!(top_readme.contains("nmrxiv/cc-by-4.0/"));
+    assert!(top_readme.contains("dataverse/cc0/"));
     assert!(top_readme.contains("Fixture Rules"));
 
     let zenodo_readme = fs::read_to_string(testdata.join("zenodo_7100132/README.md"))?;
@@ -26,6 +27,12 @@ fn redistributed_fixture_files_are_documented() -> anyhow::Result<()> {
     assert!(nmrxiv_readme.matches("- Authors:").count() >= 2);
     assert_checksum_inventory_covers(&testdata.join("nmrxiv"), "cc0", &nmrxiv_readme)?;
     assert_checksum_inventory_covers(&testdata.join("nmrxiv"), "cc-by-4.0", &nmrxiv_readme)?;
+
+    let dataverse_readme = fs::read_to_string(testdata.join("dataverse/README.md"))?;
+    assert!(dataverse_readme.contains("Creative Commons Zero v1.0 Universal"));
+    assert!(dataverse_readme.contains("Package license: MIT"));
+    assert!(dataverse_readme.contains("Authors:"));
+    assert_checksum_inventory_covers(&testdata.join("dataverse"), "cc0", &dataverse_readme)?;
     Ok(())
 }
 

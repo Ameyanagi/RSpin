@@ -16,6 +16,9 @@ or only acceptable for private comparison.
 - `nmrxiv/cc-by-4.0/`: selected CC-BY-4.0 NMRXiv Varian fixtures. See the
   nested README for required attribution, source APIs, source URLs, changes, and
   checksums.
+- `dataverse/cc0/`: selected CC0 Harvard Dataverse Rutin fixtures copied from
+  MIT-licensed test-data packages. See the nested README for original DOI,
+  package provenance, authors, changes, and checksums.
 - `bundle_nmredata/`: small project-authored synthetic NMReDATA fixture for
   bundle metadata tests.
 
