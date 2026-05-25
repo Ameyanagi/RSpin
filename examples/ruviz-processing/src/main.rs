@@ -198,8 +198,11 @@ mod ruviz_example {
 
     fn process_2d_for_contour(spectrum: &Spectrum2D) -> Result<Spectrum2D> {
         if spectrum.x.unit == Unit::Seconds || spectrum.y.unit == Unit::Seconds {
+            let dwell_x = axis_step(&spectrum.x.values).unwrap_or(1.0e-6);
+            let dwell_y = axis_step(&spectrum.y.values).unwrap_or(1.0e-6);
             spectrum
                 .process()
+                .exponential_apodization(5.0, 5.0, dwell_x, dwell_y)
                 .fft(FftDirection::Forward)
                 .absolute_value()
                 .normalize_max_abs()
@@ -215,6 +218,18 @@ mod ruviz_example {
         }
     }
 
+    fn axis_step(values: &[f64]) -> Option<f64> {
+        if values.len() < 2 {
+            return None;
+        }
+        let step = (values[1] - values[0]).abs();
+        if step.is_finite() && step > 0.0 {
+            Some(step)
+        } else {
+            None
+        }
+    }
+
     fn write_contour_plot(
         path: &Path,
         title: &str,
@@ -222,16 +237,35 @@ mod ruviz_example {
         y_label: &str,
         spectrum: &Spectrum2D,
     ) -> Result<()> {
+        let levels = autoscale_contour_levels(&spectrum.z);
         Plot::new()
             .title(title)
             .xlabel(x_label)
             .ylabel(y_label)
             .max_resolution(1400, 1200)
             .contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
-            .levels(12)
+            .level_values(levels)
             .filled(false)
             .save(path_to_str(path)?)?;
         Ok(())
+    }
+
+    fn autoscale_contour_levels(z: &[f64]) -> Vec<f64> {
+        let max_abs = z
+            .iter()
+            .copied()
+            .map(f64::abs)
+            .fold(0.0_f64, f64::max);
+        if !(max_abs > 0.0) {
+            return vec![0.0];
+        }
+        let base = max_abs * 0.005;
+        let ratio = 1.3_f64;
+        let count: usize = 20;
+        (0..u32::try_from(count).unwrap_or(0))
+            .map(|i| base * ratio.powi(i as i32))
+            .filter(|level| *level <= max_abs)
+            .collect()
     }
 
     fn write_vendor_showcase(root: &Path, output_dir: &Path) -> Result<()> {
