@@ -6,6 +6,7 @@ mod analysis_json;
 mod assignment_json;
 mod auto;
 mod bruker;
+mod bundle;
 mod csv;
 mod csv_2d;
 mod csv_common;
@@ -68,6 +69,10 @@ pub use bruker::{
     read_bruker_fid_1d_dir, read_bruker_processed_1d_bytes, read_bruker_processed_1d_dir,
     read_bruker_processed_2d_bytes, read_bruker_processed_2d_dir, read_bruker_ser_2d_bytes,
     read_bruker_ser_2d_dir,
+};
+pub use bundle::{
+    LoadWarning, LoadedSource, LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader,
+    load_spectra,
 };
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};
