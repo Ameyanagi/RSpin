@@ -10,10 +10,11 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    RSpinReader, Spectrum1DPathFormat, Spectrum2DPathFormat, detect_spectrum1d_path_format,
-    detect_spectrum2d_path_format, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
-    read_bruker_fid_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
-    read_jeol_jdf_2d_file, read_nmrml_1d_file, read_nmrml_2d_file,
+    RSpinReader, Spectrum1DBytesFormat, Spectrum1DPathFormat, Spectrum2DBytesFormat,
+    Spectrum2DPathFormat, detect_spectrum1d_path_format, detect_spectrum2d_path_format,
+    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
+    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
+    read_nmrml_1d_file, read_nmrml_2d_file, read_spectrum1d_bytes_as, read_spectrum2d_bytes_as,
 };
 
 #[test]
@@ -246,6 +247,43 @@ fn parses_external_jeol_2d_jdf_when_available() -> anyhow::Result<()> {
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));
     assert!(spectrum.imaginary.is_some());
     assert!(spectrum.z.iter().any(|value| value.abs() > 1.0e-12));
+    Ok(())
+}
+
+#[test]
+fn routes_external_jeol_jdf_bytes_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let one_d_fixture = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_qHNMR_400MHz_Jeol.jdf");
+    let two_d_fixture = root
+        .join("unpacked/jeol-data-test-1.0.0/data/Rutin_3080ug200uL_DMSOd6_HSQC_400MHz_Jeol.jdf");
+    require_fixture(&one_d_fixture)?;
+    require_fixture(&two_d_fixture)?;
+
+    let one_d = read_spectrum1d_bytes_as(
+        &fs::read(&one_d_fixture)?,
+        Spectrum1DBytesFormat::JeolJdf,
+        None,
+    )?;
+    let two_d = read_spectrum2d_bytes_as(
+        &fs::read(&two_d_fixture)?,
+        Spectrum2DBytesFormat::JeolJdf,
+        None,
+        None,
+    )?;
+
+    assert_eq!(one_d.len(), 32_768);
+    assert_eq!(one_d.x.unit, Unit::Seconds);
+    assert_eq!(one_d.metadata.origin.as_deref(), Some("JEOL"));
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert!(one_d.imaginary.is_some());
+    assert_eq!(two_d.shape(), (4096, 256));
+    assert_eq!(two_d.x.unit, Unit::Seconds);
+    assert_eq!(two_d.y.unit, Unit::Seconds);
+    assert_eq!(two_d.metadata.origin.as_deref(), Some("JEOL"));
+    assert!(two_d.imaginary.is_some());
     Ok(())
 }
 
