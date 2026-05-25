@@ -1,7 +1,9 @@
+use std::path::PathBuf;
+
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
 use rspin_io::{
     ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, NMREDATA_RECORD_JSON_FORMAT,
-    NMREDATA_RECORDS_JSON_FORMAT,
+    NMREDATA_RECORDS_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_FORMAT,
 };
 
 use super::*;
@@ -19,6 +21,19 @@ mod pca;
 mod prediction;
 mod simulation;
 mod workflow;
+
+#[derive(Debug, serde::Deserialize)]
+struct TestBundleCounts {
+    spectra: usize,
+    spectra_1d: usize,
+    spectra_2d: usize,
+    molecules: usize,
+    warnings: usize,
+}
+
+fn io_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../rspin-io/testdata")
+}
 
 #[test]
 fn parses_jcamp_to_json() -> anyhow::Result<()> {
@@ -141,6 +156,45 @@ fn writes_spectrum_text_by_format_json() -> anyhow::Result<()> {
     let jcamp_2d = write_spectrum_2d_text_json(&spectrum_2d_json, "jdx")?;
     let parsed_jcamp_2d = spectrum2d_from_json(&parse_spectrum_2d_text_json(&jcamp_2d)?)?;
     assert_eq!(parsed_jcamp_2d.z, spectrum_2d.z);
+    Ok(())
+}
+
+#[test]
+fn validates_and_summarizes_spectrum_bundle_json() -> anyhow::Result<()> {
+    let bundle = rspin_io::load_spectra(io_fixture_root().join("bundle_nmredata"))?;
+    let legacy_json = serde_json::to_string(&bundle)?;
+
+    let normalized_json = validate_spectrum_bundle_json(&legacy_json)?;
+    assert!(normalized_json.contains(SPECTRUM_BUNDLE_JSON_FORMAT));
+
+    let reparsed = rspin_io::read_spectrum_bundle_json(&normalized_json)?;
+    assert_eq!(reparsed.len(), 0);
+    assert_eq!(reparsed.molecules().len(), 1);
+    assert!(reparsed.warnings().is_empty());
+
+    let counts_json = spectrum_bundle_counts_json(&normalized_json)?;
+    let counts: TestBundleCounts = serde_json::from_str(&counts_json)?;
+    assert_eq!(counts.spectra, 0);
+    assert_eq!(counts.spectra_1d, 0);
+    assert_eq!(counts.spectra_2d, 0);
+    assert_eq!(counts.molecules, 1);
+    assert_eq!(counts.warnings, 0);
+    Ok(())
+}
+
+#[test]
+fn extracts_exact_spectrum_from_bundle_json() -> anyhow::Result<()> {
+    let bundle = rspin_io::load_spectra(io_fixture_root().join("zenodo_7100132/varian_1h"))?;
+    let bundle_json = rspin_io::write_spectrum_bundle_json(&bundle)?;
+
+    let spectrum_json = spectrum_bundle_only_1d_json(&bundle_json)?;
+    let spectrum = spectrum1d_from_json(&spectrum_json)?;
+    assert_eq!(spectrum.len(), 16_384);
+    assert_eq!(spectrum.x.unit, Unit::Seconds);
+    assert!(spectrum.imaginary.is_some());
+
+    let wrong_dimension = spectrum_bundle_only_2d_json(&bundle_json);
+    assert!(matches!(wrong_dimension, Err(RSpinError::Parse { .. })));
     Ok(())
 }
 

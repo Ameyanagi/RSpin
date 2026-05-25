@@ -16,10 +16,11 @@ use crate::{
     parse_nmrml_version_json, parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json,
     parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json,
     parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
-    write_analysis_1d_csv_json, write_analysis_2d_csv_json, write_jcamp_dx_2d_json,
-    write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
-    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
-    write_spectrum_2d_text_json,
+    spectrum_bundle_counts_json, spectrum_bundle_only_1d_json, spectrum_bundle_only_2d_json,
+    validate_spectrum_bundle_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
+    write_jcamp_dx_2d_json, write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json,
+    write_nmrml_2d_json, write_spectrum_1d_csv_json, write_spectrum_1d_text_json,
+    write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -448,6 +449,49 @@ pub fn nmredata_to_analysis(
 #[wasm_bindgen(js_name = inspectNmrMlDocument)]
 pub fn inspect_nmrml_document(input: &str) -> std::result::Result<String, JsValue> {
     inspect_nmrml_document_json(input).map_err(|error| js_error(&error))
+}
+
+/// Validates spectrum bundle JSON and returns normalized versioned bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing, validation, or
+/// serialization fails.
+#[wasm_bindgen(js_name = validateSpectrumBundle)]
+pub fn validate_spectrum_bundle(input: &str) -> std::result::Result<String, JsValue> {
+    validate_spectrum_bundle_json(input).map_err(|error| js_error(&error))
+}
+
+/// Counts spectra, molecules, and warnings in spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when parsing or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleCounts)]
+pub fn spectrum_bundle_counts(input: &str) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_counts_json(input).map_err(|error| js_error(&error))
+}
+
+/// Extracts the only one-dimensional spectrum from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one one-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleOnly1d)]
+pub fn spectrum_bundle_only_1d(input: &str) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_only_1d_json(input).map_err(|error| js_error(&error))
+}
+
+/// Extracts the only two-dimensional spectrum from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one two-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleOnly2d)]
+pub fn spectrum_bundle_only_2d(input: &str) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_only_2d_json(input).map_err(|error| js_error(&error))
 }
 
 /// Serializes one-dimensional spectrum JSON into nmrML text.

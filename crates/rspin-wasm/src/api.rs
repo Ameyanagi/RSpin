@@ -36,13 +36,14 @@ use rspin_io::{
     read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d,
     read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes, read_nmredata_record_json,
     read_nmredata_records_json, read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str,
-    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum1d_bytes_as,
-    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as,
-    read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
-    write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record,
-    write_nmredata_record_json, write_nmredata_records,
+    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum_bundle_json,
+    read_spectrum1d_bytes_as, read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as,
+    read_spectrum2d_bytes_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
+    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d,
+    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
-    write_spectrum1d_json, write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
+    write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum1d_text,
+    write_spectrum2d_json, write_spectrum2d_text,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -595,6 +596,54 @@ pub fn parse_spectrum_2d_text_as_json(input: &str, format: &str) -> Result<Strin
     spectrum2d_to_json(&spectrum)
 }
 
+/// Validates spectrum bundle JSON and returns normalized versioned bundle JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, validation, or serialization fails.
+pub fn validate_spectrum_bundle_json(input: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    write_spectrum_bundle_json(&bundle)
+}
+
+/// Summarizes spectrum bundle JSON into counts for browser-side routing.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or serialization fails.
+pub fn spectrum_bundle_counts_json(input: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    to_json(&SpectrumBundleCounts {
+        spectra: bundle.len(),
+        spectra_1d: bundle.spectra_1d().count(),
+        spectra_2d: bundle.spectra_2d().count(),
+        molecules: bundle.molecules().len(),
+        warnings: bundle.warnings().len(),
+    })
+}
+
+/// Extracts the only one-dimensional spectrum from bundle JSON.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one one-dimensional
+/// spectrum, or when serialization fails.
+pub fn spectrum_bundle_only_1d_json(input: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    write_spectrum1d_json(bundle.only_1d()?)
+}
+
+/// Extracts the only two-dimensional spectrum from bundle JSON.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one two-dimensional
+/// spectrum, or when serialization fails.
+pub fn spectrum_bundle_only_2d_json(input: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    write_spectrum2d_json(bundle.only_2d()?)
+}
+
 /// Scales serialized `Spectrum1D` JSON.
 ///
 /// # Errors
@@ -864,6 +913,15 @@ fn spectrum1d_to_json(spectrum: &Spectrum1D) -> Result<String> {
 
 fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
     write_spectrum2d_json(spectrum)
+}
+
+#[derive(Debug, Serialize)]
+struct SpectrumBundleCounts {
+    spectra: usize,
+    spectra_1d: usize,
+    spectra_2d: usize,
+    molecules: usize,
+    warnings: usize,
 }
 
 fn parse_nucleus_label(label: &str) -> Result<Nucleus> {
