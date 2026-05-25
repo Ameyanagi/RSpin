@@ -939,3 +939,58 @@ fn prelude_supports_zone_alignment_workflows() -> Result<()> {
     assert!((result.shifts[1].delta_y - 0.25).abs() < 1.0e-12);
     Ok(())
 }
+
+#[test]
+fn prelude_supports_disk_load_process_analyze_chain() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let raw = load_spectrum_1d_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(raw.x.unit, Unit::Seconds);
+    let raw_len = raw.len();
+    assert!(raw_len > 0);
+
+    let dwell_seconds = (raw.x.values[1] - raw.x.values[0]).abs();
+    assert!(dwell_seconds.is_finite() && dwell_seconds > 0.0);
+
+    let target_len = raw_len
+        .checked_mul(2)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "raw FID length overflow".into(),
+        })?;
+
+    let recipe = ProcessingRecipe1D::new()
+        .exponential_apodization(1.0, dwell_seconds)
+        .zero_fill(target_len)
+        .fft(FftDirection::Forward)
+        .magnitude()
+        .normalize_max_abs();
+    let processed = recipe.apply(&raw)?;
+
+    assert_eq!(processed.len(), target_len);
+    assert!(processed.processing.len() >= 5);
+    let max_abs = processed
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, |acc, v| acc.max(v.abs()));
+    assert!((max_abs - 1.0).abs() < 1.0e-9);
+
+    let analysis = processed
+        .clone()
+        .process()
+        .analyze()
+        .with_peak_options(
+            PeakPickOptions::new()
+                .with_min_abs_intensity(0.05)
+                .with_min_prominence(0.0),
+        )
+        .with_range_options(RangeDetectionOptions::new().with_threshold_abs(0.05))
+        .run()?;
+
+    assert_eq!(analysis.ranges.len(), analysis.integrals.len());
+    for peak in &analysis.peaks {
+        assert!(peak.intensity.abs() >= 0.05 - 1.0e-12);
+    }
+    Ok(())
+}
