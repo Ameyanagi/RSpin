@@ -898,10 +898,9 @@ pub(crate) fn is_agilent_arrayed_2d_series_array(value: &str) -> bool {
         .map(str::trim)
         .filter(|token| !token.is_empty())
     {
-        if token.eq_ignore_ascii_case("phase") {
-            return false;
+        if !token.eq_ignore_ascii_case("phase") {
+            has_series_parameter = true;
         }
-        has_series_parameter = true;
     }
     has_series_parameter
 }

@@ -58,6 +58,16 @@ operator 2 2 8 0 0 2 1 0 1 64
 }
 
 #[test]
+fn classifies_arrayed_2d_series_parameters() {
+    assert!(!is_agilent_arrayed_2d_series_array(""));
+    assert!(!is_agilent_arrayed_2d_series_array("phase"));
+    assert!(!is_agilent_arrayed_2d_series_array("(phase)"));
+    assert!(is_agilent_arrayed_2d_series_array("mix"));
+    assert!(is_agilent_arrayed_2d_series_array("phase,mix"));
+    assert!(is_agilent_arrayed_2d_series_array("(phase, mix)"));
+}
+
+#[test]
 fn rejects_higher_dimensional_procpar_routing() -> anyhow::Result<()> {
     let info = inspect_agilent_procpar(
         "\

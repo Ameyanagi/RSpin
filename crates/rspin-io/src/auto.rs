@@ -4,14 +4,15 @@ use std::{fmt, fs, path::Path, str::FromStr};
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
+use crate::agilent::is_agilent_arrayed_2d_series_array;
 use crate::{
-    SpectrumPathReader, SpectrumReader, inspect_agilent_binary_file, inspect_agilent_procpar,
-    inspect_jeol_jdf_file, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
-    read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
-    read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
-    read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
-    read_nmrml_1d_str, read_nmrml_2d_str, read_spectrum1d_csv, read_spectrum1d_json,
-    read_spectrum2d_csv, read_spectrum2d_json,
+    AgilentBinaryFileInfo, AgilentProcparInfo, SpectrumPathReader, SpectrumReader,
+    inspect_agilent_binary_file, inspect_agilent_procpar, inspect_jeol_jdf_file,
+    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_agilent_processed_1d_dir,
+    read_agilent_processed_2d_dir, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
+    read_bruker_processed_2d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jcamp_dx_2d,
+    read_jeol_jdf_1d_file, read_jeol_jdf_2d_file, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_spectrum1d_csv, read_spectrum1d_json, read_spectrum2d_csv, read_spectrum2d_json,
 };
 
 mod bytes;
@@ -984,11 +985,16 @@ fn ensure_agilent_path_dimension(
     kind: AgilentPathKind,
     expected: DetectedPathDimension,
 ) -> Result<()> {
-    validate_agilent_procpar_supported(path, kind)?;
+    let procpar_info = agilent_procpar_info(path, kind)?;
     let Some(binary_path) = agilent_binary_path(path, kind) else {
         return Ok(());
     };
     let info = inspect_agilent_binary_file(binary_path)?;
+
+    if matches!(kind, AgilentPathKind::Fid) {
+        return ensure_agilent_fid_path_dimension(procpar_info.as_ref(), &info, expected);
+    }
+
     let detected = if info.is_two_dimensional() {
         DetectedPathDimension::TwoD
     } else {
@@ -997,9 +1003,9 @@ fn ensure_agilent_path_dimension(
     ensure_detected_dimension(detected, expected, "Agilent")
 }
 
-fn validate_agilent_procpar_supported(path: &Path, kind: AgilentPathKind) -> Result<()> {
+fn agilent_procpar_info(path: &Path, kind: AgilentPathKind) -> Result<Option<AgilentProcparInfo>> {
     let Some(procpar_path) = agilent_procpar_path(path, kind) else {
-        return Ok(());
+        return Ok(None);
     };
     let text = fs::read_to_string(&procpar_path).map_err(|error| RSpinError::Parse {
         format: "Agilent",
@@ -1008,7 +1014,53 @@ fn validate_agilent_procpar_supported(path: &Path, kind: AgilentPathKind) -> Res
             procpar_path.display()
         ),
     })?;
-    inspect_agilent_procpar(&text)?.validate_supported_by_current_readers()
+    let info = inspect_agilent_procpar(&text)?;
+    info.validate_supported_by_current_readers()?;
+    Ok(Some(info))
+}
+
+fn ensure_agilent_fid_path_dimension(
+    procpar_info: Option<&AgilentProcparInfo>,
+    binary_info: &AgilentBinaryFileInfo,
+    expected: DetectedPathDimension,
+) -> Result<()> {
+    if let Some(info) = procpar_info {
+        match info.acquisition_dimension {
+            Some(0 | 1) => {
+                if binary_info.trace_count > 1 {
+                    return Err(RSpinError::Unsupported {
+                        feature: "arrayed Agilent one-dimensional FID requires bundle reader",
+                    });
+                }
+                return ensure_detected_dimension(DetectedPathDimension::OneD, expected, "Agilent");
+            }
+            Some(2) => {
+                if info
+                    .array_parameter
+                    .as_deref()
+                    .is_some_and(is_agilent_arrayed_2d_series_array)
+                {
+                    return Err(RSpinError::Unsupported {
+                        feature: "arrayed Agilent two-dimensional FID requires bundle reader",
+                    });
+                }
+                return ensure_detected_dimension(DetectedPathDimension::TwoD, expected, "Agilent");
+            }
+            Some(_) => {
+                return Err(RSpinError::Unsupported {
+                    feature: "Agilent three-or-higher-dimensional FID",
+                });
+            }
+            None => {}
+        }
+    }
+
+    let detected = if binary_info.is_two_dimensional() {
+        DetectedPathDimension::TwoD
+    } else {
+        DetectedPathDimension::OneD
+    };
+    ensure_detected_dimension(detected, expected, "Agilent")
 }
 
 fn agilent_binary_path(path: &Path, kind: AgilentPathKind) -> Option<std::path::PathBuf> {

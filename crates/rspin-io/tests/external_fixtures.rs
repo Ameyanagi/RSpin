@@ -466,6 +466,13 @@ fn auto_detects_external_vendor_path_formats_when_available() -> anyhow::Result<
     };
     let agilent_1d = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_1d");
     let agilent_2d = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_2d");
+    let agilent_2d_tppi = root.join("unpacked/nmrglue-test-data-v0.4-dev/agilent_2d_tppi");
+    let varian_arrayed_1d = root.join(
+        "unpacked/nmrglue-example-data-all-none/separate/separate_1d_varian/arrayed_data.dir",
+    );
+    let varian_arrayed_2d = root.join(
+        "unpacked/nmrglue-example-data-all-none/separate/separate_2d_varian/arrayed_data.dir",
+    );
     let bruker_1d = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_1d");
     let bruker_2d = root.join("unpacked/nmrglue-test-data-v0.4-dev/bruker_2d");
     let jeol_1d = root
@@ -484,9 +491,22 @@ fn auto_detects_external_vendor_path_formats_when_available() -> anyhow::Result<
         detect_spectrum2d_path_format(&agilent_2d)?,
         Spectrum2DPathFormat::AgilentFid
     );
+    assert_eq!(
+        detect_spectrum2d_path_format(&agilent_2d_tppi)?,
+        Spectrum2DPathFormat::AgilentFid
+    );
     let wrong_dimension = detect_spectrum1d_path_format(&agilent_2d)
         .expect_err("two-dimensional Agilent FID should not route to 1D");
     assert_unsupported(&wrong_dimension);
+    let arrayed_1d_single = detect_spectrum1d_path_format(&varian_arrayed_1d)
+        .expect_err("arrayed Agilent/Varian 1D FID should require bundle reader");
+    assert_unsupported(&arrayed_1d_single);
+    let arrayed_1d_wrong = detect_spectrum2d_path_format(&varian_arrayed_1d)
+        .expect_err("arrayed Agilent/Varian 1D FID should not route to 2D");
+    assert_unsupported(&arrayed_1d_wrong);
+    let arrayed_2d_single = detect_spectrum2d_path_format(&varian_arrayed_2d)
+        .expect_err("arrayed Agilent/Varian 2D FID should require bundle reader");
+    assert_unsupported(&arrayed_2d_single);
     assert_eq!(
         detect_spectrum1d_path_format(&bruker_1d)?,
         Spectrum1DPathFormat::BrukerFid
