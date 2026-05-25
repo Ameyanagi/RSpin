@@ -1033,10 +1033,13 @@ impl SpectrumBundleLoader {
     }
 
     fn disabled_dimension_file_message(&self, path: &Path) -> Option<String> {
-        if !self.one_d.is_enabled() && crate::detect_spectrum1d_path_format(path).is_ok() {
+        let supports_1d = crate::detect_spectrum1d_path_format(path).is_ok();
+        let supports_2d = crate::detect_spectrum2d_path_format(path).is_ok();
+
+        if !self.one_d.is_enabled() && supports_1d && (!self.two_d.is_enabled() || !supports_2d) {
             return Some(disabled_dimension_message(path, "one-dimensional"));
         }
-        if !self.two_d.is_enabled() && crate::detect_spectrum2d_path_format(path).is_ok() {
+        if !self.two_d.is_enabled() && supports_2d && (!self.one_d.is_enabled() || !supports_1d) {
             return Some(disabled_dimension_message(path, "two-dimensional"));
         }
         None

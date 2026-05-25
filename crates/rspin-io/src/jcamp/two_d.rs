@@ -41,6 +41,7 @@ struct RawJcamp2D {
     temperature_k: Option<f64>,
     origin: Option<String>,
     pages: Vec<Jcamp2DPage>,
+    saw_page_label: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -156,11 +157,14 @@ fn apply_label_2d(raw: &mut RawJcamp2D, key: &str, value: &str) -> Result<()> {
         "FIRST" => apply_first(raw, value)?,
         "LAST" => apply_last(raw, value)?,
         "UNITS" => apply_units(raw, value),
-        "PAGE" => raw.pages.push(Jcamp2DPage {
-            y_value: parse_page_coordinate(value)?,
-            channel: Channel2D::Real,
-            values: Vec::new(),
-        }),
+        "PAGE" => {
+            raw.saw_page_label = true;
+            raw.pages.push(Jcamp2DPage {
+                y_value: parse_page_coordinate(value)?,
+                channel: Channel2D::Real,
+                values: Vec::new(),
+            });
+        }
         _ => {}
     }
     Ok(())
@@ -264,6 +268,12 @@ fn current_page(raw: &mut RawJcamp2D) -> &mut Jcamp2DPage {
 }
 
 fn spectrum_from_raw_2d(raw: &RawJcamp2D) -> Result<Spectrum2D> {
+    if !raw.saw_page_label {
+        return Err(RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: "missing 2D JCAMP-DX PAGE labels".to_owned(),
+        });
+    }
     if raw.pages.is_empty() {
         return Err(RSpinError::Parse {
             format: "JCAMP-DX",

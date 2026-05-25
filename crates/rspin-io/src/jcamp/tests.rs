@@ -359,6 +359,18 @@ fn rejects_incomplete_two_dimensional_pages() {
 }
 
 #[test]
+fn rejects_one_dimensional_xydata_as_two_dimensional() {
+    let input = "\
+##TITLE=one dimensional
+##XYDATA=(X++(Y..Y))
+0 1 2
+##END=
+";
+    let result = read_jcamp_dx_2d(input);
+    assert!(matches!(result, Err(RSpinError::Parse { .. })));
+}
+
+#[test]
 fn reads_asdf_sqz_xydata_values() -> anyhow::Result<()> {
     let input = "\
 ##TITLE=sqz compressed

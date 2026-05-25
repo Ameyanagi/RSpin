@@ -139,9 +139,17 @@ fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 
     let one_d_only = RSpinReader::new().with_2d(false).read_path(&mixed)?;
-    assert_eq!(one_d_only.spectra_1d().count(), 3);
+    assert_eq!(one_d_only.spectra_1d().count(), 5);
     assert_eq!(one_d_only.spectra_2d().count(), 0);
     assert!(one_d_only.spectra().iter().all(LoadedSpectrum::is_1d));
+    assert!(has_source_path(
+        &one_d_only,
+        Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
+    ));
+    assert!(has_source_path(
+        &one_d_only,
+        Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx")
+    ));
 
     let two_d_only = RSpinReader::new().with_1d(false).read_path(&mixed)?;
     assert_eq!(two_d_only.spectra_1d().count(), 0);
