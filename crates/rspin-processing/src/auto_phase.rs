@@ -65,8 +65,15 @@ pub fn auto_phase_correct(
     options: AutoPhaseOptions,
 ) -> Result<AutoPhaseResult> {
     options.validate()?;
+    let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
+    let active_mask = resolve_active_mask(spectrum, options);
     let buffer = complex_buffer(spectrum);
     let fractions = index_fractions(spectrum.len())?;
+    let options = AutoPhaseOptions {
+        pivot_fraction,
+        pivot_value: None,
+        ..options
+    };
     let zero_order_values = grid_values(
         options.zero_order_min_deg,
         options.zero_order_max_deg,
@@ -80,8 +87,16 @@ pub fn auto_phase_correct(
         "first-order phase",
     )?;
 
-    let evaluate =
-        |ph0: f64, ph1: f64| -> f64 { score_candidate(&buffer, &fractions, ph0, ph1, options) };
+    let evaluate = |ph0: f64, ph1: f64| -> f64 {
+        score_candidate(
+            &buffer,
+            &fractions,
+            active_mask.as_deref(),
+            ph0,
+            ph1,
+            options,
+        )
+    };
 
     let mut best: Option<PhaseCandidate> = None;
     for zero_order_deg in zero_order_values {
@@ -300,23 +315,39 @@ impl PhaseCandidate {
 fn score_candidate(
     buffer: &[Complex<f64>],
     fractions: &[f64],
+    mask: Option<&[bool]>,
     zero_order_deg: f64,
     first_order_deg: f64,
     options: AutoPhaseOptions,
 ) -> f64 {
     match options.cost {
-        AutoPhaseCost::LegacyImagNegArea => {
-            legacy_cost(buffer, fractions, zero_order_deg, first_order_deg, options)
-        }
-        AutoPhaseCost::AcmeEntropy => {
-            acme_cost(buffer, fractions, zero_order_deg, first_order_deg, options)
-        }
+        AutoPhaseCost::LegacyImagNegArea => legacy_cost(
+            buffer,
+            fractions,
+            mask,
+            zero_order_deg,
+            first_order_deg,
+            options,
+        ),
+        AutoPhaseCost::AcmeEntropy => acme_cost(
+            buffer,
+            fractions,
+            mask,
+            zero_order_deg,
+            first_order_deg,
+            options,
+        ),
     }
+}
+
+fn is_active(mask: Option<&[bool]>, index: usize) -> bool {
+    mask.is_none_or(|m| m.get(index).copied().unwrap_or(false))
 }
 
 fn legacy_cost(
     buffer: &[Complex<f64>],
     fractions: &[f64],
+    mask: Option<&[bool]>,
     zero_order_deg: f64,
     first_order_deg: f64,
     options: AutoPhaseOptions,
@@ -324,7 +355,11 @@ fn legacy_cost(
     buffer
         .iter()
         .zip(fractions)
-        .map(|(value, fraction)| {
+        .enumerate()
+        .filter_map(|(index, (value, fraction))| {
+            if !is_active(mask, index) {
+                return None;
+            }
             let phase_rad = (zero_order_deg
                 + first_order_deg * (*fraction - options.pivot_fraction))
                 .to_radians();
@@ -336,7 +371,7 @@ fn legacy_cost(
             } else {
                 0.0
             };
-            imaginary_penalty + negative_penalty
+            Some(imaginary_penalty + negative_penalty)
         })
         .sum()
 }
@@ -344,12 +379,20 @@ fn legacy_cost(
 fn acme_cost(
     buffer: &[Complex<f64>],
     fractions: &[f64],
+    mask: Option<&[bool]>,
     zero_order_deg: f64,
     first_order_deg: f64,
     options: AutoPhaseOptions,
 ) -> f64 {
     if buffer.len() < 3 {
-        return legacy_cost(buffer, fractions, zero_order_deg, first_order_deg, options);
+        return legacy_cost(
+            buffer,
+            fractions,
+            mask,
+            zero_order_deg,
+            first_order_deg,
+            options,
+        );
     }
 
     let mut real_parts = Vec::with_capacity(buffer.len());
@@ -360,19 +403,34 @@ fn acme_cost(
         real_parts.push((*value * rotation).re);
     }
 
-    let mut abs_deriv = Vec::with_capacity(real_parts.len().saturating_sub(1));
     let mut deriv_sum = 0.0_f64;
-    for window in real_parts.windows(2) {
-        let d = (window[1] - window[0]).abs();
+    let mut abs_deriv = Vec::with_capacity(real_parts.len().saturating_sub(1));
+    for (offset, window) in real_parts.windows(2).enumerate() {
+        let both_active = is_active(mask, offset) && is_active(mask, offset + 1);
+        let d = if both_active {
+            (window[1] - window[0]).abs()
+        } else {
+            0.0
+        };
         deriv_sum += d;
         abs_deriv.push(d);
     }
     if deriv_sum <= f64::EPSILON {
-        return legacy_cost(buffer, fractions, zero_order_deg, first_order_deg, options);
+        return legacy_cost(
+            buffer,
+            fractions,
+            mask,
+            zero_order_deg,
+            first_order_deg,
+            options,
+        );
     }
 
     let mut entropy = 0.0_f64;
     for d in &abs_deriv {
+        if *d <= 0.0 {
+            continue;
+        }
         let p = d / deriv_sum;
         if p > 0.0 {
             entropy -= p * p.ln();
@@ -381,7 +439,10 @@ fn acme_cost(
 
     let mut sum_sq = 0.0_f64;
     let mut neg_sq = 0.0_f64;
-    for value in &real_parts {
+    for (index, value) in real_parts.iter().enumerate() {
+        if !is_active(mask, index) {
+            continue;
+        }
         sum_sq += value * value;
         if *value < 0.0 {
             neg_sq += value * value;
@@ -394,6 +455,46 @@ fn acme_cost(
     };
 
     entropy + options.negative_weight * normalized_negativity
+}
+
+fn resolve_pivot_fraction(spectrum: &Spectrum1D, options: AutoPhaseOptions) -> Result<f64> {
+    let Some(pivot_value) = options.pivot_value else {
+        return Ok(options.pivot_fraction);
+    };
+    if !pivot_value.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "pivot_value",
+        });
+    }
+    let values = &spectrum.x.values;
+    if values.len() < 2 {
+        return Ok(options.pivot_fraction);
+    }
+    let first = values[0];
+    let last = values[values.len() - 1];
+    let range = last - first;
+    if range.abs() <= f64::EPSILON {
+        return Ok(options.pivot_fraction);
+    }
+    let fraction = (pivot_value - first) / range;
+    Ok(fraction.clamp(0.0, 1.0))
+}
+
+fn resolve_active_mask(spectrum: &Spectrum1D, options: AutoPhaseOptions) -> Option<Vec<bool>> {
+    let (raw_start, raw_end) = options.active_region?;
+    if !raw_start.is_finite() || !raw_end.is_finite() {
+        return None;
+    }
+    let lo = raw_start.min(raw_end);
+    let hi = raw_start.max(raw_end);
+    Some(
+        spectrum
+            .x
+            .values
+            .iter()
+            .map(|value| *value >= lo && *value <= hi)
+            .collect(),
+    )
 }
 
 fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {

@@ -165,6 +165,107 @@ fn refinement_improves_grid_score() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn pivot_value_resolves_to_expected_fraction() -> anyhow::Result<()> {
+    let spectrum = two_peak_lorentzian_spectrum(192, 0.06)?;
+    let pivot_fraction_at_zero = peak_pivot_fraction(&spectrum, 0.0);
+    let phased = phase_correct(&spectrum, 0.0, 25.0, pivot_fraction_at_zero)?;
+    let result = auto_phase_correct(&phased, AutoPhaseOptions::default().with_pivot_value(0.0))?;
+    let max_re = result
+        .spectrum
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    let min_re = result
+        .spectrum
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::min);
+    assert!(max_re > 0.0);
+    assert!(
+        min_re > -0.1 * max_re,
+        "pivot-aware phasing should keep spectrum mostly positive, min={min_re}, max={max_re}"
+    );
+    Ok(())
+}
+
+#[test]
+fn active_region_improves_off_center_spectrum() -> anyhow::Result<()> {
+    let spectrum = two_peak_lorentzian_spectrum(192, 0.06)?;
+    let pivot_fraction_at_zero = peak_pivot_fraction(&spectrum, 0.0);
+    let phased = phase_correct(&spectrum, 30.0, 0.0, pivot_fraction_at_zero)?;
+    let without = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default()
+            .with_pivot_value(0.0)
+            .first_order_range(0.0, 0.0, 1.0),
+    )?;
+    let with = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default()
+            .with_pivot_value(0.0)
+            .with_active_region(-1.5, 4.0)
+            .first_order_range(0.0, 0.0, 1.0),
+    )?;
+    let neg_fraction = |s: &Spectrum1D| -> f64 {
+        let max = s.intensities.iter().copied().fold(0.0_f64, f64::max);
+        if max <= 0.0 {
+            return 1.0;
+        }
+        let neg: f64 = s
+            .intensities
+            .iter()
+            .map(|v| if *v < 0.0 { v.abs() } else { 0.0 })
+            .sum();
+        let total: f64 = s.intensities.iter().map(|v| v.abs()).sum();
+        if total <= 0.0 { 0.0 } else { neg / total }
+    };
+    let neg_without = neg_fraction(&without.spectrum);
+    let neg_with = neg_fraction(&with.spectrum);
+    assert!(
+        neg_with <= neg_without + 1.0e-9,
+        "active region should not increase negative-area fraction (with={neg_with}, without={neg_without})"
+    );
+    Ok(())
+}
+
+fn two_peak_lorentzian_spectrum(
+    point_count: usize,
+    half_width_ppm: f64,
+) -> anyhow::Result<Spectrum1D> {
+    let segments = u32::try_from(point_count.saturating_sub(1))?;
+    let mut real = Vec::with_capacity(point_count);
+    let mut imag = Vec::with_capacity(point_count);
+    for index in 0..u32::try_from(point_count)? {
+        let position = f64::from(index) * 10.0 / f64::from(segments) - 5.0;
+        let mut re = 0.0;
+        let mut im = 0.0;
+        for center in [0.0_f64, 3.0_f64] {
+            let x = (position - center) / half_width_ppm;
+            let denom = 1.0 + x * x;
+            re += 1.0 / denom;
+            im += x / denom;
+        }
+        real.push(re);
+        imag.push(im);
+    }
+    Ok(Spectrum1D::new_complex(
+        Axis::linear("shift", Unit::Ppm, -5.0, 5.0, point_count)?,
+        real,
+        Some(imag),
+        Metadata::default(),
+    )?)
+}
+
+fn peak_pivot_fraction(spectrum: &Spectrum1D, value: f64) -> f64 {
+    let first = spectrum.x.values[0];
+    let last = spectrum.x.values[spectrum.x.values.len() - 1];
+    let range = last - first;
+    ((value - first) / range).clamp(0.0, 1.0)
+}
+
 fn lorentzian_spectrum(point_count: usize, half_width_ppm: f64) -> anyhow::Result<Spectrum1D> {
     let segments = u32::try_from(point_count.saturating_sub(1))?;
     let mut real = Vec::with_capacity(point_count);

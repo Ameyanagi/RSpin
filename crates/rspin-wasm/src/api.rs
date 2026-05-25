@@ -1049,6 +1049,10 @@ struct AutoPhaseOptionsJson {
     first_order_max_deg: f64,
     first_order_step_deg: f64,
     pivot_fraction: f64,
+    #[serde(default)]
+    pivot_value: Option<f64>,
+    #[serde(default)]
+    active_region: Option<(f64, f64)>,
     imaginary_weight: f64,
     negative_weight: f64,
     cost: rspin_processing::AutoPhaseCost,
@@ -1066,6 +1070,8 @@ impl Default for AutoPhaseOptionsJson {
             first_order_max_deg: options.first_order_max_deg,
             first_order_step_deg: options.first_order_step_deg,
             pivot_fraction: options.pivot_fraction,
+            pivot_value: options.pivot_value,
+            active_region: options.active_region,
             imaginary_weight: options.imaginary_weight,
             negative_weight: options.negative_weight,
             cost: options.cost,
@@ -1084,6 +1090,8 @@ impl From<AutoPhaseOptionsJson> for AutoPhaseOptions {
             first_order_max_deg: options.first_order_max_deg,
             first_order_step_deg: options.first_order_step_deg,
             pivot_fraction: options.pivot_fraction,
+            pivot_value: options.pivot_value,
+            active_region: options.active_region,
             imaginary_weight: options.imaginary_weight,
             negative_weight: options.negative_weight,
             cost: options.cost,

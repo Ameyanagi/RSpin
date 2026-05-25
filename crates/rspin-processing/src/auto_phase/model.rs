@@ -32,6 +32,17 @@ pub struct AutoPhaseOptions {
     pub first_order_step_deg: f64,
     /// Pivot position as a fraction of the index range, typically in `[0, 1]`.
     pub pivot_fraction: f64,
+    /// Pivot position in the spectrum's x-axis units (ppm, Hz, etc.).
+    ///
+    /// When set, this overrides `pivot_fraction` by linear interpolation against
+    /// the spectrum's x-axis bounds.
+    pub pivot_value: Option<f64>,
+    /// Optional cost-evaluation window in the spectrum's x-axis units.
+    ///
+    /// When set, the scoring function only sums contributions from indices whose
+    /// x values fall inside `[start, end]`. Useful for restricting the search to
+    /// the active spectral region and ignoring empty baseline.
+    pub active_region: Option<(f64, f64)>,
     /// Weight for residual imaginary signal (legacy cost only).
     pub imaginary_weight: f64,
     /// Weight for negative real signal (both costs).
@@ -52,6 +63,8 @@ impl Default for AutoPhaseOptions {
             first_order_max_deg: 180.0,
             first_order_step_deg: 30.0,
             pivot_fraction: 0.5,
+            pivot_value: None,
+            active_region: None,
             imaginary_weight: 1.0,
             negative_weight: 1000.0,
             cost: AutoPhaseCost::AcmeEntropy,
@@ -105,6 +118,35 @@ impl AutoPhaseOptions {
     #[must_use]
     pub fn with_refine(mut self, refine: bool) -> Self {
         self.refine = refine;
+        self
+    }
+
+    /// Returns options with a pivot in the spectrum's x-axis units.
+    #[must_use]
+    pub fn with_pivot_value(mut self, pivot_value: f64) -> Self {
+        self.pivot_value = Some(pivot_value);
+        self
+    }
+
+    /// Returns options with the pivot reverted to a fraction of the index range.
+    #[must_use]
+    pub fn with_pivot_fraction_only(mut self, pivot_fraction: f64) -> Self {
+        self.pivot_value = None;
+        self.pivot_fraction = pivot_fraction;
+        self
+    }
+
+    /// Returns options that score only over the supplied x-axis window.
+    #[must_use]
+    pub fn with_active_region(mut self, start: f64, end: f64) -> Self {
+        self.active_region = Some((start, end));
+        self
+    }
+
+    /// Returns options with no active-region restriction (scores the full spectrum).
+    #[must_use]
+    pub fn with_full_region(mut self) -> Self {
+        self.active_region = None;
         self
     }
 }
