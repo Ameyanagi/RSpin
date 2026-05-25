@@ -131,6 +131,44 @@ impl SourceFormatCount {
     }
 }
 
+/// Deterministic count of loaded spectra for one source vendor family.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceVendorCount {
+    /// Source vendor family.
+    pub vendor: String,
+    /// Number of loaded spectra with this vendor family.
+    pub count: usize,
+}
+
+impl SourceVendorCount {
+    /// Creates a source vendor count.
+    #[must_use]
+    pub fn new(vendor: impl Into<String>, count: usize) -> Self {
+        Self {
+            vendor: vendor.into(),
+            count,
+        }
+    }
+
+    /// Returns the source vendor family.
+    #[must_use]
+    pub fn vendor(&self) -> &str {
+        &self.vendor
+    }
+
+    /// Returns the number of loaded spectra with this vendor family.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
+    /// Returns the known source vendor, if this count uses a built-in vendor name.
+    #[must_use]
+    pub fn vendor_kind(&self) -> Option<LoadedSourceVendor> {
+        LoadedSourceVendor::parse(&self.vendor).ok()
+    }
+}
+
 /// Summary counts for a loaded spectrum bundle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpectrumBundleSummary {
@@ -146,6 +184,9 @@ pub struct SpectrumBundleSummary {
     pub warnings: usize,
     /// Counts of loaded spectra by reader format.
     pub source_formats: Vec<SourceFormatCount>,
+    /// Counts of loaded spectra by source vendor family.
+    #[serde(default)]
+    pub source_vendors: Vec<SourceVendorCount>,
 }
 
 impl SpectrumBundleSummary {
@@ -159,6 +200,7 @@ impl SpectrumBundleSummary {
         warnings: usize,
         source_formats: Vec<SourceFormatCount>,
     ) -> Self {
+        let source_vendors = source_vendor_counts_from_format_counts(&source_formats);
         Self {
             spectra,
             spectra_1d,
@@ -166,6 +208,7 @@ impl SpectrumBundleSummary {
             molecules,
             warnings,
             source_formats,
+            source_vendors,
         }
     }
 
@@ -221,17 +264,28 @@ impl SpectrumBundleSummary {
         let Ok(vendor) = LoadedSourceVendor::parse(vendor.as_ref()) else {
             return 0;
         };
-        self.source_formats
+        self.source_vendor_counts()
             .iter()
-            .filter(|count| count.vendor() == Some(vendor))
-            .map(SourceFormatCount::count)
-            .sum()
+            .find(|count| count.vendor_kind() == Some(vendor))
+            .map_or(0, SourceVendorCount::count)
     }
 
     /// Returns true when a loaded spectrum was read with a vendor-specific reader.
     #[must_use]
     pub fn has_source_vendor(&self, vendor: impl AsRef<str>) -> bool {
         self.source_vendor_count(vendor) > 0
+    }
+
+    /// Returns deterministic source vendor counts in first-seen order.
+    ///
+    /// For summaries deserialized from older JSON that does not contain the
+    /// `source_vendors` field, counts are reconstructed from `source_formats`.
+    #[must_use]
+    pub fn source_vendor_counts(&self) -> Vec<SourceVendorCount> {
+        if self.source_vendors.is_empty() {
+            return source_vendor_counts_from_format_counts(&self.source_formats);
+        }
+        self.source_vendors.clone()
     }
 }
 
@@ -625,6 +679,19 @@ impl SpectrumBundle {
                 Some(count) => count.count += 1,
                 None => counts.push(SourceFormatCount::new(source.format(), 1)),
             }
+        }
+        counts
+    }
+
+    /// Returns deterministic source vendor counts in first-seen order.
+    #[must_use]
+    pub fn source_vendor_counts(&self) -> Vec<SourceVendorCount> {
+        let mut counts: Vec<SourceVendorCount> = Vec::new();
+        for source in self.loaded_sources() {
+            let Some(vendor) = source.vendor() else {
+                continue;
+            };
+            push_source_vendor_count(&mut counts, vendor, 1);
         }
         counts
     }
@@ -2292,6 +2359,33 @@ where
         push_unique_filter(&mut filters, format.as_ref());
     }
     filters
+}
+
+fn source_vendor_counts_from_format_counts(
+    format_counts: &[SourceFormatCount],
+) -> Vec<SourceVendorCount> {
+    let mut counts = Vec::new();
+    for format_count in format_counts {
+        let Some(vendor) = format_count.vendor() else {
+            continue;
+        };
+        push_source_vendor_count(&mut counts, vendor, format_count.count());
+    }
+    counts
+}
+
+fn push_source_vendor_count(
+    counts: &mut Vec<SourceVendorCount>,
+    vendor: LoadedSourceVendor,
+    increment: usize,
+) {
+    match counts
+        .iter_mut()
+        .find(|count| count.vendor_kind() == Some(vendor))
+    {
+        Some(count) => count.count += increment,
+        None => counts.push(SourceVendorCount::new(vendor.as_str(), increment)),
+    }
 }
 
 fn source_vendor_filters<I, V>(vendors: I) -> Vec<String>

@@ -995,10 +995,23 @@ fn bundle_source_vendor_helpers_group_entries() -> anyhow::Result<()> {
     assert!(bundle.has_source_vendor(LoadedSourceVendor::Jeol));
     assert!(!bundle.has_source_vendor("agilent"));
 
+    let vendor_counts = bundle.source_vendor_counts();
+    assert_eq!(vendor_counts.len(), 2);
+    assert_eq!(vendor_counts[0].vendor(), "bruker");
+    assert_eq!(vendor_counts[0].count(), 2);
+    assert_eq!(
+        vendor_counts[0].vendor_kind(),
+        Some(LoadedSourceVendor::Bruker)
+    );
+    assert_eq!(vendor_counts[1].vendor(), "jeol");
+    assert_eq!(vendor_counts[1].count(), 3);
+
     let summary = bundle.summary();
     assert_eq!(summary.source_vendor_count(LoadedSourceVendor::Bruker), 2);
     assert!(summary.has_source_vendor(LoadedSourceVendor::Jeol));
     assert!(!summary.has_source_vendor(LoadedSourceVendor::AgilentVarian));
+    assert_eq!(summary.source_vendors, vendor_counts);
+    assert_eq!(summary.source_vendor_counts(), vendor_counts);
 
     let vendors = bundle.source_vendors().collect::<Vec<_>>();
     assert_eq!(vendors.len(), 5);

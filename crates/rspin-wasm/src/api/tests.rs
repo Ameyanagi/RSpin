@@ -171,6 +171,7 @@ fn validates_and_summarizes_spectrum_bundle_json() -> anyhow::Result<()> {
     assert_eq!(counts.molecules(), 1);
     assert_eq!(counts.warnings(), 0);
     assert!(counts.source_formats.is_empty());
+    assert!(counts.source_vendors.is_empty());
     Ok(())
 }
 
@@ -212,6 +213,11 @@ fn creates_spectrum_bundle_json_from_spectrum_entries() -> anyhow::Result<()> {
     assert_eq!(counts.warnings(), 0);
     assert_eq!(counts.source_format_count("jcamp_dx"), 1);
     assert_eq!(counts.source_format_count("jeol_jdf"), 1);
+    assert_eq!(counts.source_vendor_count("jeol"), 1);
+    assert_eq!(counts.source_vendor_count("bruker"), 0);
+    assert_eq!(counts.source_vendors.len(), 1);
+    assert_eq!(counts.source_vendors[0].vendor(), "jeol");
+    assert_eq!(counts.source_vendors[0].count(), 1);
 
     let bundle = rspin_io::read_spectrum_bundle_json(&bundle_json)?;
     let sources = bundle

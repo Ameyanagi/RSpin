@@ -70,6 +70,9 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     for count in &summary.source_formats {
         println!("{}: {}", count.format(), count.count());
     }
+    for count in &summary.source_vendors {
+        println!("{} vendor spectra: {}", count.vendor(), count.count());
+    }
     for (spectrum, source) in bundle.loaded_1d_by_source_format(LoadedSourceFormat::JcampDx) {
         let label = source
             .path()
