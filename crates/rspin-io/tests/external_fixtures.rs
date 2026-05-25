@@ -14,8 +14,9 @@ use rspin_io::{
     Spectrum2DPathFormat, detect_spectrum1d_path_format, detect_spectrum2d_path_format,
     inspect_jeol_jdf_file, read_agilent_arrayed_fid_1d_dir, read_agilent_arrayed_fid_2d_dir,
     read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_bruker_fid_1d_dir,
-    read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file, read_jeol_jdf_2d_file,
-    read_nmrml_1d_file, read_nmrml_2d_file, read_spectrum1d_bytes_as, read_spectrum2d_bytes_as,
+    read_bruker_processed_1d_dir, read_bruker_ser_2d_dir, read_jcamp_dx_1d, read_jeol_jdf_1d_file,
+    read_jeol_jdf_2d_file, read_nmrml_1d_file, read_nmrml_2d_file, read_spectrum1d_bytes_as,
+    read_spectrum2d_bytes_as,
 };
 
 #[test]
@@ -312,6 +313,65 @@ fn parses_external_bruker_1d_fid_when_available() -> anyhow::Result<()> {
             .iter()
             .any(|value| value.abs() > 1_000.0)
     );
+    Ok(())
+}
+
+#[test]
+fn parses_external_bruker_processed_1d_when_available() -> anyhow::Result<()> {
+    let Some(root) = external_testdata_root() else {
+        return Ok(());
+    };
+    let dataset = root.join("nmrml/unpacked/MMBBI_10M12-CE01-1a/MMBBI_10M12-CE01-1a/1");
+    let processed = dataset.join("pdata/1");
+    let real_file = processed.join("1r");
+    require_fixture(&real_file)?;
+    require_fixture(&processed.join("1i"))?;
+    require_fixture(&processed.join("procs"))?;
+    require_fixture(&dataset.join("acqus"))?;
+
+    let spectrum = read_bruker_processed_1d_dir(&processed)?;
+    let from_file = read_bruker_processed_1d_dir(&real_file)?;
+    let from_dataset = read_bruker_processed_1d_dir(&dataset)?;
+    let bundle = RSpinReader::new().read_path(&processed)?;
+
+    assert_eq!(spectrum.len(), 32_768);
+    assert_eq!(from_file.len(), spectrum.len());
+    assert_eq!(from_dataset.len(), spectrum.len());
+    assert_eq!(spectrum.x.unit, Unit::Ppm);
+    assert_close(spectrum.x.values.first().copied(), Some(11.099_15));
+    assert_close(
+        spectrum.x.values.last().copied(),
+        Some(-0.901_812_797_195_102_4),
+    );
+    assert_eq!(
+        spectrum.metadata.origin.as_deref(),
+        Some("Bruker BioSpin GmbH")
+    );
+    assert_eq!(spectrum.metadata.solvent.as_deref(), Some("D2O"));
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_close(spectrum.metadata.frequency_mhz, Some(500.159_950_648_881));
+    assert_close(spectrum.metadata.temperature_k, Some(300.0031));
+    assert!(spectrum.imaginary.is_some());
+    assert!(
+        spectrum
+            .intensities
+            .iter()
+            .any(|value| value.abs() > 1_000.0)
+    );
+
+    assert_eq!(
+        detect_spectrum1d_path_format(&processed)?,
+        Spectrum1DPathFormat::BrukerProcessed
+    );
+    assert_eq!(
+        detect_spectrum1d_path_format(&real_file)?,
+        Spectrum1DPathFormat::BrukerProcessed
+    );
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(bundle.spectra_1d().count(), 1);
+    assert_eq!(bundle.spectra_2d().count(), 0);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(source_format_count(&bundle, "bruker_processed"), 1);
     Ok(())
 }
 
