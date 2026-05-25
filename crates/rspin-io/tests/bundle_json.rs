@@ -88,7 +88,7 @@ fn constructs_bundle_with_chainable_public_api() -> anyhow::Result<()> {
 
     let bundle = SpectrumBundle::new()
         .with_1d(
-            one_d,
+            one_d.clone(),
             LoadedSource::new(Some(PathBuf::from("one.jdx")), "jcamp_dx"),
         )
         .with_2d(
@@ -104,6 +104,23 @@ fn constructs_bundle_with_chainable_public_api() -> anyhow::Result<()> {
     assert_eq!(bundle.spectra_1d().count(), 1);
     assert_eq!(bundle.spectra_2d().count(), 1);
     assert_eq!(bundle.warnings().len(), 1);
+
+    let custom_bundle = SpectrumBundle::new().with_1d(
+        one_d,
+        LoadedSource::new(Some(PathBuf::from("one.custom")), "custom_format"),
+    );
+    assert_eq!(custom_bundle.source_format_count("custom_format"), 1);
+    assert_eq!(
+        custom_bundle.source_format_counts()[0].format(),
+        "custom_format"
+    );
+    assert_eq!(
+        custom_bundle
+            .loaded_by_source_format("custom_format")
+            .count(),
+        1
+    );
+    assert_eq!(custom_bundle.source_format_count("jdx"), 0);
 
     let text = write_spectrum_bundle_json(&bundle)?;
     let parsed = read_spectrum_bundle_json(&text)?;

@@ -74,7 +74,7 @@ impl LoadedSource {
     /// Returns true when this source was read with a source format.
     #[must_use]
     pub fn is_format(&self, format: impl AsRef<str>) -> bool {
-        self.format() == format.as_ref()
+        source_format_matches(self.format(), format.as_ref())
     }
 
     /// Returns true when this source was read with a vendor-specific reader.
@@ -248,8 +248,9 @@ impl SpectrumBundleSummary {
         let format = format.as_ref();
         self.source_formats
             .iter()
-            .find(|count| count.format() == format)
-            .map_or(0, SourceFormatCount::count)
+            .filter(|count| source_format_matches(count.format(), format))
+            .map(SourceFormatCount::count)
+            .sum()
     }
 
     /// Returns true when a loaded spectrum was read with a source format.
@@ -530,7 +531,7 @@ impl SpectrumBundle {
         let format = format.as_ref().to_owned();
         self.spectra
             .iter()
-            .filter(move |entry| entry.source().format() == format.as_str())
+            .filter(move |entry| source_format_matches(entry.source().format(), format.as_str()))
     }
 
     /// Returns one-dimensional spectra and sources read with a source format.
@@ -540,7 +541,7 @@ impl SpectrumBundle {
     ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_ {
         let format = format.as_ref().to_owned();
         self.loaded_1d()
-            .filter(move |(_, source)| source.format() == format.as_str())
+            .filter(move |(_, source)| source_format_matches(source.format(), format.as_str()))
     }
 
     /// Returns two-dimensional spectra and sources read with a source format.
@@ -550,7 +551,7 @@ impl SpectrumBundle {
     ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_ {
         let format = format.as_ref().to_owned();
         self.loaded_2d()
-            .filter(move |(_, source)| source.format() == format.as_str())
+            .filter(move |(_, source)| source_format_matches(source.format(), format.as_str()))
     }
 
     /// Returns tracked source paths for loaded spectra read with a source format.
@@ -562,7 +563,7 @@ impl SpectrumBundle {
     ) -> impl Iterator<Item = &Path> + '_ {
         let format = format.as_ref().to_owned();
         self.loaded_sources()
-            .filter(move |source| source.format() == format.as_str())
+            .filter(move |source| source_format_matches(source.format(), format.as_str()))
             .filter_map(LoadedSource::path)
     }
 
@@ -638,7 +639,7 @@ impl SpectrumBundle {
     pub fn source_format_count(&self, format: impl AsRef<str>) -> usize {
         let format = format.as_ref();
         self.loaded_sources()
-            .filter(|source| source.format() == format)
+            .filter(|source| source_format_matches(source.format(), format))
             .count()
     }
 
@@ -647,7 +648,7 @@ impl SpectrumBundle {
     pub fn has_source_format(&self, format: impl AsRef<str>) -> bool {
         let format = format.as_ref();
         self.loaded_sources()
-            .any(|source| source.format() == format)
+            .any(|source| source_format_matches(source.format(), format))
     }
 
     /// Returns the number of loaded spectra read with a vendor-specific reader.
@@ -672,12 +673,13 @@ impl SpectrumBundle {
     pub fn source_format_counts(&self) -> Vec<SourceFormatCount> {
         let mut counts: Vec<SourceFormatCount> = Vec::new();
         for source in self.loaded_sources() {
+            let format = source_format_count_name(source.format());
             match counts
                 .iter_mut()
-                .find(|count| count.format() == source.format())
+                .find(|count| source_format_matches(count.format(), format))
             {
                 Some(count) => count.count += 1,
-                None => counts.push(SourceFormatCount::new(source.format(), 1)),
+                None => counts.push(SourceFormatCount::new(format, 1)),
             }
         }
         counts
@@ -2105,7 +2107,10 @@ impl SpectrumBundleLoader {
 
     fn allows_source_format(&self, format: &str) -> bool {
         self.source_formats.is_empty()
-            || self.source_formats.iter().any(|allowed| allowed == format)
+            || self
+                .source_formats
+                .iter()
+                .any(|allowed| source_format_matches(format, allowed))
     }
 
     fn bundle_with_source_context(
@@ -2359,6 +2364,25 @@ where
         push_unique_filter(&mut filters, format.as_ref());
     }
     filters
+}
+
+fn source_format_matches(actual: &str, requested: &str) -> bool {
+    let actual = actual.trim();
+    let requested = requested.trim();
+    match (
+        LoadedSourceFormat::parse(actual),
+        LoadedSourceFormat::parse(requested),
+    ) {
+        (Ok(actual), Ok(requested)) => actual == requested,
+        _ => actual == requested,
+    }
+}
+
+fn source_format_count_name(format: &str) -> &str {
+    match LoadedSourceFormat::parse(format) {
+        Ok(format) => format.as_str(),
+        Err(_) => format.trim(),
+    }
 }
 
 fn source_vendor_counts_from_format_counts(

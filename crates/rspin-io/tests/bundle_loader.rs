@@ -8,8 +8,8 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum, RSpinReader, SpectrumBundle,
-    SpectrumBundleLoader, SpectrumPathReader, load_spectra, load_spectra_many,
+    LoadedSource, LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum, RSpinReader,
+    SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra, load_spectra_many,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_relative_to,
     load_spectrum_2d, load_spectrum_2d_many, load_spectrum_2d_many_relative_to,
@@ -889,9 +889,12 @@ fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
     assert_eq!(bundle.source_format_count("bruker_fid"), 1);
     assert_eq!(bundle.source_format_count("bruker_ser"), 1);
     assert_eq!(bundle.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(bundle.source_format_count("jdx"), 2);
     assert_eq!(bundle.source_format_count(LoadedSourceFormat::JeolJdf), 3);
+    assert_eq!(bundle.source_format_count("jdf"), 3);
     assert_eq!(bundle.source_format_count("missing"), 0);
     assert!(bundle.has_source_format(LoadedSourceFormat::JcampDx));
+    assert!(bundle.has_source_format("jcamp"));
     assert!(!bundle.has_source_format("missing"));
     assert_eq!(
         parse_loaded_source_format("jdx")?,
@@ -905,7 +908,9 @@ fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
     assert_eq!(summary.molecules(), 0);
     assert_eq!(summary.warnings(), 0);
     assert_eq!(summary.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(summary.source_format_count("jdx"), 2);
     assert!(summary.has_source_format(LoadedSourceFormat::JeolJdf));
+    assert!(summary.has_source_format("jdf"));
     assert!(!summary.has_source_format("missing"));
 
     assert_eq!(
@@ -937,6 +942,7 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
         .loaded_by_source_format(LoadedSourceFormat::JcampDx)
         .collect::<Vec<_>>();
     assert_eq!(loaded_jcamp.len(), 2);
+    assert_eq!(bundle.loaded_by_source_format("jdx").count(), 2);
     assert!(loaded_jcamp.iter().all(|entry| entry.is_1d()));
     assert!(bundle.loaded_by_source_format("missing").next().is_none());
 
@@ -954,6 +960,7 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
             .iter()
             .all(|(_, source)| source.is_format(LoadedSourceFormat::JcampDx))
     );
+    assert!(jcamp_1d.iter().all(|(_, source)| source.is_format("jdx")));
     assert!(
         jcamp_1d
             .iter()
@@ -968,6 +975,7 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
             Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
         ]
     );
+    assert_eq!(bundle.source_paths_for_format("jdx").count(), 2);
     assert_eq!(
         bundle
             .loaded_2d_by_source_format(LoadedSourceFormat::JeolJdf)
@@ -975,6 +983,7 @@ fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
             .len(),
         1
     );
+    assert_eq!(bundle.loaded_2d_by_source_format("jdf").count(), 1);
     Ok(())
 }
 
@@ -1184,6 +1193,28 @@ fn loader_source_format_filter_applies_to_nested_bundle_json() -> anyhow::Result
             .source_paths()
             .all(|path| path.starts_with(Path::new("bundle.json/jcamp")))
     );
+
+    remove_dir(root)?;
+
+    let root = temp_dir("source-format-alias-bundle")?;
+    let spectrum = load_spectrum_1d(
+        nmrxiv_fixture_root().join("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    let alias_bundle = SpectrumBundle::new().with_1d(
+        spectrum,
+        LoadedSource::new(Some(PathBuf::from("aliased-source.jdx")), "jdx"),
+    );
+    fs::write(
+        root.join("bundle.json"),
+        write_spectrum_bundle_json(&alias_bundle)?,
+    )?;
+    let bundle = RSpinReader::new()
+        .only_source_format(LoadedSourceFormat::JcampDx)
+        .read_path(&root)?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(bundle.source_format_count("jcamp_dx"), 1);
+    assert_eq!(bundle.source_format_count("jdx"), 1);
+    assert_eq!(bundle.source_format_counts()[0].format(), "jcamp_dx");
 
     remove_dir(root)?;
     Ok(())
