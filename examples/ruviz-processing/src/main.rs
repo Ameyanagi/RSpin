@@ -33,7 +33,7 @@ mod ruviz_example {
     };
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, BaselineMethod, FftDirection, ProcessSpectrum2D,
-        ProcessingRecipe1D, auto_phase_correct, fit_baseline,
+        ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks, fit_baseline,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -210,6 +210,13 @@ mod ruviz_example {
                 .with_active_region(active_region.0, active_region.1),
         )?
         .spectrum;
+        let peak_centers = detect_peak_centers(&unphased)?;
+        let acme_peak = auto_phase_correct_with_peaks(
+            &unphased,
+            AutoPhaseOptions::default().with_pivot_value(pivot_ppm),
+            &peak_centers,
+        )?
+        .spectrum;
 
         let peaks = pick_peaks(
             &acme_refined,
@@ -288,7 +295,12 @@ mod ruviz_example {
                     &slice_window(&acme_active.x.values, lo, hi),
                     &slice_window_y(&acme_active.x.values, &acme_active.intensities, lo, hi),
                 )
-                .label("+active");
+                .label("+active")
+                .line(
+                    &slice_window(&acme_peak.x.values, lo, hi),
+                    &slice_window_y(&acme_peak.x.values, &acme_peak.intensities, lo, hi),
+                )
+                .label("peak-warmed");
             figure = figure.subplot_at(index, panel.into())?;
         }
 
@@ -351,6 +363,12 @@ mod ruviz_example {
         let acme_refined_result = auto_phase_correct(&unphased, acme_refined)?;
         let acme_pivot_result = auto_phase_correct(&unphased, acme_pivot)?;
         let acme_active_result = auto_phase_correct(&unphased, acme_active)?;
+        let peak_centers = detect_peak_centers(&unphased)?;
+        let acme_peak_result = auto_phase_correct_with_peaks(
+            &unphased,
+            AutoPhaseOptions::default().with_pivot_value(pivot_ppm),
+            &peak_centers,
+        )?;
 
         let fmt_label = |stem: &str, r: &rspin_processing::AutoPhaseResult| {
             format!(
@@ -392,9 +410,48 @@ mod ruviz_example {
                 &acme_active_result.spectrum.intensities,
             )
             .label(&fmt_label("+ active 1-3.5 ppm", &acme_active_result))
+            .line(
+                &acme_peak_result.spectrum.x.values,
+                &acme_peak_result.spectrum.intensities,
+            )
+            .label(&fmt_label("peak-warmed", &acme_peak_result))
             .save(path_to_str(&output_dir.join("auto_phase_comparison.png"))?)?;
 
         Ok(())
+    }
+
+    fn detect_peak_centers(spectrum: &Spectrum1D) -> Result<Vec<f64>> {
+        let magnitude = ProcessingRecipe1D::new()
+            .magnitude()
+            .normalize_max_abs()
+            .apply(spectrum)?;
+        let peaks = pick_peaks(
+            &magnitude,
+            PeakPickOptions::new()
+                .with_min_abs_intensity(0.05)
+                .with_min_prominence(0.0)
+                .with_polarity(PeakPolarity::Positive),
+        )?;
+        let mut sorted = peaks;
+        sorted.sort_by(|a, b| b.intensity.abs().total_cmp(&a.intensity.abs()));
+        let mut centers: Vec<f64> = Vec::new();
+        for peak in sorted {
+            if centers
+                .iter()
+                .all(|existing| (existing - peak.x).abs() > 0.2)
+            {
+                centers.push(peak.x);
+                if centers.len() == 8 {
+                    break;
+                }
+            }
+        }
+        if centers.is_empty() {
+            return Err(anyhow::anyhow!(
+                "detect_peak_centers found no peaks in magnitude spectrum"
+            ));
+        }
+        Ok(centers)
     }
 
     struct VendorContourEntry {

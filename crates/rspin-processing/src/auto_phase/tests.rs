@@ -259,6 +259,76 @@ fn two_peak_lorentzian_spectrum(
     )?)
 }
 
+#[test]
+fn peak_based_estimate_recovers_known_phase() -> anyhow::Result<()> {
+    let spectrum = isolated_two_peak_spectrum(1024, 0.04)?;
+    let phased = phase_correct(&spectrum, 25.0, 40.0, 0.5)?;
+    let (ph0, ph1) = peak_based_phase_estimate(&phased, &[-3.0_f64, 3.0_f64], Some(0.0))?;
+    assert!((ph0 + 25.0).abs() < 5.0, "expected ph0 near -25, got {ph0}");
+    assert!((ph1 + 40.0).abs() < 5.0, "expected ph1 near -40, got {ph1}");
+    Ok(())
+}
+
+#[test]
+fn auto_phase_with_peaks_matches_default_quality() -> anyhow::Result<()> {
+    let spectrum = isolated_two_peak_spectrum(1024, 0.04)?;
+    let phased = phase_correct(&spectrum, 35.0, 25.0, 0.5)?;
+    let baseline = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    let hybrid = auto_phase_correct_with_peaks(
+        &phased,
+        AutoPhaseOptions::default().with_pivot_value(0.0),
+        &[-3.0_f64, 3.0_f64],
+    )?;
+    assert!(
+        hybrid.score <= baseline.score + 1.0e-6,
+        "peak-warmed hybrid should not score worse than coarse-grid: hybrid={} baseline={}",
+        hybrid.score,
+        baseline.score
+    );
+    let neg_fraction = |s: &Spectrum1D| -> f64 {
+        let neg: f64 = s
+            .intensities
+            .iter()
+            .map(|v| if *v < 0.0 { v.abs() } else { 0.0 })
+            .sum();
+        let total: f64 = s.intensities.iter().map(|v| v.abs()).sum();
+        if total <= 0.0 { 0.0 } else { neg / total }
+    };
+    assert!(
+        neg_fraction(&hybrid.spectrum) < 0.1,
+        "peak-warmed phased spectrum should be mostly positive"
+    );
+    Ok(())
+}
+
+fn isolated_two_peak_spectrum(
+    point_count: usize,
+    half_width_ppm: f64,
+) -> anyhow::Result<Spectrum1D> {
+    let segments = u32::try_from(point_count.saturating_sub(1))?;
+    let mut real = Vec::with_capacity(point_count);
+    let mut imag = Vec::with_capacity(point_count);
+    for index in 0..u32::try_from(point_count)? {
+        let position = f64::from(index) * 10.0 / f64::from(segments) - 5.0;
+        let mut re = 0.0;
+        let mut im = 0.0;
+        for center in [-3.0_f64, 3.0_f64] {
+            let x = (position - center) / half_width_ppm;
+            let denom = 1.0 + x * x;
+            re += 1.0 / denom;
+            im += x / denom;
+        }
+        real.push(re);
+        imag.push(im);
+    }
+    Ok(Spectrum1D::new_complex(
+        Axis::linear("shift", Unit::Ppm, -5.0, 5.0, point_count)?,
+        real,
+        Some(imag),
+        Metadata::default(),
+    )?)
+}
+
 fn peak_pivot_fraction(spectrum: &Spectrum1D, value: f64) -> f64 {
     let first = spectrum.x.values[0];
     let last = spectrum.x.values[spectrum.x.values.len() - 1];

@@ -457,6 +457,276 @@ fn acme_cost(
     entropy + options.negative_weight * normalized_negativity
 }
 
+/// Estimates `(ph0, ph1)` from caller-supplied peak positions.
+///
+/// For each peak position the algorithm reads the nearest complex sample,
+/// records the rotation needed to make it purely positive real, unwraps the
+/// phases by 360 degrees, and least-squares fits
+/// `phi(x) = ph0 + ph1 * (x - pivot)`.
+///
+/// `pivot_value` defaults to the midpoint of the spectrum x-axis when `None`.
+///
+/// # Errors
+///
+/// Returns an error when the peak list is empty, peak positions are not finite,
+/// or the spectrum is too short to derive an axis.
+pub fn peak_based_phase_estimate(
+    spectrum: &Spectrum1D,
+    peak_centers: &[f64],
+    pivot_value: Option<f64>,
+) -> Result<(f64, f64)> {
+    if peak_centers.is_empty() {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "peak-based phase estimate requires at least one peak".to_owned(),
+        });
+    }
+    if spectrum.x.values.len() < 2 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "spectrum is too short for peak-based phase estimate".to_owned(),
+        });
+    }
+    let buffer = complex_buffer(spectrum);
+    let axis_span = (spectrum.x.values[spectrum.x.values.len() - 1] - spectrum.x.values[0]).abs();
+    let search_half_ppm = (axis_span * 0.05).max(0.0);
+    let mut samples: Vec<(f64, f64)> = peak_centers
+        .iter()
+        .map(|center| {
+            if !center.is_finite() {
+                return Err(RSpinError::NonFinite {
+                    field: "peak_center",
+                });
+            }
+            let seed_index = nearest_index(&spectrum.x.values, *center);
+            let peak_index =
+                refine_peak_index(&spectrum.x.values, &buffer, seed_index, search_half_ppm);
+            let (sum_value, peak_x) =
+                window_complex_sum(&spectrum.x.values, &buffer, peak_index, 0.3);
+            let phi_rad = -sum_value.im.atan2(sum_value.re);
+            Ok((peak_x, phi_rad.to_degrees()))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    samples.sort_by(|a, b| a.0.total_cmp(&b.0));
+
+    let mut unwrapped = samples;
+    for i in 1..unwrapped.len() {
+        let prev = unwrapped[i - 1].1;
+        let mut current = unwrapped[i].1;
+        while current - prev > 180.0 {
+            current -= 360.0;
+        }
+        while current - prev < -180.0 {
+            current += 360.0;
+        }
+        unwrapped[i].1 = current;
+    }
+
+    let first = spectrum.x.values[0];
+    let last = spectrum.x.values[spectrum.x.values.len() - 1];
+    let span = last - first;
+    if span.abs() <= f64::EPSILON {
+        return Ok((unwrapped[0].1, 0.0));
+    }
+    let pivot = pivot_value.unwrap_or_else(|| f64::midpoint(first, last));
+
+    let count = unwrapped.len();
+    let count_u32 = u32::try_from(count).map_err(|_| RSpinError::InvalidSpectrum {
+        message: "too many peaks for phase estimate".to_owned(),
+    })?;
+    let n = f64::from(count_u32);
+
+    if count == 1 {
+        return Ok((unwrapped[0].1, 0.0));
+    }
+
+    let mut sum_dx = 0.0_f64;
+    let mut sum_dx2 = 0.0_f64;
+    let mut sum_phi = 0.0_f64;
+    let mut sum_dx_phi = 0.0_f64;
+    for (x, phi) in &unwrapped {
+        let dx = (*x - pivot) / span;
+        sum_dx += dx;
+        sum_dx2 += dx * dx;
+        sum_phi += *phi;
+        sum_dx_phi += dx * *phi;
+    }
+    let denom = n * sum_dx2 - sum_dx * sum_dx;
+    if denom.abs() <= f64::EPSILON {
+        return Ok((sum_phi / n, 0.0));
+    }
+    let ph1 = (n * sum_dx_phi - sum_dx * sum_phi) / denom;
+    let ph0 = (sum_phi - ph1 * sum_dx) / n;
+    Ok((ph0, ph1))
+}
+
+/// Auto-phases using caller-supplied peak centers as a warm-start.
+///
+/// Runs [`peak_based_phase_estimate`] to seed an initial `(ph0, ph1)`, then
+/// polishes with a Nelder-Mead simplex against the configured cost function
+/// (skipping the coarse grid).
+///
+/// # Errors
+///
+/// Returns an error when options are invalid or the seed cannot be derived.
+pub fn auto_phase_correct_with_peaks(
+    spectrum: &Spectrum1D,
+    options: AutoPhaseOptions,
+    peak_centers: &[f64],
+) -> Result<AutoPhaseResult> {
+    options.validate()?;
+    let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
+    let active_mask = resolve_active_mask(spectrum, options);
+    let (ph0_seed, ph1_seed) =
+        peak_based_phase_estimate(spectrum, peak_centers, options.pivot_value)?;
+    let buffer = complex_buffer(spectrum);
+    let fractions = index_fractions(spectrum.len())?;
+    let options = AutoPhaseOptions {
+        pivot_fraction,
+        pivot_value: None,
+        ..options
+    };
+    let evaluate = |ph0: f64, ph1: f64| -> f64 {
+        score_candidate(
+            &buffer,
+            &fractions,
+            active_mask.as_deref(),
+            ph0,
+            ph1,
+            options,
+        )
+    };
+
+    let bounds = SearchBounds {
+        zero_min: options.zero_order_min_deg,
+        zero_max: options.zero_order_max_deg,
+        first_min: options.first_order_min_deg,
+        first_max: options.first_order_max_deg,
+    };
+    let (ph0_clamped, ph1_clamped) = bounds.clamp(ph0_seed, ph1_seed);
+
+    let seed_candidate = PhaseCandidate {
+        zero_order_deg: ph0_clamped,
+        first_order_deg: ph1_clamped,
+        score: evaluate(ph0_clamped, ph1_clamped),
+    };
+
+    let mut best = seed_candidate;
+    if options.refine {
+        let refined = nelder_mead(
+            ph0_clamped,
+            ph1_clamped,
+            options.zero_order_step_deg.max(2.0),
+            options.first_order_step_deg.max(2.0),
+            &bounds,
+            &evaluate,
+        );
+        if refined.score < best.score {
+            best = refined;
+        }
+    }
+
+    let mut spectrum = phase_correct(
+        spectrum,
+        best.zero_order_deg,
+        best.first_order_deg,
+        options.pivot_fraction,
+    )?;
+    spectrum.processing.pop();
+    spectrum = spectrum.with_processing_record(
+        ProcessingRecord::new("auto_phase_correct_with_peaks").with_details(format!(
+            "zero_order_deg={},first_order_deg={},pivot_fraction={},peak_count={},seed_ph0={},seed_ph1={},refine={},score={}",
+            best.zero_order_deg,
+            best.first_order_deg,
+            options.pivot_fraction,
+            peak_centers.len(),
+            ph0_seed,
+            ph1_seed,
+            options.refine,
+            best.score
+        )),
+    );
+
+    Ok(AutoPhaseResult {
+        spectrum,
+        zero_order_deg: best.zero_order_deg,
+        first_order_deg: best.first_order_deg,
+        score: best.score,
+    })
+}
+
+fn nearest_index(values: &[f64], target: f64) -> usize {
+    let mut best = 0_usize;
+    let mut best_distance = f64::INFINITY;
+    for (index, value) in values.iter().enumerate() {
+        let distance = (*value - target).abs();
+        if distance < best_distance {
+            best_distance = distance;
+            best = index;
+        }
+    }
+    best
+}
+
+fn window_complex_sum(
+    axis: &[f64],
+    buffer: &[Complex<f64>],
+    peak_index: usize,
+    magnitude_threshold: f64,
+) -> (Complex<f64>, f64) {
+    let peak_magnitude = buffer[peak_index].norm();
+    if peak_magnitude <= 0.0 {
+        return (buffer[peak_index], axis[peak_index]);
+    }
+    let threshold = magnitude_threshold * peak_magnitude;
+    let mut sum = Complex::new(0.0_f64, 0.0_f64);
+    let mut weight = 0.0_f64;
+    let mut centroid_num = 0.0_f64;
+    let mut left = peak_index;
+    while left > 0 && buffer[left - 1].norm() >= threshold {
+        left -= 1;
+    }
+    let mut right = peak_index;
+    while right + 1 < buffer.len() && buffer[right + 1].norm() >= threshold {
+        right += 1;
+    }
+    for index in left..=right {
+        let magnitude = buffer[index].norm();
+        sum += buffer[index];
+        weight += magnitude;
+        centroid_num += magnitude * axis[index];
+    }
+    let centroid_x = if weight > 0.0 {
+        centroid_num / weight
+    } else {
+        axis[peak_index]
+    };
+    (sum, centroid_x)
+}
+
+fn refine_peak_index(
+    axis: &[f64],
+    buffer: &[Complex<f64>],
+    seed: usize,
+    half_window_ppm: f64,
+) -> usize {
+    if axis.is_empty() || buffer.is_empty() {
+        return seed;
+    }
+    let center = axis[seed];
+    let mut best = seed;
+    let mut best_magnitude = buffer[seed].norm();
+    for (index, value) in axis.iter().enumerate() {
+        if (*value - center).abs() > half_window_ppm {
+            continue;
+        }
+        let magnitude = buffer[index].norm();
+        if magnitude > best_magnitude {
+            best_magnitude = magnitude;
+            best = index;
+        }
+    }
+    best
+}
+
 fn resolve_pivot_fraction(spectrum: &Spectrum1D, options: AutoPhaseOptions) -> Result<f64> {
     let Some(pivot_value) = options.pivot_value else {
         return Ok(options.pivot_fraction);
