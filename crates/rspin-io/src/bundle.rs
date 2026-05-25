@@ -399,6 +399,46 @@ impl SpectrumBundle {
         self.loaded_sources().map(LoadedSource::format)
     }
 
+    /// Returns loaded spectra read with a source format.
+    pub fn loaded_by_source_format<'a>(
+        &'a self,
+        format: &'a str,
+    ) -> impl Iterator<Item = &'a LoadedSpectrum> + 'a {
+        self.spectra
+            .iter()
+            .filter(move |entry| entry.source().format() == format)
+    }
+
+    /// Returns one-dimensional spectra and sources read with a source format.
+    pub fn loaded_1d_by_source_format<'a>(
+        &'a self,
+        format: &'a str,
+    ) -> impl Iterator<Item = (&'a Spectrum1D, &'a LoadedSource)> + 'a {
+        self.loaded_1d()
+            .filter(move |(_, source)| source.format() == format)
+    }
+
+    /// Returns two-dimensional spectra and sources read with a source format.
+    pub fn loaded_2d_by_source_format<'a>(
+        &'a self,
+        format: &'a str,
+    ) -> impl Iterator<Item = (&'a Spectrum2D, &'a LoadedSource)> + 'a {
+        self.loaded_2d()
+            .filter(move |(_, source)| source.format() == format)
+    }
+
+    /// Returns tracked source paths for loaded spectra read with a source format.
+    ///
+    /// Spectra loaded while source path tracking is disabled are skipped.
+    pub fn source_paths_for_format<'a>(
+        &'a self,
+        format: &'a str,
+    ) -> impl Iterator<Item = &'a Path> + 'a {
+        self.loaded_sources()
+            .filter(move |source| source.format() == format)
+            .filter_map(LoadedSource::path)
+    }
+
     /// Returns a loaded spectrum by its source path, if present.
     #[must_use]
     pub fn loaded_by_source_path(&self, path: impl AsRef<Path>) -> Option<&LoadedSpectrum> {

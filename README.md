@@ -67,6 +67,12 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     for count in &summary.source_formats {
         println!("{}: {}", count.format(), count.count());
     }
+    for (spectrum, source) in bundle.loaded_1d_by_source_format("jcamp_dx") {
+        let label = source
+            .path()
+            .map_or_else(|| "<memory>".to_owned(), |path| path.display().to_string());
+        println!("{label} has {} points", spectrum.len());
+    }
     Ok(bundle.into_spectra_1d())
 }
 

@@ -817,42 +817,6 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert!(source_paths.contains(&jcamp_path));
     assert!(source_paths.contains(&hsqc_path));
     assert!(bundle.has_source_path(jcamp_path));
-    assert_eq!(bundle.source_format_count("bruker_fid"), 1);
-    assert_eq!(bundle.source_format_count("bruker_ser"), 1);
-    assert_eq!(bundle.source_format_count("jcamp_dx"), 2);
-    assert_eq!(bundle.source_format_count("jeol_jdf"), 3);
-    assert_eq!(bundle.source_format_count("missing"), 0);
-    assert!(bundle.has_source_format("jcamp_dx"));
-    assert!(!bundle.has_source_format("missing"));
-
-    let summary = bundle.summary();
-    assert_eq!(summary.spectra(), 7);
-    assert_eq!(summary.spectra_1d(), 5);
-    assert_eq!(summary.spectra_2d(), 2);
-    assert_eq!(summary.molecules(), 0);
-    assert_eq!(summary.warnings(), 0);
-    assert_eq!(summary.source_format_count("jcamp_dx"), 2);
-    assert!(summary.has_source_format("jeol_jdf"));
-    assert!(!summary.has_source_format("missing"));
-
-    let source_format_counts = bundle.source_format_counts();
-    assert_eq!(
-        source_format_counts
-            .iter()
-            .map(|count| (count.format(), count.count()))
-            .collect::<Vec<_>>(),
-        vec![
-            ("bruker_fid", 1),
-            ("bruker_ser", 1),
-            ("jcamp_dx", 2),
-            ("jeol_jdf", 3)
-        ]
-    );
-
-    let source_formats = bundle.source_formats().collect::<Vec<_>>();
-    assert_eq!(source_formats.len(), bundle.len());
-    assert!(source_formats.contains(&"jcamp_dx"));
-    assert!(source_formats.contains(&"jeol_jdf"));
 
     let loaded_sources = bundle.loaded_sources().collect::<Vec<_>>();
     assert_eq!(loaded_sources.len(), bundle.len());
@@ -914,6 +878,88 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
         .read_path(nmrxiv_fixture_root())?;
     assert!(no_sources.loaded_by_source_path(jcamp_path).is_none());
     assert!(no_sources.source_paths().next().is_none());
+    Ok(())
+}
+
+#[test]
+fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    assert_eq!(bundle.source_format_count("bruker_fid"), 1);
+    assert_eq!(bundle.source_format_count("bruker_ser"), 1);
+    assert_eq!(bundle.source_format_count("jcamp_dx"), 2);
+    assert_eq!(bundle.source_format_count("jeol_jdf"), 3);
+    assert_eq!(bundle.source_format_count("missing"), 0);
+    assert!(bundle.has_source_format("jcamp_dx"));
+    assert!(!bundle.has_source_format("missing"));
+
+    let summary = bundle.summary();
+    assert_eq!(summary.spectra(), 7);
+    assert_eq!(summary.spectra_1d(), 5);
+    assert_eq!(summary.spectra_2d(), 2);
+    assert_eq!(summary.molecules(), 0);
+    assert_eq!(summary.warnings(), 0);
+    assert_eq!(summary.source_format_count("jcamp_dx"), 2);
+    assert!(summary.has_source_format("jeol_jdf"));
+    assert!(!summary.has_source_format("missing"));
+
+    assert_eq!(
+        bundle
+            .source_format_counts()
+            .iter()
+            .map(|count| (count.format(), count.count()))
+            .collect::<Vec<_>>(),
+        vec![
+            ("bruker_fid", 1),
+            ("bruker_ser", 1),
+            ("jcamp_dx", 2),
+            ("jeol_jdf", 3)
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn bundle_source_format_helpers_filter_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    let source_formats = bundle.source_formats().collect::<Vec<_>>();
+    assert_eq!(source_formats.len(), bundle.len());
+    assert!(source_formats.contains(&"jcamp_dx"));
+    assert!(source_formats.contains(&"jeol_jdf"));
+
+    let loaded_jcamp = bundle
+        .loaded_by_source_format("jcamp_dx")
+        .collect::<Vec<_>>();
+    assert_eq!(loaded_jcamp.len(), 2);
+    assert!(loaded_jcamp.iter().all(|entry| entry.is_1d()));
+    assert!(bundle.loaded_by_source_format("missing").next().is_none());
+
+    let jcamp_1d = bundle
+        .loaded_1d_by_source_format("jcamp_dx")
+        .collect::<Vec<_>>();
+    assert_eq!(jcamp_1d.len(), 2);
+    assert!(
+        jcamp_1d
+            .iter()
+            .any(|(spectrum, _)| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+    );
+    assert_eq!(
+        bundle
+            .source_paths_for_format("jcamp_dx")
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+            Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
+        ]
+    );
+    assert_eq!(
+        bundle
+            .loaded_2d_by_source_format("jeol_jdf")
+            .collect::<Vec<_>>()
+            .len(),
+        1
+    );
     Ok(())
 }
 
