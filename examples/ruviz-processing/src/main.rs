@@ -168,6 +168,94 @@ mod ruviz_example {
         write_auto_phase_comparison_plot(output_dir, raw)?;
         write_auto_phase_peak_zoom_plot(output_dir, raw)?;
         write_jeol_auto_phase_plots(root, output_dir)?;
+        write_jeol_method_panels(root, output_dir)?;
+        Ok(())
+    }
+
+    fn write_jeol_method_panels(root: &Path, output_dir: &Path) -> Result<()> {
+        let fixture =
+            root.join("crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf");
+        let bundle = load_spectra(&fixture)?;
+        let Some(spectrum) = bundle.spectra_1d().next() else {
+            return Ok(());
+        };
+        if spectrum.imaginary.is_none() {
+            return Ok(());
+        }
+        let auto = jeol_group_delay(spectrum);
+        let (magnitude, _) = jeol_magnitude(spectrum, auto)?;
+
+        let legacy = jeol_phase_with_opts(
+            spectrum,
+            auto,
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false),
+        )?;
+        let acme = jeol_phase_with_opts(
+            spectrum,
+            auto,
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::AcmeEntropy),
+        )?;
+        let regions = jeol_phase_with_opts(spectrum, auto, AutoPhaseOptions::default())?;
+
+        let mk = |title: String, xs: &Vec<f64>, ys: &Vec<f64>, label: &str| -> Plot {
+            Plot::new()
+                .title(&title)
+                .xlabel("chemical shift / ppm")
+                .ylabel("intensity")
+                .max_resolution(900, 600)
+                .legend_position(LegendPosition::Best)
+                .line(xs, ys)
+                .label(label)
+                .into()
+        };
+
+        let magnitude_panel = mk(
+            "magnitude (reference)".to_owned(),
+            &magnitude.x.values,
+            &magnitude.intensities,
+            "|spectrum|",
+        );
+        let legacy_panel = mk(
+            format!(
+                "legacy ({:.0}\u{00B0}/{:.0}\u{00B0})",
+                legacy.zero_order_deg, legacy.first_order_deg
+            ),
+            &legacy.spectrum.x.values,
+            &legacy.spectrum.intensities,
+            "real",
+        );
+        let acme_panel = mk(
+            format!(
+                "ACME entropy ({:.0}\u{00B0}/{:.0}\u{00B0})",
+                acme.zero_order_deg, acme.first_order_deg
+            ),
+            &acme.spectrum.x.values,
+            &acme.spectrum.intensities,
+            "real",
+        );
+        let regions_panel = mk(
+            format!(
+                "Regions Zorin 2017 ({:.0}\u{00B0}/{:.0}\u{00B0})",
+                regions.zero_order_deg, regions.first_order_deg
+            ),
+            &regions.spectrum.x.values,
+            &regions.spectrum.intensities,
+            "real",
+        );
+
+        let figure = subplots(2, 2, 1800, 1200)?
+            .subplot_at(0, magnitude_panel)?
+            .subplot_at(1, legacy_panel)?
+            .subplot_at(2, acme_panel)?
+            .subplot_at(3, regions_panel)?;
+        figure.save(path_to_str(
+            &output_dir.join("auto_phase_methods_jeol_13c.png"),
+        )?)?;
         Ok(())
     }
 
