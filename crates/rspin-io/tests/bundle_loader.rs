@@ -716,6 +716,50 @@ fn bundle_accessors_count_and_consume_loaded_dimensions() -> anyhow::Result<()> 
 }
 
 #[test]
+fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let jcamp_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let loaded = bundle
+        .loaded_by_source_path(jcamp_path)
+        .ok_or_else(|| anyhow::anyhow!("missing loaded entry at {}", jcamp_path.display()))?;
+    assert!(loaded.is_1d());
+    assert_eq!(loaded.source().format, "jcamp_dx");
+
+    let (carbon, carbon_source) = bundle
+        .loaded_1d_by_source_path(jcamp_path)
+        .ok_or_else(|| anyhow::anyhow!("missing 1D entry at {}", jcamp_path.display()))?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(carbon_source.format, "jcamp_dx");
+
+    let (hsqc, hsqc_source) = bundle
+        .loaded_2d_by_source_path(hsqc_path)
+        .ok_or_else(|| anyhow::anyhow!("missing 2D entry at {}", hsqc_path.display()))?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(hsqc_source.format, "jeol_jdf");
+
+    assert!(bundle.loaded_by_source_path("missing").is_none());
+    assert!(bundle.loaded_2d_by_source_path(jcamp_path).is_none());
+
+    let bundle_with_warning = RSpinReader::new().read_path(fixture_root())?;
+    let warnings = bundle_with_warning
+        .warnings_for_source_path(Path::new("empty_jcamp/empty.jdx"))
+        .collect::<Vec<_>>();
+    assert_eq!(warnings.len(), 1);
+    let warning = warnings
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing lookup warning"))?;
+    assert!(warning.message.contains("missing XYDATA values"));
+
+    let no_sources = RSpinReader::new()
+        .without_source_paths()
+        .read_path(nmrxiv_fixture_root())?;
+    assert!(no_sources.loaded_by_source_path(jcamp_path).is_none());
+    Ok(())
+}
+
+#[test]
 fn loads_nmrxiv_cc0_mixed_vendor_directory_as_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
 

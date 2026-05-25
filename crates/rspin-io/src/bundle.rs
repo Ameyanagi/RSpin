@@ -229,6 +229,48 @@ impl SpectrumBundle {
         })
     }
 
+    /// Returns a loaded spectrum by its source path, if present.
+    #[must_use]
+    pub fn loaded_by_source_path(&self, path: impl AsRef<Path>) -> Option<&LoadedSpectrum> {
+        let path = path.as_ref();
+        self.spectra
+            .iter()
+            .find(|entry| entry.source().path.as_deref() == Some(path))
+    }
+
+    /// Returns a one-dimensional spectrum and source by source path, if present.
+    #[must_use]
+    pub fn loaded_1d_by_source_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Option<(&Spectrum1D, &LoadedSource)> {
+        let path = path.as_ref();
+        self.loaded_1d()
+            .find(|(_, source)| source.path.as_deref() == Some(path))
+    }
+
+    /// Returns a two-dimensional spectrum and source by source path, if present.
+    #[must_use]
+    pub fn loaded_2d_by_source_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Option<(&Spectrum2D, &LoadedSource)> {
+        let path = path.as_ref();
+        self.loaded_2d()
+            .find(|(_, source)| source.path.as_deref() == Some(path))
+    }
+
+    /// Returns warnings associated with a source path.
+    pub fn warnings_for_source_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> impl Iterator<Item = &LoadWarning> + '_ {
+        let path = path.as_ref().to_path_buf();
+        self.warnings
+            .iter()
+            .filter(move |warning| warning.path.as_deref() == Some(path.as_path()))
+    }
+
     /// Consumes the bundle and returns loaded one-dimensional spectra with sources.
     #[must_use]
     pub fn into_loaded_1d(self) -> Vec<(Spectrum1D, LoadedSource)> {

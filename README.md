@@ -55,6 +55,17 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     println!("loaded {} 1D and {} 2D spectra", bundle.len_1d(), bundle.len_2d());
     Ok(bundle.into_spectra_1d())
 }
+
+fn load_named_carbon_spectrum() -> Result<Spectrum1D> {
+    let bundle = load_spectra("data/sample")?;
+    let (spectrum, _) = bundle
+        .loaded_1d_by_source_path("carbon_13c")
+        .ok_or_else(|| RSpinError::Parse {
+            format: "spectrum bundle",
+            message: "missing carbon_13c".to_owned(),
+        })?;
+    Ok(spectrum.clone())
+}
 ```
 
 `RSpinReader` exposes the same reader with chainable options:
