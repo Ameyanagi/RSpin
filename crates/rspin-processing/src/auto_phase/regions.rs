@@ -596,11 +596,7 @@ fn global_phase_from_regions(
                 .collect();
             let total: f64 = kept.iter().map(|p| p.2).sum();
             let weighted_mean = if total <= 0.0 {
-                if let Some(p) = kept.first() {
-                    p.1
-                } else {
-                    0.0
-                }
+                if let Some(p) = kept.first() { p.1 } else { 0.0 }
             } else {
                 kept.iter().map(|p| p.1 * p.2).sum::<f64>() / total
             };
