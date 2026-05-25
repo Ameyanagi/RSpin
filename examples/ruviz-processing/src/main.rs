@@ -166,6 +166,74 @@ mod ruviz_example {
         write_auto_phase_plot(output_dir, raw)?;
         write_auto_phase_comparison_plot(output_dir, raw)?;
         write_auto_phase_peak_zoom_plot(output_dir, raw)?;
+        write_jeol_auto_phase_plots(root, output_dir)?;
+        Ok(())
+    }
+
+    fn write_jeol_auto_phase_plots(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries: &[(&str, &str, &str)] = &[
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+                "JEOL 1H Auto-Phase (NMRXiv CC0 Myrcene)",
+                "auto_phase_jeol_myrcene_1h",
+            ),
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+                "JEOL 13C Auto-Phase (NMRXiv CC0 Myrcene)",
+                "auto_phase_jeol_myrcene_13c",
+            ),
+            (
+                "crates/rspin-io/testdata/dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
+                "JEOL 1H Auto-Phase (Dataverse CC0 Rutin)",
+                "auto_phase_jeol_rutin_qh",
+            ),
+        ];
+        for (fixture, title, stem) in entries {
+            let bundle = load_spectra(root.join(fixture))?;
+            let Some(spectrum) = bundle.spectra_1d().next() else {
+                continue;
+            };
+            if spectrum.imaginary.is_none() {
+                eprintln!(
+                    "skipping JEOL auto-phase plot {fixture}: spectrum has no imaginary channel"
+                );
+                continue;
+            }
+            let unphased = if spectrum.x.unit == Unit::Seconds {
+                let target_len = spectrum
+                    .len()
+                    .checked_mul(2)
+                    .context("JEOL auto-phase target length overflow")?;
+                let recipe = ProcessingRecipe1D::new()
+                    .exponential_apodization(1.0, dwell_time_seconds(spectrum)?)
+                    .zero_fill(target_len)
+                    .fft(FftDirection::Forward)
+                    .normalize_max_abs();
+                recipe.apply(spectrum)?
+            } else {
+                ProcessingRecipe1D::new()
+                    .normalize_max_abs()
+                    .apply(spectrum)?
+            };
+            let unphased = relabel_hz_to_ppm(unphased);
+            let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?;
+            let label = format!(
+                "auto-phased ({:.1}\u{00B0}/{:.1}\u{00B0})",
+                phased.zero_order_deg, phased.first_order_deg
+            );
+
+            Plot::new()
+                .title(*title)
+                .xlabel(axis_label(unphased.x.unit))
+                .ylabel("normalized intensity")
+                .max_resolution(1600, 1000)
+                .legend_position(LegendPosition::Best)
+                .line(&unphased.x.values, &unphased.intensities)
+                .label("unphased real")
+                .line(&phased.spectrum.x.values, &phased.spectrum.intensities)
+                .label(&label)
+                .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+        }
         Ok(())
     }
 
