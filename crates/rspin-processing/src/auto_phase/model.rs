@@ -1,6 +1,19 @@
 use rspin_core::Spectrum1D;
 use serde::{Deserialize, Serialize};
 
+/// Scoring strategy for automatic phase correction.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoPhaseCost {
+    /// ACME-style entropy of the real-part derivative plus a negative-area penalty.
+    ///
+    /// Based on Chen, Marion, Le Comte, J. Magn. Reson. 158 (2002) 164.
+    #[default]
+    AcmeEntropy,
+    /// Legacy scoring: imaginary squared plus negative-real squared.
+    LegacyImagNegArea,
+}
+
 /// Options for deterministic grid-search automatic phase correction.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -19,10 +32,14 @@ pub struct AutoPhaseOptions {
     pub first_order_step_deg: f64,
     /// Pivot position as a fraction of the index range, typically in `[0, 1]`.
     pub pivot_fraction: f64,
-    /// Weight for residual imaginary signal.
+    /// Weight for residual imaginary signal (legacy cost only).
     pub imaginary_weight: f64,
-    /// Weight for negative real signal.
+    /// Weight for negative real signal (both costs).
     pub negative_weight: f64,
+    /// Scoring strategy.
+    pub cost: AutoPhaseCost,
+    /// Polish the best grid candidate with a Nelder-Mead simplex search.
+    pub refine: bool,
 }
 
 impl Default for AutoPhaseOptions {
@@ -30,13 +47,15 @@ impl Default for AutoPhaseOptions {
         Self {
             zero_order_min_deg: -180.0,
             zero_order_max_deg: 180.0,
-            zero_order_step_deg: 5.0,
+            zero_order_step_deg: 10.0,
             first_order_min_deg: -180.0,
             first_order_max_deg: 180.0,
             first_order_step_deg: 30.0,
             pivot_fraction: 0.5,
             imaginary_weight: 1.0,
-            negative_weight: 4.0,
+            negative_weight: 1000.0,
+            cost: AutoPhaseCost::AcmeEntropy,
+            refine: true,
         }
     }
 }
@@ -72,6 +91,20 @@ impl AutoPhaseOptions {
     pub fn scoring_weights(mut self, imaginary_weight: f64, negative_weight: f64) -> Self {
         self.imaginary_weight = imaginary_weight;
         self.negative_weight = negative_weight;
+        self
+    }
+
+    /// Returns options with a chosen cost variant.
+    #[must_use]
+    pub fn with_cost(mut self, cost: AutoPhaseCost) -> Self {
+        self.cost = cost;
+        self
+    }
+
+    /// Returns options with refinement enabled or disabled.
+    #[must_use]
+    pub fn with_refine(mut self, refine: bool) -> Self {
+        self.refine = refine;
         self
     }
 }

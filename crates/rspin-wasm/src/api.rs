@@ -1051,6 +1051,8 @@ struct AutoPhaseOptionsJson {
     pivot_fraction: f64,
     imaginary_weight: f64,
     negative_weight: f64,
+    cost: rspin_processing::AutoPhaseCost,
+    refine: bool,
 }
 
 impl Default for AutoPhaseOptionsJson {
@@ -1066,6 +1068,8 @@ impl Default for AutoPhaseOptionsJson {
             pivot_fraction: options.pivot_fraction,
             imaginary_weight: options.imaginary_weight,
             negative_weight: options.negative_weight,
+            cost: options.cost,
+            refine: options.refine,
         }
     }
 }
@@ -1082,6 +1086,8 @@ impl From<AutoPhaseOptionsJson> for AutoPhaseOptions {
             pivot_fraction: options.pivot_fraction,
             imaginary_weight: options.imaginary_weight,
             negative_weight: options.negative_weight,
+            cost: options.cost,
+            refine: options.refine,
         }
     }
 }

@@ -32,7 +32,9 @@ pub use apodization_2d::{
     ExponentialApodization2D, GaussianApodization2D, SineBellApodization2D,
     exponential_apodization_2d, gaussian_apodization_2d, sine_bell_apodization_2d,
 };
-pub use auto_phase::{AutoPhaseCorrection, AutoPhaseOptions, AutoPhaseResult, auto_phase_correct};
+pub use auto_phase::{
+    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, auto_phase_correct,
+};
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
 };

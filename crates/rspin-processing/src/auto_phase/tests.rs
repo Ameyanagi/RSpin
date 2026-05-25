@@ -8,6 +8,8 @@ fn corrects_zero_order_phase() -> anyhow::Result<()> {
     let result = auto_phase_correct(
         &phased,
         AutoPhaseOptions::default()
+            .with_cost(AutoPhaseCost::LegacyImagNegArea)
+            .with_refine(false)
             .zero_order_range(-90.0, 90.0, 5.0)
             .first_order_range(0.0, 0.0, 1.0),
     )?;
@@ -98,6 +100,88 @@ fn default_options_search_first_order_phase() -> anyhow::Result<()> {
         "default options must explore first-order phase"
     );
     Ok(())
+}
+
+#[test]
+fn acme_recovers_zero_order_on_lorentzian() -> anyhow::Result<()> {
+    let spectrum = lorentzian_spectrum(64, 0.05)?;
+    let phased = phase_correct(&spectrum, 60.0, 0.0, 0.5)?;
+    let result = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    assert!(
+        (result.zero_order_deg + 60.0).abs() < 3.0,
+        "expected ph0 near -60, got {}",
+        result.zero_order_deg
+    );
+    let max_re = result
+        .spectrum
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    let min_re = result
+        .spectrum
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::min);
+    assert!(max_re > 0.0);
+    assert!(
+        min_re > -0.05 * max_re,
+        "phased spectrum should be mostly positive"
+    );
+    Ok(())
+}
+
+#[test]
+fn acme_recovers_combined_phase_on_lorentzian() -> anyhow::Result<()> {
+    let spectrum = lorentzian_spectrum(96, 0.04)?;
+    let phased = phase_correct(&spectrum, 45.0, 30.0, 0.5)?;
+    let result = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    assert!(
+        (result.zero_order_deg + 45.0).abs() < 5.0,
+        "expected ph0 near -45, got {}",
+        result.zero_order_deg
+    );
+    assert!(
+        (result.first_order_deg + 30.0).abs() < 10.0,
+        "expected ph1 near -30, got {}",
+        result.first_order_deg
+    );
+    Ok(())
+}
+
+#[test]
+fn refinement_improves_grid_score() -> anyhow::Result<()> {
+    let spectrum = lorentzian_spectrum(64, 0.05)?;
+    let phased = phase_correct(&spectrum, 37.5, 22.5, 0.5)?;
+    let without = auto_phase_correct(&phased, AutoPhaseOptions::default().with_refine(false))?;
+    let with = auto_phase_correct(&phased, AutoPhaseOptions::default().with_refine(true))?;
+    assert!(
+        with.score <= without.score + 1.0e-9,
+        "refinement should never worsen the score: {} vs {}",
+        with.score,
+        without.score
+    );
+    Ok(())
+}
+
+fn lorentzian_spectrum(point_count: usize, half_width_ppm: f64) -> anyhow::Result<Spectrum1D> {
+    let segments = u32::try_from(point_count.saturating_sub(1))?;
+    let mut real = Vec::with_capacity(point_count);
+    let mut imag = Vec::with_capacity(point_count);
+    for index in 0..u32::try_from(point_count)? {
+        let position = f64::from(index) * 10.0 / f64::from(segments) - 5.0;
+        let x = position / half_width_ppm;
+        let denom = 1.0 + x * x;
+        real.push(1.0 / denom);
+        imag.push(x / denom);
+    }
+    Ok(Spectrum1D::new_complex(
+        Axis::linear("shift", Unit::Ppm, -5.0, 5.0, point_count)?,
+        real,
+        Some(imag),
+        Metadata::default(),
+    )?)
 }
 
 fn real_spectrum() -> anyhow::Result<Spectrum1D> {
