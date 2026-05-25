@@ -438,10 +438,7 @@ impl SpectrumBundleLoader {
         if bundle.has_data() {
             Ok(bundle)
         } else {
-            Err(RSpinError::Parse {
-                format: "spectrum bundle",
-                message: format!("no readable bundle data found at {}", root.display()),
-            })
+            Err(no_data_error_at(root, &bundle))
         }
     }
 
@@ -503,10 +500,7 @@ impl SpectrumBundleLoader {
         if bundle.has_data() {
             Ok(bundle)
         } else {
-            Err(RSpinError::Parse {
-                format: "spectrum bundle",
-                message: "no readable bundle data found in input paths".to_owned(),
-            })
+            Err(no_data_error_in_inputs(&bundle))
         }
     }
 
@@ -917,6 +911,42 @@ fn only_error_from_counts(expected: &'static str, one_d: usize, two_d: usize) ->
         message: format!(
             "expected exactly one {expected} spectrum, found {one_d} one-dimensional and {two_d} two-dimensional spectra"
         ),
+    }
+}
+
+fn no_data_error_at(path: &Path, bundle: &SpectrumBundle) -> RSpinError {
+    no_data_error(
+        format!("no readable bundle data found at {}", path.display()),
+        bundle,
+    )
+}
+
+fn no_data_error_in_inputs(bundle: &SpectrumBundle) -> RSpinError {
+    no_data_error(
+        "no readable bundle data found in input paths".to_owned(),
+        bundle,
+    )
+}
+
+fn no_data_error(mut message: String, bundle: &SpectrumBundle) -> RSpinError {
+    if let Some(warning) = bundle.warnings.first() {
+        message.push_str("; first warning");
+        if let Some(path) = warning.path.as_ref() {
+            message.push_str(" at ");
+            message.push_str(&path.display().to_string());
+        }
+        message.push_str(": ");
+        message.push_str(&warning.message);
+        if bundle.warnings.len() > 1 {
+            message.push_str("; ");
+            message.push_str(&bundle.warnings.len().to_string());
+            message.push_str(" total warnings");
+        }
+    }
+
+    RSpinError::Parse {
+        format: "spectrum bundle",
+        message,
     }
 }
 

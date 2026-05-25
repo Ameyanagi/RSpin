@@ -247,6 +247,25 @@ fn multi_path_loader_rejects_empty_input() {
 }
 
 #[test]
+fn loader_no_data_errors_include_first_warning() {
+    let single_error = RSpinReader::new()
+        .read_path(fixture_root().join("empty_jcamp/empty.jdx"))
+        .expect_err("empty JCAMP-DX path should fail");
+    assert_no_data_warning(&single_error, "missing XYDATA values");
+
+    let many_error = RSpinReader::new()
+        .read_paths([fixture_root().join("empty_jcamp/empty.jdx")])
+        .expect_err("unreadable selected paths should fail");
+    assert_no_data_warning(&many_error, "missing XYDATA values");
+
+    let disabled_error = RSpinReader::new()
+        .with_raw(false)
+        .read_path(fixture_root().join("bruker_without_expno/fid"))
+        .expect_err("disabled direct raw file should fail");
+    assert_no_data_warning(&disabled_error, "raw spectrum candidates are disabled");
+}
+
+#[test]
 fn exact_single_helpers_return_owned_and_borrowed_spectra() -> anyhow::Result<()> {
     let fixture = fixture_root().join("varian_1h");
 
@@ -492,4 +511,20 @@ fn assert_single_error<T>(
         "expected {expected_counts:?} in {message:?}"
     );
     Ok(())
+}
+
+fn assert_no_data_warning(error: &RSpinError, expected_warning: &str) {
+    let message = error.to_string();
+    assert!(
+        message.contains("no readable bundle data found"),
+        "expected no-data message in {message:?}"
+    );
+    assert!(
+        message.contains("first warning"),
+        "expected first warning context in {message:?}"
+    );
+    assert!(
+        message.contains(expected_warning),
+        "expected warning {expected_warning:?} in {message:?}"
+    );
 }
