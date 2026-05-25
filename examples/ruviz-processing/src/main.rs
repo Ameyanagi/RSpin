@@ -32,9 +32,9 @@ mod ruviz_example {
         write_spectrum1d_csv, write_spectrum1d_json,
     };
     use rspin_processing::{
-        AutoPhaseCost, AutoPhaseOptions, BaselineMethod, FftDirection, ProcessSpectrum2D,
-        ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks, fit_baseline,
-        remove_group_delay,
+        AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
+        ProcessSpectrum2D, ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks,
+        fit_baseline, remove_group_delay,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -200,46 +200,177 @@ mod ruviz_example {
                 );
                 continue;
             }
+            // Header-derived group-delay shift.
             let auto = jeol_group_delay(spectrum);
-            let shift_candidates: [f64; 5] = [0.0, auto, 32.0, 60.0, 73.0];
-            let mut traces: Vec<(Vec<f64>, Vec<f64>, String)> = Vec::new();
-            for &candidate in &shift_candidates {
-                let (_unphased, phased) = jeol_phase_with_shift(spectrum, candidate)?;
-                let neg = negative_fraction(&phased.spectrum.intensities);
-                let tag = if (candidate - auto).abs() < 0.5 && auto > 0.0 {
-                    format!("auto={candidate:.1}")
-                } else {
-                    format!("shift={candidate:.0}")
-                };
-                let label = format!(
-                    "{tag} ({:.0}\u{00B0}/{:.0}\u{00B0} neg={:.2})",
-                    phased.zero_order_deg, phased.first_order_deg, neg
-                );
-                traces.push((
-                    phased.spectrum.x.values.clone(),
-                    phased.spectrum.intensities.clone(),
-                    label,
-                ));
-            }
+            // Magnitude reference (phase-independent absorption envelope).
+            let (magnitude, _) = jeol_magnitude(spectrum, auto)?;
+
+            // Three phased traces using the same group-delay shift.
+            let legacy_opts = AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false);
+            let acme_opts = AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::AcmeEntropy);
+            let regions_opts = AutoPhaseOptions::default();
+            let legacy = jeol_phase_with_opts(spectrum, auto, legacy_opts)?;
+            let acme = jeol_phase_with_opts(spectrum, auto, acme_opts)?;
+            let regions = jeol_phase_with_opts(spectrum, auto, regions_opts)?;
+
+            let fmt = |label: &str, r: &rspin_processing::AutoPhaseResult| {
+                let neg = negative_fraction(&r.spectrum.intensities);
+                format!(
+                    "{label} ({:.0}\u{00B0}/{:.0}\u{00B0} neg={:.2})",
+                    r.zero_order_deg, r.first_order_deg, neg
+                )
+            };
+
             Plot::new()
                 .title(*title)
                 .xlabel("chemical shift / ppm")
                 .ylabel("normalized intensity")
                 .max_resolution(1600, 1000)
                 .legend_position(LegendPosition::Best)
-                .line(&traces[0].0, &traces[0].1)
-                .label(&traces[0].2)
-                .line(&traces[1].0, &traces[1].1)
-                .label(&traces[1].2)
-                .line(&traces[2].0, &traces[2].1)
-                .label(&traces[2].2)
-                .line(&traces[3].0, &traces[3].1)
-                .label(&traces[3].2)
-                .line(&traces[4].0, &traces[4].1)
-                .label(&traces[4].2)
+                .line(&magnitude.x.values, &magnitude.intensities)
+                .label(&format!("magnitude (shift={auto:.1})"))
+                .line(&legacy.spectrum.x.values, &legacy.spectrum.intensities)
+                .label(&fmt("legacy", &legacy))
+                .line(&acme.spectrum.x.values, &acme.spectrum.intensities)
+                .label(&fmt("ACME", &acme))
+                .line(&regions.spectrum.x.values, &regions.spectrum.intensities)
+                .label(&fmt("Regions (Zorin 2017)", &regions))
                 .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         }
         Ok(())
+    }
+
+    fn jeol_phase_with_opts(
+        spectrum: &Spectrum1D,
+        shift: f64,
+        options: AutoPhaseOptions,
+    ) -> Result<rspin_processing::AutoPhaseResult> {
+        let shifted = if shift > 0.0 {
+            remove_group_delay(spectrum, shift)?
+        } else {
+            spectrum.clone()
+        };
+        let prepared = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL auto-phase target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs()
+                .apply(&shifted)?
+        } else {
+            ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        };
+        let prepared = relabel_hz_to_ppm(prepared);
+        Ok(auto_phase_correct(&prepared, options)?)
+    }
+
+    fn jeol_magnitude(
+        spectrum: &Spectrum1D,
+        shift: f64,
+    ) -> Result<(Spectrum1D, rspin_processing::AutoPhaseResult)> {
+        let shifted = if shift > 0.0 {
+            remove_group_delay(spectrum, shift)?
+        } else {
+            spectrum.clone()
+        };
+        let magnitude = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL magnitude target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .magnitude()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        } else {
+            ProcessingRecipe1D::new()
+                .magnitude()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        };
+        let magnitude = relabel_hz_to_ppm(magnitude);
+        // Return a dummy auto-phase result so the API matches jeol_phase_with_shift.
+        let dummy = rspin_processing::AutoPhaseResult {
+            spectrum: magnitude.clone(),
+            zero_order_deg: 0.0,
+            first_order_deg: 0.0,
+            score: 0.0,
+        };
+        Ok((magnitude, dummy))
+    }
+
+    fn jeol_best_shift(
+        spectrum: &Spectrum1D,
+        magnitude: &Spectrum1D,
+    ) -> Result<(f64, rspin_processing::AutoPhaseResult)> {
+        // Coarse sweep, then refine around the best.
+        let coarse: Vec<f64> = (0..=30).map(|i| f64::from(i as u32) * 4.0).collect();
+        let mut best_shift = 0.0_f64;
+        let mut best_loss = f64::INFINITY;
+        let mut best_result: Option<rspin_processing::AutoPhaseResult> = None;
+        for &candidate in &coarse {
+            let (_unphased, phased) = jeol_phase_with_shift(spectrum, candidate)?;
+            let loss = magnitude_target_loss(magnitude, &phased.spectrum);
+            if loss < best_loss {
+                best_loss = loss;
+                best_shift = candidate;
+                best_result = Some(phased);
+            }
+        }
+        // Refine around the best coarse winner.
+        let lo = (best_shift - 4.0).max(0.0);
+        let hi = best_shift + 4.0;
+        let steps: u32 = 16;
+        for i in 0..=steps {
+            let candidate = lo + (hi - lo) * f64::from(i) / f64::from(steps);
+            let (_unphased, phased) = jeol_phase_with_shift(spectrum, candidate)?;
+            let loss = magnitude_target_loss(magnitude, &phased.spectrum);
+            if loss < best_loss {
+                best_loss = loss;
+                best_shift = candidate;
+                best_result = Some(phased);
+            }
+        }
+        Ok((best_shift, best_result.context("best shift not found")?))
+    }
+
+    fn magnitude_target_loss(magnitude: &Spectrum1D, phased_real: &Spectrum1D) -> f64 {
+        // Weighted least squares over the high-magnitude region.
+        let max_mag = magnitude
+            .intensities
+            .iter()
+            .copied()
+            .fold(0.0_f64, f64::max);
+        if max_mag <= 0.0 {
+            return f64::INFINITY;
+        }
+        let threshold = 0.02 * max_mag;
+        let mut loss = 0.0_f64;
+        let n = magnitude.intensities.len().min(phased_real.intensities.len());
+        for index in 0..n {
+            let m = magnitude.intensities[index];
+            if m < threshold {
+                continue;
+            }
+            let r = phased_real.intensities[index];
+            let diff = m - r;
+            loss += m * diff * diff;
+        }
+        loss
     }
 
     fn negative_fraction(values: &[f64]) -> f64 {
@@ -480,22 +611,30 @@ mod ruviz_example {
         let active_region = (1.0_f64, 3.5_f64);
 
         let legacy = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
             .with_cost(AutoPhaseCost::LegacyImagNegArea)
             .with_refine(false);
         let acme_grid = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
             .with_cost(AutoPhaseCost::AcmeEntropy)
             .with_refine(false);
-        let acme_refined = AutoPhaseOptions::default();
-        let acme_pivot = AutoPhaseOptions::default().with_pivot_value(pivot_ppm);
+        let acme_refined = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost);
+        let acme_pivot = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
+            .with_pivot_value(pivot_ppm);
         let acme_active = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
             .with_pivot_value(pivot_ppm)
             .with_active_region(active_region.0, active_region.1);
+        let regions = AutoPhaseOptions::default();
 
         let legacy_result = auto_phase_correct(&unphased, legacy)?;
         let acme_grid_result = auto_phase_correct(&unphased, acme_grid)?;
         let acme_refined_result = auto_phase_correct(&unphased, acme_refined)?;
         let acme_pivot_result = auto_phase_correct(&unphased, acme_pivot)?;
         let acme_active_result = auto_phase_correct(&unphased, acme_active)?;
+        let regions_result = auto_phase_correct(&unphased, regions)?;
         let peak_centers = detect_peak_centers(&unphased)?;
         let acme_peak_result = auto_phase_correct_with_peaks(
             &unphased,
@@ -548,6 +687,11 @@ mod ruviz_example {
                 &acme_peak_result.spectrum.intensities,
             )
             .label(&fmt_label("peak-warmed", &acme_peak_result))
+            .line(
+                &regions_result.spectrum.x.values,
+                &regions_result.spectrum.intensities,
+            )
+            .label(&fmt_label("Regions (Zorin 2017)", &regions_result))
             .save(path_to_str(&output_dir.join("auto_phase_comparison.png"))?)?;
 
         Ok(())

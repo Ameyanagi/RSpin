@@ -33,7 +33,8 @@ pub use apodization_2d::{
     exponential_apodization_2d, gaussian_apodization_2d, sine_bell_apodization_2d,
 };
 pub use auto_phase::{
-    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, auto_phase_correct,
+    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
+    RegionsOptions, RegionsResult, auto_phase_correct, auto_phase_correct_regions,
     auto_phase_correct_with_peaks, peak_based_phase_estimate,
 };
 pub use auto_phase_2d::{

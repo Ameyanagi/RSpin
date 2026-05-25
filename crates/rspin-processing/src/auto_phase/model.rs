@@ -1,6 +1,25 @@
 use rspin_core::Spectrum1D;
 use serde::{Deserialize, Serialize};
 
+/// Top-level strategy used by [`crate::auto_phase_correct`].
+///
+/// `Regions` follows Zorin, Bernstein, and Cobas (Magn. Reson. Chem. 55
+/// (2017) 738–746, DOI 10.1002/mrc.4586) and is the default. The legacy
+/// global-cost approach (ACME or imag+neg) is still available for
+/// regression tests and edge cases where the region detector cannot find
+/// reliable peaks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AutoPhaseStrategy {
+    /// Per-region phasing followed by weighted linear regression (Zorin et
+    /// al. 2017). New default.
+    #[default]
+    Regions,
+    /// Coarse grid search over the global cost function with optional
+    /// Nelder-Mead refinement.
+    GlobalCost,
+}
+
 /// Scoring strategy for automatic phase correction.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -47,7 +66,9 @@ pub struct AutoPhaseOptions {
     pub imaginary_weight: f64,
     /// Weight for negative real signal (both costs).
     pub negative_weight: f64,
-    /// Scoring strategy.
+    /// Top-level algorithm: regions (default) or global cost.
+    pub strategy: AutoPhaseStrategy,
+    /// Scoring strategy used by the global-cost path.
     pub cost: AutoPhaseCost,
     /// Polish the best grid candidate with a Nelder-Mead simplex search.
     pub refine: bool,
@@ -74,6 +95,7 @@ impl Default for AutoPhaseOptions {
             active_region: None,
             imaginary_weight: 1.0,
             negative_weight: 1000.0,
+            strategy: AutoPhaseStrategy::Regions,
             cost: AutoPhaseCost::AcmeEntropy,
             refine: true,
             regularization_weight: 0.05,
@@ -119,6 +141,13 @@ impl AutoPhaseOptions {
     #[must_use]
     pub fn with_cost(mut self, cost: AutoPhaseCost) -> Self {
         self.cost = cost;
+        self
+    }
+
+    /// Returns options with a chosen top-level strategy.
+    #[must_use]
+    pub fn with_strategy(mut self, strategy: AutoPhaseStrategy) -> Self {
+        self.strategy = strategy;
         self
     }
 

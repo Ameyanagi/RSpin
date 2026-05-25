@@ -11,8 +11,12 @@ const NELDER_MEAD_MAX_ITERS: usize = 200;
 const NELDER_MEAD_TOLERANCE_DEG: f64 = 1.0e-4;
 
 mod model;
+mod regions;
 
-pub use model::{AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult};
+pub use model::{
+    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
+};
+pub use regions::{RegionsOptions, RegionsResult, auto_phase_correct_regions};
 
 impl AutoPhaseOptions {
     fn validate(self) -> Result<()> {
@@ -60,10 +64,23 @@ impl ProcessingStep<Spectrum1D> for AutoPhaseCorrection {
 ///
 /// Returns an error when options are invalid or the spectrum is too large for
 /// safe phase-grid calculations.
+#[allow(clippy::too_many_lines)]
 pub fn auto_phase_correct(
     spectrum: &Spectrum1D,
     options: AutoPhaseOptions,
 ) -> Result<AutoPhaseResult> {
+    if options.strategy == AutoPhaseStrategy::Regions {
+        let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
+        let regions_options = RegionsOptions::default().with_pivot_fraction(pivot_fraction);
+        let result = regions::auto_phase_correct_regions(spectrum, regions_options)?;
+        return Ok(AutoPhaseResult {
+            spectrum: result.spectrum,
+            zero_order_deg: result.zero_order_deg,
+            first_order_deg: result.first_order_deg,
+            score: 1.0 - result.regression_r_squared,
+        });
+    }
+
     options.validate()?;
     let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
     let active_mask = resolve_active_mask(spectrum, options);
@@ -289,10 +306,10 @@ where
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct PhaseCandidate {
-    zero_order_deg: f64,
-    first_order_deg: f64,
-    score: f64,
+pub(crate) struct PhaseCandidate {
+    pub(crate) zero_order_deg: f64,
+    pub(crate) first_order_deg: f64,
+    pub(crate) score: f64,
 }
 
 impl PhaseCandidate {
@@ -783,7 +800,7 @@ fn resolve_active_mask(spectrum: &Spectrum1D, options: AutoPhaseOptions) -> Opti
     )
 }
 
-fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
+pub(crate) fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
     match &spectrum.imaginary {
         Some(imaginary) => spectrum
             .intensities

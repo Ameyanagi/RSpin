@@ -8,6 +8,7 @@ fn corrects_zero_order_phase() -> anyhow::Result<()> {
     let result = auto_phase_correct(
         &phased,
         AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
             .with_cost(AutoPhaseCost::LegacyImagNegArea)
             .with_refine(false)
             .zero_order_range(-90.0, 90.0, 5.0)
@@ -31,9 +32,10 @@ fn corrects_zero_order_phase() -> anyhow::Result<()> {
 #[test]
 fn serializes_auto_phase_result_and_step() -> anyhow::Result<()> {
     let phased = phase_correct(&real_spectrum()?, 45.0, 0.0, 0.5)?;
-    let step = AutoPhaseCorrection::new()
+    let mut step = AutoPhaseCorrection::new()
         .zero_order_range(-90.0, 90.0, 5.0)
         .first_order_range(0.0, 0.0, 1.0);
+    step.options = step.options.with_strategy(AutoPhaseStrategy::GlobalCost);
     let result = auto_phase_correct(&phased, step.options)?;
     let result_json = serde_json::to_string(&result)?;
     let parsed_result: AutoPhaseResult = serde_json::from_str(&result_json)?;
@@ -56,11 +58,12 @@ fn corrects_first_order_phase() -> anyhow::Result<()> {
         Metadata::default(),
     )?;
     let phased = phase_correct(&spectrum, 0.0, 60.0, 0.5)?;
-    let result = AutoPhaseCorrection::new()
+    let mut step = AutoPhaseCorrection::new()
         .zero_order_range(0.0, 0.0, 1.0)
         .first_order_range(-90.0, 90.0, 5.0)
-        .pivot_fraction(0.5)
-        .apply(&phased)?;
+        .pivot_fraction(0.5);
+    step.options = step.options.with_strategy(AutoPhaseStrategy::GlobalCost);
+    let result = step.apply(&phased)?;
 
     assert_vec_close(&result.intensities, &[1.0, 1.0, 1.0]);
     Ok(())
@@ -94,7 +97,10 @@ fn default_options_search_first_order_phase() -> anyhow::Result<()> {
         Metadata::default(),
     )?;
     let phased = phase_correct(&spectrum, 30.0, 60.0, 0.5)?;
-    let result = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    let result = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default().with_strategy(AutoPhaseStrategy::GlobalCost),
+    )?;
     assert!(
         result.first_order_deg.abs() > 1.0e-12,
         "default options must explore first-order phase"
@@ -136,7 +142,10 @@ fn acme_recovers_zero_order_on_lorentzian() -> anyhow::Result<()> {
 fn acme_recovers_combined_phase_on_lorentzian() -> anyhow::Result<()> {
     let spectrum = lorentzian_spectrum(96, 0.04)?;
     let phased = phase_correct(&spectrum, 45.0, 30.0, 0.5)?;
-    let result = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    let result = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default().with_strategy(AutoPhaseStrategy::GlobalCost),
+    )?;
     assert!(
         (result.zero_order_deg + 45.0).abs() < 5.0,
         "expected ph0 near -45, got {}",
@@ -273,7 +282,10 @@ fn peak_based_estimate_recovers_known_phase() -> anyhow::Result<()> {
 fn auto_phase_with_peaks_matches_default_quality() -> anyhow::Result<()> {
     let spectrum = isolated_two_peak_spectrum(1024, 0.04)?;
     let phased = phase_correct(&spectrum, 35.0, 25.0, 0.5)?;
-    let baseline = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    let baseline = auto_phase_correct(
+        &phased,
+        AutoPhaseOptions::default().with_strategy(AutoPhaseStrategy::GlobalCost),
+    )?;
     let hybrid = auto_phase_correct_with_peaks(
         &phased,
         AutoPhaseOptions::default().with_pivot_value(0.0),
