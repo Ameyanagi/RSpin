@@ -798,6 +798,19 @@ impl SpectrumBundle {
         }
     }
 
+    /// Returns the only loaded one-dimensional spectrum and its source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the bundle contains exactly one spectrum and it
+    /// is one-dimensional.
+    pub fn only_loaded_1d(&self) -> Result<(&Spectrum1D, &LoadedSource)> {
+        match self.spectra.as_slice() {
+            [LoadedSpectrum::OneD { spectrum, source }] => Ok((spectrum, source)),
+            _ => Err(self.only_error("one-dimensional")),
+        }
+    }
+
     /// Returns the only loaded two-dimensional spectrum.
     ///
     /// # Errors
@@ -807,6 +820,19 @@ impl SpectrumBundle {
     pub fn only_2d(&self) -> Result<&Spectrum2D> {
         match self.spectra.as_slice() {
             [LoadedSpectrum::TwoD { spectrum, .. }] => Ok(spectrum),
+            _ => Err(self.only_error("two-dimensional")),
+        }
+    }
+
+    /// Returns the only loaded two-dimensional spectrum and its source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the bundle contains exactly one spectrum and it
+    /// is two-dimensional.
+    pub fn only_loaded_2d(&self) -> Result<(&Spectrum2D, &LoadedSource)> {
+        match self.spectra.as_slice() {
+            [LoadedSpectrum::TwoD { spectrum, source }] => Ok((spectrum, source)),
             _ => Err(self.only_error("two-dimensional")),
         }
     }
@@ -831,6 +857,26 @@ impl SpectrumBundle {
         }
     }
 
+    /// Consumes the bundle and returns the only loaded one-dimensional spectrum and source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the bundle contains exactly one spectrum and it
+    /// is one-dimensional.
+    pub fn into_only_loaded_1d(self) -> Result<(Spectrum1D, LoadedSource)> {
+        let (one_d, two_d) = spectrum_dimension_counts(self.spectra.iter());
+        if self.spectra.len() != 1 {
+            return Err(only_error_from_counts("one-dimensional", one_d, two_d));
+        }
+
+        match self.spectra.into_iter().next() {
+            Some(LoadedSpectrum::OneD { spectrum, source }) => Ok((spectrum, source)),
+            Some(LoadedSpectrum::TwoD { .. }) | None => {
+                Err(only_error_from_counts("one-dimensional", one_d, two_d))
+            }
+        }
+    }
+
     /// Consumes the bundle and returns the only loaded two-dimensional spectrum.
     ///
     /// # Errors
@@ -845,6 +891,26 @@ impl SpectrumBundle {
 
         match self.spectra.into_iter().next() {
             Some(LoadedSpectrum::TwoD { spectrum, .. }) => Ok(spectrum),
+            Some(LoadedSpectrum::OneD { .. }) | None => {
+                Err(only_error_from_counts("two-dimensional", one_d, two_d))
+            }
+        }
+    }
+
+    /// Consumes the bundle and returns the only loaded two-dimensional spectrum and source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless the bundle contains exactly one spectrum and it
+    /// is two-dimensional.
+    pub fn into_only_loaded_2d(self) -> Result<(Spectrum2D, LoadedSource)> {
+        let (one_d, two_d) = spectrum_dimension_counts(self.spectra.iter());
+        if self.spectra.len() != 1 {
+            return Err(only_error_from_counts("two-dimensional", one_d, two_d));
+        }
+
+        match self.spectra.into_iter().next() {
+            Some(LoadedSpectrum::TwoD { spectrum, source }) => Ok((spectrum, source)),
             Some(LoadedSpectrum::OneD { .. }) | None => {
                 Err(only_error_from_counts("two-dimensional", one_d, two_d))
             }

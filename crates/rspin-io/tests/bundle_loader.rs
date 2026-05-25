@@ -719,6 +719,10 @@ fn exact_single_helpers_return_owned_and_borrowed_spectra() -> anyhow::Result<()
 
     let bundle = load_spectra(&fixture)?;
     assert_eq!(bundle.only_1d()?.len(), direct.len());
+    let (borrowed, source) = bundle.only_loaded_1d()?;
+    assert_eq!(borrowed.len(), direct.len());
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
     let loaded = bundle.loaded_1d().collect::<Vec<_>>();
     assert_eq!(loaded.len(), 1);
     let (_, source) = loaded
@@ -740,6 +744,23 @@ fn exact_single_helpers_return_owned_and_borrowed_spectra() -> anyhow::Result<()
 
     let owned_from_bundle = load_spectra(&fixture)?.into_only_1d()?;
     assert_eq!(owned_from_bundle.len(), direct.len());
+
+    let (owned_with_source, source) = load_spectra(&fixture)?.into_only_loaded_1d()?;
+    assert_eq!(owned_with_source.len(), direct.len());
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let two_d_bundle = load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?;
+    let (borrowed_2d, source) = two_d_bundle.only_loaded_2d()?;
+    assert_eq!(borrowed_2d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
+
+    let (owned_2d, source) =
+        load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?.into_only_loaded_2d()?;
+    assert_eq!(owned_2d.shape(), (2048, 512));
+    assert_eq!(source.format, "bruker_ser");
+    assert_eq!(source.path.as_deref(), Some(Path::new("bruker_cosy_raw")));
     Ok(())
 }
 
@@ -765,6 +786,11 @@ fn exact_single_helpers_reject_wrong_or_ambiguous_dimensions() -> anyhow::Result
     let bundle = load_spectra(&multi_fixture)?;
     assert_single_error(
         bundle.only_1d().map(rspin_core::Spectrum1D::len),
+        "expected exactly one one-dimensional spectrum",
+        "found 2 one-dimensional and 0 two-dimensional spectra",
+    )?;
+    assert_single_error(
+        bundle.only_loaded_1d().map(|(spectrum, _)| spectrum.len()),
         "expected exactly one one-dimensional spectrum",
         "found 2 one-dimensional and 0 two-dimensional spectra",
     )?;
