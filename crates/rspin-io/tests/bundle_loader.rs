@@ -812,6 +812,37 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     let jcamp_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
     let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
 
+    let source_paths = bundle.source_paths().collect::<Vec<_>>();
+    assert_eq!(source_paths.len(), bundle.len());
+    assert!(source_paths.contains(&jcamp_path));
+    assert!(source_paths.contains(&hsqc_path));
+    assert!(bundle.has_source_path(jcamp_path));
+    assert_eq!(bundle.source_format_count("bruker_fid"), 1);
+    assert_eq!(bundle.source_format_count("bruker_ser"), 1);
+    assert_eq!(bundle.source_format_count("jcamp_dx"), 2);
+    assert_eq!(bundle.source_format_count("jeol_jdf"), 3);
+    assert_eq!(bundle.source_format_count("missing"), 0);
+
+    let source_formats = bundle.source_formats().collect::<Vec<_>>();
+    assert_eq!(source_formats.len(), bundle.len());
+    assert!(source_formats.contains(&"jcamp_dx"));
+    assert!(source_formats.contains(&"jeol_jdf"));
+
+    let loaded_sources = bundle.loaded_sources().collect::<Vec<_>>();
+    assert_eq!(loaded_sources.len(), bundle.len());
+    assert!(
+        loaded_sources
+            .iter()
+            .all(|source| !source.format().is_empty())
+    );
+    assert_eq!(
+        loaded_sources
+            .iter()
+            .filter_map(|source| source.path())
+            .count(),
+        bundle.len()
+    );
+
     let loaded = bundle
         .loaded_by_source_path(jcamp_path)
         .ok_or_else(|| anyhow::anyhow!("missing loaded entry at {}", jcamp_path.display()))?;
@@ -831,6 +862,7 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert_eq!(hsqc_source.format, "jeol_jdf");
 
     assert!(bundle.loaded_by_source_path("missing").is_none());
+    assert!(!bundle.has_source_path("missing"));
     assert!(bundle.loaded_2d_by_source_path(jcamp_path).is_none());
 
     let bundle_with_warning = RSpinReader::new().read_path(fixture_root())?;

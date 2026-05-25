@@ -314,9 +314,11 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     assert_eq!(bundle.spectra_1d().count(), 3);
     assert_eq!(bundle.spectra_2d().count(), 0);
     assert!(bundle.warnings().is_empty());
-    assert_eq!(source_format_count(&bundle, "agilent_fid"), 1);
-    assert_eq!(source_format_count(&bundle, "bruker_fid"), 1);
-    assert_eq!(source_format_count(&bundle, "bruker_processed"), 1);
+    assert_eq!(bundle.source_format_count("agilent_fid"), 1);
+    assert_eq!(bundle.source_format_count("bruker_fid"), 1);
+    assert_eq!(bundle.source_format_count("bruker_processed"), 1);
+    assert_eq!(bundle.source_paths().count(), 3);
+    assert!(bundle.has_source_path(std::path::Path::new("varian_1h")));
 
     let anchored = load_spectra_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(anchored.len(), 2);
@@ -601,14 +603,6 @@ fn assert_j_coupling_json_round_trip(coupling_graph: &JCouplingGraph) -> Result<
     assert!(graph_json.contains(J_COUPLING_GRAPH_JSON_FORMAT));
     assert_eq!(read_j_coupling_graph_json(&graph_json)?, *coupling_graph);
     Ok(())
-}
-
-fn source_format_count(bundle: &SpectrumBundle, format: &str) -> usize {
-    bundle
-        .spectra()
-        .iter()
-        .filter(|spectrum| spectrum.source().format == format)
-        .count()
 }
 
 #[test]

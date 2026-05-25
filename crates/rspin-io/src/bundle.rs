@@ -41,6 +41,18 @@ impl LoadedSource {
             format: format.into(),
         }
     }
+
+    /// Returns the source path, if source path tracking was enabled.
+    #[must_use]
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
+    }
+
+    /// Returns the reader format used for this source.
+    #[must_use]
+    pub fn format(&self) -> &str {
+        &self.format
+    }
 }
 
 /// A loaded one- or two-dimensional spectrum plus source metadata.
@@ -229,13 +241,44 @@ impl SpectrumBundle {
         })
     }
 
+    /// Returns an iterator over loaded spectrum sources.
+    pub fn loaded_sources(&self) -> impl Iterator<Item = &LoadedSource> {
+        self.spectra.iter().map(LoadedSpectrum::source)
+    }
+
+    /// Returns an iterator over tracked source paths for loaded spectra.
+    ///
+    /// Spectra loaded while source path tracking is disabled are skipped.
+    pub fn source_paths(&self) -> impl Iterator<Item = &Path> {
+        self.loaded_sources().filter_map(LoadedSource::path)
+    }
+
+    /// Returns an iterator over source formats for loaded spectra.
+    pub fn source_formats(&self) -> impl Iterator<Item = &str> {
+        self.loaded_sources().map(LoadedSource::format)
+    }
+
     /// Returns a loaded spectrum by its source path, if present.
     #[must_use]
     pub fn loaded_by_source_path(&self, path: impl AsRef<Path>) -> Option<&LoadedSpectrum> {
         let path = path.as_ref();
         self.spectra
             .iter()
-            .find(|entry| entry.source().path.as_deref() == Some(path))
+            .find(|entry| entry.source().path() == Some(path))
+    }
+
+    /// Returns true when a loaded spectrum has the given source path.
+    #[must_use]
+    pub fn has_source_path(&self, path: impl AsRef<Path>) -> bool {
+        self.loaded_by_source_path(path).is_some()
+    }
+
+    /// Returns the number of loaded spectra read with a source format.
+    #[must_use]
+    pub fn source_format_count(&self, format: &str) -> usize {
+        self.loaded_sources()
+            .filter(|source| source.format() == format)
+            .count()
     }
 
     /// Returns a one-dimensional spectrum and source by source path, if present.
@@ -246,7 +289,7 @@ impl SpectrumBundle {
     ) -> Option<(&Spectrum1D, &LoadedSource)> {
         let path = path.as_ref();
         self.loaded_1d()
-            .find(|(_, source)| source.path.as_deref() == Some(path))
+            .find(|(_, source)| source.path() == Some(path))
     }
 
     /// Returns a two-dimensional spectrum and source by source path, if present.
@@ -257,7 +300,7 @@ impl SpectrumBundle {
     ) -> Option<(&Spectrum2D, &LoadedSource)> {
         let path = path.as_ref();
         self.loaded_2d()
-            .find(|(_, source)| source.path.as_deref() == Some(path))
+            .find(|(_, source)| source.path() == Some(path))
     }
 
     /// Returns warnings associated with a source path.
