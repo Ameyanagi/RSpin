@@ -367,6 +367,73 @@ sw 1 1 5 5 5 2 1 8203 1 64
 }
 
 #[test]
+fn reads_arrayed_2d_fid_as_spectrum_series() -> anyhow::Result<()> {
+    let root = synthetic_dataset("arrayed-2d-series")?;
+    write_procpar(
+        &root,
+        "\
+acqdim 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+array 2 2 256 0 0 2 1 1 1 64
+1 \"mix\"
+0
+ni 7 1 32767 0 0 2 1 0 1 64
+1 2
+0
+sw 1 1 5 5 5 2 1 8203 1 64
+1 1000
+0
+sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
+1 200
+0
+",
+    )?;
+    write_fid(
+        &root,
+        EndianForTest::Little,
+        DataForTest::F32(&[
+            0.5, -0.5, 1.5, -1.5, 2.5, -2.5, 3.5, -3.5, 4.5, -4.5, 5.5, -5.5, 6.5, -6.5, 7.5, -7.5,
+        ]),
+        4,
+        1,
+    )?;
+
+    let spectra = read_agilent_arrayed_fid_2d_dir(&root)?;
+    let bytes_spectra = read_agilent_arrayed_fid_2d_bytes(
+        &fs::read_to_string(root.join("procpar"))?,
+        &fs::read(root.join("fid"))?,
+    )?;
+
+    assert_eq!(spectra, bytes_spectra);
+    assert_eq!(spectra.len(), 2);
+    assert_eq!(spectra[0].shape(), (2, 2));
+    assert_eq!(spectra[0].x.values, vec![0.0, 0.001]);
+    assert_eq!(spectra[0].y.values, vec![0.0, 1.0]);
+    assert_eq!(spectra[0].z, vec![0.5, 1.5, 2.5, 3.5]);
+    assert_eq!(spectra[0].imaginary, Some(vec![-0.5, -1.5, -2.5, -3.5]));
+    assert_eq!(spectra[1].z, vec![4.5, 5.5, 6.5, 7.5]);
+    assert_eq!(spectra[1].imaginary, Some(vec![-4.5, -5.5, -6.5, -7.5]));
+    assert_eq!(
+        spectra[0].metadata.property("agilent.array.index"),
+        Some("0")
+    );
+    assert_eq!(
+        spectra[1].metadata.property("agilent.array.count"),
+        Some("2")
+    );
+    assert_eq!(
+        spectra[1]
+            .metadata
+            .property("agilent.array.traces_per_spectrum"),
+        Some("2")
+    );
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn reads_big_endian_i32_processed_phasefile() -> anyhow::Result<()> {
     let root = synthetic_dataset("processed-phasefile")?;
     write_procpar(
@@ -743,6 +810,10 @@ sw1 1 1 5000000 1 -1.25e-08 2 1 0 1 64
     assert_eq!(spectrum.y.values, vec![0.0, 1.0]);
     assert_eq!(spectrum.z, vec![0.5, 1.5, 3.0, 5.0]);
     assert_eq!(spectrum.imaginary, Some(vec![-0.25, -2.5, 4.0, 6.0]));
+    assert!(matches!(
+        read_agilent_arrayed_fid_2d_dir(&root).err(),
+        Some(RSpinError::Unsupported { .. })
+    ));
 
     remove_dir(root)?;
     Ok(())

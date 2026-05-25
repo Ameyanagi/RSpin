@@ -370,6 +370,61 @@ pub fn read_agilent_fid_2d_bytes(procpar: &str, fid_bytes: &[u8]) -> Result<Spec
     Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
 }
 
+/// Reads arrayed two-dimensional FIDs from an Agilent/Varian dataset directory.
+///
+/// The path may point to the dataset directory or directly to `fid`. Each
+/// array member is returned as one `Spectrum2D` with shared acquisition
+/// metadata and array index/count metadata properties.
+///
+/// # Errors
+///
+/// Returns an error when the dataset is missing, malformed, not an arrayed
+/// two-dimensional acquisition, or uses an unsupported data representation.
+pub fn read_agilent_arrayed_fid_2d_dir(path: impl AsRef<Path>) -> Result<Vec<Spectrum2D>> {
+    let dataset_dir = locate_dataset_dir(path.as_ref());
+    let procpar_text = read_text(&dataset_dir.join("procpar"), "Agilent procpar")?;
+    let fid_bytes = fs::read(dataset_dir.join("fid")).map_err(|error| RSpinError::Parse {
+        format: "Agilent",
+        message: format!("failed to read fid: {error}"),
+    })?;
+
+    read_agilent_arrayed_fid_2d_bytes(&procpar_text, &fid_bytes)
+}
+
+/// Reads arrayed two-dimensional FIDs from Agilent/Varian `procpar` text and
+/// FID bytes.
+///
+/// # Errors
+///
+/// Returns an error when the `procpar` text is malformed, does not describe an
+/// arrayed two-dimensional acquisition, or the FID bytes are malformed or
+/// unsupported.
+pub fn read_agilent_arrayed_fid_2d_bytes(
+    procpar: &str,
+    fid_bytes: &[u8],
+) -> Result<Vec<Spectrum2D>> {
+    let procpar = parse_procpar_for_reader(procpar)?;
+    validate_2d_procpar(&procpar)?;
+    let (z, imaginary, x_count, total_y_count) = read_fid_matrix_values(fid_bytes)?;
+    let y_count = arrayed_2d_trace_count(&procpar, total_y_count)?;
+    let spectrum_count = total_y_count / y_count;
+    let x = build_axis(x_count, &procpar)?;
+    let y = build_indirect_axis(y_count, &procpar)?;
+    let metadata = build_metadata(&procpar);
+    build_arrayed_2d_spectra(
+        &z,
+        &imaginary,
+        Arrayed2DLayout {
+            x_points: x_count,
+            y_traces: y_count,
+            series_len: spectrum_count,
+        },
+        &x,
+        &y,
+        &metadata,
+    )
+}
+
 /// Reader for Agilent/Varian processed two-dimensional `phasefile` datasets.
 ///
 /// The reader accepts the dataset directory, its `datdir` directory, or the
@@ -759,6 +814,96 @@ fn build_arrayed_1d_spectra(
         )?);
     }
     Ok(spectra)
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Arrayed2DLayout {
+    x_points: usize,
+    y_traces: usize,
+    series_len: usize,
+}
+
+fn build_arrayed_2d_spectra(
+    z: &[f64],
+    imaginary: &[f64],
+    layout: Arrayed2DLayout,
+    x: &Axis,
+    y: &Axis,
+    metadata: &Metadata,
+) -> Result<Vec<Spectrum2D>> {
+    let Arrayed2DLayout {
+        x_points,
+        y_traces,
+        series_len,
+    } = layout;
+
+    if series_len == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "Agilent arrayed 2D FID must contain at least one spectrum".to_owned(),
+        });
+    }
+
+    let matrix_len = x_points
+        .checked_mul(y_traces)
+        .ok_or_else(|| RSpinError::InvalidSpectrum {
+            message: "Agilent arrayed 2D FID matrix size overflow".to_owned(),
+        })?;
+    let expected_len =
+        matrix_len
+            .checked_mul(series_len)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent arrayed 2D FID size overflow".to_owned(),
+            })?;
+    if z.len() != expected_len || imaginary.len() != expected_len {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "Agilent arrayed 2D FID trace sizes are inconsistent".to_owned(),
+        });
+    }
+
+    let mut spectra = Vec::with_capacity(series_len);
+    for spectrum_index in 0..series_len {
+        let start =
+            spectrum_index
+                .checked_mul(matrix_len)
+                .ok_or_else(|| RSpinError::InvalidSpectrum {
+                    message: "Agilent arrayed 2D FID matrix offset overflow".to_owned(),
+                })?;
+        let end = start
+            .checked_add(matrix_len)
+            .ok_or_else(|| RSpinError::InvalidSpectrum {
+                message: "Agilent arrayed 2D FID matrix end overflow".to_owned(),
+            })?;
+        let spectrum_metadata = metadata
+            .clone()
+            .with_property("agilent.array.index", spectrum_index.to_string())
+            .with_property("agilent.array.count", series_len.to_string())
+            .with_property("agilent.array.traces_per_spectrum", y_traces.to_string());
+        spectra.push(Spectrum2D::new_complex(
+            x.clone(),
+            y.clone(),
+            z[start..end].to_vec(),
+            Some(imaginary[start..end].to_vec()),
+            spectrum_metadata,
+        )?);
+    }
+    Ok(spectra)
+}
+
+pub(crate) fn is_agilent_arrayed_2d_series_array(value: &str) -> bool {
+    let mut has_series_parameter = false;
+    for token in value
+        .split(|character: char| {
+            character == ',' || character == '(' || character == ')' || character.is_whitespace()
+        })
+        .map(str::trim)
+        .filter(|token| !token.is_empty())
+    {
+        if token.eq_ignore_ascii_case("phase") {
+            return false;
+        }
+        has_series_parameter = true;
+    }
+    has_series_parameter
 }
 
 fn first_trace<'a>(
@@ -1285,6 +1430,44 @@ fn validate_arrayed_1d_procpar(parameters: &BTreeMap<String, Vec<String>>) -> Re
             feature: "Agilent three-or-higher-dimensional FID",
         }),
     }
+}
+
+fn arrayed_2d_trace_count(
+    parameters: &BTreeMap<String, Vec<String>>,
+    total_y_count: usize,
+) -> Result<usize> {
+    let Some(array_parameter) = first_text(parameters, "array") else {
+        return Err(RSpinError::Unsupported {
+            feature: "Agilent non-arrayed FID in arrayed 2D reader",
+        });
+    };
+    if !is_agilent_arrayed_2d_series_array(&array_parameter) {
+        return Err(RSpinError::Unsupported {
+            feature: "Agilent non-arrayed FID in arrayed 2D reader",
+        });
+    }
+
+    let y_count = first_usize(parameters, "ni")?.ok_or(RSpinError::Unsupported {
+        feature: "Agilent arrayed 2D FID without ni trace count",
+    })?;
+    if y_count == 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "Agilent arrayed 2D FID ni must be positive".to_owned(),
+        });
+    }
+    if total_y_count <= y_count {
+        return Err(RSpinError::Unsupported {
+            feature: "Agilent non-arrayed FID in arrayed 2D reader",
+        });
+    }
+    if total_y_count % y_count != 0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!(
+                "Agilent arrayed 2D FID has {total_y_count} traces but ni is {y_count}"
+            ),
+        });
+    }
+    Ok(y_count)
 }
 
 fn varian_temperature_to_kelvin(value: f64) -> f64 {
