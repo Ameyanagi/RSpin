@@ -12,7 +12,8 @@ use crate::{
     NmreDataRecord, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
     read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
     read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
-    read_nmredata_records_file, read_spectrum1d_path, read_spectrum2d_path,
+    read_nmredata_records_file, read_spectrum_bundle_json_file, read_spectrum1d_path,
+    read_spectrum2d_path,
 };
 
 /// High-level reader for supported `RSpin` spectrum inputs.
@@ -291,6 +292,12 @@ impl SpectrumBundle {
         self.molecules.push(molecule);
     }
 
+    fn extend_bundle(&mut self, bundle: SpectrumBundle) {
+        self.spectra.extend(bundle.spectra);
+        self.molecules.extend(bundle.molecules);
+        self.warnings.extend(bundle.warnings);
+    }
+
     fn push_warning(&mut self, warning: LoadWarning) {
         self.warnings.push(warning);
     }
@@ -374,7 +381,7 @@ impl SpectrumBundleLoader {
     /// # Errors
     ///
     /// Returns an error when the path is missing, strict mode rejects a
-    /// candidate, or no readable spectra are found.
+    /// candidate, or no readable bundle data is found.
     pub fn read_path(&self, path: impl AsRef<Path>) -> Result<SpectrumBundle> {
         let root = path.as_ref();
         if !root.exists() {
@@ -510,6 +517,16 @@ impl SpectrumBundleLoader {
         if is_nmredata_file(file) {
             return self.read_nmredata_candidate(root, file, bundle);
         }
+        if is_json_file(file) {
+            return self.add_1d_or_2d_or_bundle_result(
+                bundle,
+                root,
+                file,
+                || read_spectrum1d_path(file),
+                || read_spectrum2d_path(file),
+                || read_spectrum_bundle_json_file(file),
+            );
+        }
 
         self.add_1d_or_2d_result(
             bundle,
@@ -519,6 +536,42 @@ impl SpectrumBundleLoader {
             || read_spectrum1d_path(file),
             || read_spectrum2d_path(file),
         )
+    }
+
+    fn add_1d_or_2d_or_bundle_result(
+        &self,
+        bundle: &mut SpectrumBundle,
+        root: &Path,
+        path: &Path,
+        read_1d: impl FnOnce() -> Result<Spectrum1D>,
+        read_2d: impl FnOnce() -> Result<Spectrum2D>,
+        read_bundle: impl FnOnce() -> Result<SpectrumBundle>,
+    ) -> Result<()> {
+        let format = format_from_file(path);
+        match read_1d() {
+            Ok(spectrum) => {
+                bundle.push_1d(spectrum, self.loaded_source(root, path, format));
+                Ok(())
+            }
+            Err(first_error) => match read_2d() {
+                Ok(spectrum) => {
+                    bundle.push_2d(spectrum, self.loaded_source(root, path, format));
+                    Ok(())
+                }
+                Err(second_error) => match read_bundle() {
+                    Ok(loaded) => {
+                        bundle.extend_bundle(loaded);
+                        Ok(())
+                    }
+                    Err(third_error) => {
+                        let message = format!(
+                            "{first_error}; two-dimensional fallback: {second_error}; bundle fallback: {third_error}"
+                        );
+                        self.handle_error_message(bundle, root, path, message)
+                    }
+                },
+            },
+        }
     }
 
     fn read_nmredata_candidate(
@@ -659,11 +712,11 @@ impl Default for SpectrumBundleLoader {
     }
 }
 
-/// Loads all supported spectra from a file or directory path.
+/// Loads all supported spectrum bundle data from a file or directory path.
 ///
 /// # Errors
 ///
-/// Returns an error when the path is missing or no readable spectra are found.
+/// Returns an error when the path is missing or no readable bundle data is found.
 pub fn load_spectra(path: impl AsRef<Path>) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path(path)
 }
@@ -796,6 +849,12 @@ fn is_nmredata_file(path: &Path) -> bool {
                 "sdf" | "sd" | "nmredata"
             )
         })
+}
+
+fn is_json_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(std::ffi::OsStr::to_str)
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
 }
 
 fn format_from_file(path: &Path) -> &'static str {
