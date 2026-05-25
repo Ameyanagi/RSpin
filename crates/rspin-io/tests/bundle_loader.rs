@@ -3,7 +3,10 @@
 use std::path::{Path, PathBuf};
 
 use rspin_core::{Nucleus, RSpinError, Unit};
-use rspin_io::{LoadedSpectrum, RSpinReader, SpectrumBundleLoader, load_spectra};
+use rspin_io::{
+    LoadedSpectrum, RSpinReader, SpectrumBundleLoader, load_spectra, load_spectrum_1d,
+    load_spectrum_2d,
+};
 
 #[test]
 fn loads_varian_agilent_1h_directory_as_bundle() -> anyhow::Result<()> {
@@ -126,6 +129,70 @@ fn loader_can_disable_raw_or_processed_candidates() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn exact_single_helpers_return_owned_and_borrowed_spectra() -> anyhow::Result<()> {
+    let fixture = fixture_root().join("varian_1h");
+
+    let direct = load_spectrum_1d(&fixture)?;
+    assert_eq!(direct.len(), 16_384);
+
+    let via_reader = RSpinReader::new().read_1d(&fixture)?;
+    assert_eq!(via_reader.len(), direct.len());
+
+    let bundle = load_spectra(&fixture)?;
+    assert_eq!(bundle.only_1d()?.len(), direct.len());
+    let loaded = bundle.loaded_1d().collect::<Vec<_>>();
+    assert_eq!(loaded.len(), 1);
+    let (_, source) = loaded
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing loaded source"))?;
+    assert_eq!(source.format, "agilent_fid");
+    assert_eq!(source.path.as_deref(), Some(Path::new("varian_1h")));
+
+    let (mut entries, molecules, warnings) = bundle.into_parts();
+    assert!(molecules.is_empty());
+    assert!(warnings.is_empty());
+    let entry = entries
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("missing consumed spectrum entry"))?;
+    let owned = entry
+        .into_1d()
+        .ok_or_else(|| anyhow::anyhow!("expected one-dimensional entry"))?;
+    assert_eq!(owned.len(), direct.len());
+
+    let owned_from_bundle = load_spectra(&fixture)?.into_only_1d()?;
+    assert_eq!(owned_from_bundle.len(), direct.len());
+    Ok(())
+}
+
+#[test]
+fn exact_single_helpers_reject_wrong_or_ambiguous_dimensions() -> anyhow::Result<()> {
+    let one_d_fixture = fixture_root().join("varian_1h");
+    let multi_fixture = fixture_root().join("bruker_without_expno");
+
+    let wrong_dimension = load_spectrum_2d(&one_d_fixture);
+    assert_single_error(
+        wrong_dimension,
+        "expected exactly one two-dimensional spectrum",
+        "found 1 one-dimensional and 0 two-dimensional spectra",
+    )?;
+
+    let ambiguous = RSpinReader::new().read_1d(&multi_fixture);
+    assert_single_error(
+        ambiguous,
+        "expected exactly one one-dimensional spectrum",
+        "found 2 one-dimensional and 0 two-dimensional spectra",
+    )?;
+
+    let bundle = load_spectra(&multi_fixture)?;
+    assert_single_error(
+        bundle.only_1d().map(rspin_core::Spectrum1D::len),
+        "expected exactly one one-dimensional spectrum",
+        "found 2 one-dimensional and 0 two-dimensional spectra",
+    )?;
+    Ok(())
+}
+
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/zenodo_7100132")
 }
@@ -151,4 +218,24 @@ fn assert_close(actual: Option<f64>, expected: Option<f64>) {
         }
         _ => assert_eq!(actual, expected),
     }
+}
+
+fn assert_single_error<T>(
+    result: rspin_core::Result<T>,
+    expected_prefix: &str,
+    expected_counts: &str,
+) -> anyhow::Result<()> {
+    let Err(error) = result else {
+        anyhow::bail!("single-spectrum helper should fail");
+    };
+    let message = error.to_string();
+    assert!(
+        message.contains(expected_prefix),
+        "expected {expected_prefix:?} in {message:?}"
+    );
+    assert!(
+        message.contains(expected_counts),
+        "expected {expected_counts:?} in {message:?}"
+    );
+    Ok(())
 }

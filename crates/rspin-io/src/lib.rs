@@ -72,7 +72,7 @@ pub use bruker::{
 };
 pub use bundle::{
     LoadWarning, LoadedSource, LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader,
-    load_spectra,
+    load_spectra, load_spectrum_1d, load_spectrum_2d,
 };
 pub use csv::{CsvSpectrum1D, read_spectrum1d_csv, write_spectrum1d_csv};
 pub use csv_2d::{CsvSpectrum2D, read_spectrum2d_csv, write_spectrum2d_csv};
