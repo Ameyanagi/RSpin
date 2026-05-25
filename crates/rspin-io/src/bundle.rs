@@ -9,11 +9,11 @@ use rspin_core::{Molecule, RSpinError, Result, Spectrum1D, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    NmreDataRecord, SpectrumPathReader, read_agilent_fid_1d_dir, read_agilent_fid_2d_dir,
-    read_agilent_processed_1d_dir, read_agilent_processed_2d_dir, read_bruker_fid_1d_dir,
-    read_bruker_processed_1d_dir, read_bruker_processed_2d_dir, read_bruker_ser_2d_dir,
-    read_nmredata_records_file, read_spectrum_bundle_json_file, read_spectrum1d_path,
-    read_spectrum2d_path,
+    NmreDataRecord, Spectrum1DPathFormat, Spectrum2DPathFormat, SpectrumPathReader,
+    read_agilent_fid_1d_dir, read_agilent_fid_2d_dir, read_agilent_processed_1d_dir,
+    read_agilent_processed_2d_dir, read_bruker_fid_1d_dir, read_bruker_processed_1d_dir,
+    read_bruker_processed_2d_dir, read_bruker_ser_2d_dir, read_nmredata_records_file,
+    read_spectrum_bundle_json_file, read_spectrum1d_path, read_spectrum2d_path,
 };
 
 /// High-level reader for supported `RSpin` spectrum inputs.
@@ -450,6 +450,7 @@ impl SpectrumBundleLoader {
 
         let mut bundle = SpectrumBundle::new();
         self.read_existing_path_into(root, &mut bundle)?;
+        self.add_selected_path_disabled_warning(root, &mut bundle)?;
 
         if bundle.has_data() {
             Ok(bundle)
@@ -497,12 +498,11 @@ impl SpectrumBundleLoader {
             let data_after = bundle.spectra.len() + bundle.molecules.len();
             let warnings_after = bundle.warnings.len();
             if data_after == data_before && warnings_after == warnings_before {
-                self.handle_error_message(
-                    &mut bundle,
-                    path,
-                    path,
-                    format!("no readable bundle data found at {}", path.display()),
-                )?;
+                let message = match self.disabled_selected_path_message(path) {
+                    Some(message) => message,
+                    None => format!("no readable bundle data found at {}", path.display()),
+                };
+                self.handle_error_message(&mut bundle, path, path, message)?;
             }
         }
 
@@ -871,6 +871,15 @@ impl SpectrumBundleLoader {
         read_1d: impl FnOnce() -> Result<Spectrum1D>,
         read_2d: impl FnOnce() -> Result<Spectrum2D>,
     ) -> Result<()> {
+        if is_agilent_format(format) {
+            if let Some(message) = self.disabled_dimension_file_message(path) {
+                if root == path {
+                    return self.handle_error_message(bundle, root, path, message);
+                }
+                return Ok(());
+            }
+        }
+
         if self.one_d.is_enabled() {
             match read_1d() {
                 Ok(spectrum) => {
@@ -926,6 +935,35 @@ impl SpectrumBundleLoader {
             return Some(disabled_dimension_message(path, "two-dimensional"));
         }
         None
+    }
+
+    fn add_selected_path_disabled_warning(
+        &self,
+        root: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        if bundle.has_data() || !bundle.warnings.is_empty() {
+            return Ok(());
+        }
+
+        if let Some(message) = self.disabled_selected_path_message(root) {
+            self.handle_error_message(bundle, root, root, message)?;
+        }
+        Ok(())
+    }
+
+    fn disabled_selected_path_message(&self, path: &Path) -> Option<String> {
+        match selected_path_candidate_kind(path) {
+            FileCandidateKind::Raw if !self.raw.is_enabled() => {
+                return Some(disabled_candidate_message(path, "raw spectrum"));
+            }
+            FileCandidateKind::Processed if !self.processed.is_enabled() => {
+                return Some(disabled_candidate_message(path, "processed spectrum"));
+            }
+            FileCandidateKind::Raw | FileCandidateKind::Processed | FileCandidateKind::Other => {}
+        }
+
+        self.disabled_dimension_file_message(path)
     }
 
     fn filter_bundle_dimensions(&self, bundle: &mut SpectrumBundle) {
@@ -1148,6 +1186,10 @@ fn disabled_dimension_error(path: &Path, dimension: &'static str) -> RSpinError 
     }
 }
 
+fn disabled_candidate_message(path: &Path, candidate: &'static str) -> String {
+    format!("{candidate} candidates are disabled for {}", path.display())
+}
+
 fn disabled_dimension_message(path: &Path, dimension: &'static str) -> String {
     format!(
         "{dimension} spectrum candidates are disabled for {}",
@@ -1265,6 +1307,44 @@ fn file_candidate_kind(path: &Path) -> FileCandidateKind {
     }
 }
 
+fn selected_path_candidate_kind(path: &Path) -> FileCandidateKind {
+    match file_candidate_kind(path) {
+        FileCandidateKind::Raw => FileCandidateKind::Raw,
+        FileCandidateKind::Processed => FileCandidateKind::Processed,
+        FileCandidateKind::Other if path_looks_raw(path) => FileCandidateKind::Raw,
+        FileCandidateKind::Other if path_looks_processed(path) => FileCandidateKind::Processed,
+        FileCandidateKind::Other => FileCandidateKind::Other,
+    }
+}
+
+fn path_looks_raw(path: &Path) -> bool {
+    crate::detect_spectrum1d_path_format(path).is_ok_and(|format| {
+        matches!(
+            format,
+            Spectrum1DPathFormat::BrukerFid | Spectrum1DPathFormat::AgilentFid
+        )
+    }) || crate::detect_spectrum2d_path_format(path).is_ok_and(|format| {
+        matches!(
+            format,
+            Spectrum2DPathFormat::BrukerSer | Spectrum2DPathFormat::AgilentFid
+        )
+    })
+}
+
+fn path_looks_processed(path: &Path) -> bool {
+    crate::detect_spectrum1d_path_format(path).is_ok_and(|format| {
+        matches!(
+            format,
+            Spectrum1DPathFormat::BrukerProcessed | Spectrum1DPathFormat::AgilentProcessed
+        )
+    }) || crate::detect_spectrum2d_path_format(path).is_ok_and(|format| {
+        matches!(
+            format,
+            Spectrum2DPathFormat::BrukerProcessed | Spectrum2DPathFormat::AgilentProcessed
+        )
+    })
+}
+
 fn format_from_file(path: &Path) -> &'static str {
     match path
         .extension()
@@ -1278,6 +1358,10 @@ fn format_from_file(path: &Path) -> &'static str {
         Some(extension) if extension == "csv" => "csv",
         _ => "auto",
     }
+}
+
+fn is_agilent_format(format: &str) -> bool {
+    matches!(format, "agilent_fid" | "agilent_processed")
 }
 
 fn source_format_1d(path: &Path, fallback: &'static str) -> &'static str {

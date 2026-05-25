@@ -289,6 +289,50 @@ fn json_spectrum_dimension_toggles_report_disabled_dimension() -> anyhow::Result
 }
 
 #[test]
+fn selected_vendor_directories_report_disabled_dimensions() -> anyhow::Result<()> {
+    let one_d_disabled = RSpinReader::new()
+        .with_1d(false)
+        .read_path(fixture_root().join("varian_1h"));
+    let Err(error) = one_d_disabled else {
+        anyhow::bail!(
+            "selected one-dimensional vendor directory should not load when 1D is disabled"
+        );
+    };
+    assert_no_data_warning(&error, "one-dimensional spectrum candidates are disabled");
+
+    let two_d_disabled = RSpinReader::new()
+        .with_2d(false)
+        .read_path(nmrxiv_fixture_root().join("bruker_cosy_raw"));
+    let Err(error) = two_d_disabled else {
+        anyhow::bail!(
+            "selected two-dimensional vendor directory should not load when 2D is disabled"
+        );
+    };
+    assert_no_data_warning(&error, "two-dimensional spectrum candidates are disabled");
+    Ok(())
+}
+
+#[test]
+fn selected_vendor_directories_report_disabled_raw_or_processed() {
+    let raw_disabled = RSpinReader::new()
+        .with_raw(false)
+        .read_path(fixture_root().join("varian_1h"))
+        .expect_err("selected raw vendor directory should not load when raw is disabled");
+    assert_no_data_warning(&raw_disabled, "raw spectrum candidates are disabled");
+
+    let processed_disabled = RSpinReader::new()
+        .with_processed(false)
+        .read_path(fixture_root().join("bruker_without_expno/pdata/1"))
+        .expect_err(
+            "selected processed vendor directory should not load when processed is disabled",
+        );
+    assert_no_data_warning(
+        &processed_disabled,
+        "processed spectrum candidates are disabled",
+    );
+}
+
+#[test]
 fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra_many([
         fixture_root().join("varian_1h"),
