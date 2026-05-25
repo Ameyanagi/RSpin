@@ -180,6 +180,41 @@ fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reader_short_read_aliases_cover_common_workflows() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let varian = base.join("varian_1h");
+    let processed_bruker = base.join("bruker_without_expno/pdata/1");
+
+    let bundle = RSpinReader::new().read(&varian)?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(
+        first_1d(&bundle)?.metadata.nucleus,
+        Some(Nucleus::Hydrogen1)
+    );
+    assert!(has_source_path(&bundle, Path::new("varian_1h")));
+
+    let relative = RSpinReader::new().read_relative_to(&base, "varian_1h")?;
+    assert_eq!(relative.len(), 1);
+    assert!(has_source_path(&relative, Path::new("varian_1h")));
+
+    let many = RSpinReader::new().read_many([&varian, &processed_bruker])?;
+    assert_eq!(many.len(), 2);
+    assert_eq!(many.len_1d(), 2);
+    assert!(many.warnings().is_empty());
+
+    let relative_many = RSpinReader::new()
+        .processed_only()
+        .read_many_relative_to(&base, ["bruker_without_expno"])?;
+    assert_eq!(relative_many.len(), 1);
+    assert_eq!(first_1d(&relative_many)?.x.unit, Unit::Ppm);
+    assert!(has_source_path(
+        &relative_many,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 

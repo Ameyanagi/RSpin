@@ -1145,6 +1145,19 @@ impl SpectrumBundleLoader {
         }
     }
 
+    /// Loads all supported spectra from a file or directory path.
+    ///
+    /// This is a short alias for [`Self::read_path`] for chainable common-path
+    /// workflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the path is missing, strict mode rejects a
+    /// candidate, or no readable bundle data is found.
+    pub fn read(&self, path: impl AsRef<Path>) -> Result<SpectrumBundle> {
+        self.read_path(path)
+    }
+
     /// Loads one selected file or directory path while anchoring source paths to a base directory.
     ///
     /// Relative input paths are resolved below `base`. Absolute input paths are
@@ -1161,6 +1174,22 @@ impl SpectrumBundleLoader {
         path: impl AsRef<Path>,
     ) -> Result<SpectrumBundle> {
         self.read_paths_relative_to(base, [path])
+    }
+
+    /// Loads one selected path while anchoring source paths to a base directory.
+    ///
+    /// This is a short alias for [`Self::read_path_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `base` is missing or is not a directory, the path
+    /// is unreadable in strict mode, or no readable bundle data is found.
+    pub fn read_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<SpectrumBundle> {
+        self.read_path_relative_to(base, path)
     }
 
     /// Loads supported spectra from multiple file or directory paths.
@@ -1222,6 +1251,22 @@ impl SpectrumBundleLoader {
         } else {
             Err(no_data_error_in_inputs(&bundle))
         }
+    }
+
+    /// Loads supported spectra from multiple file or directory paths.
+    ///
+    /// This is a short alias for [`Self::read_paths`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no input paths are provided, strict mode rejects a
+    /// path, or no readable bundle data is found.
+    pub fn read_many<I, P>(&self, paths: I) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths(paths)
     }
 
     /// Loads selected paths while anchoring source paths to a common base directory.
@@ -1303,6 +1348,27 @@ impl SpectrumBundleLoader {
         } else {
             Err(no_data_error_in_inputs(&bundle))
         }
+    }
+
+    /// Loads selected paths while anchoring source paths to a common base directory.
+    ///
+    /// This is a short alias for [`Self::read_paths_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `base` is missing or is not a directory, no input
+    /// paths are provided, strict mode rejects a path, or no readable bundle
+    /// data is found.
+    pub fn read_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths_relative_to(base, paths)
     }
 
     /// Loads exactly one one-dimensional spectrum from a file or directory path.
