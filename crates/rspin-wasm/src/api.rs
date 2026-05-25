@@ -15,7 +15,9 @@ mod processing_2d;
 mod simulation;
 mod workflow;
 
-use serde::{Serialize, de::DeserializeOwned};
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 use rspin_analysis::{
     DetectedMultiplet, DetectedRange, DetectedZone, IntegralRegion, IntegralRegion2D,
@@ -27,20 +29,21 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
-    parse_jcamp_dx_version, parse_nmrml_version, parse_spectrum_text_format,
-    parse_spectrum1d_bytes_format, parse_spectrum1d_write_format, parse_spectrum2d_bytes_format,
-    parse_spectrum2d_write_format, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
-    read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
-    read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes,
-    read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d,
-    read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes, read_nmredata_record_json,
-    read_nmredata_records_json, read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str,
-    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum_bundle_json,
-    read_spectrum1d_bytes_as, read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as,
-    read_spectrum2d_bytes_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
-    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d,
-    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
+    LoadedSource, SpectrumBundle, inspect_agilent_procpar, inspect_bruker_parameter_file,
+    inspect_jeol_jdf_bytes, parse_jcamp_dx_version, parse_nmrml_version,
+    parse_spectrum_text_format, parse_spectrum1d_bytes_format, parse_spectrum1d_write_format,
+    parse_spectrum2d_bytes_format, parse_spectrum2d_write_format, read_agilent_fid_1d_bytes,
+    read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes,
+    read_assignment_set_json, read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes,
+    read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes, read_j_coupling_graph_json,
+    read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes,
+    read_nmredata_record_json, read_nmredata_records_json, read_nmredata_records_str,
+    read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str, read_nmrml_document_info_str,
+    read_spectrum_bundle_json, read_spectrum1d_bytes_as, read_spectrum1d_json,
+    read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as, read_spectrum2d_json,
+    read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
+    write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record,
+    write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum1d_text,
     write_spectrum2d_json, write_spectrum2d_text,
@@ -606,6 +609,40 @@ pub fn validate_spectrum_bundle_json(input: &str) -> Result<String> {
     write_spectrum_bundle_json(&bundle)
 }
 
+/// Builds versioned spectrum bundle JSON from serialized one- and
+/// two-dimensional spectrum entries.
+///
+/// Expected input shape:
+///
+/// ```json
+/// {
+///   "spectra_1d": [{"spectrum": {}, "path": "one.jdx", "format": "jcamp_dx"}],
+///   "spectra_2d": [{"spectrum": {}, "path": "two.jdf", "format": "jeol_jdf"}]
+/// }
+/// ```
+///
+/// `path` and `format` are optional; missing formats default to `json`.
+///
+/// # Errors
+///
+/// Returns an error when deserialization or serialization fails, or when a
+/// provided source format is empty.
+pub fn create_spectrum_bundle_json(input: &str) -> Result<String> {
+    let input: SpectrumBundleBuildInput = from_json(input)?;
+    let mut bundle = SpectrumBundle::new();
+
+    for entry in input.spectra_1d {
+        let source = build_loaded_source(entry.path, entry.format, "json")?;
+        bundle.push_1d(entry.spectrum, source);
+    }
+    for entry in input.spectra_2d {
+        let source = build_loaded_source(entry.path, entry.format, "json")?;
+        bundle.push_2d(entry.spectrum, source);
+    }
+
+    write_spectrum_bundle_json(&bundle)
+}
+
 /// Summarizes spectrum bundle JSON into counts for browser-side routing.
 ///
 /// # Errors
@@ -922,6 +959,56 @@ struct SpectrumBundleCounts {
     spectra_2d: usize,
     molecules: usize,
     warnings: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct SpectrumBundleBuildInput {
+    #[serde(default)]
+    spectra_1d: Vec<SpectrumBundleBuild1DEntry>,
+    #[serde(default)]
+    spectra_2d: Vec<SpectrumBundleBuild2DEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SpectrumBundleBuild1DEntry {
+    spectrum: Spectrum1D,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    format: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SpectrumBundleBuild2DEntry {
+    spectrum: Spectrum2D,
+    #[serde(default)]
+    path: Option<String>,
+    #[serde(default)]
+    format: Option<String>,
+}
+
+fn build_loaded_source(
+    path: Option<String>,
+    format: Option<String>,
+    default_format: &str,
+) -> Result<LoadedSource> {
+    let path = match path {
+        Some(path) if path.trim().is_empty() => None,
+        Some(path) => Some(PathBuf::from(path)),
+        None => None,
+    };
+    let format = match format {
+        Some(format) if format.trim().is_empty() => {
+            return Err(RSpinError::Parse {
+                format: "spectrum bundle build input",
+                message: "source format must not be empty".to_owned(),
+            });
+        }
+        Some(format) => format,
+        None => default_format.to_owned(),
+    };
+
+    Ok(LoadedSource::new(path, format))
 }
 
 fn parse_nucleus_label(label: &str) -> Result<Nucleus> {

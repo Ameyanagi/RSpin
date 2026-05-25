@@ -183,6 +183,53 @@ fn validates_and_summarizes_spectrum_bundle_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn creates_spectrum_bundle_json_from_spectrum_entries() -> anyhow::Result<()> {
+    let one_d = Spectrum1D::new(
+        Axis::linear_ppm(0.0, 1.0, 2)?,
+        vec![1.0, 2.0],
+        Metadata::named("wasm bundle 1d"),
+    )?;
+    let two_d = Spectrum2D::new(
+        Axis::linear("direct", Unit::Seconds, 0.0, 0.001, 2)?,
+        Axis::linear("indirect", Unit::Seconds, 0.0, 0.002, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("wasm bundle 2d"),
+    )?;
+    let input = serde_json::to_string(&serde_json::json!({
+        "spectra_1d": [{
+            "spectrum": one_d,
+            "path": "uploaded/one.jdx",
+            "format": "jcamp_dx"
+        }],
+        "spectra_2d": [{
+            "spectrum": two_d,
+            "path": "uploaded/two.jdf",
+            "format": "jeol_jdf"
+        }]
+    }))?;
+
+    let bundle_json = create_spectrum_bundle_json(&input)?;
+    assert!(bundle_json.contains(SPECTRUM_BUNDLE_JSON_FORMAT));
+
+    let counts_json = spectrum_bundle_counts_json(&bundle_json)?;
+    let counts: TestBundleCounts = serde_json::from_str(&counts_json)?;
+    assert_eq!(counts.spectra, 2);
+    assert_eq!(counts.spectra_1d, 1);
+    assert_eq!(counts.spectra_2d, 1);
+    assert_eq!(counts.molecules, 0);
+    assert_eq!(counts.warnings, 0);
+
+    let bundle = rspin_io::read_spectrum_bundle_json(&bundle_json)?;
+    let sources = bundle
+        .spectra()
+        .iter()
+        .map(|loaded| loaded.source().format.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(sources, vec!["jcamp_dx", "jeol_jdf"]);
+    Ok(())
+}
+
+#[test]
 fn extracts_exact_spectrum_from_bundle_json() -> anyhow::Result<()> {
     let bundle = rspin_io::load_spectra(io_fixture_root().join("zenodo_7100132/varian_1h"))?;
     let bundle_json = rspin_io::write_spectrum_bundle_json(&bundle)?;

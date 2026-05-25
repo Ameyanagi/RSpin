@@ -32,8 +32,8 @@ pub use api::{
     auto_phase_spectrum_1d_json, auto_phase_spectrum_2d_json, bucket_spectra_1d_json,
     bucket_spectra_2d_json, bucket_spectrum_1d_json, bucket_spectrum_2d_json,
     cluster_bucket_matrix_1d_json, cluster_bucket_matrix_2d_json, cluster_spectrum_matrix_1d_json,
-    cluster_spectrum_matrix_2d_json, crop_spectrum_1d_json, crop_spectrum_2d_json,
-    cut_cluster_result_at_distance_json, cut_cluster_result_to_count_json,
+    cluster_spectrum_matrix_2d_json, create_spectrum_bundle_json, crop_spectrum_1d_json,
+    crop_spectrum_2d_json, cut_cluster_result_at_distance_json, cut_cluster_result_to_count_json,
     decompose_exact_spin_half_spectrum_2d_json, decompose_exact_spin_half_spectrum_json,
     detect_consensus_peaks_1d_json, detect_consensus_ranges_1d_json,
     detect_consensus_zones_2d_json, detect_multiplets_json, detect_ranges_json, detect_zones_json,
@@ -87,8 +87,8 @@ pub use api::{
 };
 pub use contours::extract_contours_2d;
 pub use io::{
-    inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
-    inspect_nmrml_document, nmredata_1d_signals_to_assignment_set,
+    create_spectrum_bundle, inspect_agilent_procpar, inspect_bruker_parameter_file,
+    inspect_jeol_jdf_bytes, inspect_nmrml_document, nmredata_1d_signals_to_assignment_set,
     nmredata_2d_signals_to_assignment_set, nmredata_assignments_to_assignment_set,
     nmredata_couplings_to_j_coupling_graph, nmredata_to_analysis, parse_agilent_fid_1d_bytes,
     parse_agilent_fid_2d_bytes, parse_agilent_processed_1d_bytes, parse_agilent_processed_2d_bytes,

@@ -129,7 +129,9 @@ pub struct LoadWarning {
 }
 
 impl LoadWarning {
-    fn new(path: Option<PathBuf>, message: impl Into<String>) -> Self {
+    /// Creates a non-fatal load warning.
+    #[must_use]
+    pub fn new(path: Option<PathBuf>, message: impl Into<String>) -> Self {
         Self {
             path,
             message: message.into(),
@@ -150,6 +152,34 @@ impl SpectrumBundle {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Adds a one-dimensional spectrum with source metadata and returns the bundle.
+    #[must_use]
+    pub fn with_1d(mut self, spectrum: Spectrum1D, source: LoadedSource) -> Self {
+        self.push_1d(spectrum, source);
+        self
+    }
+
+    /// Adds a two-dimensional spectrum with source metadata and returns the bundle.
+    #[must_use]
+    pub fn with_2d(mut self, spectrum: Spectrum2D, source: LoadedSource) -> Self {
+        self.push_2d(spectrum, source);
+        self
+    }
+
+    /// Adds molecule metadata and returns the bundle.
+    #[must_use]
+    pub fn with_molecule(mut self, molecule: Molecule) -> Self {
+        self.push_molecule(molecule);
+        self
+    }
+
+    /// Adds a non-fatal load warning and returns the bundle.
+    #[must_use]
+    pub fn with_warning(mut self, warning: LoadWarning) -> Self {
+        self.push_warning(warning);
+        self
     }
 
     /// Returns all loaded spectrum entries.
@@ -280,15 +310,18 @@ impl SpectrumBundle {
         !self.has_data()
     }
 
-    fn push_1d(&mut self, spectrum: Spectrum1D, source: LoadedSource) {
+    /// Adds a one-dimensional spectrum with source metadata.
+    pub fn push_1d(&mut self, spectrum: Spectrum1D, source: LoadedSource) {
         self.spectra.push(LoadedSpectrum::OneD { spectrum, source });
     }
 
-    fn push_2d(&mut self, spectrum: Spectrum2D, source: LoadedSource) {
+    /// Adds a two-dimensional spectrum with source metadata.
+    pub fn push_2d(&mut self, spectrum: Spectrum2D, source: LoadedSource) {
         self.spectra.push(LoadedSpectrum::TwoD { spectrum, source });
     }
 
-    fn push_molecule(&mut self, molecule: Molecule) {
+    /// Adds molecule metadata.
+    pub fn push_molecule(&mut self, molecule: Molecule) {
         self.molecules.push(molecule);
     }
 
@@ -298,7 +331,8 @@ impl SpectrumBundle {
         self.warnings.extend(bundle.warnings);
     }
 
-    fn push_warning(&mut self, warning: LoadWarning) {
+    /// Adds a non-fatal load warning.
+    pub fn push_warning(&mut self, warning: LoadWarning) {
         self.warnings.push(warning);
     }
 

@@ -3,11 +3,11 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    inspect_agilent_procpar_json, inspect_bruker_parameter_file_json, inspect_jeol_jdf_bytes_json,
-    inspect_nmrml_document_json, js_error, nmredata_1d_signals_to_assignment_set_json,
-    nmredata_2d_signals_to_assignment_set_json, nmredata_assignments_to_assignment_set_json,
-    nmredata_couplings_to_j_coupling_graph_json, nmredata_to_analysis_json,
-    parse_agilent_fid_1d_bytes_json, parse_agilent_fid_2d_bytes_json,
+    create_spectrum_bundle_json, inspect_agilent_procpar_json, inspect_bruker_parameter_file_json,
+    inspect_jeol_jdf_bytes_json, inspect_nmrml_document_json, js_error,
+    nmredata_1d_signals_to_assignment_set_json, nmredata_2d_signals_to_assignment_set_json,
+    nmredata_assignments_to_assignment_set_json, nmredata_couplings_to_j_coupling_graph_json,
+    nmredata_to_analysis_json, parse_agilent_fid_1d_bytes_json, parse_agilent_fid_2d_bytes_json,
     parse_agilent_processed_1d_bytes_json, parse_agilent_processed_2d_bytes_json,
     parse_bruker_fid_1d_bytes_json, parse_bruker_processed_1d_bytes_json,
     parse_bruker_processed_2d_bytes_json, parse_bruker_ser_2d_bytes_json, parse_jcamp_dx_2d_json,
@@ -460,6 +460,18 @@ pub fn inspect_nmrml_document(input: &str) -> std::result::Result<String, JsValu
 #[wasm_bindgen(js_name = validateSpectrumBundle)]
 pub fn validate_spectrum_bundle(input: &str) -> std::result::Result<String, JsValue> {
     validate_spectrum_bundle_json(input).map_err(|error| js_error(&error))
+}
+
+/// Creates versioned spectrum bundle JSON from one- and two-dimensional
+/// spectrum entries.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, source validation,
+/// or serialization fails.
+#[wasm_bindgen(js_name = createSpectrumBundle)]
+pub fn create_spectrum_bundle(input: &str) -> std::result::Result<String, JsValue> {
+    create_spectrum_bundle_json(input).map_err(|error| js_error(&error))
 }
 
 /// Counts spectra, molecules, and warnings in spectrum bundle JSON.
