@@ -20,6 +20,7 @@ use crate::{
 };
 
 mod exact;
+mod selectors;
 mod source_format;
 pub use exact::{
     load_spectrum_1d, load_spectrum_1d_many, load_spectrum_1d_many_relative_to,
