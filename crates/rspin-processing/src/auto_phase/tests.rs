@@ -83,6 +83,23 @@ fn rejects_invalid_options() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn default_options_search_first_order_phase() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new_complex(
+        Axis::linear("shift", Unit::Ppm, 0.0, 4.0, 5)?,
+        vec![1.0, 2.0, 4.0, 2.0, 1.0],
+        Some(vec![0.0; 5]),
+        Metadata::default(),
+    )?;
+    let phased = phase_correct(&spectrum, 30.0, 60.0, 0.5)?;
+    let result = auto_phase_correct(&phased, AutoPhaseOptions::default())?;
+    assert!(
+        result.first_order_deg.abs() > 1.0e-12,
+        "default options must explore first-order phase"
+    );
+    Ok(())
+}
+
 fn real_spectrum() -> anyhow::Result<Spectrum1D> {
     Ok(Spectrum1D::new_complex(
         Axis::linear("shift", Unit::Ppm, 0.0, 2.0, 3)?,
