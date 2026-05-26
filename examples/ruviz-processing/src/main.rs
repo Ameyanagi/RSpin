@@ -24,7 +24,7 @@ mod ruviz_example {
         PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
         SpectrumAnalysis1DOptions, analyze_spectrum_1d, pick_peaks,
     };
-    use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
+    use rspin_core::{Axis, Metadata, Nucleus, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
         SpectrumBundle, load_spectra, read_analysis1d_json, read_processing_recipe_1d_json,
         read_spectrum_bundle_json, read_spectrum1d_csv, read_spectrum1d_json, write_analysis1d_csv,
@@ -1636,6 +1636,7 @@ mod ruviz_example {
         let processed = if spectrum.x.unit == Unit::Seconds {
             let opts = AutoProcessingOptions {
                 subtract_baseline: false,
+                polynomial_phase_refine: true,
                 ..AutoProcessingOptions::default()
             };
             let auto = process_spectrum_auto(spectrum, &opts)?;
@@ -1661,7 +1662,23 @@ mod ruviz_example {
         )?;
 
         // Companion zoom plot, clipped to the signal-bearing window.
-        if let Some((lo, hi)) = signal_window(&processed.x.values, &processed.intensities, 0.08) {
+        // For 1H/13C spectra in ppm units the window is always extended
+        // to include 0 ppm so the absence of TMS / reference signal is
+        // visible too.
+        let include_zero = processed.x.unit == Unit::Ppm
+            && matches!(
+                processed.metadata.nucleus,
+                Some(Nucleus::Hydrogen1) | Some(Nucleus::Carbon13)
+            );
+        let window = signal_window(&processed.x.values, &processed.intensities, 0.08)
+            .map(|(lo, hi)| {
+                if include_zero {
+                    (lo.min(-0.2), hi.max(0.2))
+                } else {
+                    (lo, hi)
+                }
+            });
+        if let Some((lo, hi)) = window {
             let mut xs = Vec::new();
             let mut ys = Vec::new();
             for (x, y) in processed.x.values.iter().zip(&processed.intensities) {

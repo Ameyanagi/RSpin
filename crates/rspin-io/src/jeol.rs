@@ -221,6 +221,18 @@ pub fn read_jeol_jdf_1d_bytes(bytes: &[u8]) -> Result<Spectrum1D> {
     let axis = build_axis(&header, 0, header.point_count()?)?;
     let metadata = build_metadata(&header, &parameters);
 
+    // JEOL Delta stores the FID with the opposite precession sign
+    // convention from Bruker/Agilent. Conjugating the imaginary part
+    // makes the forward FFT land peaks at their physical ppm
+    // positions rather than mirrored around the carrier. Applied only
+    // to time-domain (FID) data; pre-FFT files are left untouched.
+    let imaginary = match imaginary {
+        Some(values) if axis.unit == rspin_core::Unit::Seconds => {
+            Some(values.into_iter().map(|v| -v).collect())
+        }
+        other => other,
+    };
+
     Spectrum1D::new_complex(axis, real, imaginary, metadata)
 }
 
@@ -292,6 +304,14 @@ pub fn read_jeol_jdf_2d_bytes(bytes: &[u8]) -> Result<Spectrum2D> {
     let x = build_axis(&header, 0, x_count)?;
     let y = build_axis(&header, 1, y_count)?;
     let metadata = build_metadata(&header, &parameters);
+
+    // Same precession-sign correction as the 1D path.
+    let imaginary = match imaginary {
+        Some(values) if x.unit == rspin_core::Unit::Seconds => {
+            Some(values.into_iter().map(|v| -v).collect())
+        }
+        other => other,
+    };
 
     Spectrum2D::new_complex(x, y, z, imaginary, metadata)
 }
