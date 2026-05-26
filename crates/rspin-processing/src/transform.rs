@@ -257,13 +257,46 @@ impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
 /// Estimates an SNR-optimal exponential apodization from a time-domain FID
 /// (the "matched filter" recipe of Ernst).
 ///
-/// The natural linewidth that maximises the post-FFT SNR equals the
-/// Lorentzian FWHM of the strongest peak in the un-apodized magnitude
-/// spectrum. This helper performs a forward FFT internally, picks the
-/// largest magnitude peak, measures its full width at half maximum in
-/// Hz (or ppm × `frequency_mhz`), and returns the matched
-/// [`ExponentialApodization`] you should apply *before* zero-filling
-/// and FFT.
+/// # Background
+///
+/// The matched filter is the SNR-optimal window for a signal of known
+/// shape. For an NMR FID
+///
+/// ```text
+/// s(t) = exp(-π · LB · t) · cos(2π · ν · t) + noise(t)
+/// ```
+///
+/// multiplying by `w(t) = s(t)` before FFT maximises the post-transform
+/// peak-to-noise ratio. For NMR that reduces to multiplying the FID by
+/// `exp(-π · LB · t)` — exponential apodization with the **natural
+/// linewidth**. The cost is that lines broaden by a factor of two in
+/// the frequency domain: you pay resolution for SNR.
+///
+/// # Procedure
+///
+/// 1. Forward-FFT the input FID with no window.
+/// 2. Take the magnitude spectrum.
+/// 3. Locate the strongest magnitude peak.
+/// 4. Measure its FWHM in Hz (using the FFT axis directly when it is
+///    already in Hz, or scaling by `metadata.frequency_mhz` when it is
+///    in ppm).
+/// 5. Divide that FWHM by √3 — the magnitude lineshape has
+///    `FWHM = √3 · LB` while the absorption-mode lineshape has
+///    `FWHM = LB`. The Ernst-optimal LB is the absorption-mode width.
+/// 6. Return an [`ExponentialApodization`] step with that LB and the
+///    FID's dwell time.
+///
+/// # When *not* to use the matched filter
+///
+/// - Spectra whose peaks have very different natural linewidths
+///   (e.g. fast-relaxing methyls alongside slow-relaxing aromatics).
+///   The estimate is dominated by the strongest peak; weaker peaks of
+///   different width are mis-weighted.
+/// - Resolution-critical work (couplings, dispersion analysis); the
+///   ×2 linewidth penalty is exactly the wrong direction. Use
+///   [`LorentzToGaussApodization`] instead.
+/// - FIDs that have already been broadened upstream (e.g. Bruker
+///   `procs` with `LB > 0`). Apodising again would double-broaden.
 ///
 /// # Errors
 ///

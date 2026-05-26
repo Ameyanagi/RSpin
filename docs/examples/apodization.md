@@ -37,6 +37,14 @@ the FWHM of the strongest magnitude peak, and returns the
 Ernst-optimal value). The input must be a uniformly-sampled
 time-domain FID.
 
+The matched filter is the SNR-optimal window for a signal of known
+shape: multiplying the FID by a copy of its own decay envelope
+maximises the post-FFT peak-to-noise ratio. The price is that lines
+broaden by a factor of two in the frequency domain — you pay
+resolution for sensitivity. See
+[Best practices → the matched filter, in detail](../best-practices.md#the-matched-filter-in-detail)
+for the theory and the cases where you should *not* use it.
+
 ```rust
 let em = matched_filter_em(&fid)?;
 let processed = em.apply(&fid)?;
