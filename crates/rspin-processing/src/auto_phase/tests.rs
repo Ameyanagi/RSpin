@@ -415,3 +415,123 @@ fn assert_close(actual: f64, expected: f64) {
         "{actual} != {expected}"
     );
 }
+
+/// Single Lorentzian (absorption + i dispersion) of the given signed
+/// amplitude, centered at `center_ppm`. A negative amplitude models a
+/// DEPT-135 CH2 / APT methylene resonance.
+fn single_peak_spectrum(
+    point_count: usize,
+    half_width_ppm: f64,
+    amplitude: f64,
+    center_ppm: f64,
+) -> anyhow::Result<Spectrum1D> {
+    let segments = u32::try_from(point_count.saturating_sub(1))?;
+    let mut real = Vec::with_capacity(point_count);
+    let mut imag = Vec::with_capacity(point_count);
+    for index in 0..u32::try_from(point_count)? {
+        let position = f64::from(index) * 10.0 / f64::from(segments) - 5.0;
+        let x = (position - center_ppm) / half_width_ppm;
+        let denom = 1.0 + x * x;
+        real.push(amplitude / denom);
+        imag.push(amplitude * x / denom);
+    }
+    Ok(Spectrum1D::new_complex(
+        Axis::linear("shift", Unit::Ppm, -5.0, 5.0, point_count)?,
+        real,
+        Some(imag),
+        Metadata::default(),
+    )?)
+}
+
+fn real_extrema(spectrum: &Spectrum1D) -> (f64, f64) {
+    let min = spectrum
+        .intensities
+        .iter()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+    let max = spectrum
+        .intensities
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    (min, max)
+}
+
+#[test]
+fn allow_negative_preserves_negative_peak_regions_strategy() -> anyhow::Result<()> {
+    // Clean negative absorption peak, distorted by a known zero-order phase.
+    let clean = single_peak_spectrum(512, 0.05, -1.0, 0.0)?;
+    let distorted = phase_correct(&clean, 40.0, 0.0, 0.5)?;
+
+    let kept = auto_phase_correct(
+        &distorted,
+        AutoPhaseOptions::default().with_allow_negative(true),
+    )?;
+    let (min_kept, max_kept) = real_extrema(&kept.spectrum);
+    assert!(
+        min_kept < -0.8,
+        "allow_negative should keep a clean negative absorption peak, min={min_kept}"
+    );
+    assert!(
+        max_kept < 0.2,
+        "allow_negative should not introduce a large positive lobe, max={max_kept}"
+    );
+
+    // Default behavior drives the peak positive (sign information lost).
+    let flipped = auto_phase_correct(&distorted, AutoPhaseOptions::default())?;
+    let (_, max_flipped) = real_extrema(&flipped.spectrum);
+    assert!(
+        max_flipped > 0.8,
+        "default auto-phase should flip the peak positive, max={max_flipped}"
+    );
+    Ok(())
+}
+
+#[test]
+fn allow_negative_preserves_negative_peak_global_cost_strategy() -> anyhow::Result<()> {
+    let clean = single_peak_spectrum(512, 0.05, -1.0, 0.0)?;
+    let distorted = phase_correct(&clean, 40.0, 0.0, 0.5)?;
+    let base = AutoPhaseOptions::default().with_strategy(AutoPhaseStrategy::GlobalCost);
+
+    let kept = auto_phase_correct(&distorted, base.with_allow_negative(true))?;
+    let (min_kept, max_kept) = real_extrema(&kept.spectrum);
+    assert!(
+        min_kept < -0.8,
+        "allow_negative GlobalCost should keep the peak negative, min={min_kept}"
+    );
+    assert!(
+        max_kept < 0.2,
+        "allow_negative GlobalCost should not add a positive lobe, max={max_kept}"
+    );
+
+    let flipped = auto_phase_correct(&distorted, base)?;
+    let (_, max_flipped) = real_extrema(&flipped.spectrum);
+    assert!(
+        max_flipped > 0.8,
+        "default GlobalCost should flip the peak positive, max={max_flipped}"
+    );
+    Ok(())
+}
+
+#[test]
+fn allow_negative_validation_requires_imaginary_weight() {
+    // imaginary_weight must stay positive when the negative penalty is off.
+    let invalid = AutoPhaseOptions::default()
+        .with_strategy(AutoPhaseStrategy::GlobalCost)
+        .with_allow_negative(true)
+        .scoring_weights(0.0, 0.0);
+    let spectrum = match lorentzian_spectrum(64, 0.05) {
+        Ok(spectrum) => spectrum,
+        Err(error) => panic!("failed to build fixture: {error}"),
+    };
+    assert!(matches!(
+        auto_phase_correct(&spectrum, invalid),
+        Err(RSpinError::InvalidSpectrum { .. })
+    ));
+
+    // With the negative penalty active, a zero imaginary weight is still fine.
+    let valid = AutoPhaseOptions::default()
+        .with_strategy(AutoPhaseStrategy::GlobalCost)
+        .scoring_weights(0.0, 1.0);
+    assert!(auto_phase_correct(&spectrum, valid).is_ok());
+}

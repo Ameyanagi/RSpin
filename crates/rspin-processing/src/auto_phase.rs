@@ -37,7 +37,17 @@ impl AutoPhaseOptions {
         ensure_positive("first_order_step_deg", self.first_order_step_deg)?;
         ensure_non_negative("imaginary_weight", self.imaginary_weight)?;
         ensure_non_negative("negative_weight", self.negative_weight)?;
-        if self.imaginary_weight <= f64::EPSILON && self.negative_weight <= f64::EPSILON {
+        if self.allow_negative {
+            // The negative-signal penalty is intentionally disabled, so the
+            // cost is driven by imaginary / dispersion content only and the
+            // imaginary weight must remain positive.
+            if self.imaginary_weight <= f64::EPSILON {
+                return Err(RSpinError::InvalidSpectrum {
+                    message: "imaginary_weight must be positive when allow_negative is set"
+                        .to_owned(),
+                });
+            }
+        } else if self.imaginary_weight <= f64::EPSILON && self.negative_weight <= f64::EPSILON {
             return Err(RSpinError::InvalidSpectrum {
                 message: "at least one auto-phase scoring weight must be positive".to_owned(),
             });
@@ -82,11 +92,14 @@ fn auto_phase_correct_regions_dispatch(
     options: AutoPhaseOptions,
 ) -> Result<AutoPhaseResult> {
     let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
-    let mut regions_options = RegionsOptions::default().with_pivot_fraction(pivot_fraction);
+    let mut regions_options = RegionsOptions::default()
+        .with_pivot_fraction(pivot_fraction)
+        .with_allow_negative(options.allow_negative);
     // The GlobalCost-only options (`cost`, `refine`, `imaginary_weight`,
     // `negative_weight`, `regularization_weight`) have no analogue in the
-    // Regions algorithm and are intentionally ignored. `active_region`
-    // does map cleanly onto the peak detector and must be propagated.
+    // Regions algorithm and are intentionally ignored. `active_region` and
+    // `allow_negative` do map cleanly onto the region phasing and must be
+    // propagated.
     if let Some((start, end)) = options.active_region {
         regions_options = regions_options.with_active_region(start, end);
     }
@@ -418,7 +431,7 @@ fn legacy_cost(
             let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
             let corrected = *value * rotation;
             let imaginary_penalty = options.imaginary_weight * corrected.im.powi(2);
-            let negative_penalty = if corrected.re < 0.0 {
+            let negative_penalty = if !options.allow_negative && corrected.re < 0.0 {
                 options.negative_weight * corrected.re.powi(2)
             } else {
                 0.0
@@ -507,7 +520,12 @@ fn acme_cost(
         0.0
     };
 
-    entropy + options.negative_weight * normalized_negativity
+    let negative_term = if options.allow_negative {
+        0.0
+    } else {
+        options.negative_weight * normalized_negativity
+    };
+    entropy + negative_term
 }
 
 /// Estimates `(ph0, ph1)` from caller-supplied peak positions.
@@ -1117,7 +1135,12 @@ fn polynomial_acme_cost(
     } else {
         0.0
     };
-    entropy + options.negative_weight * normalized_negativity
+    let negative_term = if options.allow_negative {
+        0.0
+    } else {
+        options.negative_weight * normalized_negativity
+    };
+    entropy + negative_term
 }
 
 fn nelder_mead_polynomial<F>(ph2_init: f64, ph3_init: f64, step: f64, cost: &F) -> (f64, f64, f64)

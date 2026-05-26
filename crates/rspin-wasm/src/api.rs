@@ -1066,6 +1066,8 @@ struct AutoPhaseOptionsJson {
     regularization_weight: f64,
     #[serde(default)]
     strategy: rspin_processing::AutoPhaseStrategy,
+    #[serde(default)]
+    allow_negative: bool,
 }
 
 fn default_regularization_weight() -> f64 {
@@ -1091,6 +1093,7 @@ impl Default for AutoPhaseOptionsJson {
             refine: options.refine,
             regularization_weight: options.regularization_weight,
             strategy: options.strategy,
+            allow_negative: options.allow_negative,
         }
     }
 }
@@ -1113,6 +1116,7 @@ impl From<AutoPhaseOptionsJson> for AutoPhaseOptions {
             refine: options.refine,
             regularization_weight: options.regularization_weight,
             strategy: options.strategy,
+            allow_negative: options.allow_negative,
         }
     }
 }

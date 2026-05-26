@@ -5,10 +5,10 @@ use std::{collections::BTreeMap, fs, path::Path};
 use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 
 use crate::SpectrumPathReader;
-use crate::bruker::{optional_i32, parse_parameter_file_for_reader, read_text, required_usize};
+use crate::bruker::{parse_parameter_file_for_reader, read_text, required_usize};
 
 use super::{
-    build_raw_axis, build_raw_metadata, byte_order, decode_i32_chunk, ensure_i32_data,
+    build_raw_axis, build_raw_metadata_2d, byte_order, decode_i32_chunk, ensure_i32_data,
     locate_dataset_dir, scale_factor,
 };
 
@@ -100,7 +100,7 @@ pub fn read_bruker_ser_2d_dir(path: impl AsRef<Path>) -> Result<Spectrum2D> {
 
     let x = build_raw_axis(x_count, &direct_parameters)?;
     let y = build_indirect_axis(y_count, &indirect_parameters)?;
-    let metadata = build_raw_metadata(&direct_parameters)?;
+    let metadata = build_raw_metadata_2d(&direct_parameters, &indirect_parameters)?;
     Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
 }
 
@@ -129,7 +129,7 @@ fn build_ser_spectrum(
 
     let x = build_raw_axis(x_count, direct_parameters)?;
     let y = build_indirect_axis(y_count, indirect_parameters)?;
-    let metadata = build_raw_metadata(direct_parameters)?;
+    let metadata = build_raw_metadata_2d(direct_parameters, indirect_parameters)?;
     Spectrum2D::new_complex(x, y, z, Some(imaginary), metadata)
 }
 
@@ -200,7 +200,9 @@ fn decode_ser_values(
 }
 
 fn build_indirect_axis(point_count: usize, acqu2s: &BTreeMap<String, String>) -> Result<Axis> {
-    let _ = optional_i32(acqu2s, "FNMODE")?;
+    // `FNMODE` is consumed during metadata construction (see
+    // `build_raw_metadata_2d`); the indirect axis itself is built from the
+    // sweep-width / carrier parameters like the direct axis.
     build_raw_axis(point_count, acqu2s)
 }
 

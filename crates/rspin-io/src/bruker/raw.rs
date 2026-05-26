@@ -9,13 +9,13 @@ use std::{
     str::FromStr,
 };
 
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{Axis, Metadata, Nucleus, QuadMode, RSpinError, Result, Spectrum1D, Unit};
 
 use crate::SpectrumPathReader;
 
 use super::{
-    optional_f64, optional_i32, parse_parameter_file_for_reader, prefixed_parameter_properties,
-    read_text, required_usize, text_parameter,
+    experiment_from_pulprog, optional_f64, optional_i32, parse_parameter_file_for_reader,
+    prefixed_parameter_properties, read_text, required_usize, text_parameter,
 };
 
 pub use two_d::{BrukerSer2D, BrukerSer2DBytes, read_bruker_ser_2d_bytes, read_bruker_ser_2d_dir};
@@ -194,17 +194,39 @@ pub(super) fn build_raw_metadata(acqus: &BTreeMap<String, String>) -> Result<Met
     let solvent = text_parameter(acqus, "SOLVENT");
     let temperature_k = optional_f64(acqus, "TE")?;
     let origin = text_parameter(acqus, "ORIGIN").or_else(|| text_parameter(acqus, "OWNER"));
+    let (experiment, dept_angle_deg) = text_parameter(acqus, "PULPROG")
+        .map_or((None, None), |pulprog| experiment_from_pulprog(&pulprog));
 
     Ok(Metadata {
         name: text_parameter(acqus, "EXP").or_else(|| text_parameter(acqus, "PULPROG")),
         nucleus,
         frequency_mhz,
+        experiment,
+        dept_angle_deg,
         solvent,
         temperature_k,
         origin,
         properties: prefixed_parameter_properties("bruker.acqus", acqus),
         ..Metadata::default()
     })
+}
+
+/// Builds raw 2D metadata, augmenting [`build_raw_metadata`] with
+/// indirect-dimension fields: `SFO2` (indirect carrier, from `acqus`) and
+/// `FNMODE` (quadrature detection, from `acqu2s`).
+pub(super) fn build_raw_metadata_2d(
+    direct_parameters: &BTreeMap<String, String>,
+    indirect_parameters: &BTreeMap<String, String>,
+) -> Result<Metadata> {
+    let mut metadata = build_raw_metadata(direct_parameters)?;
+    metadata.indirect_frequency_mhz = optional_f64(direct_parameters, "SFO2")?;
+    metadata.quad_mode =
+        optional_i32(indirect_parameters, "FNMODE")?.and_then(QuadMode::from_fnmode);
+    metadata.properties.extend(prefixed_parameter_properties(
+        "bruker.acqu2s",
+        indirect_parameters,
+    ));
+    Ok(metadata)
 }
 
 pub(super) fn ensure_i32_data(acqus: &BTreeMap<String, String>) -> Result<()> {

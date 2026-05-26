@@ -88,6 +88,13 @@ pub struct RegionsOptions {
     /// Indices outside the window are forced off in the peak map so that
     /// detected regions never span the inactive area.
     pub active_region: Option<(f64, f64)>,
+    /// Allow genuinely negative absorption peaks to remain negative.
+    ///
+    /// When `true`, per-region phasing accepts a clean negative absorption
+    /// lineshape as readily as a positive one, and the wrap-resolution loss
+    /// drops its negative-content penalty. Used for DEPT/APT-style sign-edited
+    /// spectra. Defaults to `false`.
+    pub allow_negative: bool,
 }
 
 impl Default for RegionsOptions {
@@ -99,6 +106,7 @@ impl Default for RegionsOptions {
             outlier_threshold_deg: 0.6_f64.to_degrees(),
             pivot_fraction: 0.5,
             active_region: None,
+            allow_negative: false,
         }
     }
 }
@@ -130,6 +138,13 @@ impl RegionsOptions {
     #[must_use]
     pub fn with_active_region(mut self, start: f64, end: f64) -> Self {
         self.active_region = Some((start, end));
+        self
+    }
+
+    /// Returns options that preserve genuinely negative peaks (DEPT/APT).
+    #[must_use]
+    pub fn with_allow_negative(mut self, allow_negative: bool) -> Self {
+        self.allow_negative = allow_negative;
         self
     }
 }
@@ -205,7 +220,7 @@ pub fn auto_phase_correct_regions(
     // ── Stage 4: per-region zero-order phase via area-below-baseline ──
     let region_phases: Vec<RegionPhase> = regions
         .iter()
-        .filter_map(|region| phase_region(&buffer, region))
+        .filter_map(|region| phase_region(&buffer, region, options.allow_negative))
         .collect();
     if region_phases.is_empty() {
         return Err(RSpinError::InvalidSpectrum {
@@ -224,6 +239,7 @@ pub fn auto_phase_correct_regions(
         canonicalize_phase(global.zero_order_deg),
         global.first_order_deg,
         options.pivot_fraction,
+        options.allow_negative,
     );
 
     let mut spectrum = phase_correct(
@@ -448,7 +464,11 @@ struct RegionPhase {
     weight: f64,
 }
 
-fn phase_region(buffer: &[Complex<f64>], region: &PeakRegion) -> Option<RegionPhase> {
+fn phase_region(
+    buffer: &[Complex<f64>],
+    region: &PeakRegion,
+    allow_negative: bool,
+) -> Option<RegionPhase> {
     let span = region.end.saturating_sub(region.start);
     if span < 4 {
         return None;
@@ -458,8 +478,13 @@ fn phase_region(buffer: &[Complex<f64>], region: &PeakRegion) -> Option<RegionPh
     // Find zero-order phase by 3-cycle coarse-to-fine search of the area
     // below the linear baseline anchored at the region endpoints. Initial
     // sweep covers ±180° in 18° steps (paper uses 20 steps over ±180°).
+    //
+    // When `allow_negative` is set, the search uses a sign-agnostic
+    // one-sidedness score over a narrower ±90° window: within that window
+    // there is exactly one absorption solution (the smaller-magnitude of the
+    // two 180°-apart phases), so the acquired DEPT/APT peak sign is kept.
     let mut center_deg = 0.0_f64;
-    let mut half_width_deg = 180.0_f64;
+    let mut half_width_deg = if allow_negative { 90.0 } else { 180.0 };
     let mut best_phase = 0.0_f64;
     for _cycle in 0..3 {
         let step_count: usize = 20;
@@ -470,7 +495,11 @@ fn phase_region(buffer: &[Complex<f64>], region: &PeakRegion) -> Option<RegionPh
         let mut best_index = 0_usize;
         for index in 0..=step_count {
             let phase_deg = lo + step * safe_count_f64(index);
-            let score = area_below_baseline(segment, phase_deg);
+            let score = if allow_negative {
+                negated_absolute_area(segment, phase_deg)
+            } else {
+                area_below_baseline(segment, phase_deg)
+            };
             if score < best_score {
                 best_score = score;
                 best_index = index;
@@ -505,7 +534,7 @@ fn phase_region(buffer: &[Complex<f64>], region: &PeakRegion) -> Option<RegionPh
 /// segment has been rotated by `phase_deg`. Following Fig. 1 of the paper:
 /// we sum positive deviations below the baseline (i.e. samples whose real
 /// part falls under the line) and squared deviations to penalise large
-/// dips.
+/// dips. Minimising it drives the region to a positive absorption lineshape.
 fn area_below_baseline(segment: &[Complex<f64>], phase_deg: f64) -> f64 {
     let n = segment.len();
     if n < 2 {
@@ -527,6 +556,34 @@ fn area_below_baseline(segment: &[Complex<f64>], phase_deg: f64) -> f64 {
         }
     }
     total
+}
+
+/// Sign-agnostic absorption score for [`phase_region`] when `allow_negative`
+/// is set. Returns the negated absolute net area of the baseline-subtracted
+/// real part: a clean absorption peak of *either* sign integrates to a large
+/// one-signed area (low score), while dispersion (antisymmetric, net ≈ 0) and
+/// a flattened real channel (net ≈ 0) both score near zero. Minimising it
+/// therefore keeps a tall one-sided lineshape regardless of sign. Restricting
+/// the caller's search window to ±90° selects the smaller-magnitude of the two
+/// absorption solutions, preserving the acquired DEPT/APT sign.
+fn negated_absolute_area(segment: &[Complex<f64>], phase_deg: f64) -> f64 {
+    let n = segment.len();
+    if n < 2 {
+        return f64::INFINITY;
+    }
+    let phase_rad = phase_deg.to_radians();
+    let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+    let first = (segment[0] * rotation).re;
+    let last = (segment[n - 1] * rotation).re;
+    let denom = safe_count_f64(n - 1);
+    let mut net = 0.0_f64;
+    for (index, value) in segment.iter().enumerate() {
+        let real = (*value * rotation).re;
+        let t = safe_count_f64(index) / denom;
+        let baseline = first * (1.0 - t) + last * t;
+        net += real - baseline;
+    }
+    -net.abs()
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -678,6 +735,7 @@ fn resolve_wrap_ambiguity(
     ph0_canonical: f64,
     ph1_fit: f64,
     pivot_fraction: f64,
+    allow_negative: bool,
 ) -> (f64, f64) {
     // Trust the fit when it already lands inside the canonical
     // [-180, 180] window — the wrap search adds candidates that aren't
@@ -712,6 +770,7 @@ fn resolve_wrap_ambiguity(
             ph0_canonical,
             candidate,
             pivot_fraction,
+            allow_negative,
         );
         if loss < best.2 {
             best = (ph0_canonical, candidate, loss);
@@ -732,6 +791,11 @@ fn index_fractions(len: usize) -> Vec<f64> {
 /// candidates. Maximises the (peak-weighted) correlation between the
 /// rotated real part and the magnitude envelope while penalising any
 /// residual negative-going content on a peak.
+///
+/// When `allow_negative` is set the negative-content penalty is dropped and
+/// the absolute correlation is used, so a uniformly negative (but absorptive)
+/// solution scores as well as a positive one.
+#[allow(clippy::too_many_arguments)]
 fn magnitude_target_loss(
     buffer: &[Complex<f64>],
     fractions: &[f64],
@@ -740,6 +804,7 @@ fn magnitude_target_loss(
     ph0_deg: f64,
     ph1_deg: f64,
     pivot_fraction: f64,
+    allow_negative: bool,
 ) -> f64 {
     let mut numerator = 0.0_f64;
     let mut neg_area = 0.0_f64;
@@ -764,6 +829,11 @@ fn magnitude_target_loss(
         return f64::INFINITY;
     }
     let correlation = numerator / denom;
+    if allow_negative {
+        // Sign-agnostic: reward strong alignment with the magnitude envelope
+        // regardless of sign, and do not penalise negative-going content.
+        return -correlation.abs();
+    }
     let normalised_negativity = if mag_norm > 0.0 {
         neg_area / mag_norm.sqrt()
     } else {
