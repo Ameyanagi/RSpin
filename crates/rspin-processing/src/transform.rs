@@ -151,6 +151,53 @@ impl ProcessingStep<Spectrum1D> for LorentzToGaussApodization {
     }
 }
 
+/// Applies trapezoidal apodization.
+///
+/// The window ramps linearly from 0 up to 1 across the leading
+/// `rise_end_fraction` of the FID, stays at 1 between
+/// `rise_end_fraction` and `fall_start_fraction`, then ramps back down
+/// to 0 across the trailing portion. Both parameters lie in `[0, 1]`
+/// with `rise_end_fraction <= fall_start_fraction`. Setting
+/// `rise_end_fraction = 0` skips the ramp-in; `fall_start_fraction = 1`
+/// skips the ramp-out.
+///
+/// The trapezoidal window is the conventional companion to forward
+/// linear prediction: the LP-extrapolated tail can be damped smoothly
+/// to zero by lowering `fall_start_fraction`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrapezoidalApodization {
+    /// Fraction of the FID where the linear ramp-up reaches 1, in `[0, 1]`.
+    pub rise_end_fraction: f64,
+    /// Fraction of the FID where the linear ramp-down begins, in `[0, 1]`.
+    pub fall_start_fraction: f64,
+}
+
+impl TrapezoidalApodization {
+    /// Creates a trapezoidal apodization step.
+    #[must_use]
+    pub fn new(rise_end_fraction: f64, fall_start_fraction: f64) -> Self {
+        Self {
+            rise_end_fraction,
+            fall_start_fraction,
+        }
+    }
+
+    /// Creates a half-trapezoid that only ramps down at the tail.
+    #[must_use]
+    pub fn fall_only(fall_start_fraction: f64) -> Self {
+        Self {
+            rise_end_fraction: 0.0,
+            fall_start_fraction,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for TrapezoidalApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        trapezoidal_apodization(spectrum, self.rise_end_fraction, self.fall_start_fraction)
+    }
+}
+
 /// Converts a complex spectrum to magnitude mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Magnitude;
@@ -444,6 +491,43 @@ pub fn lorentz_to_gauss_apodization(
     Ok(processed.with_processing_record(
         ProcessingRecord::new("lorentz_to_gauss_apodization").with_details(format!(
             "lorentz_to_undo_hz={lorentz_to_undo_hz},gauss_fwhm_hz={gauss_fwhm_hz},gauss_shift={gauss_shift},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies trapezoidal apodization.
+///
+/// See [`TrapezoidalApodization`] for the window definition.
+///
+/// # Errors
+///
+/// Returns an error when either fraction is outside `[0, 1]`,
+/// `rise_end_fraction > fall_start_fraction`, or either parameter is
+/// non-finite.
+pub fn trapezoidal_apodization(
+    spectrum: &Spectrum1D,
+    rise_end_fraction: f64,
+    fall_start_fraction: f64,
+) -> Result<Spectrum1D> {
+    let weights = trapezoidal_weights(
+        spectrum.len(),
+        rise_end_fraction,
+        fall_start_fraction,
+        "trapezoidal apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("trapezoidal_apodization").with_details(format!(
+            "rise_end_fraction={rise_end_fraction},fall_start_fraction={fall_start_fraction}"
         )),
     ))
 }
@@ -764,6 +848,72 @@ fn index_denominator(len: usize) -> Result<f64> {
         message: "spectrum is too large for phase correction".to_owned(),
     })?;
     Ok(f64::from(denominator))
+}
+
+fn trapezoidal_weights(
+    len: usize,
+    rise_end_fraction: f64,
+    fall_start_fraction: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_finite("rise_end_fraction", rise_end_fraction)?;
+    ensure_finite("fall_start_fraction", fall_start_fraction)?;
+    if !(0.0..=1.0).contains(&rise_end_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "rise_end_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    if !(0.0..=1.0).contains(&fall_start_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "fall_start_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    if rise_end_fraction > fall_start_fraction {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "rise_end_fraction must not exceed fall_start_fraction".to_owned(),
+        });
+    }
+
+    let denominator = if len <= 1 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let fraction = if denominator == 0.0 {
+                0.0
+            } else {
+                index_f / denominator
+            };
+            let weight = if fraction < rise_end_fraction {
+                if rise_end_fraction <= 0.0 {
+                    1.0
+                } else {
+                    fraction / rise_end_fraction
+                }
+            } else if fraction > fall_start_fraction {
+                if fall_start_fraction >= 1.0 {
+                    1.0
+                } else {
+                    (1.0 - fraction) / (1.0 - fall_start_fraction)
+                }
+            } else {
+                1.0
+            };
+            Ok(weight.max(0.0))
+        })
+        .collect()
 }
 
 fn lorentz_to_gauss_weights(

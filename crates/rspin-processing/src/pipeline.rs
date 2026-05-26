@@ -6,7 +6,7 @@ use crate::{
     Abs1D, AutoPhaseOptions, BaselineMethod, Crop1D, ExponentialApodization, Fft1D, FftDirection,
     GaussianApodization, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
     OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
-    SineBellApodization, SubtractBaseline, ZeroFill,
+    SineBellApodization, SubtractBaseline, TrapezoidalApodization, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -158,6 +158,15 @@ impl Spectrum1DPipeline {
             LorentzToGaussApodization::new(lorentz_to_undo_hz, gauss_fwhm_hz, dwell_time_s)
                 .with_gauss_shift(gauss_shift),
         )
+    }
+
+    /// Applies trapezoidal apodization (ramp-in, plateau, ramp-out).
+    #[must_use]
+    pub fn trapezoidal_apodization(self, rise_end_fraction: f64, fall_start_fraction: f64) -> Self {
+        self.then(TrapezoidalApodization::new(
+            rise_end_fraction,
+            fall_start_fraction,
+        ))
     }
 
     /// Applies sine-bell apodization to real and imaginary channels.

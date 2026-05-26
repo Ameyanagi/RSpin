@@ -225,6 +225,34 @@ fn lorentz_to_gauss_2d_rejects_invalid_shift() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn trapezoidal_2d_matches_separable_product() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    // x dim: 3 points → fractions 0, 0.5, 1; rise=0.5, fall=0.5 → 0, 1, 0
+    // y dim: 2 points → fractions 0, 1; rise=0.0, fall=1.0 → 1, 1
+    let processed = trapezoidal_apodization_2d(&spectrum, 0.5, 0.5, 0.0, 1.0)?;
+    assert_close(processed.z[0], 0.0);
+    assert_close(processed.z[1], 2.0);
+    assert_close(processed.z[2], 0.0);
+    assert_close(processed.z[3], 0.0);
+    assert_close(processed.z[4], 5.0);
+    assert_close(processed.z[5], 0.0);
+    assert_eq!(
+        processed.processing[0].operation,
+        "trapezoidal_apodization_2d"
+    );
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_2d_rejects_inverted_window() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let error = trapezoidal_apodization_2d(&spectrum, 0.7, 0.3, 0.0, 1.0)
+        .expect_err("inverted rise/fall should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
 fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
     Ok(Spectrum2D::new(
         Axis::linear("x", Unit::Seconds, 0.0, 0.2, 3)?,

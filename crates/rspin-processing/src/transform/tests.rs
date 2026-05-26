@@ -134,6 +134,57 @@ fn lorentz_to_gauss_rejects_invalid_parameters() -> anyhow::Result<()> {
 }
 
 #[test]
+fn trapezoidal_identity_when_full_window() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = trapezoidal_apodization(&spectrum, 0.0, 1.0)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(processed.processing[0].operation, "trapezoidal_apodization");
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_ramps_in_and_out_linearly() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.4, 5)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 1.0, 1.0, 1.0, 1.0],
+        Some(vec![1.0, 1.0, 1.0, 1.0, 1.0]),
+        Metadata::default(),
+    )?;
+    // fractions: 0.0, 0.25, 0.5, 0.75, 1.0
+    // rise=0.5 → weight at 0.0 → 0, 0.25 → 0.5, 0.5 → 1.0
+    // fall=0.5 → weight at 0.75 → 0.5, 1.0 → 0.0
+    let processed = trapezoidal_apodization(&spectrum, 0.5, 0.5)?;
+    assert_vec_close(&processed.intensities, &[0.0, 0.5, 1.0, 0.5, 0.0]);
+    assert_vec_close(require_imaginary(&processed)?, &[0.0, 0.5, 1.0, 0.5, 0.0]);
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_fall_only_keeps_head_at_one() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![2.0; 4], Metadata::default())?;
+    // fractions: 0, 1/3, 2/3, 1; fall_start=2/3 → weights 1, 1, 1, 0.
+    let processed = trapezoidal_apodization(&spectrum, 0.0, 2.0 / 3.0)?;
+    assert_vec_close(&processed.intensities, &[2.0, 2.0, 2.0, 0.0]);
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(trapezoidal_apodization(&spectrum, -0.1, 1.0).is_err());
+    assert!(trapezoidal_apodization(&spectrum, 0.0, 1.5).is_err());
+    assert!(trapezoidal_apodization(&spectrum, 0.6, 0.4).is_err());
+    assert!(trapezoidal_apodization(&spectrum, f64::NAN, 0.5).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

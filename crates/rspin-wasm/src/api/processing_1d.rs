@@ -9,7 +9,7 @@ use rspin_processing::{
     apply_processing_recipe_1d_until, crop_1d, exponential_apodization, fft_1d,
     gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
     offset_intensity, phase_correct, resample_1d, shift_axis, sine_bell_apodization,
-    subtract_baseline, zero_fill,
+    subtract_baseline, trapezoidal_apodization, zero_fill,
 };
 
 use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
@@ -198,6 +198,25 @@ pub fn lorentz_to_gauss_apodization_spectrum_1d_json(
     spectrum1d_to_json(&processed)
 }
 
+/// Applies trapezoidal apodization to serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn trapezoidal_apodization_spectrum_1d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let options: TrapezoidalApodizationJson = from_json(options_json)?;
+    let processed = trapezoidal_apodization(
+        &spectrum,
+        options.rise_end_fraction,
+        options.fall_start_fraction,
+    )?;
+    spectrum1d_to_json(&processed)
+}
+
 /// Applies sine-bell apodization to serialized `Spectrum1D` JSON.
 ///
 /// # Errors
@@ -315,6 +334,12 @@ struct LorentzToGaussApodizationJson {
     #[serde(default)]
     gauss_shift: f64,
     dwell_time_s: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct TrapezoidalApodizationJson {
+    rise_end_fraction: f64,
+    fall_start_fraction: f64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

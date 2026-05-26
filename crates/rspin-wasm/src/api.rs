@@ -96,7 +96,7 @@ pub use processing_1d::{
     magnitude_spectrum_1d_json, normalize_spectrum_1d_area_json, offset_spectrum_1d_json,
     phase_spectrum_1d_json, resample_spectrum_1d_json, shift_spectrum_1d_axis_json,
     sine_bell_apodization_spectrum_1d_json, subtract_baseline_spectrum_1d_json,
-    zero_fill_spectrum_1d_json,
+    trapezoidal_apodization_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 pub use processing_2d::{
     abs_spectrum_2d_json, apply_processing_recipe_2d_json, apply_processing_recipe_2d_until_json,

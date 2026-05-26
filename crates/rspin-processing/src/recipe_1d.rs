@@ -8,7 +8,8 @@ use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
     crop_1d, exponential_apodization, fft_1d, gaussian_apodization, lorentz_to_gauss_apodization,
     magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
-    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
+    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
+    trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -85,6 +86,13 @@ pub enum ProcessingOperation1D {
         /// Dwell time in seconds.
         dwell_time_s: f64,
     },
+    /// Applies trapezoidal apodization (ramp-in, plateau, ramp-out).
+    TrapezoidalApodization {
+        /// Fraction of the FID where the ramp-up reaches 1, in `[0, 1]`.
+        rise_end_fraction: f64,
+        /// Fraction of the FID where the ramp-down begins, in `[0, 1]`.
+        fall_start_fraction: f64,
+    },
     /// Applies sine-bell apodization to real and imaginary channels.
     SineBellApodization {
         /// Start angle in degrees.
@@ -160,6 +168,10 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 *gauss_shift,
                 *dwell_time_s,
             ),
+            Self::TrapezoidalApodization {
+                rise_end_fraction,
+                fall_start_fraction,
+            } => trapezoidal_apodization(spectrum, *rise_end_fraction, *fall_start_fraction),
             Self::SineBellApodization {
                 start_angle_deg,
                 end_angle_deg,
@@ -370,6 +382,15 @@ impl ProcessingRecipe1D {
             gauss_fwhm_hz,
             gauss_shift,
             dwell_time_s,
+        })
+    }
+
+    /// Appends a trapezoidal apodization operation.
+    #[must_use]
+    pub fn trapezoidal_apodization(self, rise_end_fraction: f64, fall_start_fraction: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::TrapezoidalApodization {
+            rise_end_fraction,
+            fall_start_fraction,
         })
     }
 

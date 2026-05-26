@@ -164,6 +164,49 @@ impl ProcessingStep<Spectrum2D> for LorentzToGaussApodization2D {
     }
 }
 
+/// Applies separable trapezoidal apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrapezoidalApodization2D {
+    /// X-dimension fraction where the linear ramp-up reaches 1.
+    pub x_rise_end_fraction: f64,
+    /// X-dimension fraction where the linear ramp-down begins.
+    pub x_fall_start_fraction: f64,
+    /// Y-dimension fraction where the linear ramp-up reaches 1.
+    pub y_rise_end_fraction: f64,
+    /// Y-dimension fraction where the linear ramp-down begins.
+    pub y_fall_start_fraction: f64,
+}
+
+impl TrapezoidalApodization2D {
+    /// Creates a separable trapezoidal apodization step.
+    #[must_use]
+    pub fn new(
+        x_rise_end_fraction: f64,
+        x_fall_start_fraction: f64,
+        y_rise_end_fraction: f64,
+        y_fall_start_fraction: f64,
+    ) -> Self {
+        Self {
+            x_rise_end_fraction,
+            x_fall_start_fraction,
+            y_rise_end_fraction,
+            y_fall_start_fraction,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for TrapezoidalApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        trapezoidal_apodization_2d(
+            spectrum,
+            self.x_rise_end_fraction,
+            self.x_fall_start_fraction,
+            self.y_rise_end_fraction,
+            self.y_fall_start_fraction,
+        )
+    }
+}
+
 /// Applies separable sine-bell apodization to a two-dimensional spectrum.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SineBellApodization2D {
@@ -378,6 +421,53 @@ pub fn lorentz_to_gauss_apodization_2d(
     ))
 }
 
+/// Applies a separable trapezoidal window in x and y.
+///
+/// # Errors
+///
+/// Returns an error when a fraction is outside `[0, 1]`, a rise fraction
+/// exceeds the corresponding fall fraction, any parameter is non-finite,
+/// or the shape is too large for checked numeric conversion.
+pub fn trapezoidal_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_rise_end_fraction: f64,
+    x_fall_start_fraction: f64,
+    y_rise_end_fraction: f64,
+    y_fall_start_fraction: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = trapezoidal_weights(
+        width,
+        x_rise_end_fraction,
+        x_fall_start_fraction,
+        "2D x trapezoidal apodization",
+    )?;
+    let y_weights = trapezoidal_weights(
+        height,
+        y_rise_end_fraction,
+        y_fall_start_fraction,
+        "2D y trapezoidal apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("trapezoidal_apodization_2d").with_details(format!(
+            "x_rise_end_fraction={x_rise_end_fraction},x_fall_start_fraction={x_fall_start_fraction},y_rise_end_fraction={y_rise_end_fraction},y_fall_start_fraction={y_fall_start_fraction}"
+        )),
+    ))
+}
+
 /// Applies a separable sine-bell window in x and y.
 ///
 /// Each dimension uses `sin(theta_i)^exponent`, where `theta_i` moves linearly
@@ -461,6 +551,72 @@ fn gaussian_weights(
                 );
             let scaled = scale * index;
             Ok((-(scaled * scaled) / denominator).exp())
+        })
+        .collect()
+}
+
+fn trapezoidal_weights(
+    len: usize,
+    rise_end_fraction: f64,
+    fall_start_fraction: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_finite("rise_end_fraction", rise_end_fraction)?;
+    ensure_finite("fall_start_fraction", fall_start_fraction)?;
+    if !(0.0..=1.0).contains(&rise_end_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "rise_end_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    if !(0.0..=1.0).contains(&fall_start_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "fall_start_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    if rise_end_fraction > fall_start_fraction {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "rise_end_fraction must not exceed fall_start_fraction".to_owned(),
+        });
+    }
+
+    let denominator = if len <= 1 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let fraction = if denominator == 0.0 {
+                0.0
+            } else {
+                index_f / denominator
+            };
+            let weight = if fraction < rise_end_fraction {
+                if rise_end_fraction <= 0.0 {
+                    1.0
+                } else {
+                    fraction / rise_end_fraction
+                }
+            } else if fraction > fall_start_fraction {
+                if fall_start_fraction >= 1.0 {
+                    1.0
+                } else {
+                    (1.0 - fraction) / (1.0 - fall_start_fraction)
+                }
+            } else {
+                1.0
+            };
+            Ok(weight.max(0.0))
         })
         .collect()
 }
