@@ -11,10 +11,11 @@ publish = false
 [features]
 default = []
 ruviz = ["visualization-ruviz"]
-visualization-ruviz = ["dep:ruviz"]
+visualization-ruviz = ["dep:ruviz", "rspin/visualization"]
 
 [dependencies]
 anyhow = "1.0"
+rspin = { path = "../../crates/rspin" }
 rspin-analysis = { path = "../../crates/rspin-analysis" }
 rspin-core = { path = "../../crates/rspin-core" }
 rspin-io = { path = "../../crates/rspin-io" }

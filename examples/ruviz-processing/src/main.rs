@@ -107,23 +107,32 @@ mod ruviz_example {
             .normalize_max_abs()
             .apply(&raw)?;
 
-        Plot::new()
-            .title("RSpin 1D Processing Recipe")
-            .xlabel("point")
-            .ylabel("intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::LowerLeft)
-            .line(&raw.x.values, &raw.intensities)
-            .label("raw")
-            .line(&raw.x.values, &scaled.intensities)
-            .label("scale x2")
-            .line(&raw.x.values, &offset.intensities)
-            .label("offset -2")
-            .line(&raw.x.values, &absolute.intensities)
-            .label("absolute")
-            .line(&raw.x.values, &normalized.intensities)
-            .label("normalized")
-            .save(path_to_str(path)?)?;
+        nmr_plot_base(
+            "RSpin 1D Processing Recipe",
+            "point",
+            "intensity",
+            &raw.x.values,
+            &[
+                &raw.intensities,
+                &scaled.intensities,
+                &offset.intensities,
+                &absolute.intensities,
+                &normalized.intensities,
+            ],
+            raw.x.unit,
+        )
+        .legend_position(LegendPosition::LowerLeft)
+        .line(&raw.x.values, &raw.intensities)
+        .label("raw")
+        .line(&raw.x.values, &scaled.intensities)
+        .label("scale x2")
+        .line(&raw.x.values, &offset.intensities)
+        .label("offset -2")
+        .line(&raw.x.values, &absolute.intensities)
+        .label("absolute")
+        .line(&raw.x.values, &normalized.intensities)
+        .label("normalized")
+        .save(path_to_str(path)?)?;
 
         Ok(())
     }
@@ -142,19 +151,21 @@ mod ruviz_example {
             .normalize_max_abs()
             .apply(&spectrum)?;
 
-        Plot::new()
-            .title("RSpin Baseline Correction")
-            .xlabel("chemical shift / ppm")
-            .ylabel("intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&spectrum.x.values, &spectrum.intensities)
-            .label("raw")
-            .line(&spectrum.x.values, &fit.baseline)
-            .label("fitted baseline")
-            .line(&processed.x.values, &processed.intensities)
-            .label("corrected normalized")
-            .save(path_to_str(path)?)?;
+        nmr_plot_base(
+            "RSpin Baseline Correction",
+            "chemical shift / ppm",
+            "intensity",
+            &spectrum.x.values,
+            &[&spectrum.intensities, &fit.baseline, &processed.intensities],
+            spectrum.x.unit,
+        )
+        .line(&spectrum.x.values, &spectrum.intensities)
+        .label("raw")
+        .line(&spectrum.x.values, &fit.baseline)
+        .label("fitted baseline")
+        .line(&processed.x.values, &processed.intensities)
+        .label("corrected normalized")
+        .save(path_to_str(path)?)?;
 
         Ok(())
     }
@@ -366,15 +377,19 @@ mod ruviz_example {
         };
         let mk = |title: String, spectrum: &Spectrum1D, label: &str| -> Plot {
             let (xs, ys) = restrict(spectrum);
-            Plot::new()
+            let mut plot = Plot::new()
                 .title(&title)
                 .xlabel("chemical shift / ppm")
                 .ylabel("intensity")
                 .max_resolution(900, 600)
-                .legend_position(LegendPosition::Best)
-                .line(&xs, &ys)
-                .label(label)
-                .into()
+                .legend_position(LegendPosition::Best);
+            if let Some((x_max, x_min)) = nmr_x_limits(&xs, spectrum.x.unit) {
+                plot = plot.xlim(x_max, x_min);
+            }
+            if let Some((y_min, y_max)) = padded_y_limits(&[&ys]) {
+                plot = plot.ylim(y_min, y_max);
+            }
+            plot.line(&xs, &ys).label(label).into()
         };
         let phase_tag = format!(
             "phased: ph0={:.0}°, ph1={:.0}°, frac={:+.3}",
@@ -574,17 +589,19 @@ mod ruviz_example {
                 .apply(&raw_magnitude)?;
             let raw_magnitude = relabel_hz_to_ppm(raw_magnitude);
 
-            Plot::new()
-                .title(&format!("{title} — process_spectrum_auto"))
-                .xlabel("chemical shift / ppm")
-                .ylabel("normalized intensity")
-                .max_resolution(1600, 1000)
-                .legend_position(LegendPosition::Best)
-                .line(&raw_magnitude.x.values, &raw_magnitude.intensities)
-                .label("|raw FFT| (no apodization)")
-                .line(&normalized.x.values, &normalized.intensities)
-                .label("process_spectrum_auto")
-                .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+            nmr_plot_base(
+                &format!("{title} — process_spectrum_auto"),
+                "chemical shift / ppm",
+                "normalized intensity",
+                &normalized.x.values,
+                &[&raw_magnitude.intensities, &normalized.intensities],
+                normalized.x.unit,
+            )
+            .line(&raw_magnitude.x.values, &raw_magnitude.intensities)
+            .label("|raw FFT| (no apodization)")
+            .line(&normalized.x.values, &normalized.intensities)
+            .label("process_spectrum_auto")
+            .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         }
         Ok(())
     }
@@ -706,15 +723,19 @@ mod ruviz_example {
         regions: &rspin_processing::AutoPhaseResult,
     ) -> Result<()> {
         let mk = |panel_title: String, xs: &Vec<f64>, ys: &Vec<f64>, label: &str| -> Plot {
-            Plot::new()
+            let mut plot = Plot::new()
                 .title(&panel_title)
                 .xlabel("chemical shift / ppm")
                 .ylabel("intensity")
                 .max_resolution(900, 600)
-                .legend_position(LegendPosition::Best)
-                .line(xs, ys)
-                .label(label)
-                .into()
+                .legend_position(LegendPosition::Best);
+            if let Some((x_max, x_min)) = nmr_x_limits(xs, magnitude.x.unit) {
+                plot = plot.xlim(x_max, x_min);
+            }
+            if let Some((y_min, y_max)) = padded_y_limits(&[ys]) {
+                plot = plot.ylim(y_min, y_max);
+            }
+            plot.line(xs, ys).label(label).into()
         };
         let magnitude_panel = mk(
             format!("{title} — magnitude (reference)"),
@@ -813,21 +834,28 @@ mod ruviz_example {
                 )
             };
 
-            Plot::new()
-                .title(*title)
-                .xlabel("chemical shift / ppm")
-                .ylabel("normalized intensity")
-                .max_resolution(1600, 1000)
-                .legend_position(LegendPosition::Best)
-                .line(&magnitude.x.values, &magnitude.intensities)
-                .label(&format!("magnitude (shift={auto:.1})"))
-                .line(&legacy.spectrum.x.values, &legacy.spectrum.intensities)
-                .label(&fmt("legacy", &legacy))
-                .line(&acme.spectrum.x.values, &acme.spectrum.intensities)
-                .label(&fmt("ACME", &acme))
-                .line(&regions.spectrum.x.values, &regions.spectrum.intensities)
-                .label(&fmt("Regions (Zorin 2017)", &regions))
-                .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+            nmr_plot_base(
+                title,
+                "chemical shift / ppm",
+                "normalized intensity",
+                &magnitude.x.values,
+                &[
+                    &magnitude.intensities,
+                    &legacy.spectrum.intensities,
+                    &acme.spectrum.intensities,
+                    &regions.spectrum.intensities,
+                ],
+                magnitude.x.unit,
+            )
+            .line(&magnitude.x.values, &magnitude.intensities)
+            .label(&format!("magnitude (shift={auto:.1})"))
+            .line(&legacy.spectrum.x.values, &legacy.spectrum.intensities)
+            .label(&fmt("legacy", &legacy))
+            .line(&acme.spectrum.x.values, &acme.spectrum.intensities)
+            .label(&fmt("ACME", &acme))
+            .line(&regions.spectrum.x.values, &regions.spectrum.intensities)
+            .label(&fmt("Regions (Zorin 2017)", &regions))
+            .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         }
         Ok(())
     }
@@ -1151,11 +1179,15 @@ mod ruviz_example {
             let lo = center - half_window;
             let hi = center + half_window;
             let title = format!("{center:.2} ppm");
-            let panel = Plot::new()
+            let mut panel = Plot::new()
                 .title(&title)
                 .xlabel(axis_label(unphased.x.unit))
                 .ylabel("intensity")
-                .legend_position(LegendPosition::Best)
+                .legend_position(LegendPosition::Best);
+            if matches!(unphased.x.unit, Unit::Ppm | Unit::Hertz) {
+                panel = panel.xlim(hi, lo);
+            }
+            let panel = panel
                 .line(
                     &slice_window(&unphased.x.values, lo, hi),
                     &slice_window_y(&unphased.x.values, &unphased.intensities, lo, hi),
@@ -1280,14 +1312,25 @@ mod ruviz_example {
             )
         };
 
-        Plot::new()
-            .title("Auto-Phase Comparison (Varian/Agilent 1H)")
-            .xlabel(axis_label(unphased.x.unit))
-            .ylabel("normalized intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&unphased.x.values, &unphased.intensities)
-            .label("unphased real")
+        nmr_plot_base(
+            "Auto-Phase Comparison (Varian/Agilent 1H)",
+            axis_label(unphased.x.unit),
+            "normalized intensity",
+            &unphased.x.values,
+            &[
+                &unphased.intensities,
+                &legacy_result.spectrum.intensities,
+                &acme_grid_result.spectrum.intensities,
+                &acme_refined_result.spectrum.intensities,
+                &acme_pivot_result.spectrum.intensities,
+                &acme_active_result.spectrum.intensities,
+                &acme_peak_result.spectrum.intensities,
+                &regions_result.spectrum.intensities,
+            ],
+            unphased.x.unit,
+        )
+        .line(&unphased.x.values, &unphased.intensities)
+        .label("unphased real")
             .line(
                 &legacy_result.spectrum.x.values,
                 &legacy_result.spectrum.intensities,
@@ -1434,12 +1477,18 @@ mod ruviz_example {
         spectrum: &Spectrum2D,
     ) -> Result<()> {
         let levels = autoscale_contour_levels(&spectrum.z);
-        Plot::new()
+        let mut plot = Plot::new()
             .title(title)
             .xlabel(x_label)
             .ylabel(y_label)
-            .max_resolution(1400, 1200)
-            .contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
+            .max_resolution(1400, 1200);
+        if let Some((x_max, x_min)) = nmr_x_limits(&spectrum.x.values, spectrum.x.unit) {
+            plot = plot.xlim(x_max, x_min);
+        }
+        if let Some((y_max, y_min)) = nmr_x_limits(&spectrum.y.values, spectrum.y.unit) {
+            plot = plot.ylim(y_max, y_min);
+        }
+        plot.contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
             .level_values(levels)
             .filled(false)
             .save(path_to_str(path)?)?;
@@ -1703,17 +1752,19 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
         let unphased = complex_recipe.apply(raw)?;
         let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
 
-        Plot::new()
-            .title("Oracle Varian/Agilent Auto-Phase")
-            .xlabel(axis_label(unphased.x.unit))
-            .ylabel("normalized intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&unphased.x.values, &unphased.intensities)
-            .label("unphased real")
-            .line(&phased.x.values, &phased.intensities)
-            .label("auto-phased real")
-            .save(path_to_str(&output_dir.join("processed_auto_phase.png"))?)?;
+        nmr_plot_base(
+            "Oracle Varian/Agilent Auto-Phase",
+            axis_label(unphased.x.unit),
+            "normalized intensity",
+            &unphased.x.values,
+            &[&unphased.intensities, &phased.intensities],
+            unphased.x.unit,
+        )
+        .line(&unphased.x.values, &unphased.intensities)
+        .label("unphased real")
+        .line(&phased.x.values, &phased.intensities)
+        .label("auto-phased real")
+        .save(path_to_str(&output_dir.join("processed_auto_phase.png"))?)?;
 
         Ok(())
     }
@@ -1881,12 +1932,19 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             .collect::<Vec<_>>();
         let (range_x, range_y) = range_points(spectrum, &analysis.ranges);
 
-        let mut plot = Plot::new()
+        let mut base = Plot::new()
             .title(title)
             .xlabel(axis_label(spectrum.x.unit))
             .ylabel("intensity")
             .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
+            .legend_position(LegendPosition::Best);
+        if let Some((x_max, x_min)) = nmr_x_limits(&spectrum.x.values, spectrum.x.unit) {
+            base = base.xlim(x_max, x_min);
+        }
+        if let Some((y_min, y_max)) = padded_y_limits(&[&spectrum.intensities]) {
+            base = base.ylim(y_min, y_max);
+        }
+        let mut plot = base
             .line(&spectrum.x.values, &spectrum.intensities)
             .label("spectrum")
             .into_plot();
@@ -1918,16 +1976,114 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
         y: &[f64],
         series_label: &str,
     ) -> Result<()> {
-        Plot::new()
+        let mut plot = Plot::new()
             .title(title)
             .xlabel(x_label)
             .ylabel(y_label)
             .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&x, &y)
+            .legend_position(LegendPosition::Best);
+        let unit = unit_from_label(x_label);
+        if let Some((x_max, x_min)) = nmr_x_limits(x, unit) {
+            plot = plot.xlim(x_max, x_min);
+        }
+        if let Some((y_min, y_max)) = padded_y_limits(&[y]) {
+            plot = plot.ylim(y_min, y_max);
+        }
+        plot.line(&x, &y)
             .label(series_label)
             .save(path_to_str(path)?)?;
         Ok(())
+    }
+
+    /// X-axis limits in NMR convention (high → low) for Ppm/Hz units;
+    /// returns `(x_max, x_min)` so callers can pass them straight to
+    /// `Plot::xlim` to invert the axis. Returns `None` for time-domain
+    /// or point-domain plots where NMR convention does not apply.
+    fn nmr_x_limits(x: &[f64], unit: Unit) -> Option<(f64, f64)> {
+        if !matches!(unit, Unit::Ppm | Unit::Hertz) {
+            return None;
+        }
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for value in x.iter().copied().filter(|value| value.is_finite()) {
+            if value < lo {
+                lo = value;
+            }
+            if value > hi {
+                hi = value;
+            }
+        }
+        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
+            return None;
+        }
+        Some((hi, lo))
+    }
+
+    /// Y-axis limits padded below the minimum and above the maximum so
+    /// small negative baseline excursions remain visible. Accepts any
+    /// number of overlaid traces.
+    fn padded_y_limits(series: &[&[f64]]) -> Option<(f64, f64)> {
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for trace in series {
+            for value in trace.iter().copied().filter(|value| value.is_finite()) {
+                if value < lo {
+                    lo = value;
+                }
+                if value > hi {
+                    hi = value;
+                }
+            }
+        }
+        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
+            return None;
+        }
+        let span = hi - lo;
+        Some((lo - 0.05 * span, hi + 0.10 * span))
+    }
+
+    /// Builds the standard NMR-styled `Plot` used by every panel in
+    /// this example: 1600×1000 resolution, "Best" legend position,
+    /// x-axis flipped high→low for Ppm/Hz units, and y-axis padded so
+    /// negative baseline excursions stay visible.
+    fn nmr_plot_base(
+        title: &str,
+        x_label: &str,
+        y_label: &str,
+        x: &[f64],
+        y_traces: &[&[f64]],
+        unit: Unit,
+    ) -> Plot {
+        let mut plot = Plot::new()
+            .title(title)
+            .xlabel(x_label)
+            .ylabel(y_label)
+            .max_resolution(1600, 1000)
+            .legend_position(LegendPosition::Best);
+        if let Some((x_max, x_min)) = nmr_x_limits(x, unit) {
+            plot = plot.xlim(x_max, x_min);
+        }
+        if let Some((y_min, y_max)) = padded_y_limits(y_traces) {
+            plot = plot.ylim(y_min, y_max);
+        }
+        plot
+    }
+
+    /// Best-effort mapping from a free-form axis label back to its
+    /// [`Unit`]; used by `write_spectrum_plot` to decide whether to
+    /// flip the x-axis. Falls back to [`Unit::Arbitrary`] when the
+    /// label is unrecognised.
+    fn unit_from_label(label: &str) -> Unit {
+        let lower = label.to_ascii_lowercase();
+        if lower.contains("ppm") {
+            Unit::Ppm
+        } else if lower.contains("hz") || lower.contains("hertz") || lower.contains("frequency") {
+            Unit::Hertz
+        } else if lower.contains("time") || lower.contains(" s") {
+            Unit::Seconds
+        } else {
+            Unit::Arbitrary
+        }
     }
 
     fn axis_label(unit: Unit) -> &'static str {

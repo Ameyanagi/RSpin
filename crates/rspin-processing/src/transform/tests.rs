@@ -697,3 +697,57 @@ fn fft_forward_relabels_to_ppm_when_metadata_has_frequency() -> anyhow::Result<(
     assert_close(transformed.x.values[0], expected_first_ppm);
     Ok(())
 }
+
+#[test]
+fn fft_forward_applies_bruker_o1_carrier_offset() -> anyhow::Result<()> {
+    let dwell = 1.0 / 8000.0_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    // O1 = 2000 Hz at SF = 400 MHz → centre at 5 ppm
+    let metadata = Metadata::default()
+        .with_frequency_mhz(400.0)
+        .with_property("bruker.acqus.O1", "2000");
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        metadata,
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Ppm);
+    let centre_index = len / 2;
+    assert_close(transformed.x.values[centre_index], 2000.0 / 400.0);
+    Ok(())
+}
+
+#[test]
+fn fft_forward_applies_jeol_x_offset_carrier() -> anyhow::Result<()> {
+    let dwell = 1.0 / 25000.0_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    let metadata = Metadata::default()
+        .with_frequency_mhz(100.525)
+        .with_property("jeol.parameter.x_offset", "100")
+        .with_property("jeol.parameter.x_freq", "100525303.3");
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        metadata,
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Ppm);
+    let centre_index = len / 2;
+    let centre_ppm = transformed.x.values[centre_index];
+    assert!(
+        (centre_ppm - 100.0).abs() < 0.01,
+        "expected centre ≈ 100 ppm, got {centre_ppm}"
+    );
+    Ok(())
+}

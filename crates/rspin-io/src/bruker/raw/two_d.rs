@@ -161,7 +161,7 @@ fn decode_ser_values(
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "Bruker raw 2D row length is too large".to_owned(),
         })?;
-    if bytes.len() % row_bytes != 0 {
+    if !bytes.len().is_multiple_of(row_bytes) {
         return Err(RSpinError::Parse {
             format: "Bruker",
             message: format!(

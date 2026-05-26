@@ -172,14 +172,15 @@ pub fn auto_phase_correct_regions(
     // Honor the caller's active-region window by masking out everything
     // outside it before regions are clustered. The Regions algorithm has
     // no notion of a "weighted" mask, so we just force those indices off.
-    if let Some((lo_raw, hi_raw)) = options.active_region {
-        if lo_raw.is_finite() && hi_raw.is_finite() {
-            let lo = lo_raw.min(hi_raw);
-            let hi = lo_raw.max(hi_raw);
-            for (index, value) in spectrum.x.values.iter().enumerate() {
-                if !(*value >= lo && *value <= hi) {
-                    peak_map[index] = false;
-                }
+    if let Some((lo_raw, hi_raw)) = options.active_region
+        && lo_raw.is_finite()
+        && hi_raw.is_finite()
+    {
+        let lo = lo_raw.min(hi_raw);
+        let hi = lo_raw.max(hi_raw);
+        for (index, value) in spectrum.x.values.iter().enumerate() {
+            if !(*value >= lo && *value <= hi) {
+                peak_map[index] = false;
             }
         }
     }
@@ -420,11 +421,11 @@ fn build_regions(
     // Merge blocks separated by less than the minimum baseline gap.
     let mut merged: Vec<PeakRegion> = Vec::new();
     for block in blocks {
-        if let Some(last) = merged.last_mut() {
-            if block.start.saturating_sub(last.end) < min_baseline_gap {
-                last.end = block.end;
-                continue;
-            }
+        if let Some(last) = merged.last_mut()
+            && block.start.saturating_sub(last.end) < min_baseline_gap
+        {
+            last.end = block.end;
+            continue;
         }
         merged.push(block);
     }

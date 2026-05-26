@@ -282,11 +282,11 @@ fn agilent_binary_file_bytes(
     if row_count == 0 || ebytes_usize == 0 {
         anyhow::bail!("synthetic Agilent trace layout must be non-empty");
     }
-    if data_bytes.len() % ebytes_usize != 0 {
+    if !data_bytes.len().is_multiple_of(ebytes_usize) {
         anyhow::bail!("synthetic Agilent data length must match element width");
     }
     let value_count = data_bytes.len() / ebytes_usize;
-    if value_count % row_count != 0 {
+    if !value_count.is_multiple_of(row_count) {
         anyhow::bail!("synthetic Agilent value count must divide evenly into traces");
     }
     let np_values = i32::try_from(value_count / row_count)?;

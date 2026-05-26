@@ -477,8 +477,8 @@ fn infer_height(raw: &RawJcamp2D, real_page_count: usize, layout: AxisLayout) ->
             message: "2D JCAMP-DX requires at least one real page".to_owned(),
         });
     }
-    if let Some(declared) = layout.indirect_points(raw) {
-        if declared != height {
+    if let Some(declared) = layout.indirect_points(raw)
+        && declared != height {
             return Err(RSpinError::Parse {
                 format: "JCAMP-DX",
                 message: format!(
@@ -486,7 +486,6 @@ fn infer_height(raw: &RawJcamp2D, real_page_count: usize, layout: AxisLayout) ->
                 ),
             });
         }
-    }
     Ok(height)
 }
 
@@ -593,8 +592,8 @@ fn validate_imaginary_pages(
                 message: "2D JCAMP-DX internal imaginary page index is invalid".to_owned(),
             });
         };
-        if let (Some(real_y), Some(imaginary_y)) = (real_page.y_value, imaginary_page.y_value) {
-            if !close_enough(real_y, imaginary_y) {
+        if let (Some(real_y), Some(imaginary_y)) = (real_page.y_value, imaginary_page.y_value)
+            && !close_enough(real_y, imaginary_y) {
                 return Err(RSpinError::Parse {
                     format: "JCAMP-DX",
                     message: format!(
@@ -603,7 +602,6 @@ fn validate_imaginary_pages(
                     ),
                 });
             }
-        }
     }
     Ok(())
 }

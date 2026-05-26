@@ -403,10 +403,11 @@ fn group_delay_from_metadata(metadata: &Metadata) -> f64 {
         .properties
         .get("jeol.parameter.decimation_reg")
         .and_then(|v| parse_decimation_reg(v));
-    if let (Some(raw), Some(f)) = (decim_raw, factor) {
-        if f.is_finite() && f > 0.0 {
-            return raw / f;
-        }
+    if let (Some(raw), Some(f)) = (decim_raw, factor)
+        && f.is_finite()
+        && f > 0.0
+    {
+        return raw / f;
     }
 
     0.0
@@ -483,10 +484,10 @@ fn bruker_group_delay(metadata: &Metadata) -> f64 {
         .properties
         .get("bruker.acqus.GRPDLY")
         .and_then(|raw| raw.trim().parse::<f64>().ok())
+        && grpdly.is_finite()
+        && grpdly > 0.0
     {
-        if grpdly.is_finite() && grpdly > 0.0 {
-            return grpdly;
-        }
+        return grpdly;
     }
     let dspfvs = metadata
         .properties

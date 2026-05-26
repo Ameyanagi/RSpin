@@ -1164,10 +1164,10 @@ pub fn first_point_scale(spectrum: &Spectrum1D, scale: f64) -> Result<Spectrum1D
     if let Some(first) = processed.intensities.get_mut(0) {
         *first *= scale;
     }
-    if let Some(imag) = processed.imaginary.as_mut() {
-        if let Some(first) = imag.get_mut(0) {
-            *first *= scale;
-        }
+    if let Some(imag) = processed.imaginary.as_mut()
+        && let Some(first) = imag.get_mut(0)
+    {
+        *first *= scale;
     }
     Ok(processed.with_processing_record(
         ProcessingRecord::new("first_point_scale").with_details(format!("scale={scale}")),
@@ -1370,10 +1370,11 @@ pub(crate) fn frequency_axis_from_time(
     let n_f = safe_usize_to_f64(len, "spectrum length")?;
     let half_f = safe_usize_to_f64(half, "spectrum index")?;
     let scale = sweep_width_hz / n_f;
+    let carrier_hz = carrier_offset_hz_from_metadata(metadata).unwrap_or(0.0);
     let mut hz_values = Vec::with_capacity(len);
     for index in 0..len {
         let index_f = safe_usize_to_f64(index, "spectrum index")?;
-        hz_values.push((index_f - half_f) * scale);
+        hz_values.push((index_f - half_f) * scale + carrier_hz);
     }
     match metadata.frequency_mhz {
         Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
@@ -1382,6 +1383,46 @@ pub(crate) fn frequency_axis_from_time(
         }
         _ => Axis::new("frequency", Unit::Hertz, hz_values),
     }
+}
+
+/// Returns the carrier (transmitter) offset in Hz relative to the 0 ppm
+/// reference, read from vendor-namespaced metadata properties. Used to
+/// shift the FFT frequency axis so post-FFT ppm values match the
+/// conventional NMR range (≈ 0–10 for ¹H, 0–200 for ¹³C) rather than
+/// being centred on zero.
+fn carrier_offset_hz_from_metadata(metadata: &rspin_core::Metadata) -> Option<f64> {
+    // Bruker: `O1` (Hz) is the transmitter offset relative to BF1.
+    if let Some(o1) = metadata
+        .property("bruker.acqus.O1")
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite())
+    {
+        return Some(o1);
+    }
+    // JEOL Delta: `x_offset` is in ppm and `x_freq` is in Hz; the
+    // carrier offset in Hz is `x_offset * x_freq / 1e6`.
+    let x_offset_ppm = metadata
+        .property("jeol.parameter.x_offset")
+        .and_then(|value| value.parse::<f64>().ok());
+    let x_freq_hz = metadata
+        .property("jeol.parameter.x_freq")
+        .and_then(|value| value.parse::<f64>().ok());
+    if let (Some(ppm), Some(hz)) = (x_offset_ppm, x_freq_hz)
+        && ppm.is_finite()
+        && hz.is_finite()
+        && hz != 0.0
+    {
+        return Some(ppm * hz / 1.0e6);
+    }
+    // Agilent/Varian: `tof` is the transmitter offset frequency in Hz.
+    if let Some(tof) = metadata
+        .property("agilent.procpar.tof")
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite())
+    {
+        return Some(tof);
+    }
+    None
 }
 
 pub(crate) fn time_axis_from_frequency(

@@ -107,10 +107,10 @@ impl PeakAlignmentOptions {
     }
 
     fn validate(self) -> Result<()> {
-        if let Some(target_x) = self.target_x {
-            if !target_x.is_finite() {
-                return Err(RSpinError::NonFinite { field: "target_x" });
-            }
+        if let Some(target_x) = self.target_x
+            && !target_x.is_finite()
+        {
+            return Err(RSpinError::NonFinite { field: "target_x" });
         }
         if let Some(window) = self.search_window {
             window.bounds()?;

@@ -105,7 +105,7 @@ pub fn read_bruker_fid_1d_bytes(acqus: &str, fid_bytes: &[u8]) -> Result<Spectru
 }
 
 fn build_raw_spectrum(acqus: &BTreeMap<String, String>, values: &[f64]) -> Result<Spectrum1D> {
-    if values.len() % 2 != 0 {
+    if !values.len().is_multiple_of(2) {
         return Err(RSpinError::InvalidSpectrum {
             message: "Bruker raw FID must contain interleaved real/imaginary pairs".to_owned(),
         });

@@ -210,11 +210,10 @@ fn validate_spectrum(spectrum: &Spectrum1D) -> Result<()> {
     {
         return Err(RSpinError::NonFinite { field: "spectrum" });
     }
-    if let Some(imaginary) = &spectrum.imaginary {
-        if !imaginary.iter().all(|value| value.is_finite()) {
+    if let Some(imaginary) = &spectrum.imaginary
+        && !imaginary.iter().all(|value| value.is_finite()) {
             return Err(RSpinError::NonFinite { field: "imaginary" });
         }
-    }
     Ok(())
 }
 
