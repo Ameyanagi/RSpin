@@ -399,6 +399,77 @@ fn matched_filter_em_rejects_frequency_domain_input() -> anyhow::Result<()> {
 }
 
 #[test]
+fn apply_subsample_shift_zero_is_identity() -> anyhow::Result<()> {
+    let axis = Axis::linear("freq", Unit::Hertz, -2.0, 2.0, 5)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        Some(vec![0.5, 1.5, 2.5, 3.5, 4.5]),
+        Metadata::default(),
+    )?;
+    let shifted = apply_subsample_shift(&spectrum, 0.0)?;
+    assert_vec_close(&shifted.intensities, &spectrum.intensities);
+    assert_vec_close(require_imaginary(&shifted)?, require_imaginary(&spectrum)?);
+    assert_eq!(
+        shifted.processing.last().map(|r| r.operation.as_str()),
+        Some("apply_subsample_shift")
+    );
+    Ok(())
+}
+
+#[test]
+fn apply_subsample_shift_round_trip_via_fft() -> anyhow::Result<()> {
+    // Build a small complex FID, FFT, apply +0.4 sub-sample shift,
+    // apply -0.4 sub-sample shift, inverse FFT — should recover the
+    // original FID to floating-point precision.
+    let n: u32 = 16;
+    let dwell = 0.01_f64;
+    let mut times = Vec::with_capacity(usize::try_from(n)?);
+    let mut real = Vec::with_capacity(usize::try_from(n)?);
+    let mut imag = Vec::with_capacity(usize::try_from(n)?);
+    for i in 0..n {
+        let t = f64::from(i) * dwell;
+        times.push(t);
+        real.push((2.0 * PI * 10.0 * t).cos() * (-PI * 2.0 * t).exp());
+        imag.push((2.0 * PI * 10.0 * t).sin() * (-PI * 2.0 * t).exp());
+    }
+    let axis = Axis::new("time", Unit::Seconds, times)?;
+    let fid = Spectrum1D::new_complex(axis, real.clone(), Some(imag.clone()), Metadata::default())?;
+    let forward = fft_1d(&fid, FftDirection::Forward)?;
+    let plus = apply_subsample_shift(&forward, 0.4)?;
+    let restored = apply_subsample_shift(&plus, -0.4)?;
+    let inverse = fft_1d(&restored, FftDirection::Inverse)?;
+    assert_vec_close(&inverse.intensities, &real);
+    assert_vec_close(require_imaginary(&inverse)?, &imag);
+    Ok(())
+}
+
+#[test]
+fn apply_subsample_shift_rejects_invalid_input() -> anyhow::Result<()> {
+    let freq_axis = Axis::linear("freq", Unit::Hertz, -1.0, 1.0, 3)?;
+    let real_only = Spectrum1D::new(freq_axis.clone(), vec![1.0, 2.0, 3.0], Metadata::default())?;
+    assert!(apply_subsample_shift(&real_only, 0.3).is_err());
+
+    let time_axis = Axis::linear("time", Unit::Seconds, 0.0, 0.2, 3)?;
+    let time_domain = Spectrum1D::new_complex(
+        time_axis,
+        vec![1.0, 2.0, 3.0],
+        Some(vec![0.0; 3]),
+        Metadata::default(),
+    )?;
+    assert!(apply_subsample_shift(&time_domain, 0.3).is_err());
+
+    let valid = Spectrum1D::new_complex(
+        freq_axis,
+        vec![1.0, 2.0, 3.0],
+        Some(vec![0.0; 3]),
+        Metadata::default(),
+    )?;
+    assert!(apply_subsample_shift(&valid, f64::NAN).is_err());
+    Ok(())
+}
+
+#[test]
 fn first_point_scale_halves_only_the_first_sample() -> anyhow::Result<()> {
     let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
     let spectrum = Spectrum1D::new_complex(

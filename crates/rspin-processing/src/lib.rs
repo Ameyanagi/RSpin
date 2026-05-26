@@ -66,7 +66,6 @@ pub use recipe_2d::{
 pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
-pub use transform::remove_group_delay;
 pub use transform::{
     ConvolutionDifferenceApodization, ExponentialApodization, Fft1D, FftDirection, FirstPointScale,
     GaussMultiplyBrukerApodization, GaussianApodization, LorentzToGaussApodization, Magnitude,
@@ -76,6 +75,7 @@ pub use transform::{
     magnitude_spectrum, matched_filter_em, phase_correct, sine_bell_apodization, traf_apodization,
     trapezoidal_apodization,
 };
+pub use transform::{SubsampleShift, apply_subsample_shift, remove_group_delay};
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{
     Normalize2DMaxAbs, Normalize2DVolume, Offset2D, ProjectionMode, Scale2D, Shift2DAxes,

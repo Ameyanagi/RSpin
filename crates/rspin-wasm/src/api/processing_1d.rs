@@ -6,8 +6,8 @@ use rspin_core::{Axis, Result};
 use rspin_io::read_processing_recipe_1d_json;
 use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
-    apply_processing_recipe_1d_until, convolution_difference_apodization, crop_1d,
-    exponential_apodization, fft_1d, first_point_scale, gauss_multiply_bruker_apodization,
+    apply_processing_recipe_1d_until, apply_subsample_shift, convolution_difference_apodization,
+    crop_1d, exponential_apodization, fft_1d, first_point_scale, gauss_multiply_bruker_apodization,
     gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
     offset_intensity, phase_correct, resample_1d, shift_axis, sine_bell_apodization,
     subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
@@ -273,6 +273,21 @@ pub fn trapezoidal_apodization_spectrum_1d_json(
         options.rise_end_fraction,
         options.fall_start_fraction,
     )?;
+    spectrum1d_to_json(&processed)
+}
+
+/// Applies a fractional-sample circular shift to a serialized
+/// `Spectrum1D` frequency-domain JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn apply_subsample_shift_spectrum_1d_json(
+    spectrum_json: &str,
+    frac_samples: f64,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let processed = apply_subsample_shift(&spectrum, frac_samples)?;
     spectrum1d_to_json(&processed)
 }
 

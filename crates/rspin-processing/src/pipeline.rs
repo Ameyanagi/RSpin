@@ -7,7 +7,8 @@ use crate::{
     ExponentialApodization, Fft1D, FftDirection, FirstPointScale, GaussMultiplyBrukerApodization,
     GaussianApodization, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
     OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
-    SineBellApodization, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
+    SineBellApodization, SubsampleShift, SubtractBaseline, TrafApodization, TrapezoidalApodization,
+    ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -218,6 +219,13 @@ impl Spectrum1DPipeline {
     #[must_use]
     pub fn first_point_half(self) -> Self {
         self.then(FirstPointScale::half())
+    }
+
+    /// Applies a fractional-sample circular shift via the Fourier-shift
+    /// theorem (call after `fft(...)`).
+    #[must_use]
+    pub fn subsample_shift(self, frac_samples: f64) -> Self {
+        self.then(SubsampleShift::new(frac_samples))
     }
 
     /// Applies sine-bell apodization to real and imaginary channels.

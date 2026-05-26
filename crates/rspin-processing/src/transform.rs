@@ -1047,6 +1047,105 @@ pub fn trapezoidal_apodization(
     ))
 }
 
+/// Applies a fractional-sample circular shift to a frequency-domain
+/// spectrum via the Fourier-shift theorem.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SubsampleShift {
+    /// Fractional sample shift to apply (positive shifts toward `t = 0`).
+    pub frac_samples: f64,
+}
+
+impl SubsampleShift {
+    /// Creates a sub-sample shift step.
+    #[must_use]
+    pub fn new(frac_samples: f64) -> Self {
+        Self { frac_samples }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for SubsampleShift {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        apply_subsample_shift(spectrum, self.frac_samples)
+    }
+}
+
+/// Applies a fractional-sample circular shift via the Fourier-shift theorem.
+///
+/// A time-domain circular shift by `frac_samples` is equivalent to
+/// multiplying the corresponding frequency-domain spectrum by the
+/// linear phase ramp
+/// `exp(+2π · i · k · frac_samples / N)`, where `k` is the centred
+/// frequency-bin index (`k = index − N/2` so that `k = 0` lies at DC)
+/// and `N` is the spectrum length. Positive `frac_samples` shifts the
+/// time-domain FID toward `t = 0` (matches the sign convention used by
+/// [`remove_group_delay`]).
+///
+/// Use this to complete a Bruker / JEOL digital-filter group-delay
+/// removal: apply the integer part of `GRPDLY` (or
+/// `decimation_reg / filter_factor`) in the time domain via
+/// [`remove_group_delay`], FFT the FID, then apply the fractional
+/// residual here. Without this step the residual leaves a first-order
+/// phase ramp `2π · frac · sweep_width` across the spectrum that auto-
+/// phase has to over-correct, producing the multi-turn `ph1 ≈ ±1800°`
+/// signature familiar from un-corrected JEOL fixtures.
+///
+/// # Errors
+///
+/// Returns an error when `frac_samples` is non-finite, the input
+/// spectrum is not frequency-domain (`Unit::Hertz` or `Unit::Ppm`),
+/// the spectrum lacks an imaginary channel, or the point count is too
+/// large for safe numeric conversion.
+pub fn apply_subsample_shift(spectrum: &Spectrum1D, frac_samples: f64) -> Result<Spectrum1D> {
+    ensure_finite("frac_samples", frac_samples)?;
+    if !matches!(spectrum.x.unit, Unit::Hertz | Unit::Ppm) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "apply_subsample_shift requires a frequency-domain spectrum (Hertz or Ppm)"
+                .to_owned(),
+        });
+    }
+    let len = spectrum.len();
+    if len == 0 {
+        return Ok(spectrum.clone());
+    }
+    let imaginary = match spectrum.imaginary.as_ref() {
+        Some(imag) if imag.len() == len => imag.clone(),
+        _ => {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "apply_subsample_shift requires a complex (real + imaginary) spectrum"
+                    .to_owned(),
+            });
+        }
+    };
+
+    let n_f = safe_usize_to_f64(len, "spectrum length")?;
+    let half_f = safe_usize_to_f64(len / 2, "spectrum index")?;
+    let scale = 2.0 * PI * frac_samples / n_f;
+
+    let mut processed = spectrum.clone();
+    let imaginary_mut = processed
+        .imaginary
+        .as_mut()
+        .ok_or(RSpinError::InvalidSpectrum {
+            message: "apply_subsample_shift lost imaginary channel after clone".to_owned(),
+        })?;
+    for index in 0..len {
+        let index_f = safe_usize_to_f64(index, "spectrum index")?;
+        let k = index_f - half_f;
+        let phase = scale * k;
+        let cos_p = phase.cos();
+        let sin_p = phase.sin();
+        let re = processed.intensities[index];
+        let im = imaginary[index];
+        processed.intensities[index] = re * cos_p - im * sin_p;
+        imaginary_mut[index] = re * sin_p + im * cos_p;
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("apply_subsample_shift")
+            .with_details(format!("frac_samples={frac_samples}")),
+    ))
+}
+
 /// Scales the first sample of a time-domain FID by a constant.
 ///
 /// See [`FirstPointScale`] for the recipe and motivation.
