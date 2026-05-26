@@ -542,6 +542,12 @@ mod ruviz_example {
             let group_delay = jeol_group_delay(&fid);
             let opts = AutoProcessingOptions {
                 group_delay_samples: Some(group_delay),
+                // Baseline subtraction on 131k points with the
+                // Whittaker AsLS sparse solver takes minutes for the
+                // demo; skip it for the panel and rely on the auto-
+                // phased real spectrum being baseline-flat enough at
+                // the resolution the PNG is rendered.
+                subtract_baseline: false,
                 ..AutoProcessingOptions::default()
             };
             let processed = process_spectrum_auto(&fid, &opts)?;
