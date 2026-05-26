@@ -81,6 +81,28 @@ pub struct AutoPhaseOptions {
     pub regularization_weight: f64,
 }
 
+impl AutoPhaseStrategy {
+    /// Stable lower-case token used in serde and processing-record details.
+    #[must_use]
+    pub fn as_token(self) -> &'static str {
+        match self {
+            Self::Regions => "regions",
+            Self::GlobalCost => "global_cost",
+        }
+    }
+}
+
+impl AutoPhaseCost {
+    /// Stable lower-case token used in serde and processing-record details.
+    #[must_use]
+    pub fn as_token(self) -> &'static str {
+        match self {
+            Self::AcmeEntropy => "acme_entropy",
+            Self::LegacyImagNegArea => "legacy_imag_neg_area",
+        }
+    }
+}
+
 impl Default for AutoPhaseOptions {
     fn default() -> Self {
         Self {

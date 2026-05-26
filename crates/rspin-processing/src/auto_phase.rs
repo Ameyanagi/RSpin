@@ -4,6 +4,7 @@ use rustfft::num_complex::Complex;
 
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
 
+use crate::transform::complex_buffer;
 use crate::{ProcessingStep, phase_correct};
 
 const MAX_GRID_POINTS: usize = 10_000;
@@ -64,23 +65,35 @@ impl ProcessingStep<Spectrum1D> for AutoPhaseCorrection {
 ///
 /// Returns an error when options are invalid or the spectrum is too large for
 /// safe phase-grid calculations.
-#[allow(clippy::too_many_lines)]
 pub fn auto_phase_correct(
     spectrum: &Spectrum1D,
     options: AutoPhaseOptions,
 ) -> Result<AutoPhaseResult> {
-    if options.strategy == AutoPhaseStrategy::Regions {
-        let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
-        let regions_options = RegionsOptions::default().with_pivot_fraction(pivot_fraction);
-        let result = regions::auto_phase_correct_regions(spectrum, regions_options)?;
-        return Ok(AutoPhaseResult {
-            spectrum: result.spectrum,
-            zero_order_deg: result.zero_order_deg,
-            first_order_deg: result.first_order_deg,
-            score: 1.0 - result.regression_r_squared,
-        });
+    match options.strategy {
+        AutoPhaseStrategy::Regions => auto_phase_correct_regions_dispatch(spectrum, options),
+        AutoPhaseStrategy::GlobalCost => auto_phase_correct_global(spectrum, options),
     }
+}
 
+fn auto_phase_correct_regions_dispatch(
+    spectrum: &Spectrum1D,
+    options: AutoPhaseOptions,
+) -> Result<AutoPhaseResult> {
+    let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
+    let regions_options = RegionsOptions::default().with_pivot_fraction(pivot_fraction);
+    let result = regions::auto_phase_correct_regions(spectrum, regions_options)?;
+    Ok(AutoPhaseResult {
+        spectrum: result.spectrum,
+        zero_order_deg: result.zero_order_deg,
+        first_order_deg: result.first_order_deg,
+        score: 1.0 - result.regression_r_squared,
+    })
+}
+
+fn auto_phase_correct_global(
+    spectrum: &Spectrum1D,
+    options: AutoPhaseOptions,
+) -> Result<AutoPhaseResult> {
     options.validate()?;
     let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
     let active_mask = resolve_active_mask(spectrum, options);
@@ -169,11 +182,11 @@ pub fn auto_phase_correct(
     spectrum.processing.pop();
     spectrum = spectrum.with_processing_record(
         ProcessingRecord::new("auto_phase_correct").with_details(format!(
-            "zero_order_deg={},first_order_deg={},pivot_fraction={},cost={:?},refine={},score={}",
+            "zero_order_deg={},first_order_deg={},pivot_fraction={},cost={},refine={},score={}",
             best.zero_order_deg,
             best.first_order_deg,
             options.pivot_fraction,
-            options.cost,
+            options.cost.as_token(),
             options.refine,
             best.score
         )),
@@ -425,25 +438,37 @@ fn acme_cost(
         );
     }
 
-    let mut real_parts = Vec::with_capacity(buffer.len());
-    for (value, fraction) in buffer.iter().zip(fractions) {
+    // Streaming pass: rotate each sample, compute |Δreal| against the
+    // previous rotated value, and accumulate the sums needed for entropy
+    // and negativity in one go. Only the |Δ| values are buffered because
+    // entropy normalisation requires their total before the ratio step.
+    let mut abs_deriv = Vec::with_capacity(buffer.len().saturating_sub(1));
+    let mut deriv_sum = 0.0_f64;
+    let mut sum_sq = 0.0_f64;
+    let mut neg_sq = 0.0_f64;
+    let mut prev_real: Option<f64> = None;
+    for (index, (value, fraction)) in buffer.iter().zip(fractions).enumerate() {
         let phase_rad =
             (zero_order_deg + first_order_deg * (*fraction - options.pivot_fraction)).to_radians();
         let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
-        real_parts.push((*value * rotation).re);
-    }
-
-    let mut deriv_sum = 0.0_f64;
-    let mut abs_deriv = Vec::with_capacity(real_parts.len().saturating_sub(1));
-    for (offset, window) in real_parts.windows(2).enumerate() {
-        let both_active = is_active(mask, offset) && is_active(mask, offset + 1);
-        let d = if both_active {
-            (window[1] - window[0]).abs()
-        } else {
-            0.0
-        };
-        deriv_sum += d;
-        abs_deriv.push(d);
+        let real = (*value * rotation).re;
+        if is_active(mask, index) {
+            sum_sq += real * real;
+            if real < 0.0 {
+                neg_sq += real * real;
+            }
+        }
+        if let Some(prev) = prev_real {
+            let both_active = is_active(mask, index - 1) && is_active(mask, index);
+            let d = if both_active {
+                (real - prev).abs()
+            } else {
+                0.0
+            };
+            deriv_sum += d;
+            abs_deriv.push(d);
+        }
+        prev_real = Some(real);
     }
     if deriv_sum <= f64::EPSILON {
         return legacy_cost(
@@ -467,17 +492,6 @@ fn acme_cost(
         }
     }
 
-    let mut sum_sq = 0.0_f64;
-    let mut neg_sq = 0.0_f64;
-    for (index, value) in real_parts.iter().enumerate() {
-        if !is_active(mask, index) {
-            continue;
-        }
-        sum_sq += value * value;
-        if *value < 0.0 {
-            neg_sq += value * value;
-        }
-    }
     let normalized_negativity = if sum_sq > f64::EPSILON {
         neg_sq / sum_sq
     } else {
@@ -536,59 +550,30 @@ pub fn peak_based_phase_estimate(
         })
         .collect::<Result<Vec<_>>>()?;
     samples.sort_by(|a, b| a.0.total_cmp(&b.0));
-
-    let mut unwrapped = samples;
-    for i in 1..unwrapped.len() {
-        let prev = unwrapped[i - 1].1;
-        let mut current = unwrapped[i].1;
-        while current - prev > 180.0 {
-            current -= 360.0;
-        }
-        while current - prev < -180.0 {
-            current += 360.0;
-        }
-        unwrapped[i].1 = current;
-    }
+    unwrap_phases_deg(&mut samples, |item| &mut item.1);
 
     let first = spectrum.x.values[0];
     let last = spectrum.x.values[spectrum.x.values.len() - 1];
     let span = last - first;
     if span.abs() <= f64::EPSILON {
-        return Ok((unwrapped[0].1, 0.0));
+        return Ok((samples[0].1, 0.0));
     }
     let pivot = match pivot_value {
         Some(value) => value,
         None => f64::midpoint(first, last),
     };
 
-    let count = unwrapped.len();
-    let count_u32 = u32::try_from(count).map_err(|_| RSpinError::InvalidSpectrum {
-        message: "too many peaks for phase estimate".to_owned(),
-    })?;
-    let n = f64::from(count_u32);
-
-    if count == 1 {
-        return Ok((unwrapped[0].1, 0.0));
+    if samples.len() == 1 {
+        return Ok((samples[0].1, 0.0));
     }
 
-    let mut sum_dx = 0.0_f64;
-    let mut sum_dx2 = 0.0_f64;
-    let mut sum_phi = 0.0_f64;
-    let mut sum_dx_phi = 0.0_f64;
-    for (x, phi) in &unwrapped {
-        let dx = (*x - pivot) / span;
-        sum_dx += dx;
-        sum_dx2 += dx * dx;
-        sum_phi += *phi;
-        sum_dx_phi += dx * *phi;
-    }
-    let denom = n * sum_dx2 - sum_dx * sum_dx;
-    if denom.abs() <= f64::EPSILON {
-        return Ok((sum_phi / n, 0.0));
-    }
-    let ph1 = (n * sum_dx_phi - sum_dx * sum_phi) / denom;
-    let ph0 = (sum_phi - ph1 * sum_dx) / n;
-    Ok((ph0, ph1))
+    let points: Vec<(f64, f64, f64)> = samples
+        .iter()
+        .map(|(x, phi)| ((*x - pivot) / span, *phi, 1.0))
+        .collect();
+    let active = vec![true; points.len()];
+    let (intercept, slope, _r) = weighted_linear_fit(&points, &active);
+    Ok((intercept, slope))
 }
 
 /// Auto-phases using caller-supplied peak centers as a warm-start.
@@ -684,6 +669,77 @@ pub fn auto_phase_correct_with_peaks(
         first_order_deg: best.first_order_deg,
         score: best.score,
     })
+}
+
+/// Unwraps a sequence of phase samples in degrees by adding/subtracting
+/// 360° so that consecutive values stay within ±180° of each other.
+/// `phase` extracts the mutable phase field from each item.
+pub(crate) fn unwrap_phases_deg<T, F>(items: &mut [T], mut phase: F)
+where
+    F: FnMut(&mut T) -> &mut f64,
+{
+    for i in 1..items.len() {
+        let prev = *phase(&mut items[i - 1]);
+        let current = phase(&mut items[i]);
+        while *current - prev > 180.0 {
+            *current -= 360.0;
+        }
+        while *current - prev < -180.0 {
+            *current += 360.0;
+        }
+    }
+}
+
+/// Weighted linear least-squares fit `y = intercept + slope * x`.
+///
+/// Items with `active[i] == false` are excluded. Returns
+/// `(intercept, slope, r_squared)`. Caller passes all-true `active` and
+/// all-1.0 weights for an ordinary least-squares fit.
+#[allow(clippy::similar_names)]
+pub(crate) fn weighted_linear_fit(points: &[(f64, f64, f64)], active: &[bool]) -> (f64, f64, f64) {
+    let mut sum_w = 0.0_f64;
+    let mut sum_wx = 0.0_f64;
+    let mut sum_wy = 0.0_f64;
+    let mut sum_wxx = 0.0_f64;
+    let mut sum_wxy = 0.0_f64;
+    let mut sum_wyy = 0.0_f64;
+    for (index, point) in points.iter().enumerate() {
+        if !active[index] {
+            continue;
+        }
+        let (x, y, w) = (point.0, point.1, point.2);
+        sum_w += w;
+        sum_wx += w * x;
+        sum_wy += w * y;
+        sum_wxx += w * x * x;
+        sum_wxy += w * x * y;
+        sum_wyy += w * y * y;
+    }
+    if sum_w <= 0.0 {
+        return (0.0, 0.0, 0.0);
+    }
+    let denom = sum_w * sum_wxx - sum_wx * sum_wx;
+    if denom.abs() <= f64::EPSILON {
+        return (sum_wy / sum_w, 0.0, 0.0);
+    }
+    let slope = (sum_w * sum_wxy - sum_wx * sum_wy) / denom;
+    let intercept = (sum_wy - slope * sum_wx) / sum_w;
+    let mean_y = sum_wy / sum_w;
+    let mut ss_tot = sum_wyy - sum_w * mean_y * mean_y;
+    let mut ss_res = 0.0_f64;
+    for (index, point) in points.iter().enumerate() {
+        if !active[index] {
+            continue;
+        }
+        let predicted = intercept + slope * point.0;
+        let residual = point.1 - predicted;
+        ss_res += point.2 * residual * residual;
+    }
+    if ss_tot <= 0.0 {
+        ss_tot = f64::EPSILON;
+    }
+    let r_sq = (1.0 - ss_res / ss_tot).clamp(0.0, 1.0);
+    (intercept, slope, r_sq)
 }
 
 fn nearest_index(values: &[f64], target: f64) -> usize {
@@ -798,22 +854,6 @@ fn resolve_active_mask(spectrum: &Spectrum1D, options: AutoPhaseOptions) -> Opti
             .map(|value| *value >= lo && *value <= hi)
             .collect(),
     )
-}
-
-pub(crate) fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
-    match &spectrum.imaginary {
-        Some(imaginary) => spectrum
-            .intensities
-            .iter()
-            .zip(imaginary)
-            .map(|(real, imag)| Complex::new(*real, *imag))
-            .collect(),
-        None => spectrum
-            .intensities
-            .iter()
-            .map(|real| Complex::new(*real, 0.0))
-            .collect(),
-    }
 }
 
 fn index_fractions(len: usize) -> Result<Vec<f64>> {

@@ -455,17 +455,12 @@ pub fn remove_group_delay(spectrum: &Spectrum1D, samples: f64) -> Result<Spectru
     if len == 0 {
         return Ok(processed);
     }
-    let mut integer_shift = 0_usize;
     let truncated = samples.trunc();
-    if truncated > 0.0 {
-        let mut counter = 0.0_f64;
-        for _ in 0..len {
-            if counter >= truncated {
-                break;
-            }
-            counter += 1.0;
-            integer_shift += 1;
-        }
+    let mut integer_shift = 0_usize;
+    let mut accumulated = 0.0_f64;
+    while integer_shift < len && accumulated < truncated {
+        accumulated += 1.0;
+        integer_shift += 1;
     }
     if integer_shift > 0 {
         processed.intensities.rotate_left(integer_shift);
@@ -536,11 +531,12 @@ pub(crate) fn frequency_axis_from_time(
     let sweep_width_hz = 1.0 / dwell;
     let half = len / 2;
     let n_f = safe_usize_to_f64(len, "spectrum length")?;
+    let half_f = safe_usize_to_f64(half, "spectrum index")?;
+    let scale = sweep_width_hz / n_f;
     let mut hz_values = Vec::with_capacity(len);
     for index in 0..len {
         let index_f = safe_usize_to_f64(index, "spectrum index")?;
-        let half_f = safe_usize_to_f64(half, "spectrum index")?;
-        hz_values.push((index_f - half_f) * sweep_width_hz / n_f);
+        hz_values.push((index_f - half_f) * scale);
     }
     match metadata.frequency_mhz {
         Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
@@ -646,7 +642,7 @@ pub fn phase_correct(
     ))
 }
 
-fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
+pub(crate) fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
     match &spectrum.imaginary {
         Some(imaginary) => spectrum
             .intensities

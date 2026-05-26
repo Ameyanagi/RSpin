@@ -47,8 +47,9 @@ use rustfft::num_complex::Complex;
 
 use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum1D};
 
-use super::{PhaseCandidate, complex_buffer};
+use super::{unwrap_phases_deg, weighted_linear_fit};
 use crate::phase_correct;
+use crate::transform::complex_buffer;
 
 /// Result returned by [`auto_phase_correct_regions`].
 #[derive(Clone, Debug, PartialEq)]
@@ -59,8 +60,6 @@ pub struct RegionsResult {
     pub zero_order_deg: f64,
     /// Fitted global first-order phase in degrees across the full spectrum.
     pub first_order_deg: f64,
-    /// Pivot fraction used by [`phase_correct`].
-    pub pivot_fraction: f64,
     /// Number of peak regions retained in the final fit.
     pub region_count: usize,
     /// `R²` of the final weighted linear regression (0 when only one region
@@ -191,7 +190,7 @@ pub fn auto_phase_correct_regions(
     // ── Stage 5b: canonicalize ph0 and pick the ph1 wrap whose phased real
     //              part best matches the (phase-independent) magnitude. ──
     let (zero_order_deg, first_order_deg) = resolve_wrap_ambiguity(
-        spectrum,
+        &buffer,
         &magnitude,
         canonicalize_phase(global.zero_order_deg),
         global.first_order_deg,
@@ -216,7 +215,6 @@ pub fn auto_phase_correct_regions(
         spectrum,
         zero_order_deg,
         first_order_deg,
-        pivot_fraction: options.pivot_fraction,
         region_count: global.region_count,
         regression_r_squared: global.regression_r_squared,
     })
@@ -243,39 +241,34 @@ fn holoborodko_derivative(values: &[f64]) -> Vec<f64> {
 }
 
 /// Iterative three-sigma threshold (paper, eq. 5 commentary).
+///
+/// Maintains a running sum / sum-of-squares so each rejection cycle is one
+/// pass instead of three.
 fn iterative_three_sigma(values: &[f64]) -> f64 {
     if values.is_empty() {
         return 0.0;
     }
     let mut keep: Vec<bool> = vec![true; values.len()];
+    let mut sum: f64 = values.iter().sum();
+    let mut sum_sq: f64 = values.iter().map(|v| v * v).sum();
+    let mut count = values.len() as u64;
     let mut prev_threshold = f64::INFINITY;
     for _ in 0..20 {
-        let mut sum = 0.0_f64;
-        let mut count = 0_u64;
-        for (index, value) in values.iter().enumerate() {
-            if keep[index] {
-                sum += value;
-                count += 1;
-            }
-        }
         if count == 0 {
             break;
         }
-        let count_f = u32_from_u64(count);
-        let mean = sum / f64::from(count_f);
-        let mut variance = 0.0_f64;
-        for (index, value) in values.iter().enumerate() {
-            if keep[index] {
-                let delta = value - mean;
-                variance += delta * delta;
-            }
-        }
-        let std_dev = (variance / f64::from(count_f)).sqrt();
+        let count_f = f64::from(u32_from_u64(count));
+        let mean = sum / count_f;
+        let variance = (sum_sq / count_f - mean * mean).max(0.0);
+        let std_dev = variance.sqrt();
         let threshold = mean.abs() + 3.0 * std_dev;
         let mut changed = false;
         for (index, value) in values.iter().enumerate() {
             if keep[index] && value.abs() > threshold {
                 keep[index] = false;
+                sum -= *value;
+                sum_sq -= value * value;
+                count -= 1;
                 changed = true;
             }
         }
@@ -439,8 +432,8 @@ fn phase_region(buffer: &[Complex<f64>], region: &PeakRegion) -> Option<RegionPh
     let mut center_deg = 0.0_f64;
     let mut half_width_deg = 180.0_f64;
     let mut best_phase = 0.0_f64;
-    for cycle in 0..3 {
-        let step_count: usize = if cycle == 0 { 20 } else { 20 };
+    for _cycle in 0..3 {
+        let step_count: usize = 20;
         let lo = center_deg - half_width_deg;
         let hi = center_deg + half_width_deg;
         let step = (hi - lo) / safe_count_f64(step_count);
@@ -485,21 +478,21 @@ fn phase_region(buffer: &[Complex<f64>], region: &PeakRegion) -> Option<RegionPh
 /// part falls under the line) and squared deviations to penalise large
 /// dips.
 fn area_below_baseline(segment: &[Complex<f64>], phase_deg: f64) -> f64 {
-    let phase_rad = phase_deg.to_radians();
-    let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
-    let rotated: Vec<f64> = segment.iter().map(|v| (*v * rotation).re).collect();
-    if rotated.len() < 2 {
+    let n = segment.len();
+    if n < 2 {
         return f64::INFINITY;
     }
-    let n = rotated.len();
-    let first = rotated[0];
-    let last = rotated[n - 1];
+    let phase_rad = phase_deg.to_radians();
+    let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+    let first = (segment[0] * rotation).re;
+    let last = (segment[n - 1] * rotation).re;
     let denom = safe_count_f64(n - 1);
     let mut total = 0.0_f64;
-    for (index, value) in rotated.iter().enumerate() {
+    for (index, value) in segment.iter().enumerate() {
+        let real = (*value * rotation).re;
         let t = safe_count_f64(index) / denom;
         let baseline = first * (1.0 - t) + last * t;
-        let diff = baseline - value;
+        let diff = baseline - real;
         if diff > 0.0 {
             total += diff * diff;
         }
@@ -545,7 +538,7 @@ fn global_phase_from_regions(
         })
         .collect();
     points.sort_by(|a, b| a.0.total_cmp(&b.0));
-    unwrap_phases_in_place(&mut points);
+    unwrap_phases_deg(&mut points, |p| &mut p.1);
 
     let mut active: Vec<bool> = vec![true; points.len()];
     let outlier_threshold = options.outlier_threshold_deg;
@@ -623,66 +616,6 @@ fn global_phase_from_regions(
     }
 }
 
-fn unwrap_phases_in_place(points: &mut [(f64, f64, f64)]) {
-    for index in 1..points.len() {
-        let prev = points[index - 1].1;
-        while points[index].1 - prev > 180.0 {
-            points[index].1 -= 360.0;
-        }
-        while points[index].1 - prev < -180.0 {
-            points[index].1 += 360.0;
-        }
-    }
-}
-
-fn weighted_linear_fit(points: &[(f64, f64, f64)], active: &[bool]) -> (f64, f64, f64) {
-    let mut sum_w = 0.0_f64;
-    let mut sum_wx = 0.0_f64;
-    let mut sum_wy = 0.0_f64;
-    let mut sum_wxx = 0.0_f64;
-    let mut sum_wxy = 0.0_f64;
-    let mut sum_wyy = 0.0_f64;
-    for (index, point) in points.iter().enumerate() {
-        if !active[index] {
-            continue;
-        }
-        let (x, y, w) = (point.0, point.1, point.2);
-        sum_w += w;
-        sum_wx += w * x;
-        sum_wy += w * y;
-        sum_wxx += w * x * x;
-        sum_wxy += w * x * y;
-        sum_wyy += w * y * y;
-    }
-    if sum_w <= 0.0 {
-        return (0.0, 0.0, 0.0);
-    }
-    let denom = sum_w * sum_wxx - sum_wx * sum_wx;
-    if denom.abs() <= f64::EPSILON {
-        let mean = sum_wy / sum_w;
-        return (mean, 0.0, 0.0);
-    }
-    let slope = (sum_w * sum_wxy - sum_wx * sum_wy) / denom;
-    let intercept = (sum_wy - slope * sum_wx) / sum_w;
-    // R²: total variance vs residual variance.
-    let mean_y = sum_wy / sum_w;
-    let mut ss_tot = sum_wyy - sum_w * mean_y * mean_y;
-    let mut ss_res = 0.0_f64;
-    for (index, point) in points.iter().enumerate() {
-        if !active[index] {
-            continue;
-        }
-        let predicted = intercept + slope * point.0;
-        let residual = point.1 - predicted;
-        ss_res += point.2 * residual * residual;
-    }
-    if ss_tot <= 0.0 {
-        ss_tot = f64::EPSILON;
-    }
-    let r_sq = (1.0 - ss_res / ss_tot).clamp(0.0, 1.0);
-    (intercept, slope, r_sq)
-}
-
 /// Maps an angle in degrees to the canonical `(-180, 180]` window.
 fn canonicalize_phase(angle_deg: f64) -> f64 {
     let mut value = angle_deg % 360.0;
@@ -711,7 +644,7 @@ fn canonicalize_phase(angle_deg: f64) -> f64 {
 /// fits the (phase-independent) magnitude envelope best on its peaks is
 /// the most physically meaningful answer.
 fn resolve_wrap_ambiguity(
-    original: &Spectrum1D,
+    buffer: &[Complex<f64>],
     magnitude: &[f64],
     ph0_canonical: f64,
     ph1_fit: f64,
@@ -728,7 +661,6 @@ fn resolve_wrap_ambiguity(
         return (ph0_canonical, ph1_fit);
     }
     let threshold = 0.30 * max_mag;
-    let buffer = complex_buffer(original);
     let fractions = index_fractions(buffer.len());
 
     // Build wrap candidates around the original fit, plus the canonical
@@ -744,7 +676,7 @@ fn resolve_wrap_ambiguity(
     let mut best = (ph0_canonical, ph1_fit, f64::INFINITY);
     for candidate in candidates {
         let loss = magnitude_target_loss(
-            &buffer,
+            buffer,
             &fractions,
             magnitude,
             threshold,
@@ -823,11 +755,6 @@ fn u32_from_u64(value: u64) -> u32 {
         u32::try_from(value).ok().map_or(u32::MAX, |v| v)
     }
 }
-
-// Silence unused-import warnings while keeping the type in scope for
-// future code paths.
-#[allow(dead_code)]
-fn _phase_candidate_marker(_: PhaseCandidate) {}
 
 #[cfg(test)]
 mod tests {
