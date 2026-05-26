@@ -226,6 +226,55 @@ impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
     }
 }
 
+/// Applies convolution-difference apodization
+/// (Campbell, Dobson, Williams, Xavier 1973).
+///
+/// `w[i] = exp(-π · LB1 · i · dt) - k · exp(-π · LB2 · i · dt)`. Choosing
+/// a narrow `LB1` and a broader `LB2` subtracts the broad component
+/// from the spectrum and is useful for paramagnetic, solid-state, or
+/// broad-line cleanup.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConvolutionDifferenceApodization {
+    /// Narrow line broadening in hertz (≥ 0).
+    pub narrow_line_broadening_hz: f64,
+    /// Broad line broadening in hertz (≥ 0).
+    pub broad_line_broadening_hz: f64,
+    /// Mixing coefficient `k` for the broad component, in `[0, 1]`.
+    pub mixing: f64,
+    /// Dwell time in seconds (> 0).
+    pub dwell_time_s: f64,
+}
+
+impl ConvolutionDifferenceApodization {
+    /// Creates a convolution-difference apodization step.
+    #[must_use]
+    pub fn new(
+        narrow_line_broadening_hz: f64,
+        broad_line_broadening_hz: f64,
+        mixing: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            narrow_line_broadening_hz,
+            broad_line_broadening_hz,
+            mixing,
+            dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for ConvolutionDifferenceApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        convolution_difference_apodization(
+            spectrum,
+            self.narrow_line_broadening_hz,
+            self.broad_line_broadening_hz,
+            self.mixing,
+            self.dwell_time_s,
+        )
+    }
+}
+
 /// Applies trapezoidal apodization.
 ///
 /// The window ramps linearly from 0 up to 1 across the leading
@@ -566,6 +615,48 @@ pub fn lorentz_to_gauss_apodization(
     Ok(processed.with_processing_record(
         ProcessingRecord::new("lorentz_to_gauss_apodization").with_details(format!(
             "lorentz_to_undo_hz={lorentz_to_undo_hz},gauss_fwhm_hz={gauss_fwhm_hz},gauss_shift={gauss_shift},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies convolution-difference apodization to real and imaginary channels.
+///
+/// See [`ConvolutionDifferenceApodization`] for the math.
+///
+/// # Errors
+///
+/// Returns an error when either line broadening is negative, the mixing
+/// is outside `[0, 1]`, the dwell time is not positive, any parameter
+/// is non-finite, or the point count is too large for checked numeric
+/// conversion.
+pub fn convolution_difference_apodization(
+    spectrum: &Spectrum1D,
+    narrow_line_broadening_hz: f64,
+    broad_line_broadening_hz: f64,
+    mixing: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = convolution_difference_weights(
+        spectrum.len(),
+        narrow_line_broadening_hz,
+        broad_line_broadening_hz,
+        mixing,
+        dwell_time_s,
+        "convolution-difference apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("convolution_difference_apodization").with_details(format!(
+            "narrow_line_broadening_hz={narrow_line_broadening_hz},broad_line_broadening_hz={broad_line_broadening_hz},mixing={mixing},dwell_time_s={dwell_time_s}"
         )),
     ))
 }
@@ -999,6 +1090,41 @@ fn index_denominator(len: usize) -> Result<f64> {
         message: "spectrum is too large for phase correction".to_owned(),
     })?;
     Ok(f64::from(denominator))
+}
+
+fn convolution_difference_weights(
+    len: usize,
+    narrow_line_broadening_hz: f64,
+    broad_line_broadening_hz: f64,
+    mixing: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("narrow_line_broadening_hz", narrow_line_broadening_hz)?;
+    ensure_non_negative("broad_line_broadening_hz", broad_line_broadening_hz)?;
+    ensure_finite("mixing", mixing)?;
+    if !(0.0..=1.0).contains(&mixing) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "mixing must be between 0 and 1".to_owned(),
+        });
+    }
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let narrow_scale = -PI * narrow_line_broadening_hz * dwell_time_s;
+    let broad_scale = -PI * broad_line_broadening_hz * dwell_time_s;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let narrow = (narrow_scale * index_f).exp();
+            let broad = (broad_scale * index_f).exp();
+            Ok(narrow - mixing * broad)
+        })
+        .collect()
 }
 
 fn gauss_multiply_bruker_weights(

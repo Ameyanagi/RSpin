@@ -291,6 +291,50 @@ fn bruker_gmb_rejects_invalid_parameters() -> anyhow::Result<()> {
 }
 
 #[test]
+fn convolution_difference_identity_when_mixing_is_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = convolution_difference_apodization(&spectrum, 0.0, 5.0, 0.0, 0.1)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(
+        processed.processing[0].operation,
+        "convolution_difference_apodization"
+    );
+    Ok(())
+}
+
+#[test]
+fn convolution_difference_matches_analytic_formula() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0, 1.0, 1.0, 1.0], Metadata::default())?;
+    let lb_n = 1.0_f64;
+    let lb_b = 5.0_f64;
+    let dwell = 0.1_f64;
+    let mix = 0.4_f64;
+    let processed = convolution_difference_apodization(&spectrum, lb_n, lb_b, mix, dwell)?;
+    for index in 0..4_u32 {
+        let i_f = f64::from(index);
+        let expected = (-PI * lb_n * dwell * i_f).exp() - mix * (-PI * lb_b * dwell * i_f).exp();
+        assert_close(processed.intensities[usize::try_from(index)?], expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn convolution_difference_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(convolution_difference_apodization(&spectrum, -1.0, 1.0, 0.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, -1.0, 0.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 1.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, -0.1, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 0.5, 0.0).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

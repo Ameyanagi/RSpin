@@ -6,10 +6,11 @@ use rspin_core::{Axis, Result};
 use rspin_io::read_processing_recipe_1d_json;
 use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
-    apply_processing_recipe_1d_until, crop_1d, exponential_apodization, fft_1d,
-    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
-    magnitude_spectrum, normalize_area, offset_intensity, phase_correct, resample_1d, shift_axis,
-    sine_bell_apodization, subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
+    apply_processing_recipe_1d_until, convolution_difference_apodization, crop_1d,
+    exponential_apodization, fft_1d, gauss_multiply_bruker_apodization, gaussian_apodization,
+    lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area, offset_intensity,
+    phase_correct, resample_1d, shift_axis, sine_bell_apodization, subtract_baseline,
+    traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
@@ -198,6 +199,28 @@ pub fn lorentz_to_gauss_apodization_spectrum_1d_json(
     spectrum1d_to_json(&processed)
 }
 
+/// Applies convolution-difference apodization to serialized
+/// `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn convolution_difference_apodization_spectrum_1d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let options: ConvolutionDifferenceApodizationJson = from_json(options_json)?;
+    let processed = convolution_difference_apodization(
+        &spectrum,
+        options.narrow_line_broadening_hz,
+        options.broad_line_broadening_hz,
+        options.mixing,
+        options.dwell_time_s,
+    )?;
+    spectrum1d_to_json(&processed)
+}
+
 /// Applies Bruker-style two-parameter Gaussian (GMB) apodization to
 /// serialized `Spectrum1D` JSON.
 ///
@@ -369,6 +392,14 @@ struct LorentzToGaussApodizationJson {
     gauss_fwhm_hz: f64,
     #[serde(default)]
     gauss_shift: f64,
+    dwell_time_s: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct ConvolutionDifferenceApodizationJson {
+    narrow_line_broadening_hz: f64,
+    broad_line_broadening_hz: f64,
+    mixing: f64,
     dwell_time_s: f64,
 }
 

@@ -6,10 +6,11 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
-    crop_1d, exponential_apodization, fft_1d, gauss_multiply_bruker_apodization,
-    gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
-    normalize_max_abs, offset_intensity, phase_correct, resample_1d, scale_intensity, shift_axis,
-    sine_bell_apodization, subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
+    convolution_difference_apodization, crop_1d, exponential_apodization, fft_1d,
+    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
+    magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
+    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
+    traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -83,6 +84,17 @@ pub enum ProcessingOperation1D {
         gauss_fwhm_hz: f64,
         /// Gaussian-peak shift in `[0, 1]`.
         gauss_shift: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies convolution-difference apodization.
+    ConvolutionDifferenceApodization {
+        /// Narrow line broadening in hertz (≥ 0).
+        narrow_line_broadening_hz: f64,
+        /// Broad line broadening in hertz (≥ 0).
+        broad_line_broadening_hz: f64,
+        /// Mixing coefficient in `[0, 1]`.
+        mixing: f64,
         /// Dwell time in seconds.
         dwell_time_s: f64,
     },
@@ -182,6 +194,18 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 *lorentz_to_undo_hz,
                 *gauss_fwhm_hz,
                 *gauss_shift,
+                *dwell_time_s,
+            ),
+            Self::ConvolutionDifferenceApodization {
+                narrow_line_broadening_hz,
+                broad_line_broadening_hz,
+                mixing,
+                dwell_time_s,
+            } => convolution_difference_apodization(
+                spectrum,
+                *narrow_line_broadening_hz,
+                *broad_line_broadening_hz,
+                *mixing,
                 *dwell_time_s,
             ),
             Self::GaussMultiplyBrukerApodization {
@@ -411,6 +435,23 @@ impl ProcessingRecipe1D {
             lorentz_to_undo_hz,
             gauss_fwhm_hz,
             gauss_shift,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a convolution-difference apodization operation.
+    #[must_use]
+    pub fn convolution_difference_apodization(
+        self,
+        narrow_line_broadening_hz: f64,
+        broad_line_broadening_hz: f64,
+        mixing: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation1D::ConvolutionDifferenceApodization {
+            narrow_line_broadening_hz,
+            broad_line_broadening_hz,
+            mixing,
             dwell_time_s,
         })
     }

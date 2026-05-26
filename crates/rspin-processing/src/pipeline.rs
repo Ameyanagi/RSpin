@@ -3,11 +3,11 @@
 use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
-    Abs1D, AutoPhaseOptions, BaselineMethod, Crop1D, ExponentialApodization, Fft1D, FftDirection,
-    GaussMultiplyBrukerApodization, GaussianApodization, LorentzToGaussApodization, Magnitude,
-    NormalizeArea, NormalizeMaxAbs, OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D,
-    ScaleIntensity, ShiftAxis, SineBellApodization, SubtractBaseline, TrafApodization,
-    TrapezoidalApodization, ZeroFill,
+    Abs1D, AutoPhaseOptions, BaselineMethod, ConvolutionDifferenceApodization, Crop1D,
+    ExponentialApodization, Fft1D, FftDirection, GaussMultiplyBrukerApodization,
+    GaussianApodization, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
+    OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
+    SineBellApodization, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -159,6 +159,23 @@ impl Spectrum1DPipeline {
             LorentzToGaussApodization::new(lorentz_to_undo_hz, gauss_fwhm_hz, dwell_time_s)
                 .with_gauss_shift(gauss_shift),
         )
+    }
+
+    /// Applies convolution-difference apodization.
+    #[must_use]
+    pub fn convolution_difference_apodization(
+        self,
+        narrow_line_broadening_hz: f64,
+        broad_line_broadening_hz: f64,
+        mixing: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.then(ConvolutionDifferenceApodization::new(
+            narrow_line_broadening_hz,
+            broad_line_broadening_hz,
+            mixing,
+            dwell_time_s,
+        ))
     }
 
     /// Applies Bruker-style two-parameter Gaussian (GMB) apodization.

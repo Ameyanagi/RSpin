@@ -91,7 +91,8 @@ pub use prediction::{
 };
 pub use processing_1d::{
     abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
-    crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
+    convolution_difference_apodization_spectrum_1d_json, crop_spectrum_1d_json,
+    exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
     gauss_multiply_bruker_apodization_spectrum_1d_json, gaussian_apodization_spectrum_1d_json,
     lorentz_to_gauss_apodization_spectrum_1d_json, magnitude_spectrum_1d_json,
     normalize_spectrum_1d_area_json, offset_spectrum_1d_json, phase_spectrum_1d_json,
