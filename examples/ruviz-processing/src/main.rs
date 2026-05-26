@@ -1634,9 +1634,12 @@ mod ruviz_example {
             return Ok(());
         };
         let processed = if spectrum.x.unit == Unit::Seconds {
+            // Polynomial refine (ph2/ph3) is intentionally OFF here:
+            // it overfits the JEOL group-delay residual on Myrcene 13C,
+            // producing a 180°-flipped CDCl3 solvent peak even when
+            // the sample resonances are well-phased.
             let opts = AutoProcessingOptions {
                 subtract_baseline: false,
-                polynomial_phase_refine: true,
                 ..AutoProcessingOptions::default()
             };
             let auto = process_spectrum_auto(spectrum, &opts)?;
