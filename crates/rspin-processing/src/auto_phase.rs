@@ -589,6 +589,11 @@ pub fn peak_based_phase_estimate(
 /// polishes with a Nelder-Mead simplex against the configured cost function
 /// (skipping the coarse grid).
 ///
+/// This entry point is a peak-warmed global-cost variant by construction —
+/// the Regions algorithm does not take seeds. `options.strategy` is therefore
+/// **always** treated as [`AutoPhaseStrategy::GlobalCost`]; pass the cost
+/// you want via [`AutoPhaseOptions::with_cost`].
+///
 /// # Errors
 ///
 /// Returns an error when options are invalid or the seed cannot be derived.
@@ -597,6 +602,11 @@ pub fn auto_phase_correct_with_peaks(
     options: AutoPhaseOptions,
     peak_centers: &[f64],
 ) -> Result<AutoPhaseResult> {
+    // The peak-warmed variant has no Regions equivalent (Regions has no
+    // notion of an initial seed). Pin the strategy here so option validation
+    // and the cost evaluator see a consistent value, and so the dispatcher
+    // can never silently round-trip back into Regions.
+    let options = options.with_strategy(AutoPhaseStrategy::GlobalCost);
     options.validate()?;
     let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
     let active_mask = resolve_active_mask(spectrum, options);
