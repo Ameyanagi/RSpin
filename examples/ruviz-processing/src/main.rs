@@ -201,17 +201,25 @@ mod ruviz_example {
         Ok(())
     }
 
-    fn write_apodization_comparison_plot(root: &Path, output_dir: &Path) -> Result<()> {
-        let fixture = root.join(
-            "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
-        );
-        let bundle = load_spectra(fixture)?;
-        let Some(fid) = bundle.spectra_1d().next() else {
-            return Ok(());
-        };
-        if fid.x.unit != Unit::Seconds || fid.imaginary.is_none() {
-            return Ok(());
-        }
+    struct ApodizationPanels {
+        raw: Spectrum1D,
+        em: Spectrum1D,
+        gm: Spectrum1D,
+        l2g: Spectrum1D,
+        traf: Spectrum1D,
+        gmb: Spectrum1D,
+        trap: Spectrum1D,
+        conv: Spectrum1D,
+        matched: Spectrum1D,
+        matched_lb_hz: f64,
+    }
+
+    fn build_apodization_panels(
+        fid: &Spectrum1D,
+        lb_hz: f64,
+        gauss_fwhm_hz: f64,
+        conv_broad_hz: f64,
+    ) -> Result<ApodizationPanels> {
         let group_delay = jeol_group_delay(fid);
         let shifted = if group_delay > 0.0 {
             remove_group_delay(fid, group_delay)?
@@ -249,63 +257,239 @@ mod ruviz_example {
         };
 
         let raw = magnitude_only(shifted.clone())?;
-        let em = apodise_and_phase(exponential_apodization(&shifted, 3.0, dwell)?)?;
-        let gm = apodise_and_phase(gaussian_apodization(&shifted, 3.0, dwell)?)?;
+        let em = apodise_and_phase(exponential_apodization(&shifted, lb_hz, dwell)?)?;
+        let gm = apodise_and_phase(gaussian_apodization(&shifted, lb_hz, dwell)?)?;
         let l2g = apodise_and_phase(lorentz_to_gauss_apodization(
-            &shifted, 3.0, 6.0, 0.0, dwell,
+            &shifted,
+            lb_hz,
+            gauss_fwhm_hz,
+            0.0,
+            dwell,
         )?)?;
-        let traf = apodise_and_phase(traf_apodization(&shifted, 3.0, dwell)?)?;
+        let traf = apodise_and_phase(traf_apodization(&shifted, lb_hz, dwell)?)?;
         let gmb = apodise_and_phase(gauss_multiply_bruker_apodization(
-            &shifted, -3.0, 0.3, dwell,
+            &shifted, -lb_hz, 0.3, dwell,
         )?)?;
         let trap = apodise_and_phase(trapezoidal_apodization(&shifted, 0.0, 0.7)?)?;
         let conv = apodise_and_phase(convolution_difference_apodization(
-            &shifted, 1.0, 20.0, 0.5, dwell,
+            &shifted,
+            lb_hz / 3.0,
+            conv_broad_hz,
+            0.5,
+            dwell,
         )?)?;
         let matched_step = matched_filter_em(&shifted)?;
-        let matched =
-            apodise_and_phase(exponential_apodization(
-                &shifted,
-                matched_step.line_broadening_hz,
-                matched_step.dwell_time_s,
-            )?)?;
+        let matched_lb_hz = matched_step.line_broadening_hz;
+        let matched = apodise_and_phase(exponential_apodization(
+            &shifted,
+            matched_lb_hz,
+            matched_step.dwell_time_s,
+        )?)?;
 
+        Ok(ApodizationPanels {
+            raw,
+            em,
+            gm,
+            l2g,
+            traf,
+            gmb,
+            trap,
+            conv,
+            matched,
+            matched_lb_hz,
+        })
+    }
+
+    fn save_apodization_panel(
+        panels: &ApodizationPanels,
+        title_prefix: &str,
+        lb_hz: f64,
+        gauss_fwhm_hz: f64,
+        conv_broad_hz: f64,
+        zoom: Option<(f64, f64)>,
+        path: &Path,
+    ) -> Result<()> {
+        let zoom_suffix = zoom
+            .map(|(lo, hi)| format!(" — zoom {lo:.1}…{hi:.1} ppm"))
+            .unwrap_or_default();
+        let restrict = |spectrum: &Spectrum1D| -> (Vec<f64>, Vec<f64>) {
+            let Some((lo_raw, hi_raw)) = zoom else {
+                return (spectrum.x.values.clone(), spectrum.intensities.clone());
+            };
+            let lo = lo_raw.min(hi_raw);
+            let hi = lo_raw.max(hi_raw);
+            let mut xs = Vec::new();
+            let mut ys = Vec::new();
+            for (x, y) in spectrum.x.values.iter().zip(&spectrum.intensities) {
+                if *x >= lo && *x <= hi {
+                    xs.push(*x);
+                    ys.push(*y);
+                }
+            }
+            (xs, ys)
+        };
         let mk = |title: String, spectrum: &Spectrum1D, label: &str| -> Plot {
+            let (xs, ys) = restrict(spectrum);
             Plot::new()
                 .title(&title)
                 .xlabel("chemical shift / ppm")
                 .ylabel("intensity")
                 .max_resolution(900, 600)
                 .legend_position(LegendPosition::Best)
-                .line(&spectrum.x.values, &spectrum.intensities)
+                .line(&xs, &ys)
                 .label(label)
                 .into()
         };
-        let title_prefix = "JEOL 13C Myrcene (NMRXiv CC0)";
         let figure = subplots(3, 3, 2700, 1800)?
-            .subplot_at(0, mk(format!("{title_prefix} — |raw FFT|"), &raw, "|spectrum|"))?
-            .subplot_at(1, mk("Exponential (EM, 3 Hz)".into(), &em, "real"))?
-            .subplot_at(2, mk("Gaussian (GM, 3 Hz)".into(), &gm, "real"))?
-            .subplot_at(3, mk("Lorentz→Gauss (lb=3, gb=6)".into(), &l2g, "real"))?
-            .subplot_at(4, mk("TRAF (lb=3 Hz)".into(), &traf, "real"))?
-            .subplot_at(5, mk("Bruker GMB (lb=-3, gb=0.3)".into(), &gmb, "real"))?
-            .subplot_at(6, mk("Trapezoidal (fall=0.7)".into(), &trap, "real"))?
-            .subplot_at(7, mk("Conv-diff (lb=1/20, k=0.5)".into(), &conv, "real"))?
+            .subplot_at(
+                0,
+                mk(
+                    format!("{title_prefix} — |raw FFT|{zoom_suffix}"),
+                    &panels.raw,
+                    "|spectrum|",
+                ),
+            )?
+            .subplot_at(
+                1,
+                mk(
+                    format!("Exponential (EM, {lb_hz:.1} Hz)"),
+                    &panels.em,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                2,
+                mk(
+                    format!("Gaussian (GM, {lb_hz:.1} Hz)"),
+                    &panels.gm,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                3,
+                mk(
+                    format!("Lorentz→Gauss (lb={lb_hz:.1}, gb={gauss_fwhm_hz:.1})"),
+                    &panels.l2g,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                4,
+                mk(format!("TRAF (lb={lb_hz:.1} Hz)"), &panels.traf, "real"),
+            )?
+            .subplot_at(
+                5,
+                mk(
+                    format!("Bruker GMB (lb=-{lb_hz:.1}, gb=0.3)"),
+                    &panels.gmb,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                6,
+                mk("Trapezoidal (fall=0.7)".into(), &panels.trap, "real"),
+            )?
+            .subplot_at(
+                7,
+                mk(
+                    format!(
+                        "Conv-diff (lb={:.1}/{conv_broad_hz:.0}, k=0.5)",
+                        lb_hz / 3.0
+                    ),
+                    &panels.conv,
+                    "real",
+                ),
+            )?
             .subplot_at(
                 8,
                 mk(
                     format!(
                         "Matched-filter EM (lb={:.2} Hz)",
-                        matched_step.line_broadening_hz
+                        panels.matched_lb_hz
                     ),
-                    &matched,
+                    &panels.matched,
                     "real",
                 ),
             )?;
-        figure.save(path_to_str(
-            &output_dir.join("apodization_methods_jeol_13c.png"),
-        )?)?;
+        figure.save(path_to_str(path)?)?;
         Ok(())
+    }
+
+    fn write_apodization_comparison_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        // JEOL 13C Myrcene — full range + tight zoom on the aromatic cluster.
+        let fixture_13c = root.join(
+            "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+        );
+        if let Some(fid) = load_first_complex_fid(&fixture_13c)? {
+            let lb_13c = 3.0_f64;
+            let gauss_13c = 6.0_f64;
+            let conv_broad_13c = 20.0_f64;
+            let panels = build_apodization_panels(&fid, lb_13c, gauss_13c, conv_broad_13c)?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+                lb_13c,
+                gauss_13c,
+                conv_broad_13c,
+                None,
+                &output_dir.join("apodization_methods_jeol_13c.png"),
+            )?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+                lb_13c,
+                gauss_13c,
+                conv_broad_13c,
+                // Tight zoom on a small mid-range cluster so lineshape
+                // differences between EM/GM/L2G/TRAF are clearly visible.
+                Some((20.0, 70.0)),
+                &output_dir.join("apodization_methods_jeol_13c_zoom.png"),
+            )?;
+        }
+
+        // JEOL 1H Myrcene — same comparison on a 1H spectrum.
+        let fixture_1h = root.join(
+            "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+        );
+        if let Some(fid) = load_first_complex_fid(&fixture_1h)? {
+            let lb_1h = 0.5_f64;
+            let gauss_1h = 1.0_f64;
+            let conv_broad_1h = 4.0_f64;
+            let panels = build_apodization_panels(&fid, lb_1h, gauss_1h, conv_broad_1h)?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+                lb_1h,
+                gauss_1h,
+                conv_broad_1h,
+                None,
+                &output_dir.join("apodization_methods_jeol_myrcene_1h_full.png"),
+            )?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+                lb_1h,
+                gauss_1h,
+                conv_broad_1h,
+                // JEOL writes carrier-centered ppm axes; the visible
+                // peak cluster sits at ±1 ppm around the carrier.
+                Some((-1.5, 1.5)),
+                &output_dir.join("apodization_methods_jeol_myrcene_1h_zoom.png"),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn load_first_complex_fid(fixture: &Path) -> Result<Option<Spectrum1D>> {
+        let bundle = load_spectra(fixture)?;
+        let Some(fid) = bundle.spectra_1d().next() else {
+            return Ok(None);
+        };
+        if fid.x.unit != Unit::Seconds || fid.imaginary.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(fid.clone()))
     }
 
     fn write_jeol_method_panel(
