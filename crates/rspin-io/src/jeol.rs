@@ -392,6 +392,19 @@ fn build_metadata(header: &Header, parameters: &Parameters) -> Metadata {
         .map(ToOwned::to_owned)
         .or_else(|| header.title.clone());
 
+    let mut properties = parameters.properties();
+    // Surface the header's data-offset table so downstream processing
+    // can identify the first usable FID sample (the leading samples
+    // are part of the digital-filter pre-acquisition transient).
+    properties.insert(
+        "jeol.header.data_offset_start_0".to_owned(),
+        header.data_offset_start[0].to_string(),
+    );
+    properties.insert(
+        "jeol.header.data_offset_stop_0".to_owned(),
+        header.data_offset_stop[0].to_string(),
+    );
+
     Metadata {
         name,
         nucleus,
@@ -399,7 +412,7 @@ fn build_metadata(header: &Header, parameters: &Parameters) -> Metadata {
         solvent,
         temperature_k,
         origin: Some("JEOL".to_owned()),
-        properties: parameters.properties(),
+        properties,
         ..Metadata::default()
     }
 }
