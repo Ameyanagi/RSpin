@@ -5,6 +5,7 @@ mod abs_2d;
 mod apodization_2d;
 mod auto_phase;
 mod auto_phase_2d;
+mod auto_processing;
 mod baseline;
 #[cfg(test)]
 mod builder_tests;
@@ -43,6 +44,7 @@ pub use auto_phase::{
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
 };
+pub use auto_processing::{AutoProcessingOptions, NucleusLbDefaults, process_spectrum_auto};
 pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
 };
