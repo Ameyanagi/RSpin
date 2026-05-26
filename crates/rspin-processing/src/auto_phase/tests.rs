@@ -161,8 +161,11 @@ fn acme_recovers_combined_phase_on_lorentzian() -> anyhow::Result<()> {
 fn refinement_improves_grid_score() -> anyhow::Result<()> {
     let spectrum = lorentzian_spectrum(64, 0.05)?;
     let phased = phase_correct(&spectrum, 37.5, 22.5, 0.5)?;
-    let without = auto_phase_correct(&phased, AutoPhaseOptions::default().with_refine(false))?;
-    let with = auto_phase_correct(&phased, AutoPhaseOptions::default().with_refine(true))?;
+    // `refine` is a GlobalCost-only knob; pin the strategy so the
+    // Nelder-Mead path is actually exercised.
+    let base = AutoPhaseOptions::default().with_strategy(AutoPhaseStrategy::GlobalCost);
+    let without = auto_phase_correct(&phased, base.with_refine(false))?;
+    let with = auto_phase_correct(&phased, base.with_refine(true))?;
     assert!(
         with.score <= without.score + 1.0e-9,
         "refinement should never worsen the score: {} vs {}",
@@ -315,16 +318,13 @@ fn auto_phase_with_peaks_matches_default_quality() -> anyhow::Result<()> {
 fn regularizer_prefers_small_ph1_over_wrap_equivalent() -> anyhow::Result<()> {
     let spectrum = isolated_two_peak_spectrum(1024, 0.04)?;
     let phased = phase_correct(&spectrum, 20.0, 30.0, 0.5)?;
-    let with = auto_phase_correct(
-        &phased,
-        AutoPhaseOptions::default().first_order_range(-720.0, 720.0, 45.0),
-    )?;
-    let without = auto_phase_correct(
-        &phased,
-        AutoPhaseOptions::default()
-            .first_order_range(-720.0, 720.0, 45.0)
-            .with_regularization_weight(0.0),
-    )?;
+    // `regularization_weight` is applied in the GlobalCost cost function;
+    // pin the strategy so the regularizer is actually evaluated.
+    let base = AutoPhaseOptions::default()
+        .with_strategy(AutoPhaseStrategy::GlobalCost)
+        .first_order_range(-720.0, 720.0, 45.0);
+    let with = auto_phase_correct(&phased, base)?;
+    let without = auto_phase_correct(&phased, base.with_regularization_weight(0.0))?;
     assert!(
         with.first_order_deg.abs() <= without.first_order_deg.abs() + 1.0e-9,
         "regularizer should prefer smaller |ph1|: with={} without={}",
