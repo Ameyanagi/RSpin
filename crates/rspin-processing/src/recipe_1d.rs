@@ -6,9 +6,9 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
-    crop_1d, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,
-    normalize_area, normalize_max_abs, offset_intensity, phase_correct, resample_1d,
-    scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
+    crop_1d, exponential_apodization, fft_1d, gaussian_apodization, lorentz_to_gauss_apodization,
+    magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
+    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -71,6 +71,17 @@ pub enum ProcessingOperation1D {
     GaussianApodization {
         /// Gaussian broadening full width at half maximum in hertz.
         gaussian_broadening_hz: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies Lorentz-to-Gauss (resolution-enhancement) apodization.
+    LorentzToGaussApodization {
+        /// Lorentzian linewidth to undo, in hertz (≥ 0).
+        lorentz_to_undo_hz: f64,
+        /// Gaussian full-width-at-half-maximum to impose, in hertz (≥ 0).
+        gauss_fwhm_hz: f64,
+        /// Gaussian-peak shift in `[0, 1]`.
+        gauss_shift: f64,
         /// Dwell time in seconds.
         dwell_time_s: f64,
     },
@@ -137,6 +148,18 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 gaussian_broadening_hz,
                 dwell_time_s,
             } => gaussian_apodization(spectrum, *gaussian_broadening_hz, *dwell_time_s),
+            Self::LorentzToGaussApodization {
+                lorentz_to_undo_hz,
+                gauss_fwhm_hz,
+                gauss_shift,
+                dwell_time_s,
+            } => lorentz_to_gauss_apodization(
+                spectrum,
+                *lorentz_to_undo_hz,
+                *gauss_fwhm_hz,
+                *gauss_shift,
+                *dwell_time_s,
+            ),
             Self::SineBellApodization {
                 start_angle_deg,
                 end_angle_deg,
@@ -329,6 +352,23 @@ impl ProcessingRecipe1D {
     pub fn gaussian_apodization(self, gaussian_broadening_hz: f64, dwell_time_s: f64) -> Self {
         self.with_operation(ProcessingOperation1D::GaussianApodization {
             gaussian_broadening_hz,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a Lorentz-to-Gauss apodization operation.
+    #[must_use]
+    pub fn lorentz_to_gauss_apodization(
+        self,
+        lorentz_to_undo_hz: f64,
+        gauss_fwhm_hz: f64,
+        gauss_shift: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation1D::LorentzToGaussApodization {
+            lorentz_to_undo_hz,
+            gauss_fwhm_hz,
+            gauss_shift,
             dwell_time_s,
         })
     }

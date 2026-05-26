@@ -84,6 +84,56 @@ fn sine_bell_apodization_weights_real_and_imaginary_channels() -> anyhow::Result
 }
 
 #[test]
+fn lorentz_to_gauss_identity_when_both_broadenings_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = lorentz_to_gauss_apodization(&spectrum, 0.0, 0.0, 0.0, 0.1)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(
+        processed.processing[0].operation,
+        "lorentz_to_gauss_apodization"
+    );
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_undoes_exponential_decay() -> anyhow::Result<()> {
+    // After multiplying by exp(-pi*lb*t) and then by Lorentz-to-Gauss with
+    // the same lb (and no Gaussian), the FID must equal the original.
+    let spectrum = complex_spectrum()?;
+    let lb = 2.0_f64;
+    let dwell = 0.1_f64;
+    let decayed = exponential_apodization(&spectrum, lb, dwell)?;
+    let restored = lorentz_to_gauss_apodization(&decayed, lb, 0.0, 0.0, dwell)?;
+    assert_vec_close(&restored.intensities, &spectrum.intensities);
+    assert_vec_close(require_imaginary(&restored)?, require_imaginary(&spectrum)?);
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_matches_gaussian_when_lorentz_is_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let gauss = gaussian_apodization(&spectrum, 1.0, 0.1)?;
+    let l2g = lorentz_to_gauss_apodization(&spectrum, 0.0, 1.0, 0.0, 0.1)?;
+    assert_vec_close(&l2g.intensities, &gauss.intensities);
+    assert_vec_close(require_imaginary(&l2g)?, require_imaginary(&gauss)?);
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(lorentz_to_gauss_apodization(&spectrum, -1.0, 1.0, 0.0, 0.1).is_err());
+    assert!(lorentz_to_gauss_apodization(&spectrum, 1.0, -1.0, 0.0, 0.1).is_err());
+    assert!(lorentz_to_gauss_apodization(&spectrum, 1.0, 1.0, 1.5, 0.1).is_err());
+    assert!(lorentz_to_gauss_apodization(&spectrum, 1.0, 1.0, 0.0, 0.0).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

@@ -93,6 +93,77 @@ impl ProcessingStep<Spectrum2D> for GaussianApodization2D {
     }
 }
 
+/// Applies separable Lorentz-to-Gauss apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LorentzToGaussApodization2D {
+    /// X-dimension Lorentzian linewidth to undo, in hertz.
+    pub x_lorentz_to_undo_hz: f64,
+    /// X-dimension Gaussian full-width-at-half-maximum to impose, in hertz.
+    pub x_gauss_fwhm_hz: f64,
+    /// X-dimension Gaussian-peak shift in `[0, 1]`.
+    pub x_gauss_shift: f64,
+    /// X-dimension dwell time in seconds.
+    pub x_dwell_time_s: f64,
+    /// Y-dimension Lorentzian linewidth to undo, in hertz.
+    pub y_lorentz_to_undo_hz: f64,
+    /// Y-dimension Gaussian full-width-at-half-maximum to impose, in hertz.
+    pub y_gauss_fwhm_hz: f64,
+    /// Y-dimension Gaussian-peak shift in `[0, 1]`.
+    pub y_gauss_shift: f64,
+    /// Y-dimension dwell time in seconds.
+    pub y_dwell_time_s: f64,
+}
+
+impl LorentzToGaussApodization2D {
+    /// Creates a separable Lorentz-to-Gauss apodization step with Gaussian
+    /// shifts at `0` on both axes.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        x_lorentz_to_undo_hz: f64,
+        x_gauss_fwhm_hz: f64,
+        x_dwell_time_s: f64,
+        y_lorentz_to_undo_hz: f64,
+        y_gauss_fwhm_hz: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            x_lorentz_to_undo_hz,
+            x_gauss_fwhm_hz,
+            x_gauss_shift: 0.0,
+            x_dwell_time_s,
+            y_lorentz_to_undo_hz,
+            y_gauss_fwhm_hz,
+            y_gauss_shift: 0.0,
+            y_dwell_time_s,
+        }
+    }
+
+    /// Returns this step with explicit Gaussian-peak shifts.
+    #[must_use]
+    pub fn with_gauss_shifts(mut self, x_gauss_shift: f64, y_gauss_shift: f64) -> Self {
+        self.x_gauss_shift = x_gauss_shift;
+        self.y_gauss_shift = y_gauss_shift;
+        self
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for LorentzToGaussApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        lorentz_to_gauss_apodization_2d(
+            spectrum,
+            self.x_lorentz_to_undo_hz,
+            self.x_gauss_fwhm_hz,
+            self.x_gauss_shift,
+            self.x_dwell_time_s,
+            self.y_lorentz_to_undo_hz,
+            self.y_gauss_fwhm_hz,
+            self.y_gauss_shift,
+            self.y_dwell_time_s,
+        )
+    }
+}
+
 /// Applies separable sine-bell apodization to a two-dimensional spectrum.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SineBellApodization2D {
@@ -248,6 +319,65 @@ pub fn gaussian_apodization_2d(
     ))
 }
 
+/// Applies a separable Lorentz-to-Gauss window in x and y.
+///
+/// Each dimension uses
+/// `exp(+π · lorentz_to_undo · t) · exp(-(π · gauss_fwhm · (t - shift · t_max))² / (4 · ln 2))`.
+///
+/// # Errors
+///
+/// Returns an error when any broadening is negative, a dwell time is not
+/// positive, a shift is outside `[0, 1]`, any parameter is non-finite, or
+/// the shape is too large for checked numeric conversion.
+#[allow(clippy::too_many_arguments)]
+pub fn lorentz_to_gauss_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_lorentz_to_undo_hz: f64,
+    x_gauss_fwhm_hz: f64,
+    x_gauss_shift: f64,
+    x_dwell_time_s: f64,
+    y_lorentz_to_undo_hz: f64,
+    y_gauss_fwhm_hz: f64,
+    y_gauss_shift: f64,
+    y_dwell_time_s: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = lorentz_to_gauss_weights(
+        width,
+        x_lorentz_to_undo_hz,
+        x_gauss_fwhm_hz,
+        x_gauss_shift,
+        x_dwell_time_s,
+        "2D x Lorentz-to-Gauss apodization",
+    )?;
+    let y_weights = lorentz_to_gauss_weights(
+        height,
+        y_lorentz_to_undo_hz,
+        y_gauss_fwhm_hz,
+        y_gauss_shift,
+        y_dwell_time_s,
+        "2D y Lorentz-to-Gauss apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("lorentz_to_gauss_apodization_2d").with_details(format!(
+            "x_lorentz_to_undo_hz={x_lorentz_to_undo_hz},x_gauss_fwhm_hz={x_gauss_fwhm_hz},x_gauss_shift={x_gauss_shift},x_dwell_time_s={x_dwell_time_s},y_lorentz_to_undo_hz={y_lorentz_to_undo_hz},y_gauss_fwhm_hz={y_gauss_fwhm_hz},y_gauss_shift={y_gauss_shift},y_dwell_time_s={y_dwell_time_s}"
+        )),
+    ))
+}
+
 /// Applies a separable sine-bell window in x and y.
 ///
 /// Each dimension uses `sin(theta_i)^exponent`, where `theta_i` moves linearly
@@ -331,6 +461,55 @@ fn gaussian_weights(
                 );
             let scaled = scale * index;
             Ok((-(scaled * scaled) / denominator).exp())
+        })
+        .collect()
+}
+
+fn lorentz_to_gauss_weights(
+    len: usize,
+    lorentz_to_undo_hz: f64,
+    gauss_fwhm_hz: f64,
+    gauss_shift: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("lorentz_to_undo_hz", lorentz_to_undo_hz)?;
+    ensure_non_negative("gauss_fwhm_hz", gauss_fwhm_hz)?;
+    ensure_finite("gauss_shift", gauss_shift)?;
+    if !(0.0..=1.0).contains(&gauss_shift) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "gauss_shift must be between 0 and 1".to_owned(),
+        });
+    }
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    let t_max = last_index_f * dwell_time_s;
+    let lorentz_scale = PI * lorentz_to_undo_hz * dwell_time_s;
+    let gauss_scale = PI * gauss_fwhm_hz;
+    let gauss_norm = 4.0 * LN_2;
+    let center_time = gauss_shift * t_max;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let lorentz_part = lorentz_scale * index_f;
+            let gauss_offset = gauss_scale * (index_f * dwell_time_s - center_time);
+            let gauss_part = -(gauss_offset * gauss_offset) / gauss_norm;
+            Ok((lorentz_part + gauss_part).exp())
         })
         .collect()
 }

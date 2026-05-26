@@ -7,8 +7,9 @@ use rspin_io::read_processing_recipe_1d_json;
 use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
     apply_processing_recipe_1d_until, crop_1d, exponential_apodization, fft_1d,
-    gaussian_apodization, magnitude_spectrum, normalize_area, offset_intensity, phase_correct,
-    resample_1d, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
+    gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
+    offset_intensity, phase_correct, resample_1d, shift_axis, sine_bell_apodization,
+    subtract_baseline, zero_fill,
 };
 
 use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
@@ -176,6 +177,27 @@ pub fn gaussian_apodization_spectrum_1d_json(
     spectrum1d_to_json(&processed)
 }
 
+/// Applies Lorentz-to-Gauss apodization to serialized `Spectrum1D` JSON.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn lorentz_to_gauss_apodization_spectrum_1d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let options: LorentzToGaussApodizationJson = from_json(options_json)?;
+    let processed = lorentz_to_gauss_apodization(
+        &spectrum,
+        options.lorentz_to_undo_hz,
+        options.gauss_fwhm_hz,
+        options.gauss_shift,
+        options.dwell_time_s,
+    )?;
+    spectrum1d_to_json(&processed)
+}
+
 /// Applies sine-bell apodization to serialized `Spectrum1D` JSON.
 ///
 /// # Errors
@@ -283,6 +305,15 @@ struct ExponentialApodizationJson {
 #[derive(Clone, Copy, Debug, Deserialize)]
 struct GaussianApodizationJson {
     gaussian_broadening_hz: f64,
+    dwell_time_s: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct LorentzToGaussApodizationJson {
+    lorentz_to_undo_hz: f64,
+    gauss_fwhm_hz: f64,
+    #[serde(default)]
+    gauss_shift: f64,
     dwell_time_s: f64,
 }
 
