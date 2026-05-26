@@ -1486,21 +1486,42 @@ mod ruviz_example {
 
         let cascade = run(None)?;
         let empirical = run(Some(16.46))?;
+        // Demonstrate the opt-in auto_group_delay_sweep: lets the
+        // orchestrator pick the best value automatically without the
+        // caller knowing the empirical optimum.
+        let sweep_opts = AutoProcessingOptions {
+            subtract_baseline: false,
+            auto_group_delay_sweep: Some(rspin_processing::GroupDelaySweepOptions {
+                delta_samples: 5.0,
+                step_samples: 0.2,
+            }),
+            ..AutoProcessingOptions::default()
+        };
+        let auto_swept = process_spectrum_auto(fid, &sweep_opts)?;
+        let auto_swept = ProcessingRecipe1D::new()
+            .normalize_max_abs()
+            .apply(&auto_swept)?;
 
-        let title = "JEOL 13C — Eucalyptol — group-delay cascade vs empirical sweep";
+        let title = "JEOL 13C — Eucalyptol — group-delay cascade vs empirical vs auto-sweep";
         let png_path = output_dir.join("auto_processing_jeol_eucalyptol_13c_group_delay.png");
         nmr_plot_base(
             title,
             "chemical shift / ppm",
             "normalized intensity",
             &cascade.x.values,
-            &[&cascade.intensities, &empirical.intensities],
+            &[
+                &cascade.intensities,
+                &empirical.intensities,
+                &auto_swept.intensities,
+            ],
             cascade.x.unit,
         )
         .line(&cascade.x.values, &cascade.intensities)
         .label("cascade (19.66, library default)")
         .line(&empirical.x.values, &empirical.intensities)
-        .label("empirical optimum (16.46)")
+        .label("empirical override (16.46)")
+        .line(&auto_swept.x.values, &auto_swept.intensities)
+        .label("auto_group_delay_sweep (Δ±5, step 0.2)")
         .save(path_to_str(&png_path)?)?;
         Ok(())
     }

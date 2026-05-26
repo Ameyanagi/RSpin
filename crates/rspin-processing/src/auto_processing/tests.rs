@@ -117,3 +117,23 @@ fn process_spectrum_auto_nucleus_lookup_picks_correct_lb() -> anyhow::Result<()>
     assert!(details.contains("line_broadening_hz=1"));
     Ok(())
 }
+
+#[test]
+fn group_delay_sweep_returns_one_of_the_candidates() -> anyhow::Result<()> {
+    // Sanity check: with a synthetic FID where the cascade prediction
+    // is zero (no vendor metadata), the sweep tries `delta_samples`
+    // candidates around 0 and returns a successful processed spectrum.
+    let fid = synthetic_complex_fid(256, 1.0e-3, &[(30.0, 1.0, 5.0)])?;
+    let options = AutoProcessingOptions {
+        subtract_baseline: false,
+        auto_group_delay_sweep: Some(GroupDelaySweepOptions {
+            delta_samples: 1.0,
+            step_samples: 0.5,
+        }),
+        ..AutoProcessingOptions::default()
+    };
+    let processed = process_spectrum_auto(&fid, &options)?;
+    assert_eq!(processed.x.unit, Unit::Hertz);
+    assert!(!processed.intensities.is_empty());
+    Ok(())
+}
