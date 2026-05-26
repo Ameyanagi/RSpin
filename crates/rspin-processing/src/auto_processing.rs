@@ -161,7 +161,11 @@ impl Default for NucleusLbDefaults {
 }
 
 impl NucleusLbDefaults {
-    fn lookup(&self, nucleus: Option<&Nucleus>) -> Option<f64> {
+    /// Returns the configured exponential-multiplication (EM) line
+    /// broadening in Hz for `nucleus`, or `None` when the nucleus is
+    /// unknown or no entry is configured.
+    #[must_use]
+    pub fn lookup(&self, nucleus: Option<&Nucleus>) -> Option<f64> {
         match nucleus? {
             Nucleus::Hydrogen1 => self.hydrogen1_hz,
             Nucleus::Carbon13 => self.carbon13_hz,
@@ -370,7 +374,8 @@ fn next_power_of_two(value: usize) -> usize {
 ///   handled it. Provide an explicit override when you have provenance.
 ///
 /// Returns `0.0` when no recognised metadata is present.
-fn group_delay_from_metadata(metadata: &Metadata) -> f64 {
+#[must_use]
+pub fn group_delay_from_metadata(metadata: &Metadata) -> f64 {
     // Bruker: GRPDLY is the canonical digital-filter delay (samples,
     // typically a value like 67.98 on modern AVANCE). Where GRPDLY is
     // missing or non-positive (legacy spectrometers), fall back to the
@@ -444,7 +449,8 @@ fn group_delay_from_metadata(metadata: &Metadata) -> f64 {
 /// ```text
 /// d = 0.5 · Σ_l (order_l − 1) / Π_{k=l..h-1} factor_k
 /// ```
-fn jeol_cascade_group_delay(metadata: &Metadata) -> Option<f64> {
+#[must_use]
+pub fn jeol_cascade_group_delay(metadata: &Metadata) -> Option<f64> {
     let orders_raw = metadata.properties.get("jeol.parameter.orders")?;
     let factors_raw = metadata.properties.get("jeol.parameter.factors")?;
     let mut order_tokens = orders_raw.split_whitespace();
@@ -479,7 +485,11 @@ fn jeol_cascade_group_delay(metadata: &Metadata) -> Option<f64> {
     Some(0.5 * total)
 }
 
-fn bruker_group_delay(metadata: &Metadata) -> f64 {
+/// Returns the Bruker digital-filter group delay in samples from
+/// `GRPDLY` (modern AVANCE) or the legacy `DSPFVS + DECIM` lookup, or
+/// `0.0` when neither is available.
+#[must_use]
+pub fn bruker_group_delay(metadata: &Metadata) -> f64 {
     if let Some(grpdly) = metadata
         .properties
         .get("bruker.acqus.GRPDLY")

@@ -1027,69 +1027,12 @@ mod ruviz_example {
         Ok((unphased, phased))
     }
 
-    /// JEOL Delta digital-filter group delay from the FIR cascade
-    /// (matches `process_spectrum_auto`'s internal formula). Falls
-    /// back to `decimation_reg / filter_factor` when `orders`/
-    /// `factors` are missing on very old fixtures.
+    /// JEOL Delta digital-filter group delay, sourced from the
+    /// library's `group_delay_from_metadata` which prefers the FIR
+    /// cascade formula but accepts other vendors too. Kept as a
+    /// one-line shim so callsites read naturally.
     fn jeol_group_delay(spectrum: &Spectrum1D) -> f64 {
-        let props = &spectrum.metadata.properties;
-        if let Some(delay) = jeol_cascade_group_delay(props) {
-            return delay;
-        }
-        let factor = props
-            .get("jeol.parameter.filter_factor")
-            .and_then(|v| v.parse::<f64>().ok());
-        let decim_raw = props
-            .get("jeol.parameter.decimation_reg")
-            .and_then(|v| parse_decimation_reg(v));
-        match (decim_raw, factor) {
-            (Some(raw), Some(f)) if f > 0.0 => raw / f,
-            _ => 0.0,
-        }
-    }
-
-    fn jeol_cascade_group_delay(
-        props: &std::collections::BTreeMap<String, String>,
-    ) -> Option<f64> {
-        let orders_raw = props.get("jeol.parameter.orders")?;
-        let factors_raw = props.get("jeol.parameter.factors")?;
-        let mut order_tokens = orders_raw.split_whitespace();
-        let stage_count: usize = order_tokens.next()?.parse().ok()?;
-        if stage_count == 0 {
-            return None;
-        }
-        let orders: Vec<f64> = order_tokens
-            .by_ref()
-            .take(stage_count)
-            .map(|token| token.parse::<f64>().ok())
-            .collect::<Option<Vec<_>>>()?;
-        if orders.len() != stage_count {
-            return None;
-        }
-        let factors: Vec<f64> = factors_raw
-            .split_whitespace()
-            .take(stage_count)
-            .map(|token| token.parse::<f64>().ok())
-            .collect::<Option<Vec<_>>>()?;
-        if factors.len() != stage_count {
-            return None;
-        }
-        let mut total = 0.0_f64;
-        for l in 0..stage_count {
-            let product: f64 = factors[l..].iter().product();
-            if !product.is_finite() || product <= 0.0 {
-                return None;
-            }
-            total += (orders[l] - 1.0) / product;
-        }
-        Some(0.5 * total)
-    }
-
-    fn parse_decimation_reg(raw: &str) -> Option<f64> {
-        let trimmed = raw.trim();
-        let after = trimmed.strip_prefix("r:")?.trim_start();
-        let first_token = after.split(|c: char| !c.is_ascii_digit()).next()?;
-        first_token.parse::<f64>().ok()
+        rspin_processing::group_delay_from_metadata(&spectrum.metadata)
     }
 
     fn write_auto_phase_peak_zoom_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {

@@ -45,7 +45,10 @@ pub use auto_phase::{
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
 };
-pub use auto_processing::{AutoProcessingOptions, NucleusLbDefaults, process_spectrum_auto};
+pub use auto_processing::{
+    AutoProcessingOptions, NucleusLbDefaults, bruker_group_delay, group_delay_from_metadata,
+    jeol_cascade_group_delay, process_spectrum_auto,
+};
 pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
 };
