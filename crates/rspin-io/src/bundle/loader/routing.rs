@@ -526,12 +526,13 @@ impl SpectrumBundleLoader {
         read_2d: impl FnOnce() -> Result<Spectrum2D>,
     ) -> Result<()> {
         if is_agilent_format(format)
-            && let Some(message) = self.disabled_dimension_file_message(path) {
-                if root == path {
-                    return self.handle_error_message(bundle, root, path, message);
-                }
-                return Ok(());
+            && let Some(message) = self.disabled_dimension_file_message(path)
+        {
+            if root == path {
+                return self.handle_error_message(bundle, root, path, message);
             }
+            return Ok(());
+        }
 
         if self.one_d.is_enabled() {
             match read_1d() {

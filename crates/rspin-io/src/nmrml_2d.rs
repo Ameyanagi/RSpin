@@ -437,12 +437,13 @@ fn apply_metadata(
         }
         b"acquisitionNucleus" => {
             if let Some(dimension) = dimension_mut(raw, dimension_context)
-                && dimension.nucleus.is_none() {
-                    dimension.nucleus = attr_value(start, b"name")?
-                        .as_deref()
-                        .map(parse_nucleus)
-                        .transpose()?;
-                }
+                && dimension.nucleus.is_none()
+            {
+                dimension.nucleus = attr_value(start, b"name")?
+                    .as_deref()
+                    .map(parse_nucleus)
+                    .transpose()?;
+            }
         }
         b"irradiationFrequency" => {
             if let Some(dimension) = dimension_mut(raw, dimension_context) {
@@ -457,21 +458,23 @@ fn apply_metadata(
         }
         b"effectiveExcitationField" => {
             if let Some(dimension) = dimension_mut(raw, dimension_context)
-                && dimension.frequency_mhz.is_none() {
-                    let value = optional_f64_attr(start, b"value", "frequency value")?;
-                    let unit_name = attr_value(start, b"unitName")?;
-                    dimension.frequency_mhz = value
-                        .and_then(|frequency| frequency_to_mhz(frequency, unit_name.as_deref()));
-                }
+                && dimension.frequency_mhz.is_none()
+            {
+                let value = optional_f64_attr(start, b"value", "frequency value")?;
+                let unit_name = attr_value(start, b"unitName")?;
+                dimension.frequency_mhz =
+                    value.and_then(|frequency| frequency_to_mhz(frequency, unit_name.as_deref()));
+            }
         }
         b"sweepWidth" => {
             if let Some(dimension) = dimension_mut(raw, dimension_context)
-                && dimension.sweep_width_hz.is_none() {
-                    let value = optional_f64_attr(start, b"value", "sweep width value")?;
-                    let unit_name = attr_value(start, b"unitName")?;
-                    dimension.sweep_width_hz = value
-                        .and_then(|sweep_width| frequency_to_hz(sweep_width, unit_name.as_deref()));
-                }
+                && dimension.sweep_width_hz.is_none()
+            {
+                let value = optional_f64_attr(start, b"value", "sweep width value")?;
+                let unit_name = attr_value(start, b"unitName")?;
+                dimension.sweep_width_hz = value
+                    .and_then(|sweep_width| frequency_to_hz(sweep_width, unit_name.as_deref()));
+            }
         }
         b"sampleAcquisitionTemperature" if raw.temperature_k.is_none() => {
             let value = optional_f64_attr(start, b"value", "temperature value")?;
@@ -570,17 +573,22 @@ fn validate_declared_spectrum_points(declared: Option<usize>, actual: usize) -> 
 
 fn infer_matrix_dimensions(raw: &RawNmrMl2D, points: usize) -> Result<(usize, usize)> {
     if let (Some(x_count), Some(y_count)) = (raw.direct.point_count, raw.indirect.point_count)
-        && x_count.checked_mul(y_count) == Some(points) {
-            return Ok((x_count, y_count));
-        }
+        && x_count.checked_mul(y_count) == Some(points)
+    {
+        return Ok((x_count, y_count));
+    }
     if let Some(x_count) = raw.direct.point_count
-        && x_count > 0 && points.is_multiple_of(x_count) {
-            return Ok((x_count, points / x_count));
-        }
+        && x_count > 0
+        && points.is_multiple_of(x_count)
+    {
+        return Ok((x_count, points / x_count));
+    }
     if let Some(y_count) = raw.indirect.point_count
-        && y_count > 0 && points.is_multiple_of(y_count) {
-            return Ok((points / y_count, y_count));
-        }
+        && y_count > 0
+        && points.is_multiple_of(y_count)
+    {
+        return Ok((points / y_count, y_count));
+    }
     Err(RSpinError::InvalidSpectrum {
         message: format!("cannot infer nmrML 2D matrix dimensions for {points} processed points"),
     })
@@ -660,14 +668,15 @@ fn validate_matrix_length(
         });
     }
     if let Some(values) = imaginary.as_deref()
-        && values.len() != expected_points {
-            return Err(RSpinError::InvalidSpectrum {
-                message: format!(
-                    "nmrML 2D fidData has {} imaginary points but dimensions require {expected_points}",
-                    values.len()
-                ),
-            });
-        }
+        && values.len() != expected_points
+    {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!(
+                "nmrML 2D fidData has {} imaginary points but dimensions require {expected_points}",
+                values.len()
+            ),
+        });
+    }
     Ok((z, imaginary))
 }
 

@@ -252,14 +252,13 @@ fn build_spectrum(state: Csv2DState) -> Result<Spectrum2D> {
 
 fn finish_previous_row(row_x_index: usize, width: Option<usize>) -> Result<()> {
     if let Some(expected_width) = width
-        && row_x_index != expected_width {
-            return Err(RSpinError::Parse {
-                format: "CSV",
-                message: format!(
-                    "2D CSV row has {row_x_index} points but expected {expected_width}"
-                ),
-            });
-        }
+        && row_x_index != expected_width
+    {
+        return Err(RSpinError::Parse {
+            format: "CSV",
+            message: format!("2D CSV row has {row_x_index} points but expected {expected_width}"),
+        });
+    }
     Ok(())
 }
 

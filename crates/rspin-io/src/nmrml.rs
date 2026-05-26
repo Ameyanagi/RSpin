@@ -507,15 +507,16 @@ fn binary_payload(binary: &BinaryDataArray) -> Result<Vec<u8>> {
         .filter(|byte| !byte.is_ascii_whitespace())
         .collect::<Vec<_>>();
     if let Some(expected) = binary.encoded_length
-        && encoded.len() != expected {
-            return Err(RSpinError::Parse {
-                format: FORMAT,
-                message: format!(
-                    "encodedLength is {expected} but spectrumDataArray contains {} characters",
-                    encoded.len()
-                ),
-            });
-        }
+        && encoded.len() != expected
+    {
+        return Err(RSpinError::Parse {
+            format: FORMAT,
+            message: format!(
+                "encodedLength is {expected} but spectrumDataArray contains {} characters",
+                encoded.len()
+            ),
+        });
+    }
 
     let decoded_bytes = STANDARD
         .decode(&encoded)

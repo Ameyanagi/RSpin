@@ -478,14 +478,15 @@ fn infer_height(raw: &RawJcamp2D, real_page_count: usize, layout: AxisLayout) ->
         });
     }
     if let Some(declared) = layout.indirect_points(raw)
-        && declared != height {
-            return Err(RSpinError::Parse {
-                format: "JCAMP-DX",
-                message: format!(
-                    "2D JCAMP-DX declares {declared} y points but contains {height} pages"
-                ),
-            });
-        }
+        && declared != height
+    {
+        return Err(RSpinError::Parse {
+            format: "JCAMP-DX",
+            message: format!(
+                "2D JCAMP-DX declares {declared} y points but contains {height} pages"
+            ),
+        });
+    }
     Ok(height)
 }
 
@@ -593,15 +594,16 @@ fn validate_imaginary_pages(
             });
         };
         if let (Some(real_y), Some(imaginary_y)) = (real_page.y_value, imaginary_page.y_value)
-            && !close_enough(real_y, imaginary_y) {
-                return Err(RSpinError::Parse {
-                    format: "JCAMP-DX",
-                    message: format!(
-                        "2D JCAMP-DX imaginary page {} coordinate does not match real page",
-                        row_index + 1
-                    ),
-                });
-            }
+            && !close_enough(real_y, imaginary_y)
+        {
+            return Err(RSpinError::Parse {
+                format: "JCAMP-DX",
+                message: format!(
+                    "2D JCAMP-DX imaginary page {} coordinate does not match real page",
+                    row_index + 1
+                ),
+            });
+        }
     }
     Ok(())
 }

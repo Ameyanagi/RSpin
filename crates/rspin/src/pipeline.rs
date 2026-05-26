@@ -140,9 +140,7 @@ mod tests {
     fn synthetic_fid(npts: u32, dwell: f64) -> Spectrum1D {
         let axis_values: Vec<f64> = (0..npts).map(|i| f64::from(i) * dwell).collect();
         let axis = Axis::new("time", Unit::Seconds, axis_values).expect("axis");
-        let intensities: Vec<f64> = (0..npts)
-            .map(|i| (f64::from(i) * 0.1).cos())
-            .collect();
+        let intensities: Vec<f64> = (0..npts).map(|i| (f64::from(i) * 0.1).cos()).collect();
         let imag: Vec<f64> = (0..npts).map(|i| (f64::from(i) * 0.1).sin()).collect();
         let metadata = Metadata::default()
             .with_frequency_mhz(400.0)
