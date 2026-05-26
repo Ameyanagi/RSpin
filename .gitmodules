@@ -1,0 +1,12 @@
+[submodule "external-testdata/cheminfo/bruker-data-test"]
+	path = external-testdata/cheminfo/bruker-data-test
+	url = https://github.com/Ameyanagi/bruker-data-test.git
+[submodule "external-testdata/cheminfo/jeol-data-test"]
+	path = external-testdata/cheminfo/jeol-data-test
+	url = https://github.com/Ameyanagi/jeol-data-test.git
+[submodule "external-testdata/cheminfo/jcamp-data-test"]
+	path = external-testdata/cheminfo/jcamp-data-test
+	url = https://github.com/Ameyanagi/jcamp-data-test.git
+[submodule "external-testdata/cheminfo/nmredata-data-test"]
+	path = external-testdata/cheminfo/nmredata-data-test
+	url = https://github.com/Ameyanagi/nmredata-data-test.git
