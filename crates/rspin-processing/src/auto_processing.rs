@@ -102,6 +102,13 @@ pub struct AutoProcessingOptions {
     /// ramp and produces visibly wrong dispersive spikes. Fix the
     /// upstream group-delay first.
     pub polynomial_phase_refine: bool,
+    /// Optional override for the auto-phase strategy + tuning. When
+    /// `None`, the orchestrator uses [`AutoPhaseOptions::default`]
+    /// (currently the Regions algorithm of Zorin 2017). Use this to
+    /// force the peak-warmed or ACME-only strategies when Regions
+    /// converges on a local minimum that leaves residual phase on
+    /// outlier peaks.
+    pub auto_phase_options: Option<AutoPhaseOptions>,
     /// When `true`, apply [`subtract_baseline`] with the Whittaker
     /// AsLS-family default after auto-phase.
     pub subtract_baseline: bool,
@@ -123,6 +130,7 @@ impl Default for AutoProcessingOptions {
             zero_fill_multiplier: 2,
             auto_phase: true,
             polynomial_phase_refine: false,
+            auto_phase_options: None,
             subtract_baseline: true,
         }
     }
@@ -298,10 +306,17 @@ pub fn process_spectrum_auto(
     //    residual frequency-dependent phase from a digital-filter
     //    compensator.
     let after_phase = if options.auto_phase {
+        // Default to GlobalCost (ACME entropy) so weak peaks like
+        // solvent triplets contribute equally to the phase fit. The
+        // Regions weighted regression is more robust on dense
+        // multi-region spectra but underweights isolated outliers.
+        let phase_opts = options.auto_phase_options.unwrap_or_else(|| {
+            AutoPhaseOptions::default().with_strategy(crate::AutoPhaseStrategy::GlobalCost)
+        });
         if options.polynomial_phase_refine {
-            auto_phase_correct_polynomial(&after_fft, AutoPhaseOptions::default())?.spectrum
+            auto_phase_correct_polynomial(&after_fft, phase_opts)?.spectrum
         } else {
-            auto_phase_correct(&after_fft, AutoPhaseOptions::default())?.spectrum
+            auto_phase_correct(&after_fft, phase_opts)?.spectrum
         }
     } else {
         after_fft
