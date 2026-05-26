@@ -399,6 +399,43 @@ fn matched_filter_em_rejects_frequency_domain_input() -> anyhow::Result<()> {
 }
 
 #[test]
+fn first_point_scale_halves_only_the_first_sample() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![2.0, 4.0, 6.0, 8.0],
+        Some(vec![1.0, 3.0, 5.0, 7.0]),
+        Metadata::default(),
+    )?;
+    let processed = first_point_scale(&spectrum, 0.5)?;
+    assert_vec_close(&processed.intensities, &[1.0, 4.0, 6.0, 8.0]);
+    assert_vec_close(require_imaginary(&processed)?, &[0.5, 3.0, 5.0, 7.0]);
+    assert_eq!(processed.processing[0].operation, "first_point_scale");
+    Ok(())
+}
+
+#[test]
+fn first_point_scale_with_unit_scale_is_identity() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = first_point_scale(&spectrum, 1.0)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    Ok(())
+}
+
+#[test]
+fn first_point_scale_rejects_invalid_scale() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(first_point_scale(&spectrum, 0.0).is_err());
+    assert!(first_point_scale(&spectrum, -1.0).is_err());
+    assert!(first_point_scale(&spectrum, f64::NAN).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

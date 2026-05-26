@@ -68,10 +68,10 @@ pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
 pub use transform::remove_group_delay;
 pub use transform::{
-    ConvolutionDifferenceApodization, ExponentialApodization, Fft1D, FftDirection,
+    ConvolutionDifferenceApodization, ExponentialApodization, Fft1D, FftDirection, FirstPointScale,
     GaussMultiplyBrukerApodization, GaussianApodization, LorentzToGaussApodization, Magnitude,
     PhaseCorrection, SineBellApodization, TrafApodization, TrapezoidalApodization,
-    convolution_difference_apodization, exponential_apodization, fft_1d,
+    convolution_difference_apodization, exponential_apodization, fft_1d, first_point_scale,
     gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
     magnitude_spectrum, matched_filter_em, phase_correct, sine_bell_apodization, traf_apodization,
     trapezoidal_apodization,

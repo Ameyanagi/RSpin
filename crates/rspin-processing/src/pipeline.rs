@@ -4,7 +4,7 @@ use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
     Abs1D, AutoPhaseOptions, BaselineMethod, ConvolutionDifferenceApodization, Crop1D,
-    ExponentialApodization, Fft1D, FftDirection, GaussMultiplyBrukerApodization,
+    ExponentialApodization, Fft1D, FftDirection, FirstPointScale, GaussMultiplyBrukerApodization,
     GaussianApodization, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
     OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
     SineBellApodization, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
@@ -206,6 +206,18 @@ impl Spectrum1DPipeline {
             rise_end_fraction,
             fall_start_fraction,
         ))
+    }
+
+    /// Scales the first sample of the FID by `scale` (typically 0.5).
+    #[must_use]
+    pub fn first_point_scale(self, scale: f64) -> Self {
+        self.then(FirstPointScale::new(scale))
+    }
+
+    /// Scales the first sample of the FID by 0.5 (the FCOR=0.5 default).
+    #[must_use]
+    pub fn first_point_half(self) -> Self {
+        self.then(FirstPointScale::half())
     }
 
     /// Applies sine-bell apodization to real and imaginary channels.

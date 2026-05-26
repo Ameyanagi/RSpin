@@ -7,10 +7,10 @@ use rspin_io::read_processing_recipe_1d_json;
 use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
     apply_processing_recipe_1d_until, convolution_difference_apodization, crop_1d,
-    exponential_apodization, fft_1d, gauss_multiply_bruker_apodization, gaussian_apodization,
-    lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area, offset_intensity,
-    phase_correct, resample_1d, shift_axis, sine_bell_apodization, subtract_baseline,
-    traf_apodization, trapezoidal_apodization, zero_fill,
+    exponential_apodization, fft_1d, first_point_scale, gauss_multiply_bruker_apodization,
+    gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
+    offset_intensity, phase_correct, resample_1d, shift_axis, sine_bell_apodization,
+    subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
@@ -276,6 +276,21 @@ pub fn trapezoidal_apodization_spectrum_1d_json(
     spectrum1d_to_json(&processed)
 }
 
+/// Scales the first sample of a serialized `Spectrum1D` FID.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn first_point_scale_spectrum_1d_json(
+    spectrum_json: &str,
+    options_json: &str,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let options: FirstPointScaleJson = from_json(options_json)?;
+    let processed = first_point_scale(&spectrum, options.scale)?;
+    spectrum1d_to_json(&processed)
+}
+
 /// Applies sine-bell apodization to serialized `Spectrum1D` JSON.
 ///
 /// # Errors
@@ -420,6 +435,11 @@ struct TrafApodizationJson {
 struct TrapezoidalApodizationJson {
     rise_end_fraction: f64,
     fall_start_fraction: f64,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize)]
+struct FirstPointScaleJson {
+    scale: f64,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize)]

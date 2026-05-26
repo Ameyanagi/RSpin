@@ -550,6 +550,51 @@ impl ProcessingStep<Spectrum1D> for TrapezoidalApodization {
     }
 }
 
+/// Scales the first sample of a time-domain FID by a constant.
+///
+/// The canonical recipe is `s[0] *= 0.5` (the `FCOR = 0.5` convention
+/// from Bruker `procs` and nmrPipe's `-fn FT -auto`). A one-sided
+/// (causal) cosine-FT treats `s[0]` as if it spanned `[-Δt/2, Δt/2]`;
+/// without this correction `s[0]` contributes a constant DC bias that
+/// shows up as a half-height baseline offset under the whole spectrum
+/// and biases any downstream integration or baseline fit.
+///
+/// Apply this step **after** apodization and **before** zero-fill /
+/// FFT so it matches the `nmrPipe` / `TopSpin` pipeline order. Scaling
+/// always operates on the first sample of both the real and (when
+/// present) the imaginary channel.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FirstPointScale {
+    /// Multiplier applied to `s[0]`. Defaults to 0.5 (`FCOR = 0.5`).
+    pub scale: f64,
+}
+
+impl FirstPointScale {
+    /// Creates a first-point scaling step with an explicit scale.
+    #[must_use]
+    pub fn new(scale: f64) -> Self {
+        Self { scale }
+    }
+
+    /// Creates the standard `FCOR = 0.5` first-point scaling step.
+    #[must_use]
+    pub fn half() -> Self {
+        Self { scale: 0.5 }
+    }
+}
+
+impl Default for FirstPointScale {
+    fn default() -> Self {
+        Self::half()
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for FirstPointScale {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        first_point_scale(spectrum, self.scale)
+    }
+}
+
 /// Converts a complex spectrum to magnitude mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Magnitude;
@@ -999,6 +1044,34 @@ pub fn trapezoidal_apodization(
         ProcessingRecord::new("trapezoidal_apodization").with_details(format!(
             "rise_end_fraction={rise_end_fraction},fall_start_fraction={fall_start_fraction}"
         )),
+    ))
+}
+
+/// Scales the first sample of a time-domain FID by a constant.
+///
+/// See [`FirstPointScale`] for the recipe and motivation.
+///
+/// # Errors
+///
+/// Returns an error when `scale` is non-finite or non-positive.
+pub fn first_point_scale(spectrum: &Spectrum1D, scale: f64) -> Result<Spectrum1D> {
+    ensure_finite("scale", scale)?;
+    if scale <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "first-point scale must be positive".to_owned(),
+        });
+    }
+    let mut processed = spectrum.clone();
+    if let Some(first) = processed.intensities.get_mut(0) {
+        *first *= scale;
+    }
+    if let Some(imag) = processed.imaginary.as_mut() {
+        if let Some(first) = imag.get_mut(0) {
+            *first *= scale;
+        }
+    }
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("first_point_scale").with_details(format!("scale={scale}")),
     ))
 }
 

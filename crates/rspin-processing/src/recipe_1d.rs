@@ -7,10 +7,10 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
     convolution_difference_apodization, crop_1d, exponential_apodization, fft_1d,
-    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
-    magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
-    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
-    traf_apodization, trapezoidal_apodization, zero_fill,
+    first_point_scale, gauss_multiply_bruker_apodization, gaussian_apodization,
+    lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area, normalize_max_abs,
+    offset_intensity, phase_correct, resample_1d, scale_intensity, shift_axis,
+    sine_bell_apodization, subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -121,6 +121,11 @@ pub enum ProcessingOperation1D {
         /// Fraction of the FID where the ramp-down begins, in `[0, 1]`.
         fall_start_fraction: f64,
     },
+    /// Scales the first sample of the FID (typically by 0.5).
+    FirstPointScale {
+        /// Multiplier applied to `s[0]`.
+        scale: f64,
+    },
     /// Applies sine-bell apodization to real and imaginary channels.
     SineBellApodization {
         /// Start angle in degrees.
@@ -226,6 +231,7 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 rise_end_fraction,
                 fall_start_fraction,
             } => trapezoidal_apodization(spectrum, *rise_end_fraction, *fall_start_fraction),
+            Self::FirstPointScale { scale } => first_point_scale(spectrum, *scale),
             Self::SineBellApodization {
                 start_angle_deg,
                 end_angle_deg,
@@ -487,6 +493,18 @@ impl ProcessingRecipe1D {
             rise_end_fraction,
             fall_start_fraction,
         })
+    }
+
+    /// Appends a first-point scaling operation (default 0.5).
+    #[must_use]
+    pub fn first_point_scale(self, scale: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::FirstPointScale { scale })
+    }
+
+    /// Appends a first-point scaling operation with `scale = 0.5`.
+    #[must_use]
+    pub fn first_point_half(self) -> Self {
+        self.first_point_scale(0.5)
     }
 
     /// Appends a sine-bell apodization operation.
