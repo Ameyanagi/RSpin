@@ -1465,59 +1465,108 @@ mod ruviz_example {
         })?;
         let fixture_root = root.join("crates/rspin-io/testdata");
 
+        // Vendor showcase matrix: every vendor gets ¹H + ¹³C entries
+        // (and 2D below) where a permissively-licensed fixture exists.
         let entries: &[VendorShowcaseEntry] = &[
+            // ── Bruker ─────────────────────────────────────────
             VendorShowcaseEntry {
                 vendor: "bruker",
-                stem: "processed_1h_zenodo",
-                title: "Bruker processed 1H (Zenodo MIT)",
-                fixture: "zenodo_7100132/bruker_without_expno",
-            },
-            VendorShowcaseEntry {
-                vendor: "bruker",
-                stem: "raw_1h_myrcene_nmrxiv",
-                title: "Bruker raw 1H FID (NMRXiv CC0 Myrcene)",
+                stem: "myrcene_1h_raw_nmrxiv",
+                title: "Bruker 1H raw FID — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/bruker_1h_raw",
             },
             VendorShowcaseEntry {
+                vendor: "bruker",
+                stem: "zenodo_processed_1h",
+                title: "Bruker 1H processed — Zenodo MIT",
+                fixture: "zenodo_7100132/bruker_without_expno",
+            },
+            // ── Varian / Agilent ───────────────────────────────
+            VendorShowcaseEntry {
                 vendor: "varian",
-                stem: "raw_1h_zenodo",
-                title: "Varian/Agilent raw 1H FID (Zenodo MIT)",
+                stem: "zenodo_1h_raw",
+                title: "Varian/Agilent 1H raw FID — Zenodo MIT",
                 fixture: "zenodo_7100132/varian_1h",
             },
+            // ── JEOL Delta ─────────────────────────────────────
             VendorShowcaseEntry {
                 vendor: "jeol",
                 stem: "myrcene_1h_nmrxiv",
-                title: "JEOL 1H (NMRXiv CC0 Myrcene)",
+                title: "JEOL 1H — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
             },
             VendorShowcaseEntry {
                 vendor: "jeol",
                 stem: "myrcene_13c_nmrxiv",
-                title: "JEOL 13C (NMRXiv CC0 Myrcene)",
+                title: "JEOL 13C — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
             },
             VendorShowcaseEntry {
                 vendor: "jeol",
                 stem: "rutin_qh_dataverse",
-                title: "JEOL 1H (Dataverse CC0 Rutin)",
+                title: "JEOL 1H — Rutin (Dataverse CC0)",
                 fixture: "dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
             },
             VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "rutin_13c_dataverse",
+                title: "JEOL 13C — Rutin (Dataverse CC0)",
+                fixture: "dataverse/cc0/rutin/jeol/rutin_13cnmr_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "eucalyptol_qh_nmrxiv",
+                title: "JEOL 1H — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jeol/eucalyptol_qhnmr_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "eucalyptol_13c_nmrxiv",
+                title: "JEOL 13C — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jeol/eucalyptol_13cnmr_400mhz.jdf",
+            },
+            // ── JCAMP-DX ───────────────────────────────────────
+            VendorShowcaseEntry {
                 vendor: "jcamp",
                 stem: "myrcene_1h_nmrxiv",
-                title: "JCAMP-DX 1H (NMRXiv CC0 Myrcene)",
+                title: "JCAMP-DX 1H — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
             },
             VendorShowcaseEntry {
                 vendor: "jcamp",
+                stem: "myrcene_13c_nmrxiv",
+                title: "JCAMP-DX 13C — Myrcene (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
                 stem: "rutin_qh_dataverse",
-                title: "JCAMP-DX 1H (Dataverse CC0 Rutin)",
+                title: "JCAMP-DX 1H — Rutin (Dataverse CC0)",
                 fixture: "dataverse/cc0/rutin/jcamp/rutin_qh_400mhz.jdx",
             },
             VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "rutin_13c_dataverse",
+                title: "JCAMP-DX 13C — Rutin (Dataverse CC0)",
+                fixture: "dataverse/cc0/rutin/jcamp/rutin_13c_400mhz.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "eucalyptol_qh_nmrxiv",
+                title: "JCAMP-DX 1H — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jcamp/eucalyptol_qh_400mhz_jcamp_dx_6_link.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "eucalyptol_13c_nmrxiv",
+                title: "JCAMP-DX 13C — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jcamp/eucalyptol_13c_400mhz_jcamp_dx_6_link.jdx",
+            },
+            // ── nmrML ──────────────────────────────────────────
+            VendorShowcaseEntry {
                 vendor: "nmrml",
                 stem: "mmbbi_10m12_mit",
-                title: "nmrML example (MIT)",
+                title: "nmrML 1H — MMBBI 10M12 (MIT)",
                 fixture: "nmrml/mit/MMBBI_10M12-CE01-1a.nmrML",
             },
         ];
@@ -1533,15 +1582,27 @@ mod ruviz_example {
         let contour_entries: &[VendorContourEntry] = &[
             VendorContourEntry {
                 vendor: "bruker",
-                stem: "cosy_2d_myrcene_nmrxiv",
-                title: "Bruker raw COSY 2D (NMRXiv CC0 Myrcene)",
+                stem: "myrcene_cosy_2d_nmrxiv",
+                title: "Bruker COSY 2D — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/bruker_cosy_raw",
             },
             VendorContourEntry {
                 vendor: "jeol",
-                stem: "hsqc_2d_myrcene_nmrxiv",
-                title: "JEOL HSQC 2D (NMRXiv CC0 Myrcene)",
+                stem: "myrcene_hsqc_2d_nmrxiv",
+                title: "JEOL HSQC 2D — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_hsqc_400mhz.jdf",
+            },
+            VendorContourEntry {
+                vendor: "jeol",
+                stem: "eucalyptol_hsqc_2d_nmrxiv",
+                title: "JEOL HSQC 2D — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf",
+            },
+            VendorContourEntry {
+                vendor: "jcamp",
+                stem: "eucalyptol_hsqc_2d_nmrxiv",
+                title: "JCAMP-DX HSQC 2D — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jcamp/eucalyptol_hsqc_400mhz_jcamp_dx_6_link.jdx",
             },
         ];
         for entry in contour_entries {
@@ -1598,7 +1659,63 @@ mod ruviz_example {
             &processed.intensities,
             "spectrum",
         )?;
+
+        // Companion zoom plot, clipped to the signal-bearing window.
+        if let Some((lo, hi)) = signal_window(&processed.x.values, &processed.intensities, 0.08) {
+            let mut xs = Vec::new();
+            let mut ys = Vec::new();
+            for (x, y) in processed.x.values.iter().zip(&processed.intensities) {
+                if *x >= lo && *x <= hi {
+                    xs.push(*x);
+                    ys.push(*y);
+                }
+            }
+            if xs.len() >= 4 {
+                let zoom_path = out_dir.join(format!("{}_zoom.png", entry.stem));
+                write_spectrum_plot(
+                    &zoom_path,
+                    &format!("{} — zoom", entry.title),
+                    axis_label(processed.x.unit),
+                    "normalized intensity",
+                    &xs,
+                    &ys,
+                    "spectrum (signal window)",
+                )?;
+            }
+        }
         Ok(())
+    }
+
+    /// Auto-detects the signal-bearing window on a normalized spectrum
+    /// by finding the leftmost/rightmost x where `|y|` first exceeds
+    /// `threshold_fraction × peak`, then padding 10 % on each side.
+    /// Returns `None` for spectra with no clear signal.
+    fn signal_window(x: &[f64], y: &[f64], threshold_fraction: f64) -> Option<(f64, f64)> {
+        let peak = y
+            .iter()
+            .copied()
+            .fold(0.0_f64, |acc, value| acc.max(value.abs()));
+        if !peak.is_finite() || peak <= 0.0 {
+            return None;
+        }
+        let threshold = peak * threshold_fraction;
+        let mut x_lo = f64::INFINITY;
+        let mut x_hi = f64::NEG_INFINITY;
+        for (xi, yi) in x.iter().zip(y) {
+            if yi.abs() >= threshold && xi.is_finite() {
+                if *xi < x_lo {
+                    x_lo = *xi;
+                }
+                if *xi > x_hi {
+                    x_hi = *xi;
+                }
+            }
+        }
+        if !x_lo.is_finite() || !x_hi.is_finite() || x_lo >= x_hi {
+            return None;
+        }
+        let pad = 0.10 * (x_hi - x_lo);
+        Some((x_lo - pad, x_hi + pad))
     }
 
     fn relabel_hz_to_ppm(mut spectrum: Spectrum1D) -> Spectrum1D {
