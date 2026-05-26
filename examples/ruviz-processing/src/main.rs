@@ -60,6 +60,7 @@ mod ruviz_example {
         write_auto_processing_plot(&root, &output_dir)?;
         let vendor_dir = output_dir.join("vendors");
         write_vendor_showcase(&root, &vendor_dir)?;
+        write_jeol_group_delay_comparison(&root, &output_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
         write_oracle_visual_artifacts(&root, &visual_output_dir)?;
 
@@ -1454,6 +1455,54 @@ mod ruviz_example {
             .map(|i| base * ratio.powi(i as i32))
             .filter(|level| *level <= max_abs)
             .collect()
+    }
+
+    /// Generates a single comparison PNG for the Eucalyptol 13C JEOL
+    /// fixture showing process_spectrum_auto output at the FIR-cascade
+    /// group-delay value (~19.66 samples, library default) overlaid
+    /// against the empirically-swept optimum (~16.46 samples).
+    fn write_jeol_group_delay_comparison(root: &Path, output_dir: &Path) -> Result<()> {
+        let fixture = root
+            .join("crates/rspin-io/testdata/nmrxiv/cc0/eucalyptol/jeol/eucalyptol_13cnmr_400mhz.jdf");
+        let bundle = load_spectra(&fixture)
+            .with_context(|| format!("failed to load fixture {}", fixture.display()))?;
+        let fid = bundle
+            .spectra_1d()
+            .next()
+            .context("eucalyptol 13C fixture has no 1D spectrum")?;
+
+        let run = |gd: Option<f64>| -> Result<Spectrum1D> {
+            let opts = AutoProcessingOptions {
+                group_delay_samples: gd,
+                subtract_baseline: false,
+                ..AutoProcessingOptions::default()
+            };
+            let processed = process_spectrum_auto(fid, &opts)?;
+            let normalized = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&processed)?;
+            Ok(normalized)
+        };
+
+        let cascade = run(None)?;
+        let empirical = run(Some(16.46))?;
+
+        let title = "JEOL 13C — Eucalyptol — group-delay cascade vs empirical sweep";
+        let png_path = output_dir.join("auto_processing_jeol_eucalyptol_13c_group_delay.png");
+        nmr_plot_base(
+            title,
+            "chemical shift / ppm",
+            "normalized intensity",
+            &cascade.x.values,
+            &[&cascade.intensities, &empirical.intensities],
+            cascade.x.unit,
+        )
+        .line(&cascade.x.values, &cascade.intensities)
+        .label("cascade (19.66, library default)")
+        .line(&empirical.x.values, &empirical.intensities)
+        .label("empirical optimum (16.46)")
+        .save(path_to_str(&png_path)?)?;
+        Ok(())
     }
 
     fn write_vendor_showcase(root: &Path, output_dir: &Path) -> Result<()> {
