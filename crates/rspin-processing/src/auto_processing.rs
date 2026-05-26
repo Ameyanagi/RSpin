@@ -380,7 +380,19 @@ fn group_delay_from_metadata(metadata: &Metadata) -> f64 {
         return bruker;
     }
 
-    // JEOL: decimation_reg / filter_factor (encoded as e.g. "r:60").
+    // JEOL: `decimation_reg / filter_factor` is the canonical formula
+    // (decimation_reg is the FIR delay at the original ADC rate; the
+    // ratio converts to stored-rate samples).
+    //
+    // Calibration on the curated Myrcene fixtures shows this matches
+    // the empirically-required delay almost exactly for ¹H (≈ 52.125
+    // samples, residual ph1 ≈ +5°), but underestimates ¹³C by ~5
+    // stored-rate samples (formula gives 12.375, empirical best is
+    // ≈ 17). The remaining discrepancy is not explained by any of
+    // `orders`, `factors`, `filter_width`, `acq_delay`, or
+    // `irr_dec_merit_factor` from the public JEOL `.jdf` schema.
+    // We accept the formula as-is here; users with broader 13C
+    // fixtures should pass `group_delay_samples` explicitly.
     let factor = metadata
         .properties
         .get("jeol.parameter.filter_factor")
