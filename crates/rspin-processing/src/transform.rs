@@ -81,6 +81,34 @@ impl SineBellApodization {
             exponent,
         }
     }
+
+    /// Creates the unshifted sine-squared window (`nmrPipe -fn SP -off 0 -end 1 -pow 2`).
+    #[must_use]
+    pub fn sine_squared() -> Self {
+        Self::new(0.0, 180.0, 2.0)
+    }
+
+    /// Creates the cosine-bell window (`nmrPipe -fn SP -off 0.5 -end 1 -pow 1`),
+    /// equivalent to a Hann window.
+    #[must_use]
+    pub fn cosine_bell() -> Self {
+        Self::new(90.0, 180.0, 1.0)
+    }
+
+    /// Creates the cosine-squared window (`nmrPipe -fn SP -off 0.5 -end 1 -pow 2`),
+    /// the standard biomolecular HSQC indirect-dimension default.
+    #[must_use]
+    pub fn cosine_squared() -> Self {
+        Self::new(90.0, 180.0, 2.0)
+    }
+
+    /// Creates a shifted-sine window with a start fraction (`off`) in
+    /// `[0, 1]` and an explicit positive exponent, matching nmrPipe's
+    /// `-fn SP -off <off> -end 1 -pow <exp>` convention.
+    #[must_use]
+    pub fn shifted_sine(offset_fraction: f64, exponent: f64) -> Self {
+        Self::new(offset_fraction * 180.0, 180.0, exponent)
+    }
 }
 
 impl ProcessingStep<Spectrum1D> for SineBellApodization {

@@ -335,6 +335,27 @@ fn convolution_difference_rejects_invalid_parameters() -> anyhow::Result<()> {
 }
 
 #[test]
+fn sine_bell_convenience_constructors_match_nmrpipe_defaults() {
+    let sine_squared = SineBellApodization::sine_squared();
+    assert_close(sine_squared.start_angle_deg, 0.0);
+    assert_close(sine_squared.end_angle_deg, 180.0);
+    assert_close(sine_squared.exponent, 2.0);
+
+    let cosine_bell = SineBellApodization::cosine_bell();
+    assert_close(cosine_bell.start_angle_deg, 90.0);
+    assert_close(cosine_bell.exponent, 1.0);
+
+    let cosine_squared = SineBellApodization::cosine_squared();
+    assert_close(cosine_squared.start_angle_deg, 90.0);
+    assert_close(cosine_squared.exponent, 2.0);
+
+    let shifted = SineBellApodization::shifted_sine(0.25, 1.5);
+    assert_close(shifted.start_angle_deg, 45.0);
+    assert_close(shifted.end_angle_deg, 180.0);
+    assert_close(shifted.exponent, 1.5);
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;
