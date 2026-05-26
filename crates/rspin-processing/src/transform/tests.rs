@@ -356,6 +356,49 @@ fn sine_bell_convenience_constructors_match_nmrpipe_defaults() {
 }
 
 #[test]
+fn matched_filter_em_recovers_lorentzian_fwhm() -> anyhow::Result<()> {
+    // Quadrature FID at a single off-centre frequency. The complex
+    // (cosine+i·sine) carrier gives a one-sided Lorentzian in the
+    // magnitude spectrum whose FWHM in Hz equals the decay constant
+    // `lb_true_hz` exactly (the textbook matched-filter case).
+    let lb_true_hz = 5.0_f64;
+    let n: u32 = 2048;
+    let dwell = 1.0e-3_f64;
+    let carrier_hz = 80.0_f64;
+    let mut times = Vec::with_capacity(usize::try_from(n)?);
+    let mut real = Vec::with_capacity(usize::try_from(n)?);
+    let mut imag = Vec::with_capacity(usize::try_from(n)?);
+    for i in 0..n {
+        let t = f64::from(i) * dwell;
+        times.push(t);
+        let decay = (-PI * lb_true_hz * t).exp();
+        let phase = 2.0 * PI * carrier_hz * t;
+        real.push(decay * phase.cos());
+        imag.push(decay * phase.sin());
+    }
+    let axis = Axis::new("time", Unit::Seconds, times)?;
+    let fid = Spectrum1D::new_complex(axis, real, Some(imag), Metadata::default())?;
+    let recommended = matched_filter_em(&fid)?;
+    let relative_error = (recommended.line_broadening_hz - lb_true_hz).abs() / lb_true_hz;
+    assert!(
+        relative_error < 0.2,
+        "expected lb ≈ {lb_true_hz}, got {} (rel. error {:.2})",
+        recommended.line_broadening_hz,
+        relative_error
+    );
+    assert_close(recommended.dwell_time_s, dwell);
+    Ok(())
+}
+
+#[test]
+fn matched_filter_em_rejects_frequency_domain_input() -> anyhow::Result<()> {
+    let axis = Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 16)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0; 16], Metadata::default())?;
+    assert!(matched_filter_em(&spectrum).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

@@ -254,6 +254,109 @@ impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
     }
 }
 
+/// Estimates an SNR-optimal exponential apodization from a time-domain FID
+/// (the "matched filter" recipe of Ernst).
+///
+/// The natural linewidth that maximises the post-FFT SNR equals the
+/// Lorentzian FWHM of the strongest peak in the un-apodized magnitude
+/// spectrum. This helper performs a forward FFT internally, picks the
+/// largest magnitude peak, measures its full width at half maximum in
+/// Hz (or ppm × `frequency_mhz`), and returns the matched
+/// [`ExponentialApodization`] you should apply *before* zero-filling
+/// and FFT.
+///
+/// # Errors
+///
+/// Returns an error when the input is not a time-domain spectrum
+/// (axis unit must be `Seconds`), the dwell time cannot be inferred,
+/// the spectrum is too short to FFT, or the FWHM cannot be measured.
+pub fn matched_filter_em(spectrum: &Spectrum1D) -> Result<ExponentialApodization> {
+    if spectrum.x.unit != Unit::Seconds {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em requires a time-domain FID (axis unit = Seconds)"
+                .to_owned(),
+        });
+    }
+    let dwell =
+        uniform_step(&spectrum.x.values)
+            .map(f64::abs)
+            .ok_or(RSpinError::InvalidSpectrum {
+                message: "matched_filter_em requires a uniformly-spaced time axis".to_owned(),
+            })?;
+    if dwell <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em requires a positive dwell time".to_owned(),
+        });
+    }
+    if spectrum.len() < 8 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em requires at least 8 FID points".to_owned(),
+        });
+    }
+
+    let frequency = fft_1d(spectrum, FftDirection::Forward)?;
+    let magnitude = magnitude_spectrum(&frequency)?;
+    let mut peak_index = 0_usize;
+    let mut peak_value = f64::NEG_INFINITY;
+    for (index, value) in magnitude.intensities.iter().enumerate() {
+        if *value > peak_value {
+            peak_value = *value;
+            peak_index = index;
+        }
+    }
+    if !peak_value.is_finite() || peak_value <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em could not find a positive peak".to_owned(),
+        });
+    }
+    let half = peak_value / 2.0;
+    let mut left = peak_index;
+    while left > 0 && magnitude.intensities[left - 1] > half {
+        left -= 1;
+    }
+    let mut right = peak_index;
+    while right + 1 < magnitude.intensities.len() && magnitude.intensities[right + 1] > half {
+        right += 1;
+    }
+    if right <= left {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em could not measure a peak FWHM".to_owned(),
+        });
+    }
+    let fwhm_axis = (magnitude.x.values[right] - magnitude.x.values[left]).abs();
+    let fwhm_hz = match magnitude.x.unit {
+        Unit::Hertz => fwhm_axis,
+        Unit::Ppm => match magnitude.metadata.frequency_mhz {
+            Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
+                fwhm_axis * freq_mhz.abs()
+            }
+            _ => {
+                return Err(RSpinError::InvalidSpectrum {
+                    message: "matched_filter_em needs metadata.frequency_mhz for ppm axes"
+                        .to_owned(),
+                });
+            }
+        },
+        _ => {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "matched_filter_em produced an unsupported frequency axis unit".to_owned(),
+            });
+        }
+    };
+    if !fwhm_hz.is_finite() || fwhm_hz <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em produced a non-positive FWHM".to_owned(),
+        });
+    }
+    // The magnitude spectrum of a Lorentzian decays as
+    // 1/sqrt(α² + (2πΔ)²), whose FWHM in Hz equals √3·LB while the
+    // absorption-mode (phased real) Lorentzian has FWHM = LB. The
+    // SNR-optimal exponential decay matches LB, so divide out the √3
+    // factor we picked up by measuring on the magnitude spectrum.
+    let lb_hz = fwhm_hz / 3.0_f64.sqrt();
+    Ok(ExponentialApodization::new(lb_hz, dwell))
+}
+
 /// Applies convolution-difference apodization
 /// (Campbell, Dobson, Williams, Xavier 1973).
 ///

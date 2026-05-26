@@ -73,7 +73,7 @@ pub use transform::{
     PhaseCorrection, SineBellApodization, TrafApodization, TrapezoidalApodization,
     convolution_difference_apodization, exponential_apodization, fft_1d,
     gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
-    magnitude_spectrum, phase_correct, sine_bell_apodization, traf_apodization,
+    magnitude_spectrum, matched_filter_em, phase_correct, sine_bell_apodization, traf_apodization,
     trapezoidal_apodization,
 };
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
