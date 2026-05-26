@@ -34,7 +34,10 @@ mod ruviz_example {
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
         ProcessSpectrum2D, ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks,
-        fit_baseline, remove_group_delay,
+        convolution_difference_apodization, exponential_apodization, fit_baseline,
+        gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
+        magnitude_spectrum, matched_filter_em, remove_group_delay, traf_apodization,
+        trapezoidal_apodization,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -53,6 +56,7 @@ mod ruviz_example {
         write_baseline_plot(&output_dir.join("processed_baseline.png"))?;
         write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))?;
         write_curated_auto_phase_plot(&root, &output_dir)?;
+        write_apodization_comparison_plot(&root, &output_dir)?;
         let vendor_dir = output_dir.join("vendors");
         write_vendor_showcase(&root, &vendor_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
@@ -194,6 +198,113 @@ mod ruviz_example {
             write_jeol_method_panel(root, output_dir, path, stem, title)?;
         }
         write_varian_method_panel(root, output_dir)?;
+        Ok(())
+    }
+
+    fn write_apodization_comparison_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        let fixture = root.join(
+            "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+        );
+        let bundle = load_spectra(fixture)?;
+        let Some(fid) = bundle.spectra_1d().next() else {
+            return Ok(());
+        };
+        if fid.x.unit != Unit::Seconds || fid.imaginary.is_none() {
+            return Ok(());
+        }
+        let group_delay = jeol_group_delay(fid);
+        let shifted = if group_delay > 0.0 {
+            remove_group_delay(fid, group_delay)?
+        } else {
+            fid.clone()
+        };
+        let dwell = dwell_time_seconds(&shifted)?;
+        let zero_fill_len = shifted
+            .len()
+            .checked_mul(2)
+            .context("apodization comparison target length overflow")?;
+
+        // Builds each apodised+FFT+auto-phased spectrum from the same FID
+        // so the only difference between panels is the window function.
+        let apodise_and_phase = |windowed: Spectrum1D| -> Result<Spectrum1D> {
+            let processed = ProcessingRecipe1D::new()
+                .zero_fill(zero_fill_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs()
+                .apply(&windowed)?;
+            let processed = relabel_hz_to_ppm(processed);
+            let phased = auto_phase_correct(&processed, AutoPhaseOptions::default())?;
+            Ok(phased.spectrum)
+        };
+        let magnitude_only = |windowed: Spectrum1D| -> Result<Spectrum1D> {
+            let processed = ProcessingRecipe1D::new()
+                .zero_fill(zero_fill_len)
+                .fft(FftDirection::Forward)
+                .apply(&windowed)?;
+            let mag = magnitude_spectrum(&processed)?;
+            let mag = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&mag)?;
+            Ok(relabel_hz_to_ppm(mag))
+        };
+
+        let raw = magnitude_only(shifted.clone())?;
+        let em = apodise_and_phase(exponential_apodization(&shifted, 3.0, dwell)?)?;
+        let gm = apodise_and_phase(gaussian_apodization(&shifted, 3.0, dwell)?)?;
+        let l2g = apodise_and_phase(lorentz_to_gauss_apodization(
+            &shifted, 3.0, 6.0, 0.0, dwell,
+        )?)?;
+        let traf = apodise_and_phase(traf_apodization(&shifted, 3.0, dwell)?)?;
+        let gmb = apodise_and_phase(gauss_multiply_bruker_apodization(
+            &shifted, -3.0, 0.3, dwell,
+        )?)?;
+        let trap = apodise_and_phase(trapezoidal_apodization(&shifted, 0.0, 0.7)?)?;
+        let conv = apodise_and_phase(convolution_difference_apodization(
+            &shifted, 1.0, 20.0, 0.5, dwell,
+        )?)?;
+        let matched_step = matched_filter_em(&shifted)?;
+        let matched =
+            apodise_and_phase(exponential_apodization(
+                &shifted,
+                matched_step.line_broadening_hz,
+                matched_step.dwell_time_s,
+            )?)?;
+
+        let mk = |title: String, spectrum: &Spectrum1D, label: &str| -> Plot {
+            Plot::new()
+                .title(&title)
+                .xlabel("chemical shift / ppm")
+                .ylabel("intensity")
+                .max_resolution(900, 600)
+                .legend_position(LegendPosition::Best)
+                .line(&spectrum.x.values, &spectrum.intensities)
+                .label(label)
+                .into()
+        };
+        let title_prefix = "JEOL 13C Myrcene (NMRXiv CC0)";
+        let figure = subplots(3, 3, 2700, 1800)?
+            .subplot_at(0, mk(format!("{title_prefix} — |raw FFT|"), &raw, "|spectrum|"))?
+            .subplot_at(1, mk("Exponential (EM, 3 Hz)".into(), &em, "real"))?
+            .subplot_at(2, mk("Gaussian (GM, 3 Hz)".into(), &gm, "real"))?
+            .subplot_at(3, mk("Lorentz→Gauss (lb=3, gb=6)".into(), &l2g, "real"))?
+            .subplot_at(4, mk("TRAF (lb=3 Hz)".into(), &traf, "real"))?
+            .subplot_at(5, mk("Bruker GMB (lb=-3, gb=0.3)".into(), &gmb, "real"))?
+            .subplot_at(6, mk("Trapezoidal (fall=0.7)".into(), &trap, "real"))?
+            .subplot_at(7, mk("Conv-diff (lb=1/20, k=0.5)".into(), &conv, "real"))?
+            .subplot_at(
+                8,
+                mk(
+                    format!(
+                        "Matched-filter EM (lb={:.2} Hz)",
+                        matched_step.line_broadening_hz
+                    ),
+                    &matched,
+                    "real",
+                ),
+            )?;
+        figure.save(path_to_str(
+            &output_dir.join("apodization_methods_jeol_13c.png"),
+        )?)?;
         Ok(())
     }
 
