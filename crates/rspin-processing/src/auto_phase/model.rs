@@ -278,5 +278,20 @@ pub struct AutoPhaseResult {
     /// Selected first-order phase in degrees.
     pub first_order_deg: f64,
     /// Final score for the selected correction.
+    ///
+    /// **The meaning of this value depends on
+    /// [`AutoPhaseOptions::strategy`] and the two are not comparable:**
+    ///
+    /// - [`AutoPhaseStrategy::Regions`] returns `1.0 - R²` from the
+    ///   region-phase regression, so the value lies in `[0.0, 1.0]` with
+    ///   `0.0` representing a perfect fit.
+    /// - [`AutoPhaseStrategy::GlobalCost`] returns the raw cost-function
+    ///   value (ACME entropy or the legacy imag/neg sum), which is
+    ///   unbounded and scales with the spectrum length and weight
+    ///   settings.
+    ///
+    /// Do not compare `score` across strategies to pick a "better"
+    /// correction — compare the spectra themselves or pin a single
+    /// strategy.
     pub score: f64,
 }

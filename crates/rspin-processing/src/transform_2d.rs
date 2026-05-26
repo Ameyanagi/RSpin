@@ -208,25 +208,17 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
     ))
 }
 
-fn fftshift_2d(buffer: &mut Vec<Complex<f64>>, width: usize, height: usize) {
+fn fftshift_2d(buffer: &mut [Complex<f64>], width: usize, height: usize) {
     for row in buffer.chunks_exact_mut(width) {
         crate::transform::fftshift_in_place(row);
     }
     let half_rows = height - height / 2;
-    let cut = half_rows * width;
-    let mut rotated: Vec<Complex<f64>> = Vec::with_capacity(buffer.len());
-    rotated.extend_from_slice(&buffer[cut..]);
-    rotated.extend_from_slice(&buffer[..cut]);
-    *buffer = rotated;
+    buffer.rotate_left(half_rows * width);
 }
 
-fn ifftshift_2d(buffer: &mut Vec<Complex<f64>>, width: usize, height: usize) {
+fn ifftshift_2d(buffer: &mut [Complex<f64>], width: usize, height: usize) {
     let half_rows = height / 2;
-    let cut = half_rows * width;
-    let mut rotated: Vec<Complex<f64>> = Vec::with_capacity(buffer.len());
-    rotated.extend_from_slice(&buffer[cut..]);
-    rotated.extend_from_slice(&buffer[..cut]);
-    *buffer = rotated;
+    buffer.rotate_left(half_rows * width);
     for row in buffer.chunks_exact_mut(width) {
         crate::transform::ifftshift_in_place(row);
     }

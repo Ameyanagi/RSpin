@@ -455,13 +455,11 @@ pub fn remove_group_delay(spectrum: &Spectrum1D, samples: f64) -> Result<Spectru
     if len == 0 {
         return Ok(processed);
     }
-    let truncated = samples.trunc();
-    let mut integer_shift = 0_usize;
-    let mut accumulated = 0.0_f64;
-    while integer_shift < len && accumulated < truncated {
-        accumulated += 1.0;
-        integer_shift += 1;
-    }
+    // Float-to-integer casts saturate on overflow (Rust ≥ 1.45), so
+    // `samples.trunc() as usize` clamps cleanly; we still cap at `len` to
+    // keep `rotate_left` in bounds.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let integer_shift = (samples.trunc() as usize).min(len);
     if integer_shift > 0 {
         processed.intensities.rotate_left(integer_shift);
         if let Some(imag) = processed.imaginary.as_mut() {
