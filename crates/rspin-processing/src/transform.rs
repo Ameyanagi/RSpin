@@ -81,6 +81,34 @@ impl SineBellApodization {
             exponent,
         }
     }
+
+    /// Creates the unshifted sine-squared window (`nmrPipe -fn SP -off 0 -end 1 -pow 2`).
+    #[must_use]
+    pub fn sine_squared() -> Self {
+        Self::new(0.0, 180.0, 2.0)
+    }
+
+    /// Creates the cosine-bell window (`nmrPipe -fn SP -off 0.5 -end 1 -pow 1`),
+    /// equivalent to a Hann window.
+    #[must_use]
+    pub fn cosine_bell() -> Self {
+        Self::new(90.0, 180.0, 1.0)
+    }
+
+    /// Creates the cosine-squared window (`nmrPipe -fn SP -off 0.5 -end 1 -pow 2`),
+    /// the standard biomolecular HSQC indirect-dimension default.
+    #[must_use]
+    pub fn cosine_squared() -> Self {
+        Self::new(90.0, 180.0, 2.0)
+    }
+
+    /// Creates a shifted-sine window with a start fraction (`off`) in
+    /// `[0, 1]` and an explicit positive exponent, matching nmrPipe's
+    /// `-fn SP -off <off> -end 1 -pow <exp>` convention.
+    #[must_use]
+    pub fn shifted_sine(offset_fraction: f64, exponent: f64) -> Self {
+        Self::new(offset_fraction * 180.0, 180.0, exponent)
+    }
 }
 
 impl ProcessingStep<Spectrum1D> for SineBellApodization {
@@ -91,6 +119,434 @@ impl ProcessingStep<Spectrum1D> for SineBellApodization {
             self.end_angle_deg,
             self.exponent,
         )
+    }
+}
+
+/// Applies Lorentz-to-Gauss (resolution-enhancement) apodization.
+///
+/// The weight at point `i` is
+/// `exp(+π · lorentz_to_undo_hz · t) · exp(-(π · gauss_fwhm_hz · (t - shift · t_max))² / (4 · ln 2))`
+/// with `t = i · dwell_time_s` and `t_max = (N - 1) · dwell_time_s`.
+///
+/// Following Ferrige & Lindon (J. Magn. Reson. 1978, 31, 337) and the
+/// convention used by nmrPipe `-fn GM`, `lorentz_to_undo_hz` cancels an
+/// underlying Lorentzian decay (so it should be set to the natural
+/// linewidth that is to be removed) and `gauss_fwhm_hz` imposes a
+/// Gaussian envelope of that FWHM. `gauss_shift` ∈ `[0, 1]` lets the
+/// Gaussian peak away from `t = 0` for pseudo-echo experiments.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LorentzToGaussApodization {
+    /// Lorentzian linewidth to undo, in hertz (≥ 0).
+    pub lorentz_to_undo_hz: f64,
+    /// Gaussian full-width-at-half-maximum to impose, in hertz (≥ 0).
+    pub gauss_fwhm_hz: f64,
+    /// Position of the Gaussian peak as a fraction of the FID duration (`0..=1`).
+    pub gauss_shift: f64,
+    /// Dwell time in seconds.
+    pub dwell_time_s: f64,
+}
+
+impl LorentzToGaussApodization {
+    /// Creates a Lorentz-to-Gauss apodization step with the Gaussian
+    /// peaked at the start of the FID.
+    #[must_use]
+    pub fn new(lorentz_to_undo_hz: f64, gauss_fwhm_hz: f64, dwell_time_s: f64) -> Self {
+        Self {
+            lorentz_to_undo_hz,
+            gauss_fwhm_hz,
+            gauss_shift: 0.0,
+            dwell_time_s,
+        }
+    }
+
+    /// Returns this step with a Gaussian-peak shift in `[0, 1]`.
+    #[must_use]
+    pub fn with_gauss_shift(mut self, gauss_shift: f64) -> Self {
+        self.gauss_shift = gauss_shift;
+        self
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for LorentzToGaussApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        lorentz_to_gauss_apodization(
+            spectrum,
+            self.lorentz_to_undo_hz,
+            self.gauss_fwhm_hz,
+            self.gauss_shift,
+            self.dwell_time_s,
+        )
+    }
+}
+
+/// Applies TRAF (Traficante) apodization.
+///
+/// `w[i] = E² / (E³ + R³)` with `E = exp(-π · LB · i · dt)` and
+/// `R = exp(-π · LB · (N-1-i) · dt)`, following Traficante,
+/// *Concepts Magn. Reson.* 12 (2000) 83-101. TRAF is a self-normalising
+/// matched filter that preserves SNR while sharpening peaks; it is the
+/// preferred default for 13C in some commercial pipelines (ACD/Labs).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrafApodization {
+    /// Line broadening in hertz (≥ 0).
+    pub line_broadening_hz: f64,
+    /// Dwell time in seconds (> 0).
+    pub dwell_time_s: f64,
+}
+
+impl TrafApodization {
+    /// Creates a TRAF apodization step.
+    #[must_use]
+    pub fn new(line_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        Self {
+            line_broadening_hz,
+            dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for TrafApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        traf_apodization(spectrum, self.line_broadening_hz, self.dwell_time_s)
+    }
+}
+
+/// Applies Bruker-style two-parameter Gaussian apodization (`procs` GMB).
+///
+/// `w[i] = exp(-a · i - b · i²)` with `a = π · LB · dt` and
+/// `b = -a / (2 · GB · (N-1) · dt)` when `GB > 0`, else `b = 0`.
+///
+/// This matches the `LB`/`GB` parameter convention of Bruker's `procs`
+/// file: signed `lb_hz` and the fractional Gaussian peak position
+/// `gb_fraction ∈ [0, 1]`. Negative `lb_hz` combined with positive
+/// `gb_fraction` yields resolution enhancement; positive `lb_hz` with
+/// `gb_fraction = 0` reduces to exponential apodization.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GaussMultiplyBrukerApodization {
+    /// Signed Bruker `LB` line broadening, in hertz.
+    pub line_broadening_hz: f64,
+    /// Bruker `GB` Gaussian peak position as a fraction of the FID, in `[0, 1]`.
+    pub gauss_position_fraction: f64,
+    /// Dwell time in seconds (> 0).
+    pub dwell_time_s: f64,
+}
+
+impl GaussMultiplyBrukerApodization {
+    /// Creates a Bruker-convention GMB apodization step.
+    #[must_use]
+    pub fn new(line_broadening_hz: f64, gauss_position_fraction: f64, dwell_time_s: f64) -> Self {
+        Self {
+            line_broadening_hz,
+            gauss_position_fraction,
+            dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        gauss_multiply_bruker_apodization(
+            spectrum,
+            self.line_broadening_hz,
+            self.gauss_position_fraction,
+            self.dwell_time_s,
+        )
+    }
+}
+
+/// Estimates an SNR-optimal exponential apodization from a time-domain FID
+/// (the "matched filter" recipe of Ernst).
+///
+/// # Background
+///
+/// The matched filter is the SNR-optimal window for a signal of known
+/// shape. For an NMR FID
+///
+/// ```text
+/// s(t) = exp(-π · LB · t) · cos(2π · ν · t) + noise(t)
+/// ```
+///
+/// multiplying by `w(t) = s(t)` before FFT maximises the post-transform
+/// peak-to-noise ratio. For NMR that reduces to multiplying the FID by
+/// `exp(-π · LB · t)` — exponential apodization with the **natural
+/// linewidth**. The cost is that lines broaden by a factor of two in
+/// the frequency domain: you pay resolution for SNR.
+///
+/// # Procedure
+///
+/// 1. Apply a gentle 1 Hz exponential pre-broadening to the FID and
+///    zero-fill ×2 before FFT. The pre-broadening suppresses
+///    truncation ringing; the zero-fill takes bin spacing out of the
+///    FWHM measurement.
+/// 2. Take the magnitude spectrum.
+/// 3. Scan for local-maximum peaks at least 30 % of the global maximum.
+///    For each peak measure the FWHM with linear interpolation of the
+///    half-height crossings.
+/// 4. Pick the **narrowest** qualifying peak. NMR singlets are
+///    narrower than multiplet envelopes, so this targets a single
+///    Lorentzian line.
+/// 5. Convert that FWHM into Hz (using the FFT axis directly when it
+///    is in Hz, or scaling by `metadata.frequency_mhz` for ppm axes).
+/// 6. Divide by √3 — magnitude FWHM = √3 · LB, absorption FWHM = LB —
+///    and subtract the 1 Hz pre-broadening to recover the natural LB.
+/// 7. Clamp the result into a sensible range and return an
+///    [`ExponentialApodization`] with that LB and the FID's dwell.
+///
+/// # When *not* to use the matched filter
+///
+/// - Spectra whose peaks have very different natural linewidths
+///   (e.g. fast-relaxing methyls alongside slow-relaxing aromatics).
+///   The estimate is dominated by the narrowest peak; broader peaks
+///   are under-weighted.
+/// - Resolution-critical work (couplings, dispersion analysis); the
+///   ×2 linewidth penalty is exactly the wrong direction. Use
+///   [`LorentzToGaussApodization`] instead.
+/// - FIDs that have already been broadened upstream (e.g. Bruker
+///   `procs` with `LB > 0`). Apodising again would double-broaden.
+///
+/// # Errors
+///
+/// Returns an error when the input is not a time-domain spectrum
+/// (axis unit must be `Seconds`), the dwell time cannot be inferred,
+/// the spectrum is too short to FFT, or the FWHM cannot be measured.
+#[allow(clippy::too_many_lines)]
+pub fn matched_filter_em(spectrum: &Spectrum1D) -> Result<ExponentialApodization> {
+    if spectrum.x.unit != Unit::Seconds {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em requires a time-domain FID (axis unit = Seconds)"
+                .to_owned(),
+        });
+    }
+    let dwell =
+        uniform_step(&spectrum.x.values)
+            .map(f64::abs)
+            .ok_or(RSpinError::InvalidSpectrum {
+                message: "matched_filter_em requires a uniformly-spaced time axis".to_owned(),
+            })?;
+    if dwell <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em requires a positive dwell time".to_owned(),
+        });
+    }
+    if spectrum.len() < 32 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em requires at least 32 FID points".to_owned(),
+        });
+    }
+
+    // Step 1: gentle pre-broadening + zero-fill ×2, then FFT and take
+    // the magnitude. The pre-broadening damps truncation ringing so
+    // FWHM measurement is dominated by the natural linewidth, not the
+    // FFT sidelobes; the zero-fill removes bin spacing as a floor.
+    let lb_pre_hz = 1.0_f64;
+    let pre = exponential_apodization(spectrum, lb_pre_hz, dwell)?;
+    let target_len = pre.len().saturating_mul(2);
+    let zero_filled = crate::one_d::zero_fill(&pre, target_len)?;
+    let frequency = fft_1d(&zero_filled, FftDirection::Forward)?;
+    let magnitude = magnitude_spectrum(&frequency)?;
+
+    // Step 2 + 3: scan for local maxima at least 30 % of global max,
+    // measure their FWHM with linear interpolation of the half-height
+    // crossings, and remember the smallest FWHM.
+    let global_max = magnitude
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    if !global_max.is_finite() || global_max <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em could not find a positive peak".to_owned(),
+        });
+    }
+    let threshold = 0.3 * global_max;
+    let n = magnitude.intensities.len();
+    let mut best_fwhm_axis: Option<f64> = None;
+    for index in 1..n.saturating_sub(1) {
+        let value = magnitude.intensities[index];
+        if value < threshold {
+            continue;
+        }
+        let prev = magnitude.intensities[index - 1];
+        let next = magnitude.intensities[index + 1];
+        if !(value >= prev && value >= next) {
+            continue;
+        }
+        let half = value / 2.0;
+        let mut left = index;
+        while left > 0 && magnitude.intensities[left - 1] > half {
+            left -= 1;
+        }
+        if left == 0 {
+            continue;
+        }
+        let mut right = index;
+        while right + 1 < n && magnitude.intensities[right + 1] > half {
+            right += 1;
+        }
+        if right + 1 >= n {
+            continue;
+        }
+        let left_x = interp_half_crossing(
+            magnitude.x.values[left - 1],
+            magnitude.intensities[left - 1],
+            magnitude.x.values[left],
+            magnitude.intensities[left],
+            half,
+        );
+        let right_x = interp_half_crossing(
+            magnitude.x.values[right],
+            magnitude.intensities[right],
+            magnitude.x.values[right + 1],
+            magnitude.intensities[right + 1],
+            half,
+        );
+        let fwhm = (right_x - left_x).abs();
+        if fwhm > 0.0 && best_fwhm_axis.is_none_or(|best| fwhm < best) {
+            best_fwhm_axis = Some(fwhm);
+        }
+    }
+    let fwhm_axis = best_fwhm_axis.ok_or(RSpinError::InvalidSpectrum {
+        message: "matched_filter_em could not measure a peak FWHM".to_owned(),
+    })?;
+
+    // Step 5: convert axis units → Hz.
+    let fwhm_hz = match magnitude.x.unit {
+        Unit::Hertz => fwhm_axis,
+        Unit::Ppm => match magnitude.metadata.frequency_mhz {
+            Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
+                fwhm_axis * freq_mhz.abs()
+            }
+            _ => {
+                return Err(RSpinError::InvalidSpectrum {
+                    message: "matched_filter_em needs metadata.frequency_mhz for ppm axes"
+                        .to_owned(),
+                });
+            }
+        },
+        _ => {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "matched_filter_em produced an unsupported frequency axis unit".to_owned(),
+            });
+        }
+    };
+    if !fwhm_hz.is_finite() || fwhm_hz <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "matched_filter_em produced a non-positive FWHM".to_owned(),
+        });
+    }
+
+    // Steps 6 + 7: magnitude FWHM = √3 · LB_total where LB_total is
+    // the absorption-mode Lorentzian width including pre-broadening.
+    // Subtract the pre-broadening to get the natural linewidth, then
+    // clamp to a sensible NMR range so a pathological measurement
+    // never returns a runaway value.
+    let lb_total_abs = fwhm_hz / 3.0_f64.sqrt();
+    let lb_natural = (lb_total_abs - lb_pre_hz).clamp(0.05, 50.0);
+    Ok(ExponentialApodization::new(lb_natural, dwell))
+}
+
+fn interp_half_crossing(x0: f64, y0: f64, x1: f64, y1: f64, target: f64) -> f64 {
+    let denom = y1 - y0;
+    if denom.abs() <= f64::EPSILON {
+        return f64::midpoint(x0, x1);
+    }
+    let t = (target - y0) / denom;
+    x0 + t * (x1 - x0)
+}
+
+/// Applies convolution-difference apodization
+/// (Campbell, Dobson, Williams, Xavier 1973).
+///
+/// `w[i] = exp(-π · LB1 · i · dt) - k · exp(-π · LB2 · i · dt)`. Choosing
+/// a narrow `LB1` and a broader `LB2` subtracts the broad component
+/// from the spectrum and is useful for paramagnetic, solid-state, or
+/// broad-line cleanup.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ConvolutionDifferenceApodization {
+    /// Narrow line broadening in hertz (≥ 0).
+    pub narrow_line_broadening_hz: f64,
+    /// Broad line broadening in hertz (≥ 0).
+    pub broad_line_broadening_hz: f64,
+    /// Mixing coefficient `k` for the broad component, in `[0, 1]`.
+    pub mixing: f64,
+    /// Dwell time in seconds (> 0).
+    pub dwell_time_s: f64,
+}
+
+impl ConvolutionDifferenceApodization {
+    /// Creates a convolution-difference apodization step.
+    #[must_use]
+    pub fn new(
+        narrow_line_broadening_hz: f64,
+        broad_line_broadening_hz: f64,
+        mixing: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            narrow_line_broadening_hz,
+            broad_line_broadening_hz,
+            mixing,
+            dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for ConvolutionDifferenceApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        convolution_difference_apodization(
+            spectrum,
+            self.narrow_line_broadening_hz,
+            self.broad_line_broadening_hz,
+            self.mixing,
+            self.dwell_time_s,
+        )
+    }
+}
+
+/// Applies trapezoidal apodization.
+///
+/// The window ramps linearly from 0 up to 1 across the leading
+/// `rise_end_fraction` of the FID, stays at 1 between
+/// `rise_end_fraction` and `fall_start_fraction`, then ramps back down
+/// to 0 across the trailing portion. Both parameters lie in `[0, 1]`
+/// with `rise_end_fraction <= fall_start_fraction`. Setting
+/// `rise_end_fraction = 0` skips the ramp-in; `fall_start_fraction = 1`
+/// skips the ramp-out.
+///
+/// The trapezoidal window is the conventional companion to forward
+/// linear prediction: the LP-extrapolated tail can be damped smoothly
+/// to zero by lowering `fall_start_fraction`.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrapezoidalApodization {
+    /// Fraction of the FID where the linear ramp-up reaches 1, in `[0, 1]`.
+    pub rise_end_fraction: f64,
+    /// Fraction of the FID where the linear ramp-down begins, in `[0, 1]`.
+    pub fall_start_fraction: f64,
+}
+
+impl TrapezoidalApodization {
+    /// Creates a trapezoidal apodization step.
+    #[must_use]
+    pub fn new(rise_end_fraction: f64, fall_start_fraction: f64) -> Self {
+        Self {
+            rise_end_fraction,
+            fall_start_fraction,
+        }
+    }
+
+    /// Creates a half-trapezoid that only ramps down at the tail.
+    #[must_use]
+    pub fn fall_only(fall_start_fraction: f64) -> Self {
+        Self {
+            rise_end_fraction: 0.0,
+            fall_start_fraction,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for TrapezoidalApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        trapezoidal_apodization(spectrum, self.rise_end_fraction, self.fall_start_fraction)
     }
 }
 
@@ -344,6 +800,204 @@ pub fn sine_bell_apodization(
     Ok(processed.with_processing_record(
         ProcessingRecord::new("sine_bell_apodization").with_details(format!(
             "start_angle_deg={start_angle_deg},end_angle_deg={end_angle_deg},exponent={exponent}"
+        )),
+    ))
+}
+
+/// Applies Lorentz-to-Gauss (resolution-enhancement) apodization.
+///
+/// See [`LorentzToGaussApodization`] for the math. The weight is applied
+/// to both the real and imaginary channels.
+///
+/// # Errors
+///
+/// Returns an error when either broadening is negative, the dwell time is
+/// not positive, the shift is outside `[0, 1]`, any parameter is non-finite,
+/// or the point count is too large for checked numeric conversion.
+pub fn lorentz_to_gauss_apodization(
+    spectrum: &Spectrum1D,
+    lorentz_to_undo_hz: f64,
+    gauss_fwhm_hz: f64,
+    gauss_shift: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = lorentz_to_gauss_weights(
+        spectrum.len(),
+        lorentz_to_undo_hz,
+        gauss_fwhm_hz,
+        gauss_shift,
+        dwell_time_s,
+        "Lorentz-to-Gauss apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("lorentz_to_gauss_apodization").with_details(format!(
+            "lorentz_to_undo_hz={lorentz_to_undo_hz},gauss_fwhm_hz={gauss_fwhm_hz},gauss_shift={gauss_shift},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies convolution-difference apodization to real and imaginary channels.
+///
+/// See [`ConvolutionDifferenceApodization`] for the math.
+///
+/// # Errors
+///
+/// Returns an error when either line broadening is negative, the mixing
+/// is outside `[0, 1]`, the dwell time is not positive, any parameter
+/// is non-finite, or the point count is too large for checked numeric
+/// conversion.
+pub fn convolution_difference_apodization(
+    spectrum: &Spectrum1D,
+    narrow_line_broadening_hz: f64,
+    broad_line_broadening_hz: f64,
+    mixing: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = convolution_difference_weights(
+        spectrum.len(),
+        narrow_line_broadening_hz,
+        broad_line_broadening_hz,
+        mixing,
+        dwell_time_s,
+        "convolution-difference apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("convolution_difference_apodization").with_details(format!(
+            "narrow_line_broadening_hz={narrow_line_broadening_hz},broad_line_broadening_hz={broad_line_broadening_hz},mixing={mixing},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies Bruker-style two-parameter Gaussian apodization.
+///
+/// See [`GaussMultiplyBrukerApodization`] for the math.
+///
+/// # Errors
+///
+/// Returns an error when `gauss_position_fraction` is outside `[0, 1]`,
+/// dwell time is not positive, any parameter is non-finite, or the
+/// point count is too large for checked numeric conversion.
+pub fn gauss_multiply_bruker_apodization(
+    spectrum: &Spectrum1D,
+    line_broadening_hz: f64,
+    gauss_position_fraction: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = gauss_multiply_bruker_weights(
+        spectrum.len(),
+        line_broadening_hz,
+        gauss_position_fraction,
+        dwell_time_s,
+        "Bruker GMB apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("gauss_multiply_bruker_apodization").with_details(format!(
+            "line_broadening_hz={line_broadening_hz},gauss_position_fraction={gauss_position_fraction},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies TRAF apodization to real and imaginary channels.
+///
+/// See [`TrafApodization`] for the math.
+///
+/// # Errors
+///
+/// Returns an error when line broadening is negative, dwell time is not
+/// positive, any parameter is non-finite, or the point count is too
+/// large for checked numeric conversion.
+pub fn traf_apodization(
+    spectrum: &Spectrum1D,
+    line_broadening_hz: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = traf_weights(
+        spectrum.len(),
+        line_broadening_hz,
+        dwell_time_s,
+        "TRAF apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(
+        processed.with_processing_record(ProcessingRecord::new("traf_apodization").with_details(
+            format!("line_broadening_hz={line_broadening_hz},dwell_time_s={dwell_time_s}"),
+        )),
+    )
+}
+
+/// Applies trapezoidal apodization.
+///
+/// See [`TrapezoidalApodization`] for the window definition.
+///
+/// # Errors
+///
+/// Returns an error when either fraction is outside `[0, 1]`,
+/// `rise_end_fraction > fall_start_fraction`, or either parameter is
+/// non-finite.
+pub fn trapezoidal_apodization(
+    spectrum: &Spectrum1D,
+    rise_end_fraction: f64,
+    fall_start_fraction: f64,
+) -> Result<Spectrum1D> {
+    let weights = trapezoidal_weights(
+        spectrum.len(),
+        rise_end_fraction,
+        fall_start_fraction,
+        "trapezoidal apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("trapezoidal_apodization").with_details(format!(
+            "rise_end_fraction={rise_end_fraction},fall_start_fraction={fall_start_fraction}"
         )),
     ))
 }
@@ -664,6 +1318,247 @@ fn index_denominator(len: usize) -> Result<f64> {
         message: "spectrum is too large for phase correction".to_owned(),
     })?;
     Ok(f64::from(denominator))
+}
+
+fn convolution_difference_weights(
+    len: usize,
+    narrow_line_broadening_hz: f64,
+    broad_line_broadening_hz: f64,
+    mixing: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("narrow_line_broadening_hz", narrow_line_broadening_hz)?;
+    ensure_non_negative("broad_line_broadening_hz", broad_line_broadening_hz)?;
+    ensure_finite("mixing", mixing)?;
+    if !(0.0..=1.0).contains(&mixing) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "mixing must be between 0 and 1".to_owned(),
+        });
+    }
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let narrow_scale = -PI * narrow_line_broadening_hz * dwell_time_s;
+    let broad_scale = -PI * broad_line_broadening_hz * dwell_time_s;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let narrow = (narrow_scale * index_f).exp();
+            let broad = (broad_scale * index_f).exp();
+            Ok(narrow - mixing * broad)
+        })
+        .collect()
+}
+
+fn gauss_multiply_bruker_weights(
+    len: usize,
+    line_broadening_hz: f64,
+    gauss_position_fraction: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_finite("line_broadening_hz", line_broadening_hz)?;
+    ensure_finite("gauss_position_fraction", gauss_position_fraction)?;
+    if !(0.0..=1.0).contains(&gauss_position_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "gauss_position_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    // Bruker procs convention: F(t) = exp(-a·t - b·t²) with a = π·LB and
+    // b = -a / (2·GB·AQ) where AQ = (N-1)·dt. Working in discretised
+    // index form F[i] = exp(-a'·i - b'·i²) the per-step coefficients are
+    // a' = π·LB·dt and b' = -a' / (2·GB·(N-1)), which gives a Gaussian
+    // peak at i = GB·(N-1) for LB<0, GB>0 (the resolution-enhancement
+    // case). When GB = 0 the formula reduces to plain exponential.
+    let a = PI * line_broadening_hz * dwell_time_s;
+    let b = if gauss_position_fraction > 0.0 && last_index_f > 0.0 {
+        -a / (2.0 * gauss_position_fraction * last_index_f)
+    } else {
+        0.0
+    };
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            Ok((-a * index_f - b * index_f * index_f).exp())
+        })
+        .collect()
+}
+
+fn traf_weights(
+    len: usize,
+    line_broadening_hz: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("line_broadening_hz", line_broadening_hz)?;
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    let scale = -PI * line_broadening_hz * dwell_time_s;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let e_decay = (scale * index_f).exp();
+            let r_decay = (scale * (last_index_f - index_f)).exp();
+            let denominator = e_decay.powi(3) + r_decay.powi(3);
+            let weight = if denominator <= 0.0 {
+                0.0
+            } else {
+                e_decay.powi(2) / denominator
+            };
+            Ok(weight)
+        })
+        .collect()
+}
+
+fn trapezoidal_weights(
+    len: usize,
+    rise_end_fraction: f64,
+    fall_start_fraction: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_finite("rise_end_fraction", rise_end_fraction)?;
+    ensure_finite("fall_start_fraction", fall_start_fraction)?;
+    if !(0.0..=1.0).contains(&rise_end_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "rise_end_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    if !(0.0..=1.0).contains(&fall_start_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "fall_start_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    if rise_end_fraction > fall_start_fraction {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "rise_end_fraction must not exceed fall_start_fraction".to_owned(),
+        });
+    }
+
+    let denominator = if len <= 1 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let fraction = if denominator == 0.0 {
+                0.0
+            } else {
+                index_f / denominator
+            };
+            let weight = if fraction < rise_end_fraction {
+                if rise_end_fraction <= 0.0 {
+                    1.0
+                } else {
+                    fraction / rise_end_fraction
+                }
+            } else if fraction > fall_start_fraction {
+                if fall_start_fraction >= 1.0 {
+                    1.0
+                } else {
+                    (1.0 - fraction) / (1.0 - fall_start_fraction)
+                }
+            } else {
+                1.0
+            };
+            Ok(weight.max(0.0))
+        })
+        .collect()
+}
+
+fn lorentz_to_gauss_weights(
+    len: usize,
+    lorentz_to_undo_hz: f64,
+    gauss_fwhm_hz: f64,
+    gauss_shift: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("lorentz_to_undo_hz", lorentz_to_undo_hz)?;
+    ensure_non_negative("gauss_fwhm_hz", gauss_fwhm_hz)?;
+    ensure_finite("gauss_shift", gauss_shift)?;
+    if !(0.0..=1.0).contains(&gauss_shift) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "gauss_shift must be between 0 and 1".to_owned(),
+        });
+    }
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    let t_max = last_index_f * dwell_time_s;
+    let lorentz_scale = PI * lorentz_to_undo_hz * dwell_time_s;
+    let gauss_scale = PI * gauss_fwhm_hz;
+    let gauss_norm = 4.0 * LN_2;
+    let center_time = gauss_shift * t_max;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let lorentz_part = lorentz_scale * index_f;
+            let gauss_offset = gauss_scale * (index_f * dwell_time_s - center_time);
+            let gauss_part = -(gauss_offset * gauss_offset) / gauss_norm;
+            Ok((lorentz_part + gauss_part).exp())
+        })
+        .collect()
 }
 
 fn gaussian_weights(

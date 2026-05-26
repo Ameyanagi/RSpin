@@ -185,6 +185,86 @@ fn rejects_invalid_parameters() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn lorentz_to_gauss_2d_matches_separable_product() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let processed =
+        lorentz_to_gauss_apodization_2d(&spectrum, 1.0, 2.0, 0.0, 0.1, 2.0, 2.0, 0.0, 0.2)?;
+
+    // x_dim: lorentz=1, gauss=2, dwell=0.1 → step factor = PI * 1.0 * 0.1 = 0.1*PI.
+    // y_dim: lorentz=2, gauss=2, dwell=0.2 → step factor = PI * 2.0 * 0.2 = 0.4*PI.
+    let x_rise_one = (PI * 0.1_f64).exp();
+    let x_gauss_one = (-(PI * 0.2_f64).powi(2) / (4.0 * LN_2)).exp();
+    let x_gauss_two = (-(PI * 0.4_f64).powi(2) / (4.0 * LN_2)).exp();
+    let y_rise_one = (PI * 0.4_f64).exp();
+    let y_gauss_one = (-(PI * 0.4_f64).powi(2) / (4.0 * LN_2)).exp();
+
+    let x_one = x_rise_one * x_gauss_one;
+    let x_two = x_rise_one * x_rise_one * x_gauss_two;
+    let y_one = y_rise_one * y_gauss_one;
+
+    assert_close(processed.z[0], 1.0);
+    assert_close(processed.z[1], 2.0 * x_one);
+    assert_close(processed.z[2], 3.0 * x_two);
+    assert_close(processed.z[3], 4.0 * y_one);
+    assert_close(processed.z[4], 5.0 * x_one * y_one);
+    assert_close(processed.z[5], 6.0 * x_two * y_one);
+    assert_eq!(
+        processed.processing[0].operation,
+        "lorentz_to_gauss_apodization_2d"
+    );
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_2d_rejects_invalid_shift() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let error = lorentz_to_gauss_apodization_2d(&spectrum, 1.0, 2.0, 1.5, 0.1, 1.0, 2.0, 0.0, 0.2)
+        .expect_err("out-of-range gauss_shift should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_2d_matches_separable_product() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    // x dim: 3 points → fractions 0, 0.5, 1; rise=0.5, fall=0.5 → 0, 1, 0
+    // y dim: 2 points → fractions 0, 1; rise=0.0, fall=1.0 → 1, 1
+    let processed = trapezoidal_apodization_2d(&spectrum, 0.5, 0.5, 0.0, 1.0)?;
+    assert_close(processed.z[0], 0.0);
+    assert_close(processed.z[1], 2.0);
+    assert_close(processed.z[2], 0.0);
+    assert_close(processed.z[3], 0.0);
+    assert_close(processed.z[4], 5.0);
+    assert_close(processed.z[5], 0.0);
+    assert_eq!(
+        processed.processing[0].operation,
+        "trapezoidal_apodization_2d"
+    );
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_2d_rejects_inverted_window() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let error = trapezoidal_apodization_2d(&spectrum, 0.7, 0.3, 0.0, 1.0)
+        .expect_err("inverted rise/fall should fail");
+    assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
+    Ok(())
+}
+
+#[test]
+fn traf_2d_matches_separable_product() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let processed = traf_apodization_2d(&spectrum, 0.0, 0.1, 0.0, 0.2)?;
+    // With LB=0 on both axes, all weights are 0.5 → product is 0.25.
+    assert_close(processed.z[0], 0.25);
+    assert_close(processed.z[1], 0.5);
+    assert_close(processed.z[5], 1.5);
+    assert_eq!(processed.processing[0].operation, "traf_apodization_2d");
+    Ok(())
+}
+
 fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
     Ok(Spectrum2D::new(
         Axis::linear("x", Unit::Seconds, 0.0, 0.2, 3)?,

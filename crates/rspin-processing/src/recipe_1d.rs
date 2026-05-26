@@ -6,9 +6,11 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
-    crop_1d, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,
-    normalize_area, normalize_max_abs, offset_intensity, phase_correct, resample_1d,
-    scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline, zero_fill,
+    convolution_difference_apodization, crop_1d, exponential_apodization, fft_1d,
+    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
+    magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
+    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
+    traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -74,6 +76,51 @@ pub enum ProcessingOperation1D {
         /// Dwell time in seconds.
         dwell_time_s: f64,
     },
+    /// Applies Lorentz-to-Gauss (resolution-enhancement) apodization.
+    LorentzToGaussApodization {
+        /// Lorentzian linewidth to undo, in hertz (≥ 0).
+        lorentz_to_undo_hz: f64,
+        /// Gaussian full-width-at-half-maximum to impose, in hertz (≥ 0).
+        gauss_fwhm_hz: f64,
+        /// Gaussian-peak shift in `[0, 1]`.
+        gauss_shift: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies convolution-difference apodization.
+    ConvolutionDifferenceApodization {
+        /// Narrow line broadening in hertz (≥ 0).
+        narrow_line_broadening_hz: f64,
+        /// Broad line broadening in hertz (≥ 0).
+        broad_line_broadening_hz: f64,
+        /// Mixing coefficient in `[0, 1]`.
+        mixing: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies Bruker-style two-parameter Gaussian (`procs` GMB) apodization.
+    GaussMultiplyBrukerApodization {
+        /// Signed Bruker `LB` line broadening, in hertz.
+        line_broadening_hz: f64,
+        /// Bruker `GB` Gaussian peak position as a fraction of the FID, in `[0, 1]`.
+        gauss_position_fraction: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies TRAF (Traficante) apodization.
+    TrafApodization {
+        /// Line broadening in hertz (≥ 0).
+        line_broadening_hz: f64,
+        /// Dwell time in seconds (> 0).
+        dwell_time_s: f64,
+    },
+    /// Applies trapezoidal apodization (ramp-in, plateau, ramp-out).
+    TrapezoidalApodization {
+        /// Fraction of the FID where the ramp-up reaches 1, in `[0, 1]`.
+        rise_end_fraction: f64,
+        /// Fraction of the FID where the ramp-down begins, in `[0, 1]`.
+        fall_start_fraction: f64,
+    },
     /// Applies sine-bell apodization to real and imaginary channels.
     SineBellApodization {
         /// Start angle in degrees.
@@ -137,6 +184,48 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 gaussian_broadening_hz,
                 dwell_time_s,
             } => gaussian_apodization(spectrum, *gaussian_broadening_hz, *dwell_time_s),
+            Self::LorentzToGaussApodization {
+                lorentz_to_undo_hz,
+                gauss_fwhm_hz,
+                gauss_shift,
+                dwell_time_s,
+            } => lorentz_to_gauss_apodization(
+                spectrum,
+                *lorentz_to_undo_hz,
+                *gauss_fwhm_hz,
+                *gauss_shift,
+                *dwell_time_s,
+            ),
+            Self::ConvolutionDifferenceApodization {
+                narrow_line_broadening_hz,
+                broad_line_broadening_hz,
+                mixing,
+                dwell_time_s,
+            } => convolution_difference_apodization(
+                spectrum,
+                *narrow_line_broadening_hz,
+                *broad_line_broadening_hz,
+                *mixing,
+                *dwell_time_s,
+            ),
+            Self::GaussMultiplyBrukerApodization {
+                line_broadening_hz,
+                gauss_position_fraction,
+                dwell_time_s,
+            } => gauss_multiply_bruker_apodization(
+                spectrum,
+                *line_broadening_hz,
+                *gauss_position_fraction,
+                *dwell_time_s,
+            ),
+            Self::TrafApodization {
+                line_broadening_hz,
+                dwell_time_s,
+            } => traf_apodization(spectrum, *line_broadening_hz, *dwell_time_s),
+            Self::TrapezoidalApodization {
+                rise_end_fraction,
+                fall_start_fraction,
+            } => trapezoidal_apodization(spectrum, *rise_end_fraction, *fall_start_fraction),
             Self::SineBellApodization {
                 start_angle_deg,
                 end_angle_deg,
@@ -330,6 +419,73 @@ impl ProcessingRecipe1D {
         self.with_operation(ProcessingOperation1D::GaussianApodization {
             gaussian_broadening_hz,
             dwell_time_s,
+        })
+    }
+
+    /// Appends a Lorentz-to-Gauss apodization operation.
+    #[must_use]
+    pub fn lorentz_to_gauss_apodization(
+        self,
+        lorentz_to_undo_hz: f64,
+        gauss_fwhm_hz: f64,
+        gauss_shift: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation1D::LorentzToGaussApodization {
+            lorentz_to_undo_hz,
+            gauss_fwhm_hz,
+            gauss_shift,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a convolution-difference apodization operation.
+    #[must_use]
+    pub fn convolution_difference_apodization(
+        self,
+        narrow_line_broadening_hz: f64,
+        broad_line_broadening_hz: f64,
+        mixing: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation1D::ConvolutionDifferenceApodization {
+            narrow_line_broadening_hz,
+            broad_line_broadening_hz,
+            mixing,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a Bruker-style two-parameter Gaussian (GMB) apodization operation.
+    #[must_use]
+    pub fn gauss_multiply_bruker_apodization(
+        self,
+        line_broadening_hz: f64,
+        gauss_position_fraction: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation1D::GaussMultiplyBrukerApodization {
+            line_broadening_hz,
+            gauss_position_fraction,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a TRAF apodization operation.
+    #[must_use]
+    pub fn traf_apodization(self, line_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::TrafApodization {
+            line_broadening_hz,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a trapezoidal apodization operation.
+    #[must_use]
+    pub fn trapezoidal_apodization(self, rise_end_fraction: f64, fall_start_fraction: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::TrapezoidalApodization {
+            rise_end_fraction,
+            fall_start_fraction,
         })
     }
 

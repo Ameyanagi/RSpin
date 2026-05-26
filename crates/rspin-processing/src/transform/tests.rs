@@ -84,6 +84,321 @@ fn sine_bell_apodization_weights_real_and_imaginary_channels() -> anyhow::Result
 }
 
 #[test]
+fn lorentz_to_gauss_identity_when_both_broadenings_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = lorentz_to_gauss_apodization(&spectrum, 0.0, 0.0, 0.0, 0.1)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(
+        processed.processing[0].operation,
+        "lorentz_to_gauss_apodization"
+    );
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_undoes_exponential_decay() -> anyhow::Result<()> {
+    // After multiplying by exp(-pi*lb*t) and then by Lorentz-to-Gauss with
+    // the same lb (and no Gaussian), the FID must equal the original.
+    let spectrum = complex_spectrum()?;
+    let lb = 2.0_f64;
+    let dwell = 0.1_f64;
+    let decayed = exponential_apodization(&spectrum, lb, dwell)?;
+    let restored = lorentz_to_gauss_apodization(&decayed, lb, 0.0, 0.0, dwell)?;
+    assert_vec_close(&restored.intensities, &spectrum.intensities);
+    assert_vec_close(require_imaginary(&restored)?, require_imaginary(&spectrum)?);
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_matches_gaussian_when_lorentz_is_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let gauss = gaussian_apodization(&spectrum, 1.0, 0.1)?;
+    let l2g = lorentz_to_gauss_apodization(&spectrum, 0.0, 1.0, 0.0, 0.1)?;
+    assert_vec_close(&l2g.intensities, &gauss.intensities);
+    assert_vec_close(require_imaginary(&l2g)?, require_imaginary(&gauss)?);
+    Ok(())
+}
+
+#[test]
+fn lorentz_to_gauss_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(lorentz_to_gauss_apodization(&spectrum, -1.0, 1.0, 0.0, 0.1).is_err());
+    assert!(lorentz_to_gauss_apodization(&spectrum, 1.0, -1.0, 0.0, 0.1).is_err());
+    assert!(lorentz_to_gauss_apodization(&spectrum, 1.0, 1.0, 1.5, 0.1).is_err());
+    assert!(lorentz_to_gauss_apodization(&spectrum, 1.0, 1.0, 0.0, 0.0).is_err());
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_identity_when_full_window() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = trapezoidal_apodization(&spectrum, 0.0, 1.0)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(processed.processing[0].operation, "trapezoidal_apodization");
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_ramps_in_and_out_linearly() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.4, 5)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 1.0, 1.0, 1.0, 1.0],
+        Some(vec![1.0, 1.0, 1.0, 1.0, 1.0]),
+        Metadata::default(),
+    )?;
+    // fractions: 0.0, 0.25, 0.5, 0.75, 1.0
+    // rise=0.5 → weight at 0.0 → 0, 0.25 → 0.5, 0.5 → 1.0
+    // fall=0.5 → weight at 0.75 → 0.5, 1.0 → 0.0
+    let processed = trapezoidal_apodization(&spectrum, 0.5, 0.5)?;
+    assert_vec_close(&processed.intensities, &[0.0, 0.5, 1.0, 0.5, 0.0]);
+    assert_vec_close(require_imaginary(&processed)?, &[0.0, 0.5, 1.0, 0.5, 0.0]);
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_fall_only_keeps_head_at_one() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![2.0; 4], Metadata::default())?;
+    // fractions: 0, 1/3, 2/3, 1; fall_start=2/3 → weights 1, 1, 1, 0.
+    let processed = trapezoidal_apodization(&spectrum, 0.0, 2.0 / 3.0)?;
+    assert_vec_close(&processed.intensities, &[2.0, 2.0, 2.0, 0.0]);
+    Ok(())
+}
+
+#[test]
+fn trapezoidal_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(trapezoidal_apodization(&spectrum, -0.1, 1.0).is_err());
+    assert!(trapezoidal_apodization(&spectrum, 0.0, 1.5).is_err());
+    assert!(trapezoidal_apodization(&spectrum, 0.6, 0.4).is_err());
+    assert!(trapezoidal_apodization(&spectrum, f64::NAN, 0.5).is_err());
+    Ok(())
+}
+
+#[test]
+fn traf_zero_broadening_gives_uniform_half_weight() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = traf_apodization(&spectrum, 0.0, 0.1)?;
+    // E = R = 1 → w = 1/2 everywhere.
+    assert_vec_close(
+        &processed.intensities,
+        &spectrum
+            .intensities
+            .iter()
+            .map(|v| v * 0.5)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(processed.processing[0].operation, "traf_apodization");
+    Ok(())
+}
+
+#[test]
+fn traf_matches_analytic_formula() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0, 1.0, 1.0, 1.0], Metadata::default())?;
+    let lb = 2.0_f64;
+    let dwell = 0.1_f64;
+    let last = 3.0_f64;
+    let scale = -PI * lb * dwell;
+    let processed = traf_apodization(&spectrum, lb, dwell)?;
+    for index in 0..4_u32 {
+        let i_f = f64::from(index);
+        let e = (scale * i_f).exp();
+        let r = (scale * (last - i_f)).exp();
+        let expected = e.powi(2) / (e.powi(3) + r.powi(3));
+        assert_close(processed.intensities[usize::try_from(index)?], expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn traf_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(traf_apodization(&spectrum, -1.0, 0.1).is_err());
+    assert!(traf_apodization(&spectrum, 1.0, 0.0).is_err());
+    assert!(traf_apodization(&spectrum, f64::NAN, 0.1).is_err());
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_identity_when_both_parameters_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = gauss_multiply_bruker_apodization(&spectrum, 0.0, 0.0, 0.1)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(
+        processed.processing[0].operation,
+        "gauss_multiply_bruker_apodization"
+    );
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_reduces_to_exponential_when_gauss_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let lb = 1.5_f64;
+    let dwell = 0.1_f64;
+    let bruker = gauss_multiply_bruker_apodization(&spectrum, lb, 0.0, dwell)?;
+    let em = exponential_apodization(&spectrum, lb, dwell)?;
+    assert_vec_close(&bruker.intensities, &em.intensities);
+    assert_vec_close(require_imaginary(&bruker)?, require_imaginary(&em)?);
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_peaks_near_gb_fraction_for_resolution_enhancement() -> anyhow::Result<()> {
+    // LB < 0 with GB > 0 should produce a window that peaks at i = GB*(N-1).
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.99, 100)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0; 100], Metadata::default())?;
+    let processed = gauss_multiply_bruker_apodization(&spectrum, -1.0, 0.5, 0.01)?;
+    let (peak_index, _) = processed.intensities.iter().enumerate().fold(
+        (0_usize, f64::NEG_INFINITY),
+        |(best_index, best), (index, value)| {
+            if *value > best {
+                (index, *value)
+            } else {
+                (best_index, best)
+            }
+        },
+    );
+    assert!(
+        (47..=52).contains(&peak_index),
+        "expected peak near 49, got {peak_index}"
+    );
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, -0.1, 0.1).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 1.5, 0.1).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 0.5, 0.0).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, f64::NAN, 0.5, 0.1).is_err());
+    Ok(())
+}
+
+#[test]
+fn convolution_difference_identity_when_mixing_is_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = convolution_difference_apodization(&spectrum, 0.0, 5.0, 0.0, 0.1)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(
+        processed.processing[0].operation,
+        "convolution_difference_apodization"
+    );
+    Ok(())
+}
+
+#[test]
+fn convolution_difference_matches_analytic_formula() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0, 1.0, 1.0, 1.0], Metadata::default())?;
+    let lb_n = 1.0_f64;
+    let lb_b = 5.0_f64;
+    let dwell = 0.1_f64;
+    let mix = 0.4_f64;
+    let processed = convolution_difference_apodization(&spectrum, lb_n, lb_b, mix, dwell)?;
+    for index in 0..4_u32 {
+        let i_f = f64::from(index);
+        let expected = (-PI * lb_n * dwell * i_f).exp() - mix * (-PI * lb_b * dwell * i_f).exp();
+        assert_close(processed.intensities[usize::try_from(index)?], expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn convolution_difference_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(convolution_difference_apodization(&spectrum, -1.0, 1.0, 0.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, -1.0, 0.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 1.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, -0.1, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 0.5, 0.0).is_err());
+    Ok(())
+}
+
+#[test]
+fn sine_bell_convenience_constructors_match_nmrpipe_defaults() {
+    let sine_squared = SineBellApodization::sine_squared();
+    assert_close(sine_squared.start_angle_deg, 0.0);
+    assert_close(sine_squared.end_angle_deg, 180.0);
+    assert_close(sine_squared.exponent, 2.0);
+
+    let cosine_bell = SineBellApodization::cosine_bell();
+    assert_close(cosine_bell.start_angle_deg, 90.0);
+    assert_close(cosine_bell.exponent, 1.0);
+
+    let cosine_squared = SineBellApodization::cosine_squared();
+    assert_close(cosine_squared.start_angle_deg, 90.0);
+    assert_close(cosine_squared.exponent, 2.0);
+
+    let shifted = SineBellApodization::shifted_sine(0.25, 1.5);
+    assert_close(shifted.start_angle_deg, 45.0);
+    assert_close(shifted.end_angle_deg, 180.0);
+    assert_close(shifted.exponent, 1.5);
+}
+
+#[test]
+fn matched_filter_em_recovers_lorentzian_fwhm() -> anyhow::Result<()> {
+    // Quadrature FID at a single off-centre frequency. The complex
+    // (cosine+i·sine) carrier gives a one-sided Lorentzian in the
+    // magnitude spectrum whose FWHM in Hz equals the decay constant
+    // `lb_true_hz` exactly (the textbook matched-filter case).
+    let lb_true_hz = 5.0_f64;
+    let n: u32 = 2048;
+    let dwell = 1.0e-3_f64;
+    let carrier_hz = 80.0_f64;
+    let mut times = Vec::with_capacity(usize::try_from(n)?);
+    let mut real = Vec::with_capacity(usize::try_from(n)?);
+    let mut imag = Vec::with_capacity(usize::try_from(n)?);
+    for i in 0..n {
+        let t = f64::from(i) * dwell;
+        times.push(t);
+        let decay = (-PI * lb_true_hz * t).exp();
+        let phase = 2.0 * PI * carrier_hz * t;
+        real.push(decay * phase.cos());
+        imag.push(decay * phase.sin());
+    }
+    let axis = Axis::new("time", Unit::Seconds, times)?;
+    let fid = Spectrum1D::new_complex(axis, real, Some(imag), Metadata::default())?;
+    let recommended = matched_filter_em(&fid)?;
+    let relative_error = (recommended.line_broadening_hz - lb_true_hz).abs() / lb_true_hz;
+    assert!(
+        relative_error < 0.2,
+        "expected lb ≈ {lb_true_hz}, got {} (rel. error {:.2})",
+        recommended.line_broadening_hz,
+        relative_error
+    );
+    assert_close(recommended.dwell_time_s, dwell);
+    Ok(())
+}
+
+#[test]
+fn matched_filter_em_rejects_frequency_domain_input() -> anyhow::Result<()> {
+    let axis = Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 16)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0; 16], Metadata::default())?;
+    assert!(matched_filter_em(&spectrum).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;
