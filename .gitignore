@@ -3,3 +3,5 @@ Cargo.lock
 AGENTS.md
 *.profraw
 *.profdata
+.DS_Store
+**/.DS_Store

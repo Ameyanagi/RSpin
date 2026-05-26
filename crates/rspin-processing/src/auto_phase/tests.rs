@@ -72,18 +72,16 @@ fn corrects_first_order_phase() -> anyhow::Result<()> {
 #[test]
 fn rejects_invalid_options() -> anyhow::Result<()> {
     let spectrum = real_spectrum()?;
-    let error = auto_phase_correct(
-        &spectrum,
-        AutoPhaseOptions::default().zero_order_range(10.0, -10.0, 5.0),
-    )
-    .expect_err("inverted zero-order range should fail");
+    // Validation only runs on the GlobalCost path; pin the strategy so the
+    // assertions exercise the option checks rather than the Regions
+    // minimum-length guard.
+    let base = AutoPhaseOptions::default().with_strategy(AutoPhaseStrategy::GlobalCost);
+    let error = auto_phase_correct(&spectrum, base.zero_order_range(10.0, -10.0, 5.0))
+        .expect_err("inverted zero-order range should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
 
-    let error = auto_phase_correct(
-        &spectrum,
-        AutoPhaseOptions::default().scoring_weights(0.0, 0.0),
-    )
-    .expect_err("zero scoring weights should fail");
+    let error = auto_phase_correct(&spectrum, base.scoring_weights(0.0, 0.0))
+        .expect_err("zero scoring weights should fail");
     assert!(matches!(error, RSpinError::InvalidSpectrum { .. }));
     Ok(())
 }

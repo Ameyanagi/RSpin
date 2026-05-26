@@ -80,7 +80,14 @@ fn auto_phase_correct_regions_dispatch(
     options: AutoPhaseOptions,
 ) -> Result<AutoPhaseResult> {
     let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
-    let regions_options = RegionsOptions::default().with_pivot_fraction(pivot_fraction);
+    let mut regions_options = RegionsOptions::default().with_pivot_fraction(pivot_fraction);
+    // The GlobalCost-only options (`cost`, `refine`, `imaginary_weight`,
+    // `negative_weight`, `regularization_weight`) have no analogue in the
+    // Regions algorithm and are intentionally ignored. `active_region`
+    // does map cleanly onto the peak detector and must be propagated.
+    if let Some((start, end)) = options.active_region {
+        regions_options = regions_options.with_active_region(start, end);
+    }
     let result = regions::auto_phase_correct_regions(spectrum, regions_options)?;
     Ok(AutoPhaseResult {
         spectrum: result.spectrum,

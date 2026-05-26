@@ -84,6 +84,10 @@ pub struct RegionsOptions {
     /// Pivot fraction passed to [`phase_correct`] when reconstructing
     /// the final spectrum.
     pub pivot_fraction: f64,
+    /// Optional `(start, end)` window in the spectrum's x-axis units.
+    /// Indices outside the window are forced off in the peak map so that
+    /// detected regions never span the inactive area.
+    pub active_region: Option<(f64, f64)>,
 }
 
 impl Default for RegionsOptions {
@@ -94,6 +98,7 @@ impl Default for RegionsOptions {
             r_squared_drop_threshold: 0.2,
             outlier_threshold_deg: 0.6_f64.to_degrees(),
             pivot_fraction: 0.5,
+            active_region: None,
         }
     }
 }
@@ -117,6 +122,14 @@ impl RegionsOptions {
     #[must_use]
     pub fn with_pivot_fraction(mut self, pivot: f64) -> Self {
         self.pivot_fraction = pivot;
+        self
+    }
+
+    /// Returns options that restrict peak detection to the supplied x-axis
+    /// window.
+    #[must_use]
+    pub fn with_active_region(mut self, start: f64, end: f64) -> Self {
+        self.active_region = Some((start, end));
         self
     }
 }
@@ -153,6 +166,21 @@ pub fn auto_phase_correct_regions(
     for (flag, value) in peak_map.iter_mut().zip(&magnitude) {
         if *value >= magnitude_threshold {
             *flag = true;
+        }
+    }
+
+    // Honor the caller's active-region window by masking out everything
+    // outside it before regions are clustered. The Regions algorithm has
+    // no notion of a "weighted" mask, so we just force those indices off.
+    if let Some((lo_raw, hi_raw)) = options.active_region {
+        if lo_raw.is_finite() && hi_raw.is_finite() {
+            let lo = lo_raw.min(hi_raw);
+            let hi = lo_raw.max(hi_raw);
+            for (index, value) in spectrum.x.values.iter().enumerate() {
+                if !(*value >= lo && *value <= hi) {
+                    peak_map[index] = false;
+                }
+            }
         }
     }
 

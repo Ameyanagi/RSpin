@@ -176,14 +176,25 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
         }
     }
 
+    // For heteronuclear 2D the indirect axis has its own carrier; build a
+    // shim metadata with `frequency_mhz = indirect_frequency_mhz` when
+    // available so ppm relabeling uses the right MHz.
+    let indirect_metadata = match spectrum.metadata.indirect_frequency_mhz {
+        Some(freq) => {
+            let mut m = spectrum.metadata.clone();
+            m.frequency_mhz = Some(freq);
+            m
+        }
+        None => spectrum.metadata.clone(),
+    };
     let (new_x, new_y) = match direction {
         FftDirection::Forward => (
             crate::transform::frequency_axis_from_time(&spectrum.x, &spectrum.metadata, width)?,
-            crate::transform::frequency_axis_from_time(&spectrum.y, &spectrum.metadata, height)?,
+            crate::transform::frequency_axis_from_time(&spectrum.y, &indirect_metadata, height)?,
         ),
         FftDirection::Inverse => (
             crate::transform::time_axis_from_frequency(&spectrum.x, &spectrum.metadata, width)?,
-            crate::transform::time_axis_from_frequency(&spectrum.y, &spectrum.metadata, height)?,
+            crate::transform::time_axis_from_frequency(&spectrum.y, &indirect_metadata, height)?,
         ),
     };
 
