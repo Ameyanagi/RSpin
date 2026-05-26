@@ -1479,6 +1479,84 @@ pub fn phase_correct(
     ))
 }
 
+/// Applies a polynomial phase correction up to cubic order to a
+/// complex one-dimensional spectrum.
+///
+/// The phase at point `i` is
+/// ```text
+/// φ(i) = ph0 + ph1·x + ph2·x² + ph3·x³
+/// ```
+/// where `x = fraction(i) − pivot_fraction` and `fraction(i)` spans
+/// `0..=1` across the spectrum. Passing `ph2 = ph3 = 0` reproduces the
+/// linear correction of [`phase_correct`].
+///
+/// Higher-order terms are needed when a digital-filter group-delay
+/// compensator introduces frequency-dependent phase (Bruker AVANCE,
+/// JEOL Delta) that linear `(ph0, ph1)` cannot represent. Following
+/// Cobas, *Magn. Reson. Chem.* 61, 75 (2023), DOI 10.1002/mrc.5320.
+///
+/// # Errors
+///
+/// Returns an error when any parameter is non-finite, the pivot is
+/// outside `[0, 1]`, or the point count is too large for safe
+/// conversion.
+pub fn phase_correct_polynomial(
+    spectrum: &Spectrum1D,
+    zero_order_deg: f64,
+    first_order_deg: f64,
+    second_order_deg: f64,
+    third_order_deg: f64,
+    pivot_fraction: f64,
+) -> Result<Spectrum1D> {
+    ensure_finite("zero_order_deg", zero_order_deg)?;
+    ensure_finite("first_order_deg", first_order_deg)?;
+    ensure_finite("second_order_deg", second_order_deg)?;
+    ensure_finite("third_order_deg", third_order_deg)?;
+    if !pivot_fraction.is_finite() || !(0.0..=1.0).contains(&pivot_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "phase pivot fraction must be finite and between 0 and 1".to_owned(),
+        });
+    }
+
+    let denominator = index_denominator(spectrum.len())?;
+    let mut real = Vec::with_capacity(spectrum.len());
+    let mut imaginary = Vec::with_capacity(spectrum.len());
+    for (index, value) in complex_buffer(spectrum).into_iter().enumerate() {
+        let fraction = if denominator == 0.0 {
+            0.0
+        } else {
+            f64::from(
+                u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                    message: "spectrum is too large for phase correction".to_owned(),
+                })?,
+            ) / denominator
+        };
+        let x = fraction - pivot_fraction;
+        let phase_deg = zero_order_deg
+            + first_order_deg * x
+            + second_order_deg * x * x
+            + third_order_deg * x * x * x;
+        let phase_rad = phase_deg.to_radians();
+        let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+        let corrected = value * rotation;
+        real.push(corrected.re);
+        imaginary.push(corrected.im);
+    }
+
+    let mut processed = Spectrum1D::new_complex(
+        spectrum.x.clone(),
+        real,
+        Some(imaginary),
+        spectrum.metadata.clone(),
+    )?;
+    processed.processing.clone_from(&spectrum.processing);
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("phase_correct_polynomial").with_details(format!(
+            "ph0={zero_order_deg},ph1={first_order_deg},ph2={second_order_deg},ph3={third_order_deg},pivot_fraction={pivot_fraction}"
+        )),
+    ))
+}
+
 pub(crate) fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
     match &spectrum.imaginary {
         Some(imaginary) => spectrum

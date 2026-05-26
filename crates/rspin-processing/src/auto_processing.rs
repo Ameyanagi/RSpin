@@ -35,8 +35,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingRecipe1D, apply_subsample_shift,
-    auto_phase_correct, exponential_apodization, first_point_scale, linear_predict_backward,
-    matched_filter_em, remove_group_delay, subtract_baseline,
+    auto_phase_correct, auto_phase_correct_polynomial, exponential_apodization, first_point_scale,
+    linear_predict_backward, matched_filter_em, remove_group_delay, subtract_baseline,
 };
 
 /// Options controlling [`process_spectrum_auto`].
@@ -45,6 +45,7 @@ use crate::{
 /// override the default behaviour for a specific dataset.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct AutoProcessingOptions {
     /// Override the digital-filter group-delay value (`integer +
     /// fractional` samples). When `None` the value is recovered from
@@ -72,7 +73,13 @@ pub struct AutoProcessingOptions {
     /// Defaults: 1H → 0.3 Hz, 13C → 1.0 Hz, 15N/19F/31P → 2.0 Hz,
     /// unknown → matched-filter EM (auto).
     pub nucleus_lb_hz: NucleusLbDefaults,
-    /// Apply the first-point scaling `s[0] *= 0.5` (FCOR=0.5 default).
+    /// Apply the first-point scaling `s[0] *= 0.5` (`FCOR = 0.5`).
+    ///
+    /// Set to `false` when residual `ph1` after group-delay correction
+    /// is expected to be nonzero (Bruker/JEOL with partial correction,
+    /// non-causal FIDs) — halving here would inject a half-amplitude
+    /// DC offset that the residual phase ramp turns into a visible
+    /// dispersive baseline distortion.
     pub first_point_scale: bool,
     /// Zero-fill target multiplier relative to the (post-LP) FID
     /// length. The actual target is the next power of two greater
@@ -82,6 +89,19 @@ pub struct AutoProcessingOptions {
     /// When `true`, run [`auto_phase_correct`] with the default
     /// Regions options on the FFT'd spectrum.
     pub auto_phase: bool,
+    /// When `true`, run [`auto_phase_correct_polynomial`] to refine
+    /// the linear `(ph0, ph1)` with quadratic + cubic terms (ph2, ph3).
+    /// Has no effect when `auto_phase = false`.
+    ///
+    /// **Experimental — only enable when the linear fit is already
+    /// near-zero.** Polynomial refinement is only meaningful once the
+    /// group-delay correction has reduced the linear residual to a
+    /// few degrees. When `|ph1|` is still in the hundreds (e.g.
+    /// because the integer group-delay extraction is off by several
+    /// samples), the polynomial optimiser amplifies the multi-turn
+    /// ramp and produces visibly wrong dispersive spikes. Fix the
+    /// upstream group-delay first.
+    pub polynomial_phase_refine: bool,
     /// When `true`, apply [`subtract_baseline`] with the Whittaker
     /// AsLS-family default after auto-phase.
     pub subtract_baseline: bool,
@@ -102,6 +122,7 @@ impl Default for AutoProcessingOptions {
             first_point_scale: true,
             zero_fill_multiplier: 2,
             auto_phase: true,
+            polynomial_phase_refine: false,
             subtract_baseline: true,
         }
     }
@@ -268,9 +289,16 @@ pub fn process_spectrum_auto(
         after_fft = apply_subsample_shift(&after_fft, group_delay_frac)?;
     }
 
-    // 8. Auto-phase with Regions defaults.
+    // 8. Auto-phase. Linear (ph0, ph1) by default; refines with
+    //    polynomial (ph2, ph3) when requested for spectra carrying
+    //    residual frequency-dependent phase from a digital-filter
+    //    compensator.
     let after_phase = if options.auto_phase {
-        auto_phase_correct(&after_fft, AutoPhaseOptions::default())?.spectrum
+        if options.polynomial_phase_refine {
+            auto_phase_correct_polynomial(&after_fft, AutoPhaseOptions::default())?.spectrum
+        } else {
+            auto_phase_correct(&after_fft, AutoPhaseOptions::default())?.spectrum
+        }
     } else {
         after_fft
     };

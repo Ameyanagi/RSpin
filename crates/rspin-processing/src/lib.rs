@@ -37,9 +37,10 @@ pub use apodization_2d::{
     traf_apodization_2d, trapezoidal_apodization_2d,
 };
 pub use auto_phase::{
-    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
-    RegionsOptions, RegionsResult, auto_phase_correct, auto_phase_correct_regions,
-    auto_phase_correct_with_peaks, peak_based_phase_estimate,
+    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhasePolynomialResult,
+    AutoPhaseResult, AutoPhaseStrategy, RegionsOptions, RegionsResult, auto_phase_correct,
+    auto_phase_correct_polynomial, auto_phase_correct_regions, auto_phase_correct_with_peaks,
+    peak_based_phase_estimate,
 };
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
@@ -79,8 +80,8 @@ pub use transform::{
     PhaseCorrection, SineBellApodization, TrafApodization, TrapezoidalApodization,
     convolution_difference_apodization, exponential_apodization, fft_1d, first_point_scale,
     gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
-    magnitude_spectrum, matched_filter_em, phase_correct, sine_bell_apodization, traf_apodization,
-    trapezoidal_apodization,
+    magnitude_spectrum, matched_filter_em, phase_correct, phase_correct_polynomial,
+    sine_bell_apodization, traf_apodization, trapezoidal_apodization,
 };
 pub use transform::{SubsampleShift, apply_subsample_shift, remove_group_delay};
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};

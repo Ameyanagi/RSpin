@@ -17,6 +17,8 @@ mod regions;
 pub use model::{
     AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
 };
+// Public from this file (declared further down).
+// `auto_phase_correct_polynomial` and `AutoPhasePolynomialResult`.
 pub use regions::{RegionsOptions, RegionsResult, auto_phase_correct_regions};
 
 impl AutoPhaseOptions {
@@ -943,6 +945,245 @@ fn ensure_finite(field: &'static str, value: f64) -> Result<()> {
         return Err(RSpinError::NonFinite { field });
     }
     Ok(())
+}
+
+/// Result of [`auto_phase_correct_polynomial`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct AutoPhasePolynomialResult {
+    /// Phased spectrum (real + imaginary).
+    pub spectrum: Spectrum1D,
+    /// Zero-order phase in degrees.
+    pub zero_order_deg: f64,
+    /// First-order phase in degrees.
+    pub first_order_deg: f64,
+    /// Second-order phase in degrees.
+    pub second_order_deg: f64,
+    /// Third-order phase in degrees.
+    pub third_order_deg: f64,
+    /// Pivot fraction the polynomial is centred on.
+    pub pivot_fraction: f64,
+    /// Final ACME entropy cost.
+    pub score: f64,
+}
+
+/// Auto-fits a polynomial phase up to cubic order (ph0, ph1, ph2, ph3).
+///
+/// Two-stage fit (Cobas, *Magn. Reson. Chem.* 61, 75 (2023),
+/// DOI 10.1002/mrc.5320):
+///
+/// 1. Linear stage: run [`auto_phase_correct`] with the
+///    `GlobalCost` + ACME entropy strategy to recover the dominant
+///    (`ph0`, `ph1`).
+/// 2. Polynomial refinement: holding (`ph0`, `ph1`) fixed, do a
+///    Nelder-Mead search over (`ph2`, `ph3`) against the same ACME
+///    entropy cost. The starting simplex is small (`±5°` around 0)
+///    because well-corrected digital filters need only a few degrees
+///    of polynomial residual.
+///
+/// The returned spectrum has the **combined** polynomial phase
+/// applied. The processing history records `phase_correct_polynomial`.
+///
+/// # Errors
+///
+/// Returns an error when options are invalid or the spectrum is too
+/// small for the linear stage.
+pub fn auto_phase_correct_polynomial(
+    spectrum: &Spectrum1D,
+    options: AutoPhaseOptions,
+) -> Result<AutoPhasePolynomialResult> {
+    // Force GlobalCost — Regions doesn't expose the cost function
+    // shape that the polynomial refinement needs to score against.
+    let linear_options = options.with_strategy(AutoPhaseStrategy::GlobalCost);
+    let linear = auto_phase_correct(spectrum, linear_options)?;
+    let ph0 = linear.zero_order_deg;
+    let ph1 = linear.first_order_deg;
+
+    let pivot_fraction = resolve_pivot_fraction(spectrum, options)?;
+    let buffer = complex_buffer(spectrum);
+    let fractions = index_fractions(spectrum.len())?;
+    let mask = resolve_active_mask(spectrum, options);
+
+    // Regularised ACME entropy cost: penalises large |ph2|, |ph3| so
+    // the optimiser prefers tiny polynomial residuals over big swings
+    // that locally minimise entropy by introducing dispersive lobes on
+    // weak peaks. The regularisation weight is small relative to the
+    // entropy magnitude (≈ 1) so the optimum still tracks real
+    // distortion when there is one.
+    let regulariser_weight = 5.0e-4_f64;
+    let evaluate = |ph2: f64, ph3: f64| -> f64 {
+        let base = polynomial_acme_cost(
+            &buffer,
+            &fractions,
+            mask.as_deref(),
+            ph0,
+            ph1,
+            ph2,
+            ph3,
+            pivot_fraction,
+            options,
+        );
+        base + regulariser_weight * (ph2 * ph2 + ph3 * ph3)
+    };
+
+    let baseline_score = evaluate(0.0, 0.0);
+    // Nelder-Mead in 2-d (ph2, ph3). Starting simplex covers ±5° on
+    // each axis; final tolerance 1e-4 °.
+    let (best_ph2, best_ph3, best_score) = nelder_mead_polynomial(0.0, 0.0, 5.0, &evaluate);
+
+    // Reject the polynomial refinement when it doesn't beat the
+    // linear (ph2=ph3=0) baseline by a meaningful margin (≥ 2 %).
+    // Polynomial optimisation against ACME entropy is prone to local
+    // minima that improve the score by a sliver while introducing
+    // dispersive lobes on the real spectrum.
+    let improvement = baseline_score - best_score;
+    let relative = if baseline_score.abs() > f64::EPSILON {
+        improvement / baseline_score.abs()
+    } else {
+        improvement
+    };
+    let (ph2, ph3, score) = if relative > 0.02 {
+        (best_ph2, best_ph3, best_score)
+    } else {
+        (0.0, 0.0, baseline_score)
+    };
+
+    let phased = crate::phase_correct_polynomial(spectrum, ph0, ph1, ph2, ph3, pivot_fraction)?;
+    Ok(AutoPhasePolynomialResult {
+        spectrum: phased,
+        zero_order_deg: ph0,
+        first_order_deg: ph1,
+        second_order_deg: ph2,
+        third_order_deg: ph3,
+        pivot_fraction,
+        score,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn polynomial_acme_cost(
+    buffer: &[Complex<f64>],
+    fractions: &[f64],
+    mask: Option<&[bool]>,
+    ph0: f64,
+    ph1: f64,
+    ph2: f64,
+    ph3: f64,
+    pivot_fraction: f64,
+    options: AutoPhaseOptions,
+) -> f64 {
+    let mut abs_deriv = Vec::with_capacity(buffer.len().saturating_sub(1));
+    let mut deriv_sum = 0.0_f64;
+    let mut sum_sq = 0.0_f64;
+    let mut neg_sq = 0.0_f64;
+    let mut prev_real: Option<f64> = None;
+    for (index, (value, fraction)) in buffer.iter().zip(fractions).enumerate() {
+        let x = *fraction - pivot_fraction;
+        let phase_rad = (ph0 + ph1 * x + ph2 * x * x + ph3 * x * x * x).to_radians();
+        let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+        let real = (*value * rotation).re;
+        if is_active(mask, index) {
+            sum_sq += real * real;
+            if real < 0.0 {
+                neg_sq += real * real;
+            }
+        }
+        if let Some(prev) = prev_real {
+            let both_active = is_active(mask, index - 1) && is_active(mask, index);
+            let d = if both_active {
+                (real - prev).abs()
+            } else {
+                0.0
+            };
+            deriv_sum += d;
+            abs_deriv.push(d);
+        }
+        prev_real = Some(real);
+    }
+    if deriv_sum <= f64::EPSILON {
+        return 0.0;
+    }
+    let mut entropy = 0.0_f64;
+    for d in &abs_deriv {
+        if *d <= 0.0 {
+            continue;
+        }
+        let p = d / deriv_sum;
+        if p > 0.0 {
+            entropy -= p * p.ln();
+        }
+    }
+    let normalized_negativity = if sum_sq > f64::EPSILON {
+        neg_sq / sum_sq
+    } else {
+        0.0
+    };
+    entropy + options.negative_weight * normalized_negativity
+}
+
+fn nelder_mead_polynomial<F>(ph2_init: f64, ph3_init: f64, step: f64, cost: &F) -> (f64, f64, f64)
+where
+    F: Fn(f64, f64) -> f64,
+{
+    let mut simplex: [(f64, f64, f64); 3] = [
+        (ph2_init, ph3_init, cost(ph2_init, ph3_init)),
+        (ph2_init + step, ph3_init, cost(ph2_init + step, ph3_init)),
+        (ph2_init, ph3_init + step, cost(ph2_init, ph3_init + step)),
+    ];
+    let tolerance = 1.0e-4_f64;
+    for _ in 0..NELDER_MEAD_MAX_ITERS {
+        simplex.sort_by(|a, b| a.2.total_cmp(&b.2));
+        let best = simplex[0];
+        let mid = simplex[1];
+        let worst = simplex[2];
+        let span_a = (best.0 - worst.0)
+            .abs()
+            .max((best.0 - mid.0).abs())
+            .max((mid.0 - worst.0).abs());
+        let span_b = (best.1 - worst.1)
+            .abs()
+            .max((best.1 - mid.1).abs())
+            .max((mid.1 - worst.1).abs());
+        if span_a < tolerance && span_b < tolerance {
+            break;
+        }
+        let centroid_a = f64::midpoint(best.0, mid.0);
+        let centroid_b = f64::midpoint(best.1, mid.1);
+        let r_a = centroid_a + (centroid_a - worst.0);
+        let r_b = centroid_b + (centroid_b - worst.1);
+        let r_score = cost(r_a, r_b);
+        if r_score < best.2 {
+            let e_a = centroid_a + 2.0 * (centroid_a - worst.0);
+            let e_b = centroid_b + 2.0 * (centroid_b - worst.1);
+            let e_score = cost(e_a, e_b);
+            simplex[2] = if e_score < r_score {
+                (e_a, e_b, e_score)
+            } else {
+                (r_a, r_b, r_score)
+            };
+            continue;
+        }
+        if r_score < mid.2 {
+            simplex[2] = (r_a, r_b, r_score);
+            continue;
+        }
+        let c_a = centroid_a + 0.5 * (worst.0 - centroid_a);
+        let c_b = centroid_b + 0.5 * (worst.1 - centroid_b);
+        let c_score = cost(c_a, c_b);
+        if c_score < worst.2 {
+            simplex[2] = (c_a, c_b, c_score);
+            continue;
+        }
+        for vertex in &mut simplex[1..] {
+            let new_a = best.0 + 0.5 * (vertex.0 - best.0);
+            let new_b = best.1 + 0.5 * (vertex.1 - best.1);
+            vertex.0 = new_a;
+            vertex.1 = new_b;
+            vertex.2 = cost(new_a, new_b);
+        }
+    }
+    simplex.sort_by(|a, b| a.2.total_cmp(&b.2));
+    let best = simplex[0];
+    (best.0, best.1, best.2)
 }
 
 #[cfg(test)]
