@@ -6,10 +6,10 @@ use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
     AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
-    crop_1d, exponential_apodization, fft_1d, gaussian_apodization, lorentz_to_gauss_apodization,
-    magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
-    resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
-    traf_apodization, trapezoidal_apodization, zero_fill,
+    crop_1d, exponential_apodization, fft_1d, gauss_multiply_bruker_apodization,
+    gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
+    normalize_max_abs, offset_intensity, phase_correct, resample_1d, scale_intensity, shift_axis,
+    sine_bell_apodization, subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -83,6 +83,15 @@ pub enum ProcessingOperation1D {
         gauss_fwhm_hz: f64,
         /// Gaussian-peak shift in `[0, 1]`.
         gauss_shift: f64,
+        /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies Bruker-style two-parameter Gaussian (`procs` GMB) apodization.
+    GaussMultiplyBrukerApodization {
+        /// Signed Bruker `LB` line broadening, in hertz.
+        line_broadening_hz: f64,
+        /// Bruker `GB` Gaussian peak position as a fraction of the FID, in `[0, 1]`.
+        gauss_position_fraction: f64,
         /// Dwell time in seconds.
         dwell_time_s: f64,
     },
@@ -173,6 +182,16 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 *lorentz_to_undo_hz,
                 *gauss_fwhm_hz,
                 *gauss_shift,
+                *dwell_time_s,
+            ),
+            Self::GaussMultiplyBrukerApodization {
+                line_broadening_hz,
+                gauss_position_fraction,
+                dwell_time_s,
+            } => gauss_multiply_bruker_apodization(
+                spectrum,
+                *line_broadening_hz,
+                *gauss_position_fraction,
                 *dwell_time_s,
             ),
             Self::TrafApodization {
@@ -392,6 +411,21 @@ impl ProcessingRecipe1D {
             lorentz_to_undo_hz,
             gauss_fwhm_hz,
             gauss_shift,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a Bruker-style two-parameter Gaussian (GMB) apodization operation.
+    #[must_use]
+    pub fn gauss_multiply_bruker_apodization(
+        self,
+        line_broadening_hz: f64,
+        gauss_position_fraction: f64,
+        dwell_time_s: f64,
+    ) -> Self {
+        self.with_operation(ProcessingOperation1D::GaussMultiplyBrukerApodization {
+            line_broadening_hz,
+            gauss_position_fraction,
             dwell_time_s,
         })
     }

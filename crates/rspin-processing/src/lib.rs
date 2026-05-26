@@ -68,9 +68,10 @@ pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
 pub use transform::remove_group_delay;
 pub use transform::{
-    ExponentialApodization, Fft1D, FftDirection, GaussianApodization, LorentzToGaussApodization,
-    Magnitude, PhaseCorrection, SineBellApodization, TrafApodization, TrapezoidalApodization,
-    exponential_apodization, fft_1d, gaussian_apodization, lorentz_to_gauss_apodization,
+    ExponentialApodization, Fft1D, FftDirection, GaussMultiplyBrukerApodization,
+    GaussianApodization, LorentzToGaussApodization, Magnitude, PhaseCorrection,
+    SineBellApodization, TrafApodization, TrapezoidalApodization, exponential_apodization, fft_1d,
+    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
     magnitude_spectrum, phase_correct, sine_bell_apodization, traf_apodization,
     trapezoidal_apodization,
 };

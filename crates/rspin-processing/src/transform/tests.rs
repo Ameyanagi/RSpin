@@ -230,6 +230,67 @@ fn traf_rejects_invalid_parameters() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bruker_gmb_identity_when_both_parameters_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = gauss_multiply_bruker_apodization(&spectrum, 0.0, 0.0, 0.1)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    assert_eq!(
+        processed.processing[0].operation,
+        "gauss_multiply_bruker_apodization"
+    );
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_reduces_to_exponential_when_gauss_zero() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let lb = 1.5_f64;
+    let dwell = 0.1_f64;
+    let bruker = gauss_multiply_bruker_apodization(&spectrum, lb, 0.0, dwell)?;
+    let em = exponential_apodization(&spectrum, lb, dwell)?;
+    assert_vec_close(&bruker.intensities, &em.intensities);
+    assert_vec_close(require_imaginary(&bruker)?, require_imaginary(&em)?);
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_peaks_near_gb_fraction_for_resolution_enhancement() -> anyhow::Result<()> {
+    // LB < 0 with GB > 0 should produce a window that peaks at i = GB*(N-1).
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.99, 100)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0; 100], Metadata::default())?;
+    let processed = gauss_multiply_bruker_apodization(&spectrum, -1.0, 0.5, 0.01)?;
+    let (peak_index, _) = processed.intensities.iter().enumerate().fold(
+        (0_usize, f64::NEG_INFINITY),
+        |(best_index, best), (index, value)| {
+            if *value > best {
+                (index, *value)
+            } else {
+                (best_index, best)
+            }
+        },
+    );
+    assert!(
+        (47..=52).contains(&peak_index),
+        "expected peak near 49, got {peak_index}"
+    );
+    Ok(())
+}
+
+#[test]
+fn bruker_gmb_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, -0.1, 0.1).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 1.5, 0.1).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 0.5, 0.0).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, f64::NAN, 0.5, 0.1).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

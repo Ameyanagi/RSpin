@@ -183,6 +183,49 @@ impl ProcessingStep<Spectrum1D> for TrafApodization {
     }
 }
 
+/// Applies Bruker-style two-parameter Gaussian apodization (`procs` GMB).
+///
+/// `w[i] = exp(-a · i - b · i²)` with `a = π · LB · dt` and
+/// `b = -a / (2 · GB · (N-1) · dt)` when `GB > 0`, else `b = 0`.
+///
+/// This matches the `LB`/`GB` parameter convention of Bruker's `procs`
+/// file: signed `lb_hz` and the fractional Gaussian peak position
+/// `gb_fraction ∈ [0, 1]`. Negative `lb_hz` combined with positive
+/// `gb_fraction` yields resolution enhancement; positive `lb_hz` with
+/// `gb_fraction = 0` reduces to exponential apodization.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct GaussMultiplyBrukerApodization {
+    /// Signed Bruker `LB` line broadening, in hertz.
+    pub line_broadening_hz: f64,
+    /// Bruker `GB` Gaussian peak position as a fraction of the FID, in `[0, 1]`.
+    pub gauss_position_fraction: f64,
+    /// Dwell time in seconds (> 0).
+    pub dwell_time_s: f64,
+}
+
+impl GaussMultiplyBrukerApodization {
+    /// Creates a Bruker-convention GMB apodization step.
+    #[must_use]
+    pub fn new(line_broadening_hz: f64, gauss_position_fraction: f64, dwell_time_s: f64) -> Self {
+        Self {
+            line_broadening_hz,
+            gauss_position_fraction,
+            dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        gauss_multiply_bruker_apodization(
+            spectrum,
+            self.line_broadening_hz,
+            self.gauss_position_fraction,
+            self.dwell_time_s,
+        )
+    }
+}
+
 /// Applies trapezoidal apodization.
 ///
 /// The window ramps linearly from 0 up to 1 across the leading
@@ -523,6 +566,45 @@ pub fn lorentz_to_gauss_apodization(
     Ok(processed.with_processing_record(
         ProcessingRecord::new("lorentz_to_gauss_apodization").with_details(format!(
             "lorentz_to_undo_hz={lorentz_to_undo_hz},gauss_fwhm_hz={gauss_fwhm_hz},gauss_shift={gauss_shift},dwell_time_s={dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies Bruker-style two-parameter Gaussian apodization.
+///
+/// See [`GaussMultiplyBrukerApodization`] for the math.
+///
+/// # Errors
+///
+/// Returns an error when `gauss_position_fraction` is outside `[0, 1]`,
+/// dwell time is not positive, any parameter is non-finite, or the
+/// point count is too large for checked numeric conversion.
+pub fn gauss_multiply_bruker_apodization(
+    spectrum: &Spectrum1D,
+    line_broadening_hz: f64,
+    gauss_position_fraction: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = gauss_multiply_bruker_weights(
+        spectrum.len(),
+        line_broadening_hz,
+        gauss_position_fraction,
+        dwell_time_s,
+        "Bruker GMB apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("gauss_multiply_bruker_apodization").with_details(format!(
+            "line_broadening_hz={line_broadening_hz},gauss_position_fraction={gauss_position_fraction},dwell_time_s={dwell_time_s}"
         )),
     ))
 }
@@ -917,6 +999,57 @@ fn index_denominator(len: usize) -> Result<f64> {
         message: "spectrum is too large for phase correction".to_owned(),
     })?;
     Ok(f64::from(denominator))
+}
+
+fn gauss_multiply_bruker_weights(
+    len: usize,
+    line_broadening_hz: f64,
+    gauss_position_fraction: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_finite("line_broadening_hz", line_broadening_hz)?;
+    ensure_finite("gauss_position_fraction", gauss_position_fraction)?;
+    if !(0.0..=1.0).contains(&gauss_position_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "gauss_position_fraction must be between 0 and 1".to_owned(),
+        });
+    }
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    // Bruker procs convention: F(t) = exp(-a·t - b·t²) with a = π·LB and
+    // b = -a / (2·GB·AQ) where AQ = (N-1)·dt. Working in discretised
+    // index form F[i] = exp(-a'·i - b'·i²) the per-step coefficients are
+    // a' = π·LB·dt and b' = -a' / (2·GB·(N-1)), which gives a Gaussian
+    // peak at i = GB·(N-1) for LB<0, GB>0 (the resolution-enhancement
+    // case). When GB = 0 the formula reduces to plain exponential.
+    let a = PI * line_broadening_hz * dwell_time_s;
+    let b = if gauss_position_fraction > 0.0 && last_index_f > 0.0 {
+        -a / (2.0 * gauss_position_fraction * last_index_f)
+    } else {
+        0.0
+    };
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            Ok((-a * index_f - b * index_f * index_f).exp())
+        })
+        .collect()
 }
 
 fn traf_weights(
