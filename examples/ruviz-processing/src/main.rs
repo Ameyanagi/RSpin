@@ -33,11 +33,11 @@ mod ruviz_example {
     };
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
-        ProcessSpectrum2D, ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks,
-        convolution_difference_apodization, exponential_apodization, fit_baseline,
-        gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
-        magnitude_spectrum, matched_filter_em, remove_group_delay, traf_apodization,
-        trapezoidal_apodization,
+        ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift, auto_phase_correct,
+        auto_phase_correct_with_peaks, convolution_difference_apodization, exponential_apodization,
+        fit_baseline, gauss_multiply_bruker_apodization, gaussian_apodization,
+        lorentz_to_gauss_apodization, magnitude_spectrum, matched_filter_em, remove_group_delay,
+        traf_apodization, trapezoidal_apodization,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -214,6 +214,7 @@ mod ruviz_example {
         matched_lb_hz: f64,
         ph0_deg: f64,
         ph1_deg: f64,
+        subsample_frac: f64,
     }
 
     fn build_apodization_panels(
@@ -223,8 +224,10 @@ mod ruviz_example {
         conv_broad_hz: f64,
     ) -> Result<ApodizationPanels> {
         let group_delay = jeol_group_delay(fid);
-        let shifted = if group_delay > 0.0 {
-            remove_group_delay(fid, group_delay)?
+        let group_delay_integer = group_delay.trunc();
+        let group_delay_frac = group_delay - group_delay_integer;
+        let shifted = if group_delay_integer > 0.0 {
+            remove_group_delay(fid, group_delay_integer)?
         } else {
             fid.clone()
         };
@@ -241,13 +244,22 @@ mod ruviz_example {
         // multiplication and cannot change the FID's phase; phasing
         // each panel independently introduces noise from the auto-phase
         // search converging slightly differently per spectrum.
+        let fft_then_subsample = |windowed: &Spectrum1D| -> Result<Spectrum1D> {
+            let mut out = ProcessingRecipe1D::new()
+                .zero_fill(zero_fill_len)
+                .fft(FftDirection::Forward)
+                .apply(windowed)?;
+            if group_delay_frac.abs() > f64::EPSILON {
+                out = apply_subsample_shift(&out, group_delay_frac)?;
+            }
+            Ok(relabel_hz_to_ppm(out))
+        };
+
         let reference_windowed = exponential_apodization(&shifted, lb_hz, dwell)?;
+        let reference_freq = fft_then_subsample(&reference_windowed)?;
         let reference_spectrum = ProcessingRecipe1D::new()
-            .zero_fill(zero_fill_len)
-            .fft(FftDirection::Forward)
             .normalize_max_abs()
-            .apply(&reference_windowed)?;
-        let reference_spectrum = relabel_hz_to_ppm(reference_spectrum);
+            .apply(&reference_freq)?;
         let reference = auto_phase_correct(
             &reference_spectrum,
             AutoPhaseOptions::default().pivot_fraction(pivot_fraction),
@@ -256,12 +268,10 @@ mod ruviz_example {
         let ph1_deg = reference.first_order_deg;
 
         let apodise_with_shared_phase = |windowed: Spectrum1D| -> Result<Spectrum1D> {
+            let processed = fft_then_subsample(&windowed)?;
             let processed = ProcessingRecipe1D::new()
-                .zero_fill(zero_fill_len)
-                .fft(FftDirection::Forward)
                 .normalize_max_abs()
-                .apply(&windowed)?;
-            let processed = relabel_hz_to_ppm(processed);
+                .apply(&processed)?;
             // Manual phase with the same (ph0, ph1) recovered above.
             let phased = ProcessingRecipe1D::new()
                 .phase(ph0_deg, ph1_deg, pivot_fraction)
@@ -269,15 +279,12 @@ mod ruviz_example {
             Ok(phased)
         };
         let magnitude_only = |windowed: Spectrum1D| -> Result<Spectrum1D> {
-            let processed = ProcessingRecipe1D::new()
-                .zero_fill(zero_fill_len)
-                .fft(FftDirection::Forward)
-                .apply(&windowed)?;
+            let processed = fft_then_subsample(&windowed)?;
             let mag = magnitude_spectrum(&processed)?;
             let mag = ProcessingRecipe1D::new()
                 .normalize_max_abs()
                 .apply(&mag)?;
-            Ok(relabel_hz_to_ppm(mag))
+            Ok(mag)
         };
 
         let raw = magnitude_only(shifted.clone())?;
@@ -324,6 +331,7 @@ mod ruviz_example {
             matched_lb_hz,
             ph0_deg,
             ph1_deg,
+            subsample_frac: group_delay_frac,
         })
     }
 
@@ -368,8 +376,8 @@ mod ruviz_example {
                 .into()
         };
         let phase_tag = format!(
-            "phased: ph0={:.0}°, ph1={:.0}°",
-            panels.ph0_deg, panels.ph1_deg
+            "phased: ph0={:.0}°, ph1={:.0}°, frac={:+.3}",
+            panels.ph0_deg, panels.ph1_deg, panels.subsample_frac
         );
         let figure = subplots(3, 3, 2700, 1800)?
             .subplot_at(
