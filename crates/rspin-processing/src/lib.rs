@@ -30,9 +30,9 @@ pub use abs_1d::{Abs1D, abs_1d};
 pub use abs_2d::{Abs2D, abs_2d};
 pub use apodization_2d::{
     ExponentialApodization2D, GaussianApodization2D, LorentzToGaussApodization2D,
-    SineBellApodization2D, TrapezoidalApodization2D, exponential_apodization_2d,
+    SineBellApodization2D, TrafApodization2D, TrapezoidalApodization2D, exponential_apodization_2d,
     gaussian_apodization_2d, lorentz_to_gauss_apodization_2d, sine_bell_apodization_2d,
-    trapezoidal_apodization_2d,
+    traf_apodization_2d, trapezoidal_apodization_2d,
 };
 pub use auto_phase::{
     AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
@@ -69,9 +69,10 @@ pub use traits::ProcessingStep;
 pub use transform::remove_group_delay;
 pub use transform::{
     ExponentialApodization, Fft1D, FftDirection, GaussianApodization, LorentzToGaussApodization,
-    Magnitude, PhaseCorrection, SineBellApodization, TrapezoidalApodization,
+    Magnitude, PhaseCorrection, SineBellApodization, TrafApodization, TrapezoidalApodization,
     exponential_apodization, fft_1d, gaussian_apodization, lorentz_to_gauss_apodization,
-    magnitude_spectrum, phase_correct, sine_bell_apodization, trapezoidal_apodization,
+    magnitude_spectrum, phase_correct, sine_bell_apodization, traf_apodization,
+    trapezoidal_apodization,
 };
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{

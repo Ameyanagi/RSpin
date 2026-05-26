@@ -164,6 +164,49 @@ impl ProcessingStep<Spectrum2D> for LorentzToGaussApodization2D {
     }
 }
 
+/// Applies separable TRAF (Traficante) apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrafApodization2D {
+    /// X-dimension line broadening in hertz.
+    pub x_line_broadening_hz: f64,
+    /// X-dimension dwell time in seconds.
+    pub x_dwell_time_s: f64,
+    /// Y-dimension line broadening in hertz.
+    pub y_line_broadening_hz: f64,
+    /// Y-dimension dwell time in seconds.
+    pub y_dwell_time_s: f64,
+}
+
+impl TrafApodization2D {
+    /// Creates a separable TRAF apodization step.
+    #[must_use]
+    pub fn new(
+        x_line_broadening_hz: f64,
+        x_dwell_time_s: f64,
+        y_line_broadening_hz: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            x_line_broadening_hz,
+            x_dwell_time_s,
+            y_line_broadening_hz,
+            y_dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for TrafApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        traf_apodization_2d(
+            spectrum,
+            self.x_line_broadening_hz,
+            self.x_dwell_time_s,
+            self.y_line_broadening_hz,
+            self.y_dwell_time_s,
+        )
+    }
+}
+
 /// Applies separable trapezoidal apodization to a two-dimensional spectrum.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TrapezoidalApodization2D {
@@ -421,6 +464,53 @@ pub fn lorentz_to_gauss_apodization_2d(
     ))
 }
 
+/// Applies a separable TRAF window in x and y.
+///
+/// # Errors
+///
+/// Returns an error when line broadening is negative, dwell times are not
+/// positive, any parameter is non-finite, or the shape is too large for
+/// checked numeric conversion.
+pub fn traf_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_line_broadening_hz: f64,
+    x_dwell_time_s: f64,
+    y_line_broadening_hz: f64,
+    y_dwell_time_s: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = traf_weights(
+        width,
+        x_line_broadening_hz,
+        x_dwell_time_s,
+        "2D x TRAF apodization",
+    )?;
+    let y_weights = traf_weights(
+        height,
+        y_line_broadening_hz,
+        y_dwell_time_s,
+        "2D y TRAF apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("traf_apodization_2d").with_details(format!(
+            "x_line_broadening_hz={x_line_broadening_hz},x_dwell_time_s={x_dwell_time_s},y_line_broadening_hz={y_line_broadening_hz},y_dwell_time_s={y_dwell_time_s}"
+        )),
+    ))
+}
+
 /// Applies a separable trapezoidal window in x and y.
 ///
 /// # Errors
@@ -551,6 +641,46 @@ fn gaussian_weights(
                 );
             let scaled = scale * index;
             Ok((-(scaled * scaled) / denominator).exp())
+        })
+        .collect()
+}
+
+fn traf_weights(
+    len: usize,
+    line_broadening_hz: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("line_broadening_hz", line_broadening_hz)?;
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    let scale = -PI * line_broadening_hz * dwell_time_s;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let e_decay = (scale * index_f).exp();
+            let r_decay = (scale * (last_index_f - index_f)).exp();
+            let denominator = e_decay.powi(3) + r_decay.powi(3);
+            let weight = if denominator <= 0.0 {
+                0.0
+            } else {
+                e_decay.powi(2) / denominator
+            };
+            Ok(weight)
         })
         .collect()
 }

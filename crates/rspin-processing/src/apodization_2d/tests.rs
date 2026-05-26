@@ -253,6 +253,18 @@ fn trapezoidal_2d_rejects_inverted_window() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn traf_2d_matches_separable_product() -> anyhow::Result<()> {
+    let spectrum = demo_spectrum()?;
+    let processed = traf_apodization_2d(&spectrum, 0.0, 0.1, 0.0, 0.2)?;
+    // With LB=0 on both axes, all weights are 0.5 → product is 0.25.
+    assert_close(processed.z[0], 0.25);
+    assert_close(processed.z[1], 0.5);
+    assert_close(processed.z[5], 1.5);
+    assert_eq!(processed.processing[0].operation, "traf_apodization_2d");
+    Ok(())
+}
+
 fn demo_spectrum() -> anyhow::Result<Spectrum2D> {
     Ok(Spectrum2D::new(
         Axis::linear("x", Unit::Seconds, 0.0, 0.2, 3)?,

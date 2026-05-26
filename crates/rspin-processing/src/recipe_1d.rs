@@ -9,7 +9,7 @@ use crate::{
     crop_1d, exponential_apodization, fft_1d, gaussian_apodization, lorentz_to_gauss_apodization,
     magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
     resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
-    trapezoidal_apodization, zero_fill,
+    traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -84,6 +84,13 @@ pub enum ProcessingOperation1D {
         /// Gaussian-peak shift in `[0, 1]`.
         gauss_shift: f64,
         /// Dwell time in seconds.
+        dwell_time_s: f64,
+    },
+    /// Applies TRAF (Traficante) apodization.
+    TrafApodization {
+        /// Line broadening in hertz (≥ 0).
+        line_broadening_hz: f64,
+        /// Dwell time in seconds (> 0).
         dwell_time_s: f64,
     },
     /// Applies trapezoidal apodization (ramp-in, plateau, ramp-out).
@@ -168,6 +175,10 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 *gauss_shift,
                 *dwell_time_s,
             ),
+            Self::TrafApodization {
+                line_broadening_hz,
+                dwell_time_s,
+            } => traf_apodization(spectrum, *line_broadening_hz, *dwell_time_s),
             Self::TrapezoidalApodization {
                 rise_end_fraction,
                 fall_start_fraction,
@@ -381,6 +392,15 @@ impl ProcessingRecipe1D {
             lorentz_to_undo_hz,
             gauss_fwhm_hz,
             gauss_shift,
+            dwell_time_s,
+        })
+    }
+
+    /// Appends a TRAF apodization operation.
+    #[must_use]
+    pub fn traf_apodization(self, line_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::TrafApodization {
+            line_broadening_hz,
             dwell_time_s,
         })
     }

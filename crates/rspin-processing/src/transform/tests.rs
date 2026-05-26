@@ -185,6 +185,51 @@ fn trapezoidal_rejects_invalid_parameters() -> anyhow::Result<()> {
 }
 
 #[test]
+fn traf_zero_broadening_gives_uniform_half_weight() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = traf_apodization(&spectrum, 0.0, 0.1)?;
+    // E = R = 1 → w = 1/2 everywhere.
+    assert_vec_close(
+        &processed.intensities,
+        &spectrum
+            .intensities
+            .iter()
+            .map(|v| v * 0.5)
+            .collect::<Vec<_>>(),
+    );
+    assert_eq!(processed.processing[0].operation, "traf_apodization");
+    Ok(())
+}
+
+#[test]
+fn traf_matches_analytic_formula() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new(axis, vec![1.0, 1.0, 1.0, 1.0], Metadata::default())?;
+    let lb = 2.0_f64;
+    let dwell = 0.1_f64;
+    let last = 3.0_f64;
+    let scale = -PI * lb * dwell;
+    let processed = traf_apodization(&spectrum, lb, dwell)?;
+    for index in 0..4_u32 {
+        let i_f = f64::from(index);
+        let e = (scale * i_f).exp();
+        let r = (scale * (last - i_f)).exp();
+        let expected = e.powi(2) / (e.powi(3) + r.powi(3));
+        assert_close(processed.intensities[usize::try_from(index)?], expected);
+    }
+    Ok(())
+}
+
+#[test]
+fn traf_rejects_invalid_parameters() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(traf_apodization(&spectrum, -1.0, 0.1).is_err());
+    assert!(traf_apodization(&spectrum, 1.0, 0.0).is_err());
+    assert!(traf_apodization(&spectrum, f64::NAN, 0.1).is_err());
+    Ok(())
+}
+
+#[test]
 fn magnitude_combines_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = Magnitude.apply(&spectrum)?;

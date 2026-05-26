@@ -151,6 +151,38 @@ impl ProcessingStep<Spectrum1D> for LorentzToGaussApodization {
     }
 }
 
+/// Applies TRAF (Traficante) apodization.
+///
+/// `w[i] = E² / (E³ + R³)` with `E = exp(-π · LB · i · dt)` and
+/// `R = exp(-π · LB · (N-1-i) · dt)`, following Traficante,
+/// *Concepts Magn. Reson.* 12 (2000) 83-101. TRAF is a self-normalising
+/// matched filter that preserves SNR while sharpening peaks; it is the
+/// preferred default for 13C in some commercial pipelines (ACD/Labs).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrafApodization {
+    /// Line broadening in hertz (≥ 0).
+    pub line_broadening_hz: f64,
+    /// Dwell time in seconds (> 0).
+    pub dwell_time_s: f64,
+}
+
+impl TrafApodization {
+    /// Creates a TRAF apodization step.
+    #[must_use]
+    pub fn new(line_broadening_hz: f64, dwell_time_s: f64) -> Self {
+        Self {
+            line_broadening_hz,
+            dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for TrafApodization {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        traf_apodization(spectrum, self.line_broadening_hz, self.dwell_time_s)
+    }
+}
+
 /// Applies trapezoidal apodization.
 ///
 /// The window ramps linearly from 0 up to 1 across the leading
@@ -493,6 +525,43 @@ pub fn lorentz_to_gauss_apodization(
             "lorentz_to_undo_hz={lorentz_to_undo_hz},gauss_fwhm_hz={gauss_fwhm_hz},gauss_shift={gauss_shift},dwell_time_s={dwell_time_s}"
         )),
     ))
+}
+
+/// Applies TRAF apodization to real and imaginary channels.
+///
+/// See [`TrafApodization`] for the math.
+///
+/// # Errors
+///
+/// Returns an error when line broadening is negative, dwell time is not
+/// positive, any parameter is non-finite, or the point count is too
+/// large for checked numeric conversion.
+pub fn traf_apodization(
+    spectrum: &Spectrum1D,
+    line_broadening_hz: f64,
+    dwell_time_s: f64,
+) -> Result<Spectrum1D> {
+    let weights = traf_weights(
+        spectrum.len(),
+        line_broadening_hz,
+        dwell_time_s,
+        "TRAF apodization",
+    )?;
+    let mut processed = spectrum.clone();
+    for (value, weight) in processed.intensities.iter_mut().zip(&weights) {
+        *value *= *weight;
+    }
+    if let Some(imaginary) = &mut processed.imaginary {
+        for (value, weight) in imaginary.iter_mut().zip(&weights) {
+            *value *= *weight;
+        }
+    }
+
+    Ok(
+        processed.with_processing_record(ProcessingRecord::new("traf_apodization").with_details(
+            format!("line_broadening_hz={line_broadening_hz},dwell_time_s={dwell_time_s}"),
+        )),
+    )
 }
 
 /// Applies trapezoidal apodization.
@@ -848,6 +917,46 @@ fn index_denominator(len: usize) -> Result<f64> {
         message: "spectrum is too large for phase correction".to_owned(),
     })?;
     Ok(f64::from(denominator))
+}
+
+fn traf_weights(
+    len: usize,
+    line_broadening_hz: f64,
+    dwell_time_s: f64,
+    context: &'static str,
+) -> Result<Vec<f64>> {
+    ensure_non_negative("line_broadening_hz", line_broadening_hz)?;
+    ensure_positive("dwell_time_s", dwell_time_s)?;
+    let last_index = len.saturating_sub(1);
+    let last_index_f = if last_index == 0 {
+        0.0
+    } else {
+        f64::from(
+            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
+                message: format!("{context} input is too large"),
+            })?,
+        )
+    };
+    let scale = -PI * line_broadening_hz * dwell_time_s;
+    (0..len)
+        .map(|index| {
+            let index_f =
+                f64::from(
+                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                        message: format!("{context} input is too large"),
+                    })?,
+                );
+            let e_decay = (scale * index_f).exp();
+            let r_decay = (scale * (last_index_f - index_f)).exp();
+            let denominator = e_decay.powi(3) + r_decay.powi(3);
+            let weight = if denominator <= 0.0 {
+                0.0
+            } else {
+                e_decay.powi(2) / denominator
+            };
+            Ok(weight)
+        })
+        .collect()
 }
 
 fn trapezoidal_weights(
