@@ -137,6 +137,10 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
     let mut buffer = complex_buffer(spectrum);
     let mut planner = FftPlanner::<f64>::new();
 
+    if direction == FftDirection::Inverse {
+        ifftshift_2d(&mut buffer, width, height);
+    }
+
     let row_fft = match direction {
         FftDirection::Forward => planner.plan_fft_forward(width),
         FftDirection::Inverse => planner.plan_fft_inverse(width),
@@ -160,7 +164,9 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
         }
     }
 
-    if direction == FftDirection::Inverse {
+    if direction == FftDirection::Forward {
+        fftshift_2d(&mut buffer, width, height);
+    } else {
         let len = u32::try_from(buffer.len()).map_err(|_| RSpinError::InvalidSpectrum {
             message: "2D spectrum is too large to normalize inverse FFT".to_owned(),
         })?;
@@ -170,19 +176,52 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
         }
     }
 
+    // For heteronuclear 2D the indirect axis has its own carrier; build a
+    // shim metadata with `frequency_mhz = indirect_frequency_mhz` when
+    // available so ppm relabeling uses the right MHz.
+    let indirect_metadata = match spectrum.metadata.indirect_frequency_mhz {
+        Some(freq) => {
+            let mut m = spectrum.metadata.clone();
+            m.frequency_mhz = Some(freq);
+            m
+        }
+        None => spectrum.metadata.clone(),
+    };
+    let (new_x, new_y) = match direction {
+        FftDirection::Forward => (
+            crate::transform::frequency_axis_from_time(&spectrum.x, &spectrum.metadata, width)?,
+            crate::transform::frequency_axis_from_time(&spectrum.y, &indirect_metadata, height)?,
+        ),
+        FftDirection::Inverse => (
+            crate::transform::time_axis_from_frequency(&spectrum.x, &spectrum.metadata, width)?,
+            crate::transform::time_axis_from_frequency(&spectrum.y, &indirect_metadata, height)?,
+        ),
+    };
+
     let z = buffer.iter().map(|value| value.re).collect();
     let imaginary = Some(buffer.iter().map(|value| value.im).collect());
-    let mut processed = Spectrum2D::new_complex(
-        spectrum.x.clone(),
-        spectrum.y.clone(),
-        z,
-        imaginary,
-        spectrum.metadata.clone(),
-    )?;
+    let mut processed =
+        Spectrum2D::new_complex(new_x, new_y, z, imaginary, spectrum.metadata.clone())?;
     processed.processing.clone_from(&spectrum.processing);
     Ok(processed.with_processing_record(
         ProcessingRecord::new("fft_2d").with_details(format!("direction={direction:?}")),
     ))
+}
+
+fn fftshift_2d(buffer: &mut [Complex<f64>], width: usize, height: usize) {
+    for row in buffer.chunks_exact_mut(width) {
+        crate::transform::fftshift_in_place(row);
+    }
+    let half_rows = height - height / 2;
+    buffer.rotate_left(half_rows * width);
+}
+
+fn ifftshift_2d(buffer: &mut [Complex<f64>], width: usize, height: usize) {
+    let half_rows = height / 2;
+    buffer.rotate_left(half_rows * width);
+    for row in buffer.chunks_exact_mut(width) {
+        crate::transform::ifftshift_in_place(row);
+    }
 }
 
 /// Applies manual separable x/y phase correction to a two-dimensional spectrum.

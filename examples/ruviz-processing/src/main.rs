@@ -22,17 +22,22 @@ mod ruviz_example {
     use anyhow::{Context, Result};
     use rspin_analysis::{
         PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
-        SpectrumAnalysis1DOptions, analyze_spectrum_1d,
+        SpectrumAnalysis1DOptions, analyze_spectrum_1d, pick_peaks,
     };
-    use rspin_core::{Axis, Metadata, Spectrum1D, Unit};
+    use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
         SpectrumBundle, load_spectra, read_analysis1d_json, read_processing_recipe_1d_json,
         read_spectrum_bundle_json, read_spectrum1d_csv, read_spectrum1d_json, write_analysis1d_csv,
         write_analysis1d_json, write_processing_recipe_1d_json, write_spectrum_bundle_json,
         write_spectrum1d_csv, write_spectrum1d_json,
     };
-    use rspin_processing::{BaselineMethod, FftDirection, ProcessingRecipe1D, fit_baseline};
+    use rspin_processing::{
+        AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
+        ProcessSpectrum2D, ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks,
+        fit_baseline, remove_group_delay,
+    };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
+    use ruviz::core::subplot::subplots;
 
     pub fn run() -> Result<()> {
         let root = repo_root()?;
@@ -47,6 +52,9 @@ mod ruviz_example {
         write_recipe_chain_plot(&output_dir.join("processed_recipe_chain.png"))?;
         write_baseline_plot(&output_dir.join("processed_baseline.png"))?;
         write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))?;
+        write_curated_auto_phase_plot(&root, &output_dir)?;
+        let vendor_dir = output_dir.join("vendors");
+        write_vendor_showcase(&root, &vendor_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
         write_oracle_visual_artifacts(&root, &visual_output_dir)?;
 
@@ -152,6 +160,1029 @@ mod ruviz_example {
         write_analysis_overlay_plot(path, "RSpin 1D Analysis", &spectrum, &analysis)
     }
 
+    fn write_curated_auto_phase_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        let fixture_root = root.join("crates/rspin-io/testdata/zenodo_7100132");
+        let bundle = load_spectra(fixture_root.join("varian_1h"))?;
+        let raw = bundle.only_1d()?;
+        write_auto_phase_plot(output_dir, raw)?;
+        write_auto_phase_comparison_plot(output_dir, raw)?;
+        write_auto_phase_peak_zoom_plot(output_dir, raw)?;
+        write_jeol_auto_phase_plots(root, output_dir)?;
+        write_jeol_method_panels(root, output_dir)?;
+        Ok(())
+    }
+
+    fn write_jeol_method_panels(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries: &[(&str, &str, &str)] = &[
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+                "auto_phase_methods_jeol_13c",
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+            ),
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+                "auto_phase_methods_jeol_myrcene_1h",
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+            ),
+            (
+                "crates/rspin-io/testdata/dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
+                "auto_phase_methods_jeol_rutin",
+                "JEOL 1H Rutin (Dataverse CC0)",
+            ),
+        ];
+        for (path, stem, title) in entries {
+            write_jeol_method_panel(root, output_dir, path, stem, title)?;
+        }
+        write_varian_method_panel(root, output_dir)?;
+        Ok(())
+    }
+
+    fn write_jeol_method_panel(
+        root: &Path,
+        output_dir: &Path,
+        fixture: &str,
+        stem: &str,
+        title: &str,
+    ) -> Result<()> {
+        let bundle = load_spectra(root.join(fixture))?;
+        let Some(spectrum) = bundle.spectra_1d().next() else {
+            return Ok(());
+        };
+        if spectrum.imaginary.is_none() {
+            return Ok(());
+        }
+        let auto = jeol_group_delay(spectrum);
+        let (magnitude, _) = jeol_magnitude(spectrum, auto)?;
+
+        let legacy = jeol_phase_with_opts(
+            spectrum,
+            auto,
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false),
+        )?;
+        let acme = jeol_phase_with_opts(
+            spectrum,
+            auto,
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::AcmeEntropy),
+        )?;
+        let regions = jeol_phase_with_opts(spectrum, auto, AutoPhaseOptions::default())?;
+
+        save_method_panel(
+            output_dir,
+            stem,
+            title,
+            &magnitude,
+            &legacy,
+            &acme,
+            &regions,
+        )
+    }
+
+    fn write_varian_method_panel(root: &Path, output_dir: &Path) -> Result<()> {
+        let bundle =
+            load_spectra(root.join("crates/rspin-io/testdata/zenodo_7100132/varian_1h"))?;
+        let raw = bundle.only_1d()?;
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("varian method-panel target length overflow")?;
+        let magnitude = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .magnitude()
+            .normalize_max_abs()
+            .apply(raw)?;
+        let magnitude = relabel_hz_to_ppm(magnitude);
+
+        let prepare = |opts: AutoPhaseOptions| -> Result<rspin_processing::AutoPhaseResult> {
+            let complex_recipe = ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs();
+            let unphased = complex_recipe.apply(raw)?;
+            Ok(auto_phase_correct(&unphased, opts)?)
+        };
+
+        let legacy = prepare(
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false),
+        )?;
+        let acme = prepare(
+            AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::AcmeEntropy),
+        )?;
+        let regions = prepare(AutoPhaseOptions::default())?;
+
+        save_method_panel(
+            output_dir,
+            "auto_phase_methods_varian_1h",
+            "Varian 1H (Zenodo MIT)",
+            &magnitude,
+            &legacy,
+            &acme,
+            &regions,
+        )
+    }
+
+    fn save_method_panel(
+        output_dir: &Path,
+        stem: &str,
+        title: &str,
+        magnitude: &Spectrum1D,
+        legacy: &rspin_processing::AutoPhaseResult,
+        acme: &rspin_processing::AutoPhaseResult,
+        regions: &rspin_processing::AutoPhaseResult,
+    ) -> Result<()> {
+        let mk = |panel_title: String, xs: &Vec<f64>, ys: &Vec<f64>, label: &str| -> Plot {
+            Plot::new()
+                .title(&panel_title)
+                .xlabel("chemical shift / ppm")
+                .ylabel("intensity")
+                .max_resolution(900, 600)
+                .legend_position(LegendPosition::Best)
+                .line(xs, ys)
+                .label(label)
+                .into()
+        };
+        let magnitude_panel = mk(
+            format!("{title} — magnitude (reference)"),
+            &magnitude.x.values,
+            &magnitude.intensities,
+            "|spectrum|",
+        );
+        let legacy_panel = mk(
+            format!(
+                "legacy ({:.0}\u{00B0}/{:.0}\u{00B0})",
+                legacy.zero_order_deg, legacy.first_order_deg
+            ),
+            &legacy.spectrum.x.values,
+            &legacy.spectrum.intensities,
+            "real",
+        );
+        let acme_panel = mk(
+            format!(
+                "ACME entropy ({:.0}\u{00B0}/{:.0}\u{00B0})",
+                acme.zero_order_deg, acme.first_order_deg
+            ),
+            &acme.spectrum.x.values,
+            &acme.spectrum.intensities,
+            "real",
+        );
+        let regions_panel = mk(
+            format!(
+                "Regions Zorin 2017 ({:.0}\u{00B0}/{:.0}\u{00B0})",
+                regions.zero_order_deg, regions.first_order_deg
+            ),
+            &regions.spectrum.x.values,
+            &regions.spectrum.intensities,
+            "real",
+        );
+        let figure = subplots(2, 2, 1800, 1200)?
+            .subplot_at(0, magnitude_panel)?
+            .subplot_at(1, legacy_panel)?
+            .subplot_at(2, acme_panel)?
+            .subplot_at(3, regions_panel)?;
+        figure.save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+        Ok(())
+    }
+
+    fn write_jeol_auto_phase_plots(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries: &[(&str, &str, &str)] = &[
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+                "JEOL 1H Auto-Phase (NMRXiv CC0 Myrcene)",
+                "auto_phase_jeol_myrcene_1h",
+            ),
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+                "JEOL 13C Auto-Phase (NMRXiv CC0 Myrcene)",
+                "auto_phase_jeol_myrcene_13c",
+            ),
+            (
+                "crates/rspin-io/testdata/dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
+                "JEOL 1H Auto-Phase (Dataverse CC0 Rutin)",
+                "auto_phase_jeol_rutin_qh",
+            ),
+        ];
+        for (fixture, title, stem) in entries {
+            let bundle = load_spectra(root.join(fixture))?;
+            let Some(spectrum) = bundle.spectra_1d().next() else {
+                continue;
+            };
+            if spectrum.imaginary.is_none() {
+                eprintln!(
+                    "skipping JEOL auto-phase plot {fixture}: spectrum has no imaginary channel"
+                );
+                continue;
+            }
+            // Header-derived group-delay shift.
+            let auto = jeol_group_delay(spectrum);
+            // Magnitude reference (phase-independent absorption envelope).
+            let (magnitude, _) = jeol_magnitude(spectrum, auto)?;
+
+            // Three phased traces using the same group-delay shift.
+            let legacy_opts = AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false);
+            let acme_opts = AutoPhaseOptions::default()
+                .with_strategy(AutoPhaseStrategy::GlobalCost)
+                .with_cost(AutoPhaseCost::AcmeEntropy);
+            let regions_opts = AutoPhaseOptions::default();
+            let legacy = jeol_phase_with_opts(spectrum, auto, legacy_opts)?;
+            let acme = jeol_phase_with_opts(spectrum, auto, acme_opts)?;
+            let regions = jeol_phase_with_opts(spectrum, auto, regions_opts)?;
+
+            let fmt = |label: &str, r: &rspin_processing::AutoPhaseResult| {
+                let neg = negative_fraction(&r.spectrum.intensities);
+                format!(
+                    "{label} ({:.0}\u{00B0}/{:.0}\u{00B0} neg={:.2})",
+                    r.zero_order_deg, r.first_order_deg, neg
+                )
+            };
+
+            Plot::new()
+                .title(*title)
+                .xlabel("chemical shift / ppm")
+                .ylabel("normalized intensity")
+                .max_resolution(1600, 1000)
+                .legend_position(LegendPosition::Best)
+                .line(&magnitude.x.values, &magnitude.intensities)
+                .label(&format!("magnitude (shift={auto:.1})"))
+                .line(&legacy.spectrum.x.values, &legacy.spectrum.intensities)
+                .label(&fmt("legacy", &legacy))
+                .line(&acme.spectrum.x.values, &acme.spectrum.intensities)
+                .label(&fmt("ACME", &acme))
+                .line(&regions.spectrum.x.values, &regions.spectrum.intensities)
+                .label(&fmt("Regions (Zorin 2017)", &regions))
+                .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+        }
+        Ok(())
+    }
+
+    fn jeol_phase_with_opts(
+        spectrum: &Spectrum1D,
+        shift: f64,
+        options: AutoPhaseOptions,
+    ) -> Result<rspin_processing::AutoPhaseResult> {
+        let shifted = if shift > 0.0 {
+            remove_group_delay(spectrum, shift)?
+        } else {
+            spectrum.clone()
+        };
+        let prepared = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL auto-phase target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs()
+                .apply(&shifted)?
+        } else {
+            ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        };
+        let prepared = relabel_hz_to_ppm(prepared);
+        Ok(auto_phase_correct(&prepared, options)?)
+    }
+
+    fn jeol_magnitude(
+        spectrum: &Spectrum1D,
+        shift: f64,
+    ) -> Result<(Spectrum1D, rspin_processing::AutoPhaseResult)> {
+        let shifted = if shift > 0.0 {
+            remove_group_delay(spectrum, shift)?
+        } else {
+            spectrum.clone()
+        };
+        let magnitude = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL magnitude target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .magnitude()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        } else {
+            ProcessingRecipe1D::new()
+                .magnitude()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        };
+        let magnitude = relabel_hz_to_ppm(magnitude);
+        // Return a dummy auto-phase result so the API matches jeol_phase_with_shift.
+        let dummy = rspin_processing::AutoPhaseResult {
+            spectrum: magnitude.clone(),
+            zero_order_deg: 0.0,
+            first_order_deg: 0.0,
+            score: 0.0,
+        };
+        Ok((magnitude, dummy))
+    }
+
+    fn jeol_best_shift(
+        spectrum: &Spectrum1D,
+        magnitude: &Spectrum1D,
+    ) -> Result<(f64, rspin_processing::AutoPhaseResult)> {
+        // Coarse sweep, then refine around the best.
+        let coarse: Vec<f64> = (0..=30).map(|i| f64::from(i as u32) * 4.0).collect();
+        let mut best_shift = 0.0_f64;
+        let mut best_loss = f64::INFINITY;
+        let mut best_result: Option<rspin_processing::AutoPhaseResult> = None;
+        for &candidate in &coarse {
+            let (_unphased, phased) = jeol_phase_with_shift(spectrum, candidate)?;
+            let loss = magnitude_target_loss(magnitude, &phased.spectrum);
+            if loss < best_loss {
+                best_loss = loss;
+                best_shift = candidate;
+                best_result = Some(phased);
+            }
+        }
+        // Refine around the best coarse winner.
+        let lo = (best_shift - 4.0).max(0.0);
+        let hi = best_shift + 4.0;
+        let steps: u32 = 16;
+        for i in 0..=steps {
+            let candidate = lo + (hi - lo) * f64::from(i) / f64::from(steps);
+            let (_unphased, phased) = jeol_phase_with_shift(spectrum, candidate)?;
+            let loss = magnitude_target_loss(magnitude, &phased.spectrum);
+            if loss < best_loss {
+                best_loss = loss;
+                best_shift = candidate;
+                best_result = Some(phased);
+            }
+        }
+        Ok((best_shift, best_result.context("best shift not found")?))
+    }
+
+    fn magnitude_target_loss(magnitude: &Spectrum1D, phased_real: &Spectrum1D) -> f64 {
+        // Weighted least squares over the high-magnitude region.
+        let max_mag = magnitude
+            .intensities
+            .iter()
+            .copied()
+            .fold(0.0_f64, f64::max);
+        if max_mag <= 0.0 {
+            return f64::INFINITY;
+        }
+        let threshold = 0.02 * max_mag;
+        let mut loss = 0.0_f64;
+        let n = magnitude.intensities.len().min(phased_real.intensities.len());
+        for index in 0..n {
+            let m = magnitude.intensities[index];
+            if m < threshold {
+                continue;
+            }
+            let r = phased_real.intensities[index];
+            let diff = m - r;
+            loss += m * diff * diff;
+        }
+        loss
+    }
+
+    fn negative_fraction(values: &[f64]) -> f64 {
+        let neg: f64 = values
+            .iter()
+            .map(|v| if *v < 0.0 { v.abs() } else { 0.0 })
+            .sum();
+        let total: f64 = values.iter().map(|v| v.abs()).sum();
+        if total <= 0.0 { 0.0 } else { neg / total }
+    }
+
+    fn jeol_phase_with_shift(
+        spectrum: &Spectrum1D,
+        shift_samples: f64,
+    ) -> Result<(Spectrum1D, rspin_processing::AutoPhaseResult)> {
+        let shifted = if shift_samples > 0.0 {
+            remove_group_delay(spectrum, shift_samples)?
+        } else {
+            spectrum.clone()
+        };
+        let unphased = if shifted.x.unit == Unit::Seconds {
+            let target_len = shifted
+                .len()
+                .checked_mul(2)
+                .context("JEOL auto-phase target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(&shifted)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .normalize_max_abs()
+                .apply(&shifted)?
+        } else {
+            ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&shifted)?
+        };
+        let unphased = relabel_hz_to_ppm(unphased);
+        let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?;
+        Ok((unphased, phased))
+    }
+
+    fn jeol_group_delay(spectrum: &Spectrum1D) -> f64 {
+        let props = &spectrum.metadata.properties;
+        let factor = props
+            .get("jeol.parameter.filter_factor")
+            .and_then(|v| v.parse::<f64>().ok());
+        let decim_raw = props
+            .get("jeol.parameter.decimation_reg")
+            .and_then(|v| parse_decimation_reg(v));
+        match (decim_raw, factor) {
+            (Some(raw), Some(f)) if f > 0.0 => raw / f,
+            _ => 0.0,
+        }
+    }
+
+    fn parse_decimation_reg(raw: &str) -> Option<f64> {
+        let trimmed = raw.trim();
+        let after = trimmed.strip_prefix("r:")?.trim_start();
+        let first_token = after.split(|c: char| !c.is_ascii_digit()).next()?;
+        first_token.parse::<f64>().ok()
+    }
+
+    fn write_auto_phase_peak_zoom_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("auto-phase zoom target length overflow")?;
+        let complex_recipe = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs();
+        let unphased = complex_recipe.apply(raw)?;
+        let legacy = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default()
+                .with_cost(AutoPhaseCost::LegacyImagNegArea)
+                .with_refine(false),
+        )?
+        .spectrum;
+        let acme_grid = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default()
+                .with_cost(AutoPhaseCost::AcmeEntropy)
+                .with_refine(false),
+        )?
+        .spectrum;
+        let acme_refined =
+            auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
+        let pivot_ppm = 2.7_f64;
+        let active_region = (1.0_f64, 3.5_f64);
+        let acme_pivot = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default().with_pivot_value(pivot_ppm),
+        )?
+        .spectrum;
+        let acme_active = auto_phase_correct(
+            &unphased,
+            AutoPhaseOptions::default()
+                .with_pivot_value(pivot_ppm)
+                .with_active_region(active_region.0, active_region.1),
+        )?
+        .spectrum;
+        let peak_centers = detect_peak_centers(&unphased)?;
+        let acme_peak = auto_phase_correct_with_peaks(
+            &unphased,
+            AutoPhaseOptions::default().with_pivot_value(pivot_ppm),
+            &peak_centers,
+        )?
+        .spectrum;
+
+        let peaks = pick_peaks(
+            &acme_refined,
+            PeakPickOptions::new()
+                .with_min_abs_intensity(0.05)
+                .with_min_prominence(0.0)
+                .with_polarity(PeakPolarity::Positive),
+        )?;
+        let mut sorted_peaks = peaks.clone();
+        sorted_peaks.sort_by(|a, b| b.intensity.abs().total_cmp(&a.intensity.abs()));
+        let mut centers: Vec<f64> = Vec::new();
+        for peak in sorted_peaks {
+            if centers
+                .iter()
+                .all(|existing| (existing - peak.x).abs() > 0.25)
+            {
+                centers.push(peak.x);
+                if centers.len() == 9 {
+                    break;
+                }
+            }
+        }
+        centers.sort_by(|a, b| a.total_cmp(b));
+        if centers.is_empty() {
+            eprintln!("auto-phase peak zoom: no peaks found");
+            return Ok(());
+        }
+
+        let columns: usize = 3;
+        let rows = centers.len().div_ceil(columns);
+        let width = u32::try_from(columns * 480).unwrap_or(1440);
+        let height = u32::try_from(rows * 360).unwrap_or(1080);
+        let mut figure = subplots(rows, columns, width, height)?;
+        let half_window = 0.15_f64;
+
+        for (index, center) in centers.iter().enumerate() {
+            let lo = center - half_window;
+            let hi = center + half_window;
+            let title = format!("{center:.2} ppm");
+            let panel = Plot::new()
+                .title(&title)
+                .xlabel(axis_label(unphased.x.unit))
+                .ylabel("intensity")
+                .legend_position(LegendPosition::Best)
+                .line(
+                    &slice_window(&unphased.x.values, lo, hi),
+                    &slice_window_y(&unphased.x.values, &unphased.intensities, lo, hi),
+                )
+                .label("unphased")
+                .line(
+                    &slice_window(&legacy.x.values, lo, hi),
+                    &slice_window_y(&legacy.x.values, &legacy.intensities, lo, hi),
+                )
+                .label("legacy")
+                .line(
+                    &slice_window(&acme_grid.x.values, lo, hi),
+                    &slice_window_y(&acme_grid.x.values, &acme_grid.intensities, lo, hi),
+                )
+                .label("ACME")
+                .line(
+                    &slice_window(&acme_refined.x.values, lo, hi),
+                    &slice_window_y(
+                        &acme_refined.x.values,
+                        &acme_refined.intensities,
+                        lo,
+                        hi,
+                    ),
+                )
+                .label("ACME+refine")
+                .line(
+                    &slice_window(&acme_pivot.x.values, lo, hi),
+                    &slice_window_y(&acme_pivot.x.values, &acme_pivot.intensities, lo, hi),
+                )
+                .label("+pivot")
+                .line(
+                    &slice_window(&acme_active.x.values, lo, hi),
+                    &slice_window_y(&acme_active.x.values, &acme_active.intensities, lo, hi),
+                )
+                .label("+active")
+                .line(
+                    &slice_window(&acme_peak.x.values, lo, hi),
+                    &slice_window_y(&acme_peak.x.values, &acme_peak.intensities, lo, hi),
+                )
+                .label("peak-warmed");
+            figure = figure.subplot_at(index, panel.into())?;
+        }
+
+        figure.save(path_to_str(
+            &output_dir.join("auto_phase_peak_zoom.png"),
+        )?)?;
+        Ok(())
+    }
+
+    fn slice_window(values: &[f64], lo: f64, hi: f64) -> Vec<f64> {
+        values
+            .iter()
+            .filter(|value| **value >= lo && **value <= hi)
+            .copied()
+            .collect()
+    }
+
+    fn slice_window_y(x: &[f64], y: &[f64], lo: f64, hi: f64) -> Vec<f64> {
+        x.iter()
+            .zip(y)
+            .filter_map(|(xv, yv)| {
+                if *xv >= lo && *xv <= hi {
+                    Some(*yv)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    fn write_auto_phase_comparison_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("auto-phase comparison target length overflow")?;
+        let complex_recipe = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs();
+        let unphased = complex_recipe.apply(raw)?;
+
+        let pivot_ppm = 2.7_f64;
+        let active_region = (1.0_f64, 3.5_f64);
+
+        let legacy = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
+            .with_cost(AutoPhaseCost::LegacyImagNegArea)
+            .with_refine(false);
+        let acme_grid = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
+            .with_cost(AutoPhaseCost::AcmeEntropy)
+            .with_refine(false);
+        let acme_refined = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost);
+        let acme_pivot = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
+            .with_pivot_value(pivot_ppm);
+        let acme_active = AutoPhaseOptions::default()
+            .with_strategy(AutoPhaseStrategy::GlobalCost)
+            .with_pivot_value(pivot_ppm)
+            .with_active_region(active_region.0, active_region.1);
+        let regions = AutoPhaseOptions::default();
+
+        let legacy_result = auto_phase_correct(&unphased, legacy)?;
+        let acme_grid_result = auto_phase_correct(&unphased, acme_grid)?;
+        let acme_refined_result = auto_phase_correct(&unphased, acme_refined)?;
+        let acme_pivot_result = auto_phase_correct(&unphased, acme_pivot)?;
+        let acme_active_result = auto_phase_correct(&unphased, acme_active)?;
+        let regions_result = auto_phase_correct(&unphased, regions)?;
+        let peak_centers = detect_peak_centers(&unphased)?;
+        let acme_peak_result = auto_phase_correct_with_peaks(
+            &unphased,
+            AutoPhaseOptions::default().with_pivot_value(pivot_ppm),
+            &peak_centers,
+        )?;
+
+        let fmt_label = |stem: &str, r: &rspin_processing::AutoPhaseResult| {
+            format!(
+                "{stem} ({:.1}\u{00B0}/{:.1}\u{00B0})",
+                r.zero_order_deg, r.first_order_deg
+            )
+        };
+
+        Plot::new()
+            .title("Auto-Phase Comparison (Varian/Agilent 1H)")
+            .xlabel(axis_label(unphased.x.unit))
+            .ylabel("normalized intensity")
+            .max_resolution(1600, 1000)
+            .legend_position(LegendPosition::Best)
+            .line(&unphased.x.values, &unphased.intensities)
+            .label("unphased real")
+            .line(
+                &legacy_result.spectrum.x.values,
+                &legacy_result.spectrum.intensities,
+            )
+            .label(&fmt_label("legacy", &legacy_result))
+            .line(
+                &acme_grid_result.spectrum.x.values,
+                &acme_grid_result.spectrum.intensities,
+            )
+            .label(&fmt_label("ACME grid", &acme_grid_result))
+            .line(
+                &acme_refined_result.spectrum.x.values,
+                &acme_refined_result.spectrum.intensities,
+            )
+            .label(&fmt_label("ACME + refine", &acme_refined_result))
+            .line(
+                &acme_pivot_result.spectrum.x.values,
+                &acme_pivot_result.spectrum.intensities,
+            )
+            .label(&fmt_label("+ pivot 2.7 ppm", &acme_pivot_result))
+            .line(
+                &acme_active_result.spectrum.x.values,
+                &acme_active_result.spectrum.intensities,
+            )
+            .label(&fmt_label("+ active 1-3.5 ppm", &acme_active_result))
+            .line(
+                &acme_peak_result.spectrum.x.values,
+                &acme_peak_result.spectrum.intensities,
+            )
+            .label(&fmt_label("peak-warmed", &acme_peak_result))
+            .line(
+                &regions_result.spectrum.x.values,
+                &regions_result.spectrum.intensities,
+            )
+            .label(&fmt_label("Regions (Zorin 2017)", &regions_result))
+            .save(path_to_str(&output_dir.join("auto_phase_comparison.png"))?)?;
+
+        Ok(())
+    }
+
+    fn detect_peak_centers(spectrum: &Spectrum1D) -> Result<Vec<f64>> {
+        let magnitude = ProcessingRecipe1D::new()
+            .magnitude()
+            .normalize_max_abs()
+            .apply(spectrum)?;
+        let peaks = pick_peaks(
+            &magnitude,
+            PeakPickOptions::new()
+                .with_min_abs_intensity(0.05)
+                .with_min_prominence(0.0)
+                .with_polarity(PeakPolarity::Positive),
+        )?;
+        let mut sorted = peaks;
+        sorted.sort_by(|a, b| b.intensity.abs().total_cmp(&a.intensity.abs()));
+        let mut centers: Vec<f64> = Vec::new();
+        for peak in sorted {
+            if centers
+                .iter()
+                .all(|existing| (existing - peak.x).abs() > 0.2)
+            {
+                centers.push(peak.x);
+                if centers.len() == 8 {
+                    break;
+                }
+            }
+        }
+        if centers.is_empty() {
+            return Err(anyhow::anyhow!(
+                "detect_peak_centers found no peaks in magnitude spectrum"
+            ));
+        }
+        Ok(centers)
+    }
+
+    struct VendorContourEntry {
+        vendor: &'static str,
+        stem: &'static str,
+        title: &'static str,
+        fixture: &'static str,
+    }
+
+    fn write_vendor_contour_entry(
+        entry: &VendorContourEntry,
+        fixture_root: &Path,
+        out_dir: &Path,
+    ) -> Result<()> {
+        let bundle = load_spectra(fixture_root.join(entry.fixture))
+            .with_context(|| format!("failed to load 2D fixture {}", entry.fixture))?;
+        let spectra: Vec<&Spectrum2D> = bundle.spectra_2d().collect();
+        let Some(spectrum) = spectra.first() else {
+            return Ok(());
+        };
+        let processed = process_2d_for_contour(spectrum)?;
+        let png_path = out_dir.join(format!("{}.png", entry.stem));
+        write_contour_plot(
+            &png_path,
+            entry.title,
+            axis_label(processed.x.unit),
+            axis_label(processed.y.unit),
+            &processed,
+        )?;
+        Ok(())
+    }
+
+    fn process_2d_for_contour(spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        if spectrum.x.unit == Unit::Seconds || spectrum.y.unit == Unit::Seconds {
+            let dwell_x = axis_step(&spectrum.x.values).unwrap_or(1.0e-6);
+            let dwell_y = axis_step(&spectrum.y.values).unwrap_or(1.0e-6);
+            spectrum
+                .process()
+                .exponential_apodization(5.0, 5.0, dwell_x, dwell_y)
+                .fft(FftDirection::Forward)
+                .absolute_value()
+                .normalize_max_abs()
+                .finish()
+                .context("2D contour FFT pipeline failed")
+        } else {
+            spectrum
+                .process()
+                .absolute_value()
+                .normalize_max_abs()
+                .finish()
+                .context("2D contour normalization failed")
+        }
+    }
+
+    fn axis_step(values: &[f64]) -> Option<f64> {
+        if values.len() < 2 {
+            return None;
+        }
+        let step = (values[1] - values[0]).abs();
+        if step.is_finite() && step > 0.0 {
+            Some(step)
+        } else {
+            None
+        }
+    }
+
+    fn write_contour_plot(
+        path: &Path,
+        title: &str,
+        x_label: &str,
+        y_label: &str,
+        spectrum: &Spectrum2D,
+    ) -> Result<()> {
+        let levels = autoscale_contour_levels(&spectrum.z);
+        Plot::new()
+            .title(title)
+            .xlabel(x_label)
+            .ylabel(y_label)
+            .max_resolution(1400, 1200)
+            .contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
+            .level_values(levels)
+            .filled(false)
+            .save(path_to_str(path)?)?;
+        Ok(())
+    }
+
+    fn autoscale_contour_levels(z: &[f64]) -> Vec<f64> {
+        let max_abs = z
+            .iter()
+            .copied()
+            .map(f64::abs)
+            .fold(0.0_f64, f64::max);
+        if !(max_abs > 0.0) {
+            return vec![0.0];
+        }
+        let base = max_abs * 0.005;
+        let ratio = 1.3_f64;
+        let count: usize = 20;
+        (0..u32::try_from(count).unwrap_or(0))
+            .map(|i| base * ratio.powi(i as i32))
+            .filter(|level| *level <= max_abs)
+            .collect()
+    }
+
+    fn write_vendor_showcase(root: &Path, output_dir: &Path) -> Result<()> {
+        fs::create_dir_all(output_dir).with_context(|| {
+            format!(
+                "failed to create vendor showcase directory {}",
+                output_dir.display()
+            )
+        })?;
+        let fixture_root = root.join("crates/rspin-io/testdata");
+
+        let entries: &[VendorShowcaseEntry] = &[
+            VendorShowcaseEntry {
+                vendor: "bruker",
+                stem: "processed_1h_zenodo",
+                title: "Bruker processed 1H (Zenodo MIT)",
+                fixture: "zenodo_7100132/bruker_without_expno",
+            },
+            VendorShowcaseEntry {
+                vendor: "bruker",
+                stem: "raw_1h_myrcene_nmrxiv",
+                title: "Bruker raw 1H FID (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/bruker_1h_raw",
+            },
+            VendorShowcaseEntry {
+                vendor: "varian",
+                stem: "raw_1h_zenodo",
+                title: "Varian/Agilent raw 1H FID (Zenodo MIT)",
+                fixture: "zenodo_7100132/varian_1h",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "myrcene_1h_nmrxiv",
+                title: "JEOL 1H (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "myrcene_13c_nmrxiv",
+                title: "JEOL 13C (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "rutin_qh_dataverse",
+                title: "JEOL 1H (Dataverse CC0 Rutin)",
+                fixture: "dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "myrcene_1h_nmrxiv",
+                title: "JCAMP-DX 1H (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "rutin_qh_dataverse",
+                title: "JCAMP-DX 1H (Dataverse CC0 Rutin)",
+                fixture: "dataverse/cc0/rutin/jcamp/rutin_qh_400mhz.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "nmrml",
+                stem: "mmbbi_10m12_mit",
+                title: "nmrML example (MIT)",
+                fixture: "nmrml/mit/MMBBI_10M12-CE01-1a.nmrML",
+            },
+        ];
+
+        for entry in entries {
+            let dir = output_dir.join(entry.vendor);
+            fs::create_dir_all(&dir).with_context(|| {
+                format!("failed to create vendor dir {}", dir.display())
+            })?;
+            write_vendor_showcase_entry(entry, &fixture_root, &dir)?;
+        }
+
+        let contour_entries: &[VendorContourEntry] = &[
+            VendorContourEntry {
+                vendor: "bruker",
+                stem: "cosy_2d_myrcene_nmrxiv",
+                title: "Bruker raw COSY 2D (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/bruker_cosy_raw",
+            },
+            VendorContourEntry {
+                vendor: "jeol",
+                stem: "hsqc_2d_myrcene_nmrxiv",
+                title: "JEOL HSQC 2D (NMRXiv CC0 Myrcene)",
+                fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_hsqc_400mhz.jdf",
+            },
+        ];
+        for entry in contour_entries {
+            let dir = output_dir.join(entry.vendor);
+            fs::create_dir_all(&dir).with_context(|| {
+                format!("failed to create vendor dir {}", dir.display())
+            })?;
+            write_vendor_contour_entry(entry, &fixture_root, &dir)?;
+        }
+        Ok(())
+    }
+
+    struct VendorShowcaseEntry {
+        vendor: &'static str,
+        stem: &'static str,
+        title: &'static str,
+        fixture: &'static str,
+    }
+
+    fn write_vendor_showcase_entry(
+        entry: &VendorShowcaseEntry,
+        fixture_root: &Path,
+        out_dir: &Path,
+    ) -> Result<()> {
+        let bundle = load_spectra(fixture_root.join(entry.fixture))
+            .with_context(|| format!("failed to load fixture {}", entry.fixture))?;
+        let spectra: Vec<&Spectrum1D> = bundle.spectra_1d().collect();
+        let Some(spectrum) = spectra.first() else {
+            return Ok(());
+        };
+        let processed = if spectrum.x.unit == Unit::Seconds {
+            let target_len = spectrum
+                .len()
+                .checked_mul(2)
+                .context("vendor showcase target length overflow")?;
+            ProcessingRecipe1D::new()
+                .exponential_apodization(1.0, dwell_time_seconds(spectrum)?)
+                .zero_fill(target_len)
+                .fft(FftDirection::Forward)
+                .magnitude()
+                .normalize_max_abs()
+                .apply(spectrum)?
+        } else {
+            ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(spectrum)?
+        };
+        let processed = relabel_hz_to_ppm(processed);
+
+        let png_path = out_dir.join(format!("{}.png", entry.stem));
+        write_spectrum_plot(
+            &png_path,
+            entry.title,
+            axis_label(processed.x.unit),
+            "normalized intensity",
+            &processed.x.values,
+            &processed.intensities,
+            "spectrum",
+        )?;
+        Ok(())
+    }
+
+    fn relabel_hz_to_ppm(mut spectrum: Spectrum1D) -> Spectrum1D {
+        if spectrum.x.unit != Unit::Hertz {
+            return spectrum;
+        }
+        let Some(freq_mhz) = spectrum.metadata.frequency_mhz else {
+            return spectrum;
+        };
+        if !freq_mhz.is_finite() || freq_mhz.abs() <= 0.0 {
+            return spectrum;
+        }
+        spectrum.x.unit = Unit::Ppm;
+        spectrum.x.label = "chemical shift".to_owned();
+        for value in &mut spectrum.x.values {
+            *value /= freq_mhz;
+        }
+        spectrum
+    }
+
     fn write_oracle_visual_artifacts(root: &Path, output_dir: &Path) -> Result<()> {
         fs::create_dir_all(output_dir).with_context(|| {
             format!(
@@ -202,12 +1233,44 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             &raw.intensities,
             "real",
         )?;
-        write_indexed_spectrum_plot(
+        write_spectrum_plot(
             &output_dir.join("processed_fft_magnitude.png"),
             "Oracle Varian/Agilent FFT Magnitude",
-            &processed,
+            axis_label(processed.x.unit),
             "normalized magnitude",
+            &processed.x.values,
+            &processed.intensities,
+            "spectrum",
         )?;
+        write_auto_phase_plot(output_dir, raw)?;
+        Ok(())
+    }
+
+    fn write_auto_phase_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
+        let target_len = raw
+            .len()
+            .checked_mul(2)
+            .context("auto-phase target length overflow")?;
+        let complex_recipe = ProcessingRecipe1D::new()
+            .exponential_apodization(1.0, dwell_time_seconds(raw)?)
+            .zero_fill(target_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs();
+        let unphased = complex_recipe.apply(raw)?;
+        let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
+
+        Plot::new()
+            .title("Oracle Varian/Agilent Auto-Phase")
+            .xlabel(axis_label(unphased.x.unit))
+            .ylabel("normalized intensity")
+            .max_resolution(1600, 1000)
+            .legend_position(LegendPosition::Best)
+            .line(&unphased.x.values, &unphased.intensities)
+            .label("unphased real")
+            .line(&phased.x.values, &phased.intensities)
+            .label("auto-phased real")
+            .save(path_to_str(&output_dir.join("processed_auto_phase.png"))?)?;
+
         Ok(())
     }
 
@@ -421,34 +1484,6 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             .label(series_label)
             .save(path_to_str(path)?)?;
         Ok(())
-    }
-
-    fn write_indexed_spectrum_plot(
-        path: &Path,
-        title: &str,
-        spectrum: &Spectrum1D,
-        y_label: &str,
-    ) -> Result<()> {
-        let x = point_axis(spectrum.len())?;
-        write_spectrum_plot(
-            path,
-            title,
-            "point",
-            y_label,
-            &x,
-            &spectrum.intensities,
-            "spectrum",
-        )
-    }
-
-    fn point_axis(len: usize) -> Result<Vec<f64>> {
-        (0..len)
-            .map(|index| {
-                u32::try_from(index)
-                    .map(f64::from)
-                    .context("spectrum is too large for visual point axis")
-            })
-            .collect()
     }
 
     fn axis_label(unit: Unit) -> &'static str {

@@ -337,7 +337,8 @@ fn info_from_header(header: &Header) -> Result<JeolJdfInfo> {
 }
 
 fn build_axis(header: &Header, axis_index: usize, point_count: usize) -> Result<Axis> {
-    let unit = header.data_units[axis_index].axis_unit();
+    let unit_component = header.data_units[axis_index];
+    let unit = unit_component.axis_unit();
     let label = match unit {
         Unit::Ppm => "chemical shift",
         Unit::Hertz => "frequency",
@@ -345,11 +346,12 @@ fn build_axis(header: &Header, axis_index: usize, point_count: usize) -> Result<
         Unit::Points => "point",
         _ => "axis",
     };
+    let scale = unit_component.prefix_multiplier();
     Axis::linear(
         label,
         unit,
-        header.data_axis_start[axis_index],
-        header.data_axis_stop[axis_index],
+        header.data_axis_start[axis_index] * scale,
+        header.data_axis_stop[axis_index] * scale,
         point_count,
     )
 }

@@ -2,7 +2,7 @@
 
 use std::{collections::BTreeMap, fs, path::Path};
 
-use rspin_core::{Axis, RSpinError, Result, Spectrum2D, Unit};
+use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 
 use crate::SpectrumPathReader;
 use crate::bruker::{optional_i32, parse_parameter_file_for_reader, read_text, required_usize};
@@ -200,13 +200,8 @@ fn decode_ser_values(
 }
 
 fn build_indirect_axis(point_count: usize, acqu2s: &BTreeMap<String, String>) -> Result<Axis> {
-    match optional_i32(acqu2s, "FNMODE")? {
-        Some(0) | None => build_raw_axis(point_count, acqu2s),
-        Some(_) => {
-            let end = u32::try_from(point_count.saturating_sub(1)).map_or(0.0, f64::from);
-            Axis::linear("indirect trace", Unit::Points, 0.0, end, point_count)
-        }
-    }
+    let _ = optional_i32(acqu2s, "FNMODE")?;
+    build_raw_axis(point_count, acqu2s)
 }
 
 fn validate_indirect_count(y_count: usize, acqu2s: &BTreeMap<String, String>) -> Result<()> {

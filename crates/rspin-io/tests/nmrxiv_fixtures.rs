@@ -33,7 +33,7 @@ fn reads_nmrxiv_cc0_myrcene_bruker_cosy_raw() -> anyhow::Result<()> {
 
     assert_eq!(spectrum.shape(), (2048, 512));
     assert_eq!(spectrum.x.unit, Unit::Seconds);
-    assert_eq!(spectrum.y.unit, Unit::Points);
+    assert_eq!(spectrum.y.unit, Unit::Seconds);
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("CDCl3"));
     assert_close(spectrum.metadata.frequency_mhz, Some(900.076_700_222));

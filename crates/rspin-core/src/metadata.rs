@@ -16,6 +16,13 @@ pub struct Metadata {
     pub nucleus: Option<Nucleus>,
     /// Spectrometer frequency in MHz for the primary nucleus.
     pub frequency_mhz: Option<f64>,
+    /// Spectrometer frequency in MHz for the indirect dimension of a 2D
+    /// experiment. `None` means the indirect dimension shares
+    /// [`Self::frequency_mhz`] (homonuclear experiments such as COSY or
+    /// TOCSY). Heteronuclear datasets (HSQC, HMBC, etc.) set this so the
+    /// indirect axis can be relabeled to ppm with the right carrier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub indirect_frequency_mhz: Option<f64>,
     /// Solvent name or code.
     pub solvent: Option<String>,
     /// Sample temperature in kelvin.
@@ -89,6 +96,21 @@ impl Metadata {
     #[must_use]
     pub fn without_frequency_mhz(mut self) -> Self {
         self.frequency_mhz = None;
+        self
+    }
+
+    /// Sets the indirect-dimension spectrometer frequency in MHz for
+    /// heteronuclear 2D experiments.
+    #[must_use]
+    pub fn with_indirect_frequency_mhz(mut self, frequency_mhz: f64) -> Self {
+        self.indirect_frequency_mhz = Some(frequency_mhz);
+        self
+    }
+
+    /// Clears the indirect-dimension spectrometer frequency.
+    #[must_use]
+    pub fn without_indirect_frequency_mhz(mut self) -> Self {
+        self.indirect_frequency_mhz = None;
         self
     }
 

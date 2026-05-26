@@ -5,6 +5,39 @@ use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 use super::*;
 
 #[test]
+fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 4.0, 5)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![10.0, 20.0, 30.0, 40.0, 50.0],
+        Some(vec![1.0, 2.0, 3.0, 4.0, 5.0]),
+        Metadata::default(),
+    )?;
+    let shifted = remove_group_delay(&spectrum, 2.0)?;
+    assert_eq!(shifted.intensities, vec![30.0, 40.0, 50.0, 10.0, 20.0]);
+    assert_eq!(shifted.imaginary, Some(vec![3.0, 4.0, 5.0, 1.0, 2.0]));
+    assert_eq!(
+        shifted.processing.last().map(|r| r.operation.as_str()),
+        Some("remove_group_delay")
+    );
+    Ok(())
+}
+
+#[test]
+fn remove_group_delay_rejects_invalid_input() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 1.0, 2)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 2.0],
+        Some(vec![0.0, 0.0]),
+        Metadata::default(),
+    )?;
+    assert!(remove_group_delay(&spectrum, -1.0).is_err());
+    assert!(remove_group_delay(&spectrum, f64::NAN).is_err());
+    Ok(())
+}
+
+#[test]
 fn apodization_decays_real_and_imaginary_channels() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     let processed = exponential_apodization(&spectrum, 1.0, 0.1)?;
@@ -190,4 +223,51 @@ fn assert_vec_close(actual: &[f64], expected: &[f64]) {
 
 fn assert_close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-10, "{actual} != {expected}");
+}
+
+#[test]
+fn fft_forward_relabels_time_axis_to_hertz() -> anyhow::Result<()> {
+    let dwell = 0.001_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        Metadata::default(),
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Hertz);
+    let sw = 1.0 / dwell;
+    let expected_first = -sw / 2.0;
+    assert_close(transformed.x.values[0], expected_first);
+    let dc_index = len / 2;
+    assert_close(transformed.x.values[dc_index], 0.0);
+    Ok(())
+}
+
+#[test]
+fn fft_forward_relabels_to_ppm_when_metadata_has_frequency() -> anyhow::Result<()> {
+    let dwell = 0.001_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    let metadata = Metadata::default().with_frequency_mhz(500.0);
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        metadata,
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Ppm);
+    let sw_hz = 1.0 / dwell;
+    let expected_first_ppm = -sw_hz / 2.0 / 500.0;
+    assert_close(transformed.x.values[0], expected_first_ppm);
+    Ok(())
 }

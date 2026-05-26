@@ -32,7 +32,11 @@ pub use apodization_2d::{
     ExponentialApodization2D, GaussianApodization2D, SineBellApodization2D,
     exponential_apodization_2d, gaussian_apodization_2d, sine_bell_apodization_2d,
 };
-pub use auto_phase::{AutoPhaseCorrection, AutoPhaseOptions, AutoPhaseResult, auto_phase_correct};
+pub use auto_phase::{
+    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
+    RegionsOptions, RegionsResult, auto_phase_correct, auto_phase_correct_regions,
+    auto_phase_correct_with_peaks, peak_based_phase_estimate,
+};
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
 };
@@ -60,6 +64,7 @@ pub use recipe_2d::{
 pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
 pub use traits::ProcessingStep;
+pub use transform::remove_group_delay;
 pub use transform::{
     ExponentialApodization, Fft1D, FftDirection, GaussianApodization, Magnitude, PhaseCorrection,
     SineBellApodization, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,

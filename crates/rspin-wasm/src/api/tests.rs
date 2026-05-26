@@ -1001,7 +1001,7 @@ fn auto_phases_spectrum_json() -> anyhow::Result<()> {
     let spectrum_json = to_json(&spectrum)?;
     let result_json = auto_phase_spectrum_1d_json(
         &spectrum_json,
-        r#"{"zero_order_min_deg":-90.0,"zero_order_max_deg":90.0,"zero_order_step_deg":5.0,"first_order_min_deg":0.0,"first_order_max_deg":0.0,"first_order_step_deg":1.0,"pivot_fraction":0.5,"imaginary_weight":1.0,"negative_weight":4.0}"#,
+        r#"{"zero_order_min_deg":-90.0,"zero_order_max_deg":90.0,"zero_order_step_deg":5.0,"first_order_min_deg":0.0,"first_order_max_deg":0.0,"first_order_step_deg":1.0,"pivot_fraction":0.5,"imaginary_weight":1.0,"negative_weight":4.0,"cost":"legacy_imag_neg_area","refine":false,"strategy":"global_cost"}"#,
     )?;
     let result: AutoPhaseResponseJson = from_json(&result_json)?;
 
