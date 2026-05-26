@@ -539,9 +539,10 @@ mod ruviz_example {
             let Some(fid) = load_first_complex_fid(&fixture)? else {
                 continue;
             };
-            let group_delay = jeol_group_delay(&fid);
             let opts = AutoProcessingOptions {
-                group_delay_samples: Some(group_delay),
+                // Let the orchestrator pick the JEOL group delay from
+                // metadata; the FIR cascade formula it now uses is
+                // more accurate than the example's local heuristic.
                 subtract_baseline: false,
                 ..AutoProcessingOptions::default()
             };
@@ -552,7 +553,11 @@ mod ruviz_example {
                 .apply(&processed)?;
 
             // Reference: raw |FFT| of the integer-shifted FID (no
-            // apodization, no LP, no phase).
+            // apodization, no LP, no phase). Use the example-local
+            // group-delay helper for parity with the apodization
+            // comparison PNG; process_spectrum_auto uses the cascade
+            // formula internally and may pick a different integer.
+            let group_delay = jeol_group_delay(&fid);
             let integer_shift = group_delay.trunc().max(0.0);
             let shifted = if integer_shift > 0.0 {
                 remove_group_delay(&fid, integer_shift)?
