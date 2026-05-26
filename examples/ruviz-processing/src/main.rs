@@ -212,6 +212,8 @@ mod ruviz_example {
         conv: Spectrum1D,
         matched: Spectrum1D,
         matched_lb_hz: f64,
+        ph0_deg: f64,
+        ph1_deg: f64,
     }
 
     fn build_apodization_panels(
@@ -231,18 +233,40 @@ mod ruviz_example {
             .len()
             .checked_mul(2)
             .context("apodization comparison target length overflow")?;
+        let pivot_fraction = 0.5_f64;
 
-        // Builds each apodised+FFT+auto-phased spectrum from the same FID
-        // so the only difference between panels is the window function.
-        let apodise_and_phase = |windowed: Spectrum1D| -> Result<Spectrum1D> {
+        // Run auto-phase ONCE on a moderately broadened reference so it
+        // sees clean Lorentzian peaks, then apply that same (ph0, ph1)
+        // to every windowed version. Apodization is a real-valued
+        // multiplication and cannot change the FID's phase; phasing
+        // each panel independently introduces noise from the auto-phase
+        // search converging slightly differently per spectrum.
+        let reference_windowed = exponential_apodization(&shifted, lb_hz, dwell)?;
+        let reference_spectrum = ProcessingRecipe1D::new()
+            .zero_fill(zero_fill_len)
+            .fft(FftDirection::Forward)
+            .normalize_max_abs()
+            .apply(&reference_windowed)?;
+        let reference_spectrum = relabel_hz_to_ppm(reference_spectrum);
+        let reference = auto_phase_correct(
+            &reference_spectrum,
+            AutoPhaseOptions::default().pivot_fraction(pivot_fraction),
+        )?;
+        let ph0_deg = reference.zero_order_deg;
+        let ph1_deg = reference.first_order_deg;
+
+        let apodise_with_shared_phase = |windowed: Spectrum1D| -> Result<Spectrum1D> {
             let processed = ProcessingRecipe1D::new()
                 .zero_fill(zero_fill_len)
                 .fft(FftDirection::Forward)
                 .normalize_max_abs()
                 .apply(&windowed)?;
             let processed = relabel_hz_to_ppm(processed);
-            let phased = auto_phase_correct(&processed, AutoPhaseOptions::default())?;
-            Ok(phased.spectrum)
+            // Manual phase with the same (ph0, ph1) recovered above.
+            let phased = ProcessingRecipe1D::new()
+                .phase(ph0_deg, ph1_deg, pivot_fraction)
+                .apply(&processed)?;
+            Ok(phased)
         };
         let magnitude_only = |windowed: Spectrum1D| -> Result<Spectrum1D> {
             let processed = ProcessingRecipe1D::new()
@@ -257,21 +281,22 @@ mod ruviz_example {
         };
 
         let raw = magnitude_only(shifted.clone())?;
-        let em = apodise_and_phase(exponential_apodization(&shifted, lb_hz, dwell)?)?;
-        let gm = apodise_and_phase(gaussian_apodization(&shifted, lb_hz, dwell)?)?;
-        let l2g = apodise_and_phase(lorentz_to_gauss_apodization(
+        // The reference itself becomes the EM panel — no duplicate work.
+        let em = reference.spectrum.clone();
+        let gm = apodise_with_shared_phase(gaussian_apodization(&shifted, lb_hz, dwell)?)?;
+        let l2g = apodise_with_shared_phase(lorentz_to_gauss_apodization(
             &shifted,
             lb_hz,
             gauss_fwhm_hz,
             0.0,
             dwell,
         )?)?;
-        let traf = apodise_and_phase(traf_apodization(&shifted, lb_hz, dwell)?)?;
-        let gmb = apodise_and_phase(gauss_multiply_bruker_apodization(
+        let traf = apodise_with_shared_phase(traf_apodization(&shifted, lb_hz, dwell)?)?;
+        let gmb = apodise_with_shared_phase(gauss_multiply_bruker_apodization(
             &shifted, -lb_hz, 0.3, dwell,
         )?)?;
-        let trap = apodise_and_phase(trapezoidal_apodization(&shifted, 0.0, 0.7)?)?;
-        let conv = apodise_and_phase(convolution_difference_apodization(
+        let trap = apodise_with_shared_phase(trapezoidal_apodization(&shifted, 0.0, 0.7)?)?;
+        let conv = apodise_with_shared_phase(convolution_difference_apodization(
             &shifted,
             lb_hz / 3.0,
             conv_broad_hz,
@@ -280,7 +305,7 @@ mod ruviz_example {
         )?)?;
         let matched_step = matched_filter_em(&shifted)?;
         let matched_lb_hz = matched_step.line_broadening_hz;
-        let matched = apodise_and_phase(exponential_apodization(
+        let matched = apodise_with_shared_phase(exponential_apodization(
             &shifted,
             matched_lb_hz,
             matched_step.dwell_time_s,
@@ -297,6 +322,8 @@ mod ruviz_example {
             conv,
             matched,
             matched_lb_hz,
+            ph0_deg,
+            ph1_deg,
         })
     }
 
@@ -340,11 +367,15 @@ mod ruviz_example {
                 .label(label)
                 .into()
         };
+        let phase_tag = format!(
+            "phased: ph0={:.0}°, ph1={:.0}°",
+            panels.ph0_deg, panels.ph1_deg
+        );
         let figure = subplots(3, 3, 2700, 1800)?
             .subplot_at(
                 0,
                 mk(
-                    format!("{title_prefix} — |raw FFT|{zoom_suffix}"),
+                    format!("{title_prefix} — |raw FFT|{zoom_suffix} ({phase_tag})"),
                     &panels.raw,
                     "|spectrum|",
                 ),
