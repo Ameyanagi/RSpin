@@ -105,7 +105,7 @@ impl PhaseCorrection2D {
         self
     }
 
-    fn validate(self) -> Result<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         ensure_finite("x_zero_order_deg", self.x_zero_order_deg)?;
         ensure_finite("x_first_order_deg", self.x_first_order_deg)?;
         ensure_finite("y_zero_order_deg", self.y_zero_order_deg)?;

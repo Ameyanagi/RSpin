@@ -12,6 +12,7 @@ mod builder_tests;
 mod contours;
 mod crop_1d;
 mod crop_2d;
+mod hypercomplex_2d;
 mod linear_prediction;
 mod one_d;
 mod pipeline;
@@ -55,6 +56,10 @@ pub use baseline::{
 pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, extract_contours};
 pub use crop_1d::{Crop1D, crop_1d};
 pub use crop_2d::{Crop2D, crop_2d};
+pub use hypercomplex_2d::{
+    HyperComplex2D, HyperComplex2DOptions, assemble_hypercomplex_2d, indirect_ft_hypercomplex_2d,
+    phase_hypercomplex_2d, process_hypercomplex_2d,
+};
 pub use linear_prediction::{
     LinearPredictionBackward, LinearPredictionForward, linear_predict_backward,
     linear_predict_forward,

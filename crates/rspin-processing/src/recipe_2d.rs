@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use rspin_core::{Axis, RSpinError, Result, Spectrum2D};
 
 use crate::{
-    AutoPhase2DOptions, FftDirection, PhaseCorrection2D, ProcessingStep, abs_2d,
-    auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d, gaussian_apodization_2d,
-    normalize_2d_max_abs, normalize_2d_volume, offset_2d, resample_2d, scale_2d, shift_2d_axes,
-    sine_bell_apodization_2d, zero_fill_2d,
+    AutoPhase2DOptions, FftDirection, HyperComplex2DOptions, PhaseCorrection2D, ProcessingStep,
+    abs_2d, auto_phase_correct_2d, crop_2d, exponential_apodization_2d, fft_2d,
+    gaussian_apodization_2d, normalize_2d_max_abs, normalize_2d_volume, offset_2d,
+    process_hypercomplex_2d, resample_2d, scale_2d, shift_2d_axes, sine_bell_apodization_2d,
+    zero_fill_2d,
 };
 
 /// A serializable two-dimensional processing operation.
@@ -122,6 +123,12 @@ pub enum ProcessingOperation2D {
         /// Search options.
         options: AutoPhase2DOptions,
     },
+    /// Processes a raw `ser`-style hypercomplex spectrum into a phasable
+    /// spectrum (direct FT, quadrature assembly, indirect FT, phase).
+    HyperComplexProcess {
+        /// Hypercomplex processing options.
+        options: HyperComplex2DOptions,
+    },
 }
 
 impl ProcessingStep<Spectrum2D> for ProcessingOperation2D {
@@ -196,6 +203,7 @@ impl ProcessingStep<Spectrum2D> for ProcessingOperation2D {
             Self::AutoPhase { options } => {
                 auto_phase_correct_2d(spectrum, *options).map(|result| result.spectrum)
             }
+            Self::HyperComplexProcess { options } => process_hypercomplex_2d(spectrum, options),
         }
     }
 }
@@ -476,6 +484,13 @@ impl ProcessingRecipe2D {
     #[must_use]
     pub fn auto_phase_with(self, options: AutoPhase2DOptions) -> Self {
         self.with_operation(ProcessingOperation2D::AutoPhase { options })
+    }
+
+    /// Appends raw hypercomplex processing (direct FT, quadrature assembly,
+    /// indirect FT, phase) with the supplied options.
+    #[must_use]
+    pub fn hypercomplex_process(self, options: HyperComplex2DOptions) -> Self {
+        self.with_operation(ProcessingOperation2D::HyperComplexProcess { options })
     }
 }
 
