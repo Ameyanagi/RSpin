@@ -274,24 +274,30 @@ impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
 ///
 /// # Procedure
 ///
-/// 1. Forward-FFT the input FID with no window.
+/// 1. Apply a gentle 1 Hz exponential pre-broadening to the FID and
+///    zero-fill ×2 before FFT. The pre-broadening suppresses
+///    truncation ringing; the zero-fill takes bin spacing out of the
+///    FWHM measurement.
 /// 2. Take the magnitude spectrum.
-/// 3. Locate the strongest magnitude peak.
-/// 4. Measure its FWHM in Hz (using the FFT axis directly when it is
-///    already in Hz, or scaling by `metadata.frequency_mhz` when it is
-///    in ppm).
-/// 5. Divide that FWHM by √3 — the magnitude lineshape has
-///    `FWHM = √3 · LB` while the absorption-mode lineshape has
-///    `FWHM = LB`. The Ernst-optimal LB is the absorption-mode width.
-/// 6. Return an [`ExponentialApodization`] step with that LB and the
-///    FID's dwell time.
+/// 3. Scan for local-maximum peaks at least 30 % of the global maximum.
+///    For each peak measure the FWHM with linear interpolation of the
+///    half-height crossings.
+/// 4. Pick the **narrowest** qualifying peak. NMR singlets are
+///    narrower than multiplet envelopes, so this targets a single
+///    Lorentzian line.
+/// 5. Convert that FWHM into Hz (using the FFT axis directly when it
+///    is in Hz, or scaling by `metadata.frequency_mhz` for ppm axes).
+/// 6. Divide by √3 — magnitude FWHM = √3 · LB, absorption FWHM = LB —
+///    and subtract the 1 Hz pre-broadening to recover the natural LB.
+/// 7. Clamp the result into a sensible range and return an
+///    [`ExponentialApodization`] with that LB and the FID's dwell.
 ///
 /// # When *not* to use the matched filter
 ///
 /// - Spectra whose peaks have very different natural linewidths
 ///   (e.g. fast-relaxing methyls alongside slow-relaxing aromatics).
-///   The estimate is dominated by the strongest peak; weaker peaks of
-///   different width are mis-weighted.
+///   The estimate is dominated by the narrowest peak; broader peaks
+///   are under-weighted.
 /// - Resolution-critical work (couplings, dispersion analysis); the
 ///   ×2 linewidth penalty is exactly the wrong direction. Use
 ///   [`LorentzToGaussApodization`] instead.
@@ -303,6 +309,7 @@ impl ProcessingStep<Spectrum1D> for GaussMultiplyBrukerApodization {
 /// Returns an error when the input is not a time-domain spectrum
 /// (axis unit must be `Seconds`), the dwell time cannot be inferred,
 /// the spectrum is too short to FFT, or the FWHM cannot be measured.
+#[allow(clippy::too_many_lines)]
 pub fn matched_filter_em(spectrum: &Spectrum1D) -> Result<ExponentialApodization> {
     if spectrum.x.unit != Unit::Seconds {
         return Err(RSpinError::InvalidSpectrum {
@@ -321,42 +328,88 @@ pub fn matched_filter_em(spectrum: &Spectrum1D) -> Result<ExponentialApodization
             message: "matched_filter_em requires a positive dwell time".to_owned(),
         });
     }
-    if spectrum.len() < 8 {
+    if spectrum.len() < 32 {
         return Err(RSpinError::InvalidSpectrum {
-            message: "matched_filter_em requires at least 8 FID points".to_owned(),
+            message: "matched_filter_em requires at least 32 FID points".to_owned(),
         });
     }
 
-    let frequency = fft_1d(spectrum, FftDirection::Forward)?;
+    // Step 1: gentle pre-broadening + zero-fill ×2, then FFT and take
+    // the magnitude. The pre-broadening damps truncation ringing so
+    // FWHM measurement is dominated by the natural linewidth, not the
+    // FFT sidelobes; the zero-fill removes bin spacing as a floor.
+    let lb_pre_hz = 1.0_f64;
+    let pre = exponential_apodization(spectrum, lb_pre_hz, dwell)?;
+    let target_len = pre.len().saturating_mul(2);
+    let zero_filled = crate::one_d::zero_fill(&pre, target_len)?;
+    let frequency = fft_1d(&zero_filled, FftDirection::Forward)?;
     let magnitude = magnitude_spectrum(&frequency)?;
-    let mut peak_index = 0_usize;
-    let mut peak_value = f64::NEG_INFINITY;
-    for (index, value) in magnitude.intensities.iter().enumerate() {
-        if *value > peak_value {
-            peak_value = *value;
-            peak_index = index;
-        }
-    }
-    if !peak_value.is_finite() || peak_value <= 0.0 {
+
+    // Step 2 + 3: scan for local maxima at least 30 % of global max,
+    // measure their FWHM with linear interpolation of the half-height
+    // crossings, and remember the smallest FWHM.
+    let global_max = magnitude
+        .intensities
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    if !global_max.is_finite() || global_max <= 0.0 {
         return Err(RSpinError::InvalidSpectrum {
             message: "matched_filter_em could not find a positive peak".to_owned(),
         });
     }
-    let half = peak_value / 2.0;
-    let mut left = peak_index;
-    while left > 0 && magnitude.intensities[left - 1] > half {
-        left -= 1;
+    let threshold = 0.3 * global_max;
+    let n = magnitude.intensities.len();
+    let mut best_fwhm_axis: Option<f64> = None;
+    for index in 1..n.saturating_sub(1) {
+        let value = magnitude.intensities[index];
+        if value < threshold {
+            continue;
+        }
+        let prev = magnitude.intensities[index - 1];
+        let next = magnitude.intensities[index + 1];
+        if !(value >= prev && value >= next) {
+            continue;
+        }
+        let half = value / 2.0;
+        let mut left = index;
+        while left > 0 && magnitude.intensities[left - 1] > half {
+            left -= 1;
+        }
+        if left == 0 {
+            continue;
+        }
+        let mut right = index;
+        while right + 1 < n && magnitude.intensities[right + 1] > half {
+            right += 1;
+        }
+        if right + 1 >= n {
+            continue;
+        }
+        let left_x = interp_half_crossing(
+            magnitude.x.values[left - 1],
+            magnitude.intensities[left - 1],
+            magnitude.x.values[left],
+            magnitude.intensities[left],
+            half,
+        );
+        let right_x = interp_half_crossing(
+            magnitude.x.values[right],
+            magnitude.intensities[right],
+            magnitude.x.values[right + 1],
+            magnitude.intensities[right + 1],
+            half,
+        );
+        let fwhm = (right_x - left_x).abs();
+        if fwhm > 0.0 && best_fwhm_axis.is_none_or(|best| fwhm < best) {
+            best_fwhm_axis = Some(fwhm);
+        }
     }
-    let mut right = peak_index;
-    while right + 1 < magnitude.intensities.len() && magnitude.intensities[right + 1] > half {
-        right += 1;
-    }
-    if right <= left {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "matched_filter_em could not measure a peak FWHM".to_owned(),
-        });
-    }
-    let fwhm_axis = (magnitude.x.values[right] - magnitude.x.values[left]).abs();
+    let fwhm_axis = best_fwhm_axis.ok_or(RSpinError::InvalidSpectrum {
+        message: "matched_filter_em could not measure a peak FWHM".to_owned(),
+    })?;
+
+    // Step 5: convert axis units → Hz.
     let fwhm_hz = match magnitude.x.unit {
         Unit::Hertz => fwhm_axis,
         Unit::Ppm => match magnitude.metadata.frequency_mhz {
@@ -381,13 +434,24 @@ pub fn matched_filter_em(spectrum: &Spectrum1D) -> Result<ExponentialApodization
             message: "matched_filter_em produced a non-positive FWHM".to_owned(),
         });
     }
-    // The magnitude spectrum of a Lorentzian decays as
-    // 1/sqrt(α² + (2πΔ)²), whose FWHM in Hz equals √3·LB while the
-    // absorption-mode (phased real) Lorentzian has FWHM = LB. The
-    // SNR-optimal exponential decay matches LB, so divide out the √3
-    // factor we picked up by measuring on the magnitude spectrum.
-    let lb_hz = fwhm_hz / 3.0_f64.sqrt();
-    Ok(ExponentialApodization::new(lb_hz, dwell))
+
+    // Steps 6 + 7: magnitude FWHM = √3 · LB_total where LB_total is
+    // the absorption-mode Lorentzian width including pre-broadening.
+    // Subtract the pre-broadening to get the natural linewidth, then
+    // clamp to a sensible NMR range so a pathological measurement
+    // never returns a runaway value.
+    let lb_total_abs = fwhm_hz / 3.0_f64.sqrt();
+    let lb_natural = (lb_total_abs - lb_pre_hz).clamp(0.05, 50.0);
+    Ok(ExponentialApodization::new(lb_natural, dwell))
+}
+
+fn interp_half_crossing(x0: f64, y0: f64, x1: f64, y1: f64, target: f64) -> f64 {
+    let denom = y1 - y0;
+    if denom.abs() <= f64::EPSILON {
+        return f64::midpoint(x0, x1);
+    }
+    let t = (target - y0) / denom;
+    x0 + t * (x1 - x0)
 }
 
 /// Applies convolution-difference apodization
