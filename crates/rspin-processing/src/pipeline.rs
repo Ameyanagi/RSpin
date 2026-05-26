@@ -5,10 +5,10 @@ use rspin_core::{Axis, Result, Spectrum1D};
 use crate::{
     Abs1D, AutoPhaseOptions, BaselineMethod, ConvolutionDifferenceApodization, Crop1D,
     ExponentialApodization, Fft1D, FftDirection, FirstPointScale, GaussMultiplyBrukerApodization,
-    GaussianApodization, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
-    OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
-    SineBellApodization, SubsampleShift, SubtractBaseline, TrafApodization, TrapezoidalApodization,
-    ZeroFill,
+    GaussianApodization, LinearPredictionBackward, LinearPredictionForward,
+    LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs, OffsetIntensity,
+    PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis, SineBellApodization,
+    SubsampleShift, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -226,6 +226,20 @@ impl Spectrum1DPipeline {
     #[must_use]
     pub fn subsample_shift(self, frac_samples: f64) -> Self {
         self.then(SubsampleShift::new(frac_samples))
+    }
+
+    /// Repairs the first `n_repair` FID samples with backward complex
+    /// Burg linear prediction.
+    #[must_use]
+    pub fn linear_predict_backward(self, order: usize, n_repair: usize) -> Self {
+        self.then(LinearPredictionBackward::new(order, n_repair))
+    }
+
+    /// Extends the FID tail by `n_extend` samples with forward complex
+    /// Burg linear prediction.
+    #[must_use]
+    pub fn linear_predict_forward(self, order: usize, n_extend: usize) -> Self {
+        self.then(LinearPredictionForward::new(order, n_extend))
     }
 
     /// Applies sine-bell apodization to real and imaginary channels.

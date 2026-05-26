@@ -8,9 +8,10 @@ use rspin_processing::{
     BaselineMethod, FftDirection, abs_1d, apply_processing_recipe_1d,
     apply_processing_recipe_1d_until, apply_subsample_shift, convolution_difference_apodization,
     crop_1d, exponential_apodization, fft_1d, first_point_scale, gauss_multiply_bruker_apodization,
-    gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area,
-    offset_intensity, phase_correct, resample_1d, shift_axis, sine_bell_apodization,
-    subtract_baseline, traf_apodization, trapezoidal_apodization, zero_fill,
+    gaussian_apodization, linear_predict_backward, linear_predict_forward,
+    lorentz_to_gauss_apodization, magnitude_spectrum, normalize_area, offset_intensity,
+    phase_correct, resample_1d, shift_axis, sine_bell_apodization, subtract_baseline,
+    traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 use super::{from_json, spectrum1d_from_json, spectrum1d_to_json};
@@ -273,6 +274,38 @@ pub fn trapezoidal_apodization_spectrum_1d_json(
         options.rise_end_fraction,
         options.fall_start_fraction,
     )?;
+    spectrum1d_to_json(&processed)
+}
+
+/// Repairs the first `n_repair` samples of a serialized `Spectrum1D`
+/// FID via backward complex Burg linear prediction.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn linear_predict_backward_spectrum_1d_json(
+    spectrum_json: &str,
+    order: usize,
+    n_repair: usize,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let processed = linear_predict_backward(&spectrum, order, n_repair)?;
+    spectrum1d_to_json(&processed)
+}
+
+/// Extends a serialized `Spectrum1D` FID tail with forward complex
+/// Burg linear prediction.
+///
+/// # Errors
+///
+/// Returns an error when deserialization, processing, or serialization fails.
+pub fn linear_predict_forward_spectrum_1d_json(
+    spectrum_json: &str,
+    order: usize,
+    n_extend: usize,
+) -> Result<String> {
+    let spectrum = spectrum1d_from_json(spectrum_json)?;
+    let processed = linear_predict_forward(&spectrum, order, n_extend)?;
     spectrum1d_to_json(&processed)
 }
 
