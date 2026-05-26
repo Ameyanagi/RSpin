@@ -10,20 +10,24 @@
 //! depends on the confirmed JEOL indirect-quadrature convention and reference
 //! values, which are tracked separately.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rspin::core::{QuadMode, Result, Unit};
 use rspin::io::read_jeol_jdf_2d_file;
 use rspin::processing::{HyperComplex2DOptions, process_hypercomplex_2d};
 
-fn eucalyptol_hsqc_fixture() -> std::path::PathBuf {
+fn nmrxiv_fixture(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../rspin-io/testdata/nmrxiv/cc0/eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf")
+        .join("../rspin-io/testdata/nmrxiv/cc0")
+        .join(relative)
 }
 
-#[test]
-fn processes_raw_eucalyptol_hsqc_through_hypercomplex_pipeline() -> Result<()> {
-    let mut raw = read_jeol_jdf_2d_file(eucalyptol_hsqc_fixture())?;
+/// Reads a raw, time-domain JEOL HSQC `.jdf`, drives the hypercomplex pipeline
+/// with States-style quadrature, and asserts a finite frequency-domain spectrum
+/// with signal. The JEOL reader does not record the indirect quadrature mode,
+/// so it is set explicitly; HSQC is States-acquired.
+fn check_raw_hsqc_pipeline(relative: &str) -> Result<()> {
+    let mut raw = read_jeol_jdf_2d_file(nmrxiv_fixture(relative))?;
 
     // Raw, time-domain HSQC: both axes are in seconds.
     assert_eq!(raw.x.unit, Unit::Seconds);
@@ -31,9 +35,6 @@ fn processes_raw_eucalyptol_hsqc_through_hypercomplex_pipeline() -> Result<()> {
     let (width, rows) = raw.shape();
     assert_eq!((width, rows), (1024, 32));
 
-    // The JEOL reader does not record the indirect quadrature mode. HSQC is
-    // acquired with States-style quadrature, so set it explicitly to drive the
-    // hypercomplex assembly.
     raw.metadata.quad_mode = Some(QuadMode::States);
 
     let processed = process_hypercomplex_2d(&raw, &HyperComplex2DOptions::default())?;
@@ -48,4 +49,14 @@ fn processes_raw_eucalyptol_hsqc_through_hypercomplex_pipeline() -> Result<()> {
     assert!(processed.z.iter().any(|value| value.abs() > 0.0));
 
     Ok(())
+}
+
+#[test]
+fn processes_raw_eucalyptol_hsqc_through_hypercomplex_pipeline() -> Result<()> {
+    check_raw_hsqc_pipeline("eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf")
+}
+
+#[test]
+fn processes_raw_myrcene_hsqc_through_hypercomplex_pipeline() -> Result<()> {
+    check_raw_hsqc_pipeline("myrcene/jeol/myrcene_hsqc_400mhz.jdf")
 }
