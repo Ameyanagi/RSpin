@@ -1581,17 +1581,14 @@ mod ruviz_example {
             return Ok(());
         };
         let processed = if spectrum.x.unit == Unit::Seconds {
-            let target_len = spectrum
-                .len()
-                .checked_mul(2)
-                .context("vendor showcase target length overflow")?;
+            let opts = AutoProcessingOptions {
+                subtract_baseline: false,
+                ..AutoProcessingOptions::default()
+            };
+            let auto = process_spectrum_auto(spectrum, &opts)?;
             ProcessingRecipe1D::new()
-                .exponential_apodization(1.0, dwell_time_seconds(spectrum)?)
-                .zero_fill(target_len)
-                .fft(FftDirection::Forward)
-                .magnitude()
                 .normalize_max_abs()
-                .apply(spectrum)?
+                .apply(&auto)?
         } else {
             ProcessingRecipe1D::new()
                 .normalize_max_abs()
