@@ -1,12 +1,30 @@
 //! One-call automatic processing pipeline for time-domain FIDs.
 //!
-//! [`process_spectrum_auto`] runs the canonical `RSpin` chain in order
-//! (group-delay correction → optional backward LP → nucleus-aware
-//! apodization → first-point scaling → zero-fill → FFT → fractional
-//! sub-sample shift → Regions auto-phase → `AsLS` baseline). The defaults
-//! are tuned to give a "looks like `nmrPipe` / `TopSpin` default output"
-//! result on the curated JEOL and Bruker fixtures without the caller
-//! having to set anything beyond the FID itself.
+//! [`process_spectrum_auto`] runs the canonical `RSpin` chain in order.
+//! The pipeline is organised around three deliberately-separate
+//! concepts (do not collapse them — most "phase mysteries" come from
+//! conflating them):
+//!
+//! 1. **Time-origin correction**: vendor digital-filter group delay
+//!    (Bruker `GRPDLY`, JEOL `decimation_reg / filter_factor`),
+//!    integer-sample drop + zero-pad ([`remove_group_delay`]), and the
+//!    matching fractional residual via the Fourier-shift theorem
+//!    ([`apply_subsample_shift`]).
+//!
+//! 2. **Numerical FT conditioning**: optional backward linear
+//!    prediction to repair leading samples, apodization, the FCOR=0.5
+//!    first-point scale, and zero-filling.
+//!
+//! 3. **Spectral display correction**: residual `(ph0, ph1)` from
+//!    [`auto_phase_correct`] and the [`subtract_baseline`] pass on
+//!    the phased real spectrum.
+//!
+//! Auto-phase only ever sees the **residual** phase; if you see
+//! `|ph1|` in the hundreds of degrees, the time-origin stage is wrong
+//! (not the phaser). The default chain is tuned to give a "looks like
+//! `nmrPipe` / `TopSpin` default output" result on the curated JEOL and
+//! Bruker fixtures without the caller having to set anything beyond
+//! the FID itself.
 //!
 //! Every step records its operation in the spectrum's processing
 //! history; the caller can inspect [`Spectrum1D::processing`] after the
@@ -30,10 +48,19 @@ use crate::{
 pub struct AutoProcessingOptions {
     /// Override the digital-filter group-delay value (`integer +
     /// fractional` samples). When `None` the value is recovered from
-    /// `metadata.properties` (JEOL `decimation_reg / filter_factor`).
+    /// `metadata.properties` for the supported vendors:
+    ///
+    /// - Bruker: `bruker.acqus.GRPDLY` (modern AVANCE; legacy
+    ///   spectrometers without that field need an explicit override).
+    /// - JEOL: `jeol.parameter.decimation_reg / jeol.parameter.filter_factor`.
+    /// - Agilent/Varian: not auto-detected; modern Agilent FIDs are
+    ///   typically pre-corrected by the spectrometer, but pass an
+    ///   explicit value here if your dataset needs one.
     pub group_delay_samples: Option<f64>,
     /// Number of leading samples to repair with backward LP. Set to
-    /// `0` to skip backward LP entirely. Default 8.
+    /// `0` (the default) to skip backward LP entirely. LP is opt-in to
+    /// keep the default chain reversible and to avoid silently
+    /// fabricating data on routine spectra.
     pub backward_lp_n_repair: usize,
     /// AR order for backward LP. Default 16.
     pub backward_lp_order: usize,
@@ -64,7 +91,11 @@ impl Default for AutoProcessingOptions {
     fn default() -> Self {
         Self {
             group_delay_samples: None,
-            backward_lp_n_repair: 8,
+            // LP is off by default. Turning it on silently changes
+            // quantitative data and is not safe as an unsupervised
+            // default; users repair leading samples explicitly when
+            // they know the FID needs it.
+            backward_lp_n_repair: 0,
             backward_lp_order: 16,
             apodization_lb_hz: None,
             nucleus_lb_hz: NucleusLbDefaults::default(),
@@ -152,12 +183,23 @@ pub fn process_spectrum_auto(
         });
     }
 
-    // 1. Group-delay handling. Integer part is applied in the time
-    //    domain (rotate_left); the fractional residual is remembered
-    //    and applied as a frequency-domain phase ramp after FFT.
-    let group_delay = options
-        .group_delay_samples
-        .unwrap_or_else(|| jeol_group_delay_from_metadata(&fid.metadata));
+    // 1. Group-delay handling. Integer part is dropped + zero-padded
+    //    in the time domain; the fractional residual is remembered and
+    //    applied as a frequency-domain phase ramp after FFT.
+    //
+    //    Guard against double-correction: if the FID already carries a
+    //    `remove_group_delay` record (e.g. it was re-imported from a
+    //    pipeline that already corrected it), do not re-apply unless
+    //    the caller explicitly overrides via `group_delay_samples`.
+    let already_corrected = fid
+        .processing
+        .iter()
+        .any(|record| record.operation == "remove_group_delay");
+    let group_delay = match options.group_delay_samples {
+        Some(value) => value,
+        None if already_corrected => 0.0,
+        None => group_delay_from_metadata(&fid.metadata),
+    };
     let group_delay_integer = group_delay.trunc().max(0.0);
     let group_delay_frac = group_delay - group_delay_integer;
     let after_group_delay = if group_delay_integer > 0.0 {
@@ -280,7 +322,37 @@ fn next_power_of_two(value: usize) -> usize {
     result
 }
 
-fn jeol_group_delay_from_metadata(metadata: &Metadata) -> f64 {
+/// Recovers the digital-filter group delay from vendor metadata.
+///
+/// Per-vendor policy:
+///
+/// - **Bruker raw** (`fid` / `ser`): correct by default. Prefer
+///   `GRPDLY` from the modern AVANCE `acqus` file; fall back to a
+///   `DSPFVS + DECIM` lookup table for legacy spectrometers.
+/// - **JEOL / Delta raw**: correct by default using
+///   `decimation_reg / filter_factor`.
+/// - **Varian / Agilent / `VnmrJ`**: no correction. Modern Agilent
+///   FIDs come out of the spectrometer's inline DSP already time-
+///   corrected; applying a Bruker-style shift on top would damage
+///   them. Pass an explicit override via
+///   [`AutoProcessingOptions::group_delay_samples`] when an unusual
+///   dataset needs one.
+/// - **`nmrPipe`-converted data, other formats, unknown vendors**: no
+///   auto-correction — the conversion pipeline has likely already
+///   handled it. Provide an explicit override when you have provenance.
+///
+/// Returns `0.0` when no recognised metadata is present.
+fn group_delay_from_metadata(metadata: &Metadata) -> f64 {
+    // Bruker: GRPDLY is the canonical digital-filter delay (samples,
+    // typically a value like 67.98 on modern AVANCE). Where GRPDLY is
+    // missing or non-positive (legacy spectrometers), fall back to the
+    // documented DSPFVS+DECIM lookup table.
+    let bruker = bruker_group_delay(metadata);
+    if bruker > 0.0 {
+        return bruker;
+    }
+
+    // JEOL: decimation_reg / filter_factor (encoded as e.g. "r:60").
     let factor = metadata
         .properties
         .get("jeol.parameter.filter_factor")
@@ -289,9 +361,122 @@ fn jeol_group_delay_from_metadata(metadata: &Metadata) -> f64 {
         .properties
         .get("jeol.parameter.decimation_reg")
         .and_then(|v| parse_decimation_reg(v));
-    match (decim_raw, factor) {
-        (Some(raw), Some(f)) if f > 0.0 => raw / f,
+    if let (Some(raw), Some(f)) = (decim_raw, factor) {
+        if f.is_finite() && f > 0.0 {
+            return raw / f;
+        }
+    }
+
+    0.0
+}
+
+fn bruker_group_delay(metadata: &Metadata) -> f64 {
+    if let Some(grpdly) = metadata
+        .properties
+        .get("bruker.acqus.GRPDLY")
+        .and_then(|raw| raw.trim().parse::<f64>().ok())
+    {
+        if grpdly.is_finite() && grpdly > 0.0 {
+            return grpdly;
+        }
+    }
+    let dspfvs = metadata
+        .properties
+        .get("bruker.acqus.DSPFVS")
+        .and_then(|raw| raw.trim().parse::<i32>().ok());
+    let decim = metadata
+        .properties
+        .get("bruker.acqus.DECIM")
+        .and_then(|raw| raw.trim().parse::<i32>().ok());
+    match (dspfvs, decim) {
+        (Some(d), Some(c)) => bruker_dsp_table(d, c).unwrap_or(0.0),
         _ => 0.0,
+    }
+}
+
+/// Legacy Bruker `DSPFVS + DECIM → GRPDLY` lookup table.
+///
+/// Values are numerical constants documented in the Bruker XWIN-NMR
+/// digital-filter manual and reproduced in every Bruker-aware
+/// processing toolkit (`nmrglue` BSD-3, `nmrPipe` documentation,
+/// `relax`). Used only when the FID lacks an explicit `GRPDLY`
+/// (pre-`AVANCE`-III spectrometers).
+#[allow(clippy::too_many_lines, clippy::match_same_arms)]
+fn bruker_dsp_table(dspfvs: i32, decim: i32) -> Option<f64> {
+    match (dspfvs, decim) {
+        (10, 2) => Some(44.75),
+        (10, 3) => Some(33.5),
+        (10, 4) => Some(66.625),
+        (10, 6) => Some(59.083_333_333_3),
+        (10, 8) => Some(68.562_5),
+        (10, 12) => Some(60.375),
+        (10, 16) => Some(69.531_25),
+        (10, 24) => Some(61.020_833_333_3),
+        (10, 32) => Some(70.015_625),
+        (10, 48) => Some(61.510_416_666_7),
+        (10, 64) => Some(70.257_812_5),
+        (10, 96) => Some(61.755_208_333_3),
+        (10, 128) => Some(70.378_906_25),
+        (10, 192) => Some(61.877_604_166_7),
+        (10, 256) => Some(70.439_453_125),
+        (10, 384) => Some(61.938_802_083_3),
+        (10, 512) => Some(70.469_726_562_5),
+        (10, 768) => Some(61.969_401_041_7),
+        (10, 1024) => Some(70.484_863_281_3),
+        (10, 1536) => Some(61.984_700_520_8),
+        (10, 2048) => Some(70.492_431_640_6),
+
+        (11, 2) => Some(46.0),
+        (11, 3) => Some(36.5),
+        (11, 4) => Some(48.0),
+        (11, 6) => Some(50.166_666_666_7),
+        (11, 8) => Some(53.25),
+        (11, 12) => Some(69.5),
+        (11, 16) => Some(72.25),
+        (11, 24) => Some(70.166_666_666_7),
+        (11, 32) => Some(72.75),
+        (11, 48) => Some(70.5),
+        (11, 64) => Some(73.0),
+        (11, 96) => Some(70.666_666_666_7),
+        (11, 128) => Some(72.5),
+        (11, 192) => Some(71.333_333_333_3),
+        (11, 256) => Some(72.25),
+        (11, 384) => Some(71.666_666_666_7),
+        (11, 512) => Some(72.125),
+        (11, 768) => Some(71.833_333_333_3),
+        (11, 1024) => Some(72.062_5),
+        (11, 1536) => Some(71.916_666_666_7),
+        (11, 2048) => Some(72.031_25),
+
+        (12, 2) => Some(46.0),
+        (12, 3) => Some(36.5),
+        (12, 4) => Some(48.0),
+        (12, 6) => Some(50.166_666_666_7),
+        (12, 8) => Some(53.25),
+        (12, 12) => Some(69.5),
+        (12, 16) => Some(71.625),
+        (12, 24) => Some(70.166_666_666_7),
+        (12, 32) => Some(72.125),
+        (12, 48) => Some(70.5),
+        (12, 64) => Some(72.375),
+        (12, 96) => Some(70.666_666_666_7),
+        (12, 128) => Some(72.5),
+
+        (13, 2) => Some(2.75),
+        (13, 3) => Some(2.833_333_333_3),
+        (13, 4) => Some(2.875),
+        (13, 6) => Some(2.916_666_666_7),
+        (13, 8) => Some(2.937_5),
+        (13, 12) => Some(2.958_333_333_3),
+        (13, 16) => Some(2.968_75),
+        (13, 24) => Some(2.979_166_666_7),
+        (13, 32) => Some(2.984_375),
+        (13, 48) => Some(2.989_583_333_3),
+        (13, 64) => Some(2.992_187_5),
+        (13, 96) => Some(2.994_791_666_7),
+        (13, 128) => Some(2.996_093_75),
+
+        _ => None,
     }
 }
 

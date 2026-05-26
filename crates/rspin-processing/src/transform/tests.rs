@@ -5,7 +5,10 @@ use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 use super::*;
 
 #[test]
-fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
+fn remove_group_delay_drops_leading_samples_and_zero_pads() -> anyhow::Result<()> {
+    // The discarded pre-acquisition samples are dropped, not wrapped.
+    // This avoids the wrap-around baseline artefact on the spectrum
+    // edges that a circular shift produced.
     let axis = Axis::linear("time", Unit::Seconds, 0.0, 4.0, 5)?;
     let spectrum = Spectrum1D::new_complex(
         axis,
@@ -14,8 +17,8 @@ fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
         Metadata::default(),
     )?;
     let shifted = remove_group_delay(&spectrum, 2.0)?;
-    assert_eq!(shifted.intensities, vec![30.0, 40.0, 50.0, 10.0, 20.0]);
-    assert_eq!(shifted.imaginary, Some(vec![3.0, 4.0, 5.0, 1.0, 2.0]));
+    assert_eq!(shifted.intensities, vec![30.0, 40.0, 50.0, 0.0, 0.0]);
+    assert_eq!(shifted.imaginary, Some(vec![3.0, 4.0, 5.0, 0.0, 0.0]));
     assert_eq!(
         shifted.processing.last().map(|r| r.operation.as_str()),
         Some("remove_group_delay")

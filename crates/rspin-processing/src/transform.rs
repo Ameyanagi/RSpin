@@ -1253,12 +1253,16 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
 
 /// Removes a digital-filter group delay from a time-domain spectrum.
 ///
-/// Circularly shifts the FID samples left by `samples.trunc()` (so the
-/// early "pre-acquisition" points wrap to the end of the FID) and records
-/// the operation. The fractional part of `samples` is meant to be applied
-/// downstream as a frequency-domain linear phase
-/// `exp(-2*pi*frac*k/N)` after FFT; this function only handles the
-/// integer shift so the inverse `restore_group_delay` is a clean rotation.
+/// **Drops** the first `samples.trunc()` points of the FID and pads the
+/// tail with zeros to preserve length. The discarded points contain the
+/// receiver's filter ringing / pre-acquisition transient; replacing them
+/// with zeros (rather than wrapping them to the tail via a circular shift)
+/// avoids contaminating the apodised tail and the spectrum's edge
+/// baseline.
+///
+/// The fractional part of `samples` is *not* applied here. Use the
+/// frequency-domain helper [`apply_subsample_shift`] after FFT to apply
+/// the fractional residual as a linear phase ramp.
 ///
 /// `samples` must be finite and non-negative.
 ///
@@ -1281,15 +1285,24 @@ pub fn remove_group_delay(spectrum: &Spectrum1D, samples: f64) -> Result<Spectru
     if len == 0 {
         return Ok(processed);
     }
-    // Float-to-integer casts saturate on overflow (Rust ≥ 1.45), so
-    // `samples.trunc() as usize` clamps cleanly; we still cap at `len` to
-    // keep `rotate_left` in bounds.
+    // Float-to-integer casts saturate on overflow (Rust ≥ 1.45); cap at
+    // `len` so the shift never exceeds the FID length.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let integer_shift = (samples.trunc() as usize).min(len);
     if integer_shift > 0 {
-        processed.intensities.rotate_left(integer_shift);
+        // Left-shift the surviving tail to position 0, then zero-pad
+        // the freed trailing slots. This is the non-destructive
+        // alternative to `rotate_left`: the discarded pre-acquisition
+        // samples do not wrap around to contaminate the tail.
+        processed.intensities.copy_within(integer_shift..len, 0);
+        for value in &mut processed.intensities[len - integer_shift..] {
+            *value = 0.0;
+        }
         if let Some(imag) = processed.imaginary.as_mut() {
-            imag.rotate_left(integer_shift);
+            imag.copy_within(integer_shift..len, 0);
+            for value in &mut imag[len - integer_shift..] {
+                *value = 0.0;
+            }
         }
     }
     Ok(processed.with_processing_record(

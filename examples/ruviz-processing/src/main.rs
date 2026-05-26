@@ -32,12 +32,12 @@ mod ruviz_example {
         write_spectrum1d_csv, write_spectrum1d_json,
     };
     use rspin_processing::{
-        AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
-        ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift, auto_phase_correct,
-        auto_phase_correct_with_peaks, convolution_difference_apodization, exponential_apodization,
-        fit_baseline, gauss_multiply_bruker_apodization, gaussian_apodization,
-        lorentz_to_gauss_apodization, magnitude_spectrum, matched_filter_em, remove_group_delay,
-        traf_apodization, trapezoidal_apodization,
+        AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, AutoProcessingOptions, BaselineMethod,
+        FftDirection, ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift,
+        auto_phase_correct, auto_phase_correct_with_peaks, convolution_difference_apodization,
+        exponential_apodization, fit_baseline, gauss_multiply_bruker_apodization,
+        gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, matched_filter_em,
+        process_spectrum_auto, remove_group_delay, traf_apodization, trapezoidal_apodization,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -57,6 +57,7 @@ mod ruviz_example {
         write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))?;
         write_curated_auto_phase_plot(&root, &output_dir)?;
         write_apodization_comparison_plot(&root, &output_dir)?;
+        write_auto_processing_plot(&root, &output_dir)?;
         let vendor_dir = output_dir.join("vendors");
         write_vendor_showcase(&root, &vendor_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
@@ -517,6 +518,68 @@ mod ruviz_example {
             )?;
         }
 
+        Ok(())
+    }
+
+    fn write_auto_processing_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries: &[(&str, &str, &str)] = &[
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+                "auto_processing_jeol_13c",
+            ),
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+                "auto_processing_jeol_1h",
+            ),
+        ];
+        for (fixture_path, title, stem) in entries {
+            let fixture = root.join(fixture_path);
+            let Some(fid) = load_first_complex_fid(&fixture)? else {
+                continue;
+            };
+            let group_delay = jeol_group_delay(&fid);
+            let opts = AutoProcessingOptions {
+                group_delay_samples: Some(group_delay),
+                ..AutoProcessingOptions::default()
+            };
+            let processed = process_spectrum_auto(&fid, &opts)?;
+            let processed = relabel_hz_to_ppm(processed);
+            let normalized = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&processed)?;
+
+            // Reference: raw |FFT| of the integer-shifted FID (no
+            // apodization, no LP, no phase).
+            let integer_shift = group_delay.trunc().max(0.0);
+            let shifted = if integer_shift > 0.0 {
+                remove_group_delay(&fid, integer_shift)?
+            } else {
+                fid.clone()
+            };
+            let raw_magnitude = ProcessingRecipe1D::new()
+                .zero_fill(shifted.len() * 2)
+                .fft(FftDirection::Forward)
+                .apply(&shifted)?;
+            let raw_magnitude = magnitude_spectrum(&raw_magnitude)?;
+            let raw_magnitude = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&raw_magnitude)?;
+            let raw_magnitude = relabel_hz_to_ppm(raw_magnitude);
+
+            Plot::new()
+                .title(&format!("{title} — process_spectrum_auto"))
+                .xlabel("chemical shift / ppm")
+                .ylabel("normalized intensity")
+                .max_resolution(1600, 1000)
+                .legend_position(LegendPosition::Best)
+                .line(&raw_magnitude.x.values, &raw_magnitude.intensities)
+                .label("|raw FFT| (no apodization)")
+                .line(&normalized.x.values, &normalized.intensities)
+                .label("process_spectrum_auto")
+                .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+        }
         Ok(())
     }
 
