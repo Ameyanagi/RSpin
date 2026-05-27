@@ -24,7 +24,7 @@ mod ruviz_example {
         PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
         SpectrumAnalysis1DOptions, analyze_spectrum_1d, pick_peaks,
     };
-    use rspin_core::{Axis, Metadata, Nucleus, QuadMode, Spectrum1D, Spectrum2D, Unit};
+    use rspin_core::{Axis, Metadata, Nucleus, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
         SpectrumBundle, load_spectra, read_analysis1d_json, read_processing_recipe_1d_json,
         read_spectrum_bundle_json, read_spectrum1d_csv, read_spectrum1d_json, write_analysis1d_csv,
@@ -33,12 +33,11 @@ mod ruviz_example {
     };
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, AutoProcessingOptions, BaselineMethod,
-        FftDirection, HyperComplex2DOptions, ProcessSpectrum2D, ProcessingRecipe1D,
-        apply_subsample_shift, auto_phase_correct, auto_phase_correct_with_peaks,
-        convolution_difference_apodization, exponential_apodization, fit_baseline,
-        gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
-        magnitude_spectrum, matched_filter_em, process_hypercomplex_2d, process_spectrum_auto,
-        remove_group_delay, traf_apodization, trapezoidal_apodization,
+        FftDirection, ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift,
+        auto_phase_correct, auto_phase_correct_with_peaks, convolution_difference_apodization,
+        exponential_apodization, fit_baseline, gauss_multiply_bruker_apodization,
+        gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, matched_filter_em,
+        process_spectrum_auto, remove_group_delay, traf_apodization, trapezoidal_apodization,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -62,7 +61,6 @@ mod ruviz_example {
         let vendor_dir = output_dir.join("vendors");
         write_vendor_showcase(&root, &vendor_dir)?;
         write_jeol_group_delay_comparison(&root, &output_dir)?;
-        write_hsqc_hypercomplex_contours(&root, &output_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
         write_oracle_visual_artifacts(&root, &visual_output_dir)?;
 
@@ -1525,75 +1523,6 @@ mod ruviz_example {
         .line(&auto_swept.x.values, &auto_swept.intensities)
         .label("auto_group_delay_sweep (Δ±5, step 0.2)")
         .save(path_to_str(&png_path)?)?;
-        Ok(())
-    }
-
-    /// Generates quadrature-resolved HSQC contour PNGs for the committed CC0
-    /// nmrxiv eucalyptol and myrcene fixtures.
-    ///
-    /// These are raw, time-domain phase-sensitive datasets. Unlike the generic
-    /// 2D contour path (`process_2d_for_contour`, which runs a single-plane
-    /// `fft_2d` + magnitude and therefore shows indirect quadrature images),
-    /// this routes the data through `process_hypercomplex_2d` so the indirect
-    /// dimension is sign-resolved. The JEOL reader does not record the
-    /// quadrature mode, so States is set explicitly.
-    fn write_hsqc_hypercomplex_contours(root: &Path, output_dir: &Path) -> Result<()> {
-        let entries = [
-            (
-                "crates/rspin-io/testdata/nmrxiv/cc0/eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf",
-                "hsqc_eucalyptol_hypercomplex_contour.png",
-                "JEOL HSQC — Eucalyptol — hypercomplex (States)",
-            ),
-            (
-                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_hsqc_400mhz.jdf",
-                "hsqc_myrcene_hypercomplex_contour.png",
-                "JEOL HSQC — Myrcene — hypercomplex (States)",
-            ),
-        ];
-        for (fixture, stem, title) in entries {
-            let bundle = load_spectra(root.join(fixture))
-                .with_context(|| format!("failed to load HSQC fixture {fixture}"))?;
-            let raw = bundle
-                .spectra_2d()
-                .next()
-                .with_context(|| format!("HSQC fixture {fixture} has no 2D spectrum"))?;
-            let mut raw = raw.clone();
-            raw.metadata.quad_mode = Some(QuadMode::States);
-
-            // Apodize the direct dimension in the time domain to suppress
-            // truncation ridges (no indirect window here: the raw indirect rows
-            // are interleaved cosine/sine and are not a clean t1 series yet).
-            let dwell_x = axis_step(&raw.x.values).unwrap_or(1.0e-6);
-            let dwell_y = axis_step(&raw.y.values).unwrap_or(1.0e-6);
-            let apodized = raw
-                .process()
-                .exponential_apodization(8.0, 0.0, dwell_x, dwell_y)
-                .finish()
-                .context("HSQC direct-dimension apodization failed")?;
-
-            // Zero-fill and broaden the (short, 16-point) indirect dimension.
-            let options = HyperComplex2DOptions::default()
-                .with_indirect_line_broadening_hz(8.0)
-                .with_indirect_zero_fill(128);
-            let processed = process_hypercomplex_2d(&apodized, &options)
-                .context("hypercomplex HSQC processing failed")?;
-            // Display the magnitude of the quadrature-resolved spectrum so the
-            // cross-peaks read cleanly regardless of residual phase.
-            let display = processed
-                .process()
-                .absolute_value()
-                .normalize_max_abs()
-                .finish()
-                .context("HSQC contour normalization failed")?;
-
-            write_contour_plot(
-                &output_dir.join(stem),
-                title,
-                axis_label(display.x.unit),
-                axis_label(display.y.unit),
-                &display,
-            )?;
-        }
         Ok(())
     }
 
