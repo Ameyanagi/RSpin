@@ -57,8 +57,9 @@ pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, e
 pub use crop_1d::{Crop1D, crop_1d};
 pub use crop_2d::{Crop2D, crop_2d};
 pub use hypercomplex_2d::{
-    HyperComplex2D, HyperComplex2DOptions, assemble_hypercomplex_2d, indirect_ft_hypercomplex_2d,
-    phase_hypercomplex_2d, process_hypercomplex_2d,
+    HyperComplex2DOptions, assemble_hypercomplex_2d, direct_ft_hypercomplex_2d,
+    indirect_ft_hypercomplex_2d, phase_hypercomplex_2d, process_hypercomplex_2d,
+    process_hypercomplex_planes, process_hypercomplex_planes_magnitude,
 };
 pub use linear_prediction::{
     LinearPredictionBackward, LinearPredictionForward, linear_predict_backward,
@@ -81,6 +82,7 @@ pub use recipe_2d::{
 };
 pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
+pub use rspin_core::HyperComplex2D;
 pub use traits::ProcessingStep;
 pub use transform::{
     ConvolutionDifferenceApodization, ExponentialApodization, Fft1D, FftDirection, FirstPointScale,

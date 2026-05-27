@@ -107,7 +107,7 @@ pub use jcamp::{
 pub use jeol::{
     JeolJdf1D, JeolJdf2D, JeolJdfInfo, JeolJdfVersion, inspect_jeol_jdf_bytes,
     inspect_jeol_jdf_file, read_jeol_jdf_1d_bytes, read_jeol_jdf_1d_file, read_jeol_jdf_2d_bytes,
-    read_jeol_jdf_2d_file,
+    read_jeol_jdf_2d_file, read_jeol_jdf_2d_hypercomplex_bytes, read_jeol_jdf_2d_hypercomplex_file,
 };
 pub use json::{
     JsonSpectrum1D, JsonSpectrum2D, SPECTRUM_1D_JSON_FORMAT, SPECTRUM_2D_JSON_FORMAT,

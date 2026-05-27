@@ -2,7 +2,9 @@
 
 use std::{fs, path::Path, str::FromStr};
 
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit};
+use rspin_core::{
+    Axis, HyperComplex2D, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D, Unit,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::SpectrumPathReader;
@@ -12,7 +14,7 @@ mod data;
 mod header;
 mod parameters;
 
-use data::{read_data_matrix_sections, read_data_sections};
+use data::{read_data_matrix_planes, read_data_matrix_sections, read_data_sections};
 use header::Header;
 use parameters::Parameters;
 
@@ -314,6 +316,102 @@ pub fn read_jeol_jdf_2d_bytes(bytes: &[u8]) -> Result<Spectrum2D> {
     };
 
     Spectrum2D::new_complex(x, y, z, imaginary, metadata)
+}
+
+/// Reads all four hypercomplex planes of a phase-sensitive JEOL Delta 2D
+/// `.jdf` file (e.g. HSQC), preserving the indirect-dimension quadrature that
+/// the single-companion [`read_jeol_jdf_2d_file`] discards.
+///
+/// The returned [`HyperComplex2D`] is raw and time-domain in both dimensions;
+/// feed it to `rspin-processing`'s `process_hypercomplex_planes` for a
+/// sign-resolved spectrum.
+///
+/// # Errors
+///
+/// Returns an error when the payload is malformed, not two-dimensional, or not
+/// hypercomplex (fewer than four section planes).
+pub fn read_jeol_jdf_2d_hypercomplex_file(path: impl AsRef<Path>) -> Result<HyperComplex2D> {
+    let path = path.as_ref();
+    let bytes = fs::read(path).map_err(|error| RSpinError::Parse {
+        format: "JEOL",
+        message: format!("failed to read {}: {error}", path.display()),
+    })?;
+    read_jeol_jdf_2d_hypercomplex_bytes(&bytes)
+}
+
+/// Reads all four hypercomplex planes of a phase-sensitive JEOL Delta 2D
+/// payload. See [`read_jeol_jdf_2d_hypercomplex_file`].
+///
+/// # Errors
+///
+/// Returns an error when the payload is malformed, not two-dimensional, or not
+/// hypercomplex (fewer than four section planes).
+pub fn read_jeol_jdf_2d_hypercomplex_bytes(bytes: &[u8]) -> Result<HyperComplex2D> {
+    let header = Header::parse(bytes)?;
+    header.validate_2d()?;
+    if header.data_section_count()? < 4 {
+        return Err(RSpinError::Unsupported {
+            feature: "JEOL JDF 2D dataset is not hypercomplex (needs four planes)",
+        });
+    }
+
+    let parameters = Parameters::parse(bytes, &header)?;
+    let planes = read_data_matrix_planes(bytes, &header, 4)?;
+    let mut iter = planes.planes.into_iter();
+    // jeolconverter section order is RR, RI, IR, II (the first letter is the
+    // indirect channel, the second the direct channel). This ordering keeps the
+    // direct dimension quadrature clean (a single peak, no mirror image).
+    let rr = iter.next().ok_or_else(|| missing_plane("rr"))?;
+    let mut ri = iter.next().ok_or_else(|| missing_plane("ri"))?;
+    let ir = iter.next().ok_or_else(|| missing_plane("ir"))?;
+    let mut ii = iter.next().ok_or_else(|| missing_plane("ii"))?;
+
+    let x = build_axis(&header, 0, planes.x_count)?;
+    let y = build_indirect_time_axis(&header, &parameters, planes.y_count)?;
+    let metadata = build_metadata(&header, &parameters);
+
+    // Same precession-sign correction as the single-plane path: negate the
+    // direct-imaginary quadrants for time-domain data.
+    if x.unit == Unit::Seconds {
+        for value in &mut ri {
+            *value = -*value;
+        }
+        for value in &mut ii {
+            *value = -*value;
+        }
+    }
+
+    HyperComplex2D::new(x, y, rr, ri, ir, ii, metadata)
+}
+
+fn missing_plane(name: &'static str) -> RSpinError {
+    RSpinError::InvalidSpectrum {
+        message: format!("JEOL JDF hypercomplex data is missing the {name} plane"),
+    }
+}
+
+/// Builds the indirect-dimension time axis from the `y_sweep` spectral width,
+/// which is the authoritative indirect dwell (`1 / y_sweep`). The header's
+/// `Data_Axis_Start/Stop` for the indirect dimension is unreliable for JEOL 2D,
+/// so fall back to it only when `y_sweep` is unavailable.
+fn build_indirect_time_axis(
+    header: &Header,
+    parameters: &Parameters,
+    point_count: usize,
+) -> Result<Axis> {
+    if let Some((sweep_hz, _unit)) = parameters.magnitude("y_sweep")
+        && sweep_hz.is_finite()
+        && sweep_hz > 0.0
+    {
+        let dwell = 1.0 / sweep_hz;
+        let segments =
+            u32::try_from(point_count.saturating_sub(1)).map_err(|_| RSpinError::InvalidAxis {
+                message: "JEOL JDF indirect point count too large".to_owned(),
+            })?;
+        let end = f64::from(segments) * dwell;
+        return Axis::linear("time", Unit::Seconds, 0.0, end, point_count);
+    }
+    build_axis(header, 1, point_count)
 }
 
 /// Inspects routing metadata from a JEOL Delta `.jdf` file.

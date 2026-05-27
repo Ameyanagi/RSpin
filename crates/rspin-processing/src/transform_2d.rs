@@ -189,8 +189,8 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
     };
     let (new_x, new_y) = match direction {
         FftDirection::Forward => (
-            crate::transform::frequency_axis_from_time(&spectrum.x, &spectrum.metadata, width)?,
-            crate::transform::frequency_axis_from_time(&spectrum.y, &indirect_metadata, height)?,
+            crate::transform::frequency_axis_from_time(&spectrum.x, &spectrum.metadata, width, 0)?,
+            crate::transform::frequency_axis_from_time(&spectrum.y, &indirect_metadata, height, 1)?,
         ),
         FftDirection::Inverse => (
             crate::transform::time_axis_from_frequency(&spectrum.x, &spectrum.metadata, width)?,

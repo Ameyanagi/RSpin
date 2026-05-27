@@ -1237,7 +1237,7 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
     }
 
     let new_axis = match direction {
-        FftDirection::Forward => frequency_axis_from_time(&spectrum.x, &spectrum.metadata, len)?,
+        FftDirection::Forward => frequency_axis_from_time(&spectrum.x, &spectrum.metadata, len, 0)?,
         FftDirection::Inverse => time_axis_from_frequency(&spectrum.x, &spectrum.metadata, len)?,
     };
 
@@ -1355,6 +1355,7 @@ pub(crate) fn frequency_axis_from_time(
     x: &Axis,
     metadata: &rspin_core::Metadata,
     len: usize,
+    axis: usize,
 ) -> Result<Axis> {
     if x.unit != Unit::Seconds {
         return Ok(x.clone());
@@ -1370,7 +1371,7 @@ pub(crate) fn frequency_axis_from_time(
     let n_f = safe_usize_to_f64(len, "spectrum length")?;
     let half_f = safe_usize_to_f64(half, "spectrum index")?;
     let scale = sweep_width_hz / n_f;
-    let carrier_hz = carrier_offset_hz_from_metadata(metadata).unwrap_or(0.0);
+    let carrier_hz = carrier_offset_hz_from_metadata(metadata, axis).unwrap_or(0.0);
     let mut hz_values = Vec::with_capacity(len);
     for index in 0..len {
         let index_f = safe_usize_to_f64(index, "spectrum index")?;
@@ -1390,37 +1391,60 @@ pub(crate) fn frequency_axis_from_time(
 /// shift the FFT frequency axis so post-FFT ppm values match the
 /// conventional NMR range (≈ 0–10 for ¹H, 0–200 for ¹³C) rather than
 /// being centred on zero.
-fn carrier_offset_hz_from_metadata(metadata: &rspin_core::Metadata) -> Option<f64> {
-    // Bruker: `O1` (Hz) is the transmitter offset relative to BF1.
-    if let Some(o1) = metadata
-        .property("bruker.acqus.O1")
+fn carrier_offset_hz_from_metadata(metadata: &rspin_core::Metadata, axis: usize) -> Option<f64> {
+    // Pick the per-dimension vendor parameter keys: axis 0 is the direct
+    // dimension, axis 1 the indirect dimension of a 2D experiment.
+    let (bruker_offset_key, jeol_offset_key, jeol_freq_key) = if axis == 0 {
+        (
+            "bruker.acqus.O1",
+            "jeol.parameter.x_offset",
+            "jeol.parameter.x_freq",
+        )
+    } else {
+        (
+            "bruker.acqus.O2",
+            "jeol.parameter.y_offset",
+            "jeol.parameter.y_freq",
+        )
+    };
+
+    // Bruker: `O1`/`O2` (Hz) is the transmitter offset relative to the base
+    // frequency.
+    if let Some(offset) = metadata
+        .property(bruker_offset_key)
         .and_then(|value| value.parse::<f64>().ok())
         .filter(|value| value.is_finite())
     {
-        return Some(o1);
+        return Some(offset);
     }
-    // JEOL Delta: `x_offset` is in ppm and `x_freq` is in Hz; the
-    // carrier offset in Hz is `x_offset * x_freq / 1e6`.
-    let x_offset_ppm = metadata
-        .property("jeol.parameter.x_offset")
+    // JEOL Delta: `x_offset`/`y_offset` are in ppm and `x_freq`/`y_freq` in Hz;
+    // the carrier offset in Hz is `offset_ppm * freq_hz / 1e6`.
+    let offset_ppm = metadata
+        .property(jeol_offset_key)
         .and_then(|value| value.parse::<f64>().ok());
-    let x_freq_hz = metadata
-        .property("jeol.parameter.x_freq")
+    let freq_hz = metadata
+        .property(jeol_freq_key)
         .and_then(|value| value.parse::<f64>().ok());
-    if let (Some(ppm), Some(hz)) = (x_offset_ppm, x_freq_hz)
+    if let (Some(ppm), Some(hz)) = (offset_ppm, freq_hz)
         && ppm.is_finite()
         && hz.is_finite()
         && hz != 0.0
     {
         return Some(ppm * hz / 1.0e6);
     }
-    // Agilent/Varian: `tof` is the transmitter offset frequency in Hz.
-    if let Some(tof) = metadata
-        .property("agilent.procpar.tof")
-        .and_then(|value| value.parse::<f64>().ok())
-        .filter(|value| value.is_finite())
+    // Agilent/Varian: `tof` is the direct-dimension transmitter offset in Hz.
+    if axis == 0
+        && let Some(tof) = metadata
+            .property("agilent.procpar.tof")
+            .and_then(|value| value.parse::<f64>().ok())
+            .filter(|value| value.is_finite())
     {
         return Some(tof);
+    }
+    // Homonuclear experiments (e.g. COSY) carry no indirect-specific offset;
+    // the indirect dimension shares the direct carrier.
+    if axis != 0 {
+        return carrier_offset_hz_from_metadata(metadata, 0);
     }
     None
 }

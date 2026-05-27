@@ -18,155 +18,14 @@
 // (rr_x/ri_x/...) are intrinsically similar names; renaming them hurts clarity.
 #![allow(clippy::similar_names)]
 
-use rspin_core::{Axis, Metadata, ProcessingRecord, QuadMode, RSpinError, Result, Spectrum2D};
+use rspin_core::{
+    Axis, HyperComplex2D, ProcessingRecord, QuadMode, RSpinError, Result, Spectrum2D,
+};
 use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 
 use crate::PhaseCorrection2D;
 use crate::transform::{fftshift_in_place, frequency_axis_from_time};
-
-/// Row-major hypercomplex 2D data with four real quadrant planes.
-///
-/// Each plane has length `x.len() * y.len()` in row-major order
-/// (`index = y_index * x.len() + x_index`). The first letter of each quadrant
-/// names the indirect (y) channel and the second the direct (x) channel, where
-/// `R` is the real/cosine component and `I` the imaginary/sine component. The
-/// `y` length is the number of indirect points (after pairwise assembly), not
-/// the raw acquired-row count.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct HyperComplex2D {
-    /// Direct (x) axis.
-    pub x: Axis,
-    /// Indirect (y) axis.
-    pub y: Axis,
-    /// Real-indirect, real-direct quadrant.
-    pub rr: Vec<f64>,
-    /// Real-indirect, imaginary-direct quadrant.
-    pub ri: Vec<f64>,
-    /// Imaginary-indirect, real-direct quadrant.
-    pub ir: Vec<f64>,
-    /// Imaginary-indirect, imaginary-direct quadrant.
-    pub ii: Vec<f64>,
-    /// Spectrum metadata.
-    pub metadata: Metadata,
-    /// Applied processing records.
-    pub processing: Vec<ProcessingRecord>,
-}
-
-impl HyperComplex2D {
-    /// Creates a hypercomplex 2D container from four equal-length quadrants.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when any plane length differs from `x.len() * y.len()`
-    /// or contains a non-finite value.
-    pub fn new(
-        x: Axis,
-        y: Axis,
-        rr: Vec<f64>,
-        ri: Vec<f64>,
-        ir: Vec<f64>,
-        ii: Vec<f64>,
-        metadata: Metadata,
-    ) -> Result<Self> {
-        metadata.validate()?;
-        let expected = x
-            .len()
-            .checked_mul(y.len())
-            .ok_or_else(|| RSpinError::InvalidSpectrum {
-                message: "hypercomplex 2D axis size overflow".to_owned(),
-            })?;
-        for (name, plane) in [("rr", &rr), ("ri", &ri), ("ir", &ir), ("ii", &ii)] {
-            if plane.len() != expected {
-                return Err(RSpinError::InvalidSpectrum {
-                    message: format!(
-                        "hypercomplex plane {name} has {} values but axes require {expected}",
-                        plane.len()
-                    ),
-                });
-            }
-            if !plane.iter().all(|value| value.is_finite()) {
-                return Err(RSpinError::NonFinite {
-                    field: "hypercomplex",
-                });
-            }
-        }
-        Ok(Self {
-            x,
-            y,
-            rr,
-            ri,
-            ir,
-            ii,
-            metadata,
-            processing: Vec::new(),
-        })
-    }
-
-    /// Returns the `(x, y)` shape.
-    #[must_use]
-    pub fn shape(&self) -> (usize, usize) {
-        (self.x.len(), self.y.len())
-    }
-
-    fn plane_at(plane: &[f64], width: usize, height: usize, x: usize, y: usize) -> Option<f64> {
-        if x >= width || y >= height {
-            return None;
-        }
-        plane.get(y * width + x).copied()
-    }
-
-    /// Gets the RR quadrant value by x/y index.
-    #[must_use]
-    pub fn rr_at(&self, x: usize, y: usize) -> Option<f64> {
-        let (width, height) = self.shape();
-        Self::plane_at(&self.rr, width, height, x, y)
-    }
-
-    /// Gets the RI quadrant value by x/y index.
-    #[must_use]
-    pub fn ri_at(&self, x: usize, y: usize) -> Option<f64> {
-        let (width, height) = self.shape();
-        Self::plane_at(&self.ri, width, height, x, y)
-    }
-
-    /// Gets the IR quadrant value by x/y index.
-    #[must_use]
-    pub fn ir_at(&self, x: usize, y: usize) -> Option<f64> {
-        let (width, height) = self.shape();
-        Self::plane_at(&self.ir, width, height, x, y)
-    }
-
-    /// Gets the II quadrant value by x/y index.
-    #[must_use]
-    pub fn ii_at(&self, x: usize, y: usize) -> Option<f64> {
-        let (width, height) = self.shape();
-        Self::plane_at(&self.ii, width, height, x, y)
-    }
-
-    /// Returns a copy with one appended processing record.
-    #[must_use]
-    pub fn with_processing_record(mut self, record: ProcessingRecord) -> Self {
-        self.processing.push(record);
-        self
-    }
-
-    /// Downgrades to a displayable [`Spectrum2D`].
-    ///
-    /// The doubly-real `rr` quadrant becomes the real channel (`2rr` analog)
-    /// and `ri` becomes the companion imaginary channel for direct-dimension
-    /// re-phasing.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the resulting spectrum fails validation.
-    pub fn into_spectrum_2d(self) -> Result<Spectrum2D> {
-        let mut spectrum =
-            Spectrum2D::new_complex(self.x, self.y, self.rr, Some(self.ri), self.metadata)?;
-        spectrum.processing.clone_from(&self.processing);
-        Ok(spectrum)
-    }
-}
 
 /// Options for the one-shot raw → phasable hypercomplex pipeline.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -327,7 +186,7 @@ pub fn assemble_hypercomplex_2d(raw: &Spectrum2D) -> Result<HyperComplex2D> {
         }
     }
 
-    let new_x = frequency_axis_from_time(&raw.x, &raw.metadata, width)?;
+    let new_x = frequency_axis_from_time(&raw.x, &raw.metadata, width, 0)?;
     // The assembled indirect time grid keeps one sample per indirect point.
     let y_values = raw
         .y
@@ -390,7 +249,7 @@ pub fn indirect_ft_hypercomplex_2d(hc: &HyperComplex2D) -> Result<HyperComplex2D
         }
         None => hc.metadata.clone(),
     };
-    let new_y = frequency_axis_from_time(&hc.y, &indirect_metadata, points)?;
+    let new_y = frequency_axis_from_time(&hc.y, &indirect_metadata, points, 1)?;
 
     let mut result = HyperComplex2D::new(hc.x.clone(), new_y, rr, ri, ir, ii, hc.metadata.clone())?;
     result.processing.clone_from(&hc.processing);
@@ -493,6 +352,200 @@ pub fn process_hypercomplex_2d(
     hc = indirect_ft_hypercomplex_2d(&hc)?;
     hc = phase_hypercomplex_2d(&hc, options.phase)?;
     hc.into_spectrum_2d()
+}
+
+/// Applies the direct-dimension complex FFT to a time-domain
+/// [`HyperComplex2D`], transforming each row's direct-complex pairs
+/// `(rr, ri)` and `(ir, ii)` and producing a direct-frequency /
+/// indirect-time hypercomplex spectrum.
+///
+/// # Errors
+///
+/// Returns an error when the result fails validation.
+pub fn direct_ft_hypercomplex_2d(hc: &HyperComplex2D) -> Result<HyperComplex2D> {
+    let (width, points) = hc.shape();
+    let mut rr = hc.rr.clone();
+    let mut ri = hc.ri.clone();
+    let mut ir = hc.ir.clone();
+    let mut ii = hc.ii.clone();
+
+    let mut planner = FftPlanner::<f64>::new();
+    let fft = planner.plan_fft_forward(width);
+    for point in 0..points {
+        let base = point * width;
+        let mut cosine: Vec<Complex<f64>> = (0..width)
+            .map(|k| Complex::new(hc.rr[base + k], hc.ri[base + k]))
+            .collect();
+        let mut sine: Vec<Complex<f64>> = (0..width)
+            .map(|k| Complex::new(hc.ir[base + k], hc.ii[base + k]))
+            .collect();
+        fft.process(&mut cosine);
+        fftshift_in_place(&mut cosine);
+        fft.process(&mut sine);
+        fftshift_in_place(&mut sine);
+        for k in 0..width {
+            rr[base + k] = cosine[k].re;
+            ri[base + k] = cosine[k].im;
+            ir[base + k] = sine[k].re;
+            ii[base + k] = sine[k].im;
+        }
+    }
+
+    let new_x = frequency_axis_from_time(&hc.x, &hc.metadata, width, 0)?;
+    let mut result = HyperComplex2D::new(new_x, hc.y.clone(), rr, ri, ir, ii, hc.metadata.clone())?;
+    result.processing.clone_from(&hc.processing);
+    Ok(result.with_processing_record(ProcessingRecord::new("direct_ft_hypercomplex_2d")))
+}
+
+/// Processes a time-domain four-plane [`HyperComplex2D`] (as produced by a
+/// reader that already separates the RR/RI/IR/II quadrants, e.g. JEOL) into a
+/// phasable [`Spectrum2D`]: direct FT, optional indirect apodization/zero-fill,
+/// indirect complex FT, phase correction, then downgrade.
+///
+/// Unlike [`process_hypercomplex_2d`], this does not assemble quadrants from
+/// interleaved acquisition rows — the planes are already separated.
+///
+/// # Errors
+///
+/// Returns an error when any stage fails (see the individual functions).
+pub fn process_hypercomplex_planes(
+    hc: &HyperComplex2D,
+    options: &HyperComplex2DOptions,
+) -> Result<Spectrum2D> {
+    // Window both dimensions with a 90-degree-shifted squared sine-bell before
+    // each transform. This tapers the (short, truncated) interferograms to zero
+    // and suppresses the F1/F2 truncation ridges, following the standard
+    // NMRPipe/nmrglue 2D recipe (`sp` window, off~0.5, end~0.98, pow=2).
+    const SINE_BELL_OFF: f64 = 0.5;
+    const SINE_BELL_END: f64 = 0.98;
+    const SINE_BELL_POW: f64 = 2.0;
+
+    let mut hc = direct_sine_bell(hc, SINE_BELL_OFF, SINE_BELL_END, SINE_BELL_POW);
+    hc = direct_ft_hypercomplex_2d(&hc)?;
+    if let Some(line_broadening_hz) = options.indirect_line_broadening_hz {
+        hc = indirect_exponential_apodization(&hc, line_broadening_hz)?;
+    }
+    hc = indirect_sine_bell(&hc, SINE_BELL_OFF, SINE_BELL_END, SINE_BELL_POW);
+    // Halve the first t1 increment to suppress the F1 baseline offset (the
+    // standard first-point correction, applied in the indirect dimension).
+    hc = indirect_first_point_scale(&hc, 0.5);
+    if let Some(target) = options.indirect_zero_fill {
+        hc = indirect_zero_fill(&hc, target)?;
+    }
+    hc = indirect_ft_hypercomplex_2d(&hc)?;
+    hc = phase_hypercomplex_2d(&hc, options.phase)?;
+    hc.into_spectrum_2d()
+}
+
+/// Processes a time-domain four-plane [`HyperComplex2D`] into a phase-insensitive
+/// magnitude [`Spectrum2D`]: identical to [`process_hypercomplex_planes`] up to
+/// the indirect FT, then takes the hypercomplex modulus
+/// `sqrt(rr^2 + ri^2 + ir^2 + ii^2)` over all four quadrants instead of phasing.
+///
+/// This is the robust display path when a reliable direct/indirect phase is not
+/// available: the four-quadrant modulus is phase-insensitive, so dispersive
+/// content does not leak into the contour as t1/t2 ridges.
+///
+/// # Errors
+///
+/// Returns an error when any stage fails (see the individual functions).
+pub fn process_hypercomplex_planes_magnitude(
+    hc: &HyperComplex2D,
+    options: &HyperComplex2DOptions,
+) -> Result<Spectrum2D> {
+    const SINE_BELL_OFF: f64 = 0.5;
+    const SINE_BELL_END: f64 = 0.98;
+    const SINE_BELL_POW: f64 = 2.0;
+
+    let mut hc = direct_sine_bell(hc, SINE_BELL_OFF, SINE_BELL_END, SINE_BELL_POW);
+    hc = direct_ft_hypercomplex_2d(&hc)?;
+    if let Some(line_broadening_hz) = options.indirect_line_broadening_hz {
+        hc = indirect_exponential_apodization(&hc, line_broadening_hz)?;
+    }
+    hc = indirect_sine_bell(&hc, SINE_BELL_OFF, SINE_BELL_END, SINE_BELL_POW);
+    hc = indirect_first_point_scale(&hc, 0.5);
+    if let Some(target) = options.indirect_zero_fill {
+        hc = indirect_zero_fill(&hc, target)?;
+    }
+    hc = indirect_ft_hypercomplex_2d(&hc)?;
+    hc.into_magnitude_spectrum_2d()
+}
+
+/// Shifted sine-bell apodization factor for index `i` of `n` points:
+/// `sin(pi*off + pi*(end-off)*i/(n-1))^pow` (`NMRPipe` `sp` window).
+fn sine_bell_factor(i: usize, n: usize, off: f64, end: f64, pow: f64) -> f64 {
+    if n <= 1 {
+        return 1.0;
+    }
+    let denom = u32::try_from(n - 1).map_or(1.0, f64::from);
+    let index = u32::try_from(i).map_or(0.0, f64::from);
+    let angle = std::f64::consts::PI * off + std::f64::consts::PI * (end - off) * (index / denom);
+    angle.sin().powf(pow)
+}
+
+/// Applies a shifted sine-bell window along the direct (x) dimension.
+fn direct_sine_bell(hc: &HyperComplex2D, off: f64, end: f64, pow: f64) -> HyperComplex2D {
+    let (width, points) = hc.shape();
+    let window: Vec<f64> = (0..width)
+        .map(|k| sine_bell_factor(k, width, off, end, pow))
+        .collect();
+    let mut result = hc.clone();
+    for plane in [
+        &mut result.rr,
+        &mut result.ri,
+        &mut result.ir,
+        &mut result.ii,
+    ] {
+        for point in 0..points {
+            let base = point * width;
+            for (k, factor) in window.iter().enumerate() {
+                plane[base + k] *= *factor;
+            }
+        }
+    }
+    result
+}
+
+/// Applies a shifted sine-bell window along the indirect (y) dimension.
+fn indirect_sine_bell(hc: &HyperComplex2D, off: f64, end: f64, pow: f64) -> HyperComplex2D {
+    let (width, points) = hc.shape();
+    let mut result = hc.clone();
+    for point in 0..points {
+        let factor = sine_bell_factor(point, points, off, end, pow);
+        let base = point * width;
+        for plane in [
+            &mut result.rr,
+            &mut result.ri,
+            &mut result.ir,
+            &mut result.ii,
+        ] {
+            for value in &mut plane[base..base + width] {
+                *value *= factor;
+            }
+        }
+    }
+    result
+}
+
+/// Scales the first indirect (t1) increment of all four quadrants, suppressing
+/// the F1 baseline ridge that an unscaled first point introduces.
+fn indirect_first_point_scale(hc: &HyperComplex2D, scale: f64) -> HyperComplex2D {
+    let (width, points) = hc.shape();
+    if points == 0 {
+        return hc.clone();
+    }
+    let mut result = hc.clone();
+    for plane in [
+        &mut result.rr,
+        &mut result.ri,
+        &mut result.ir,
+        &mut result.ii,
+    ] {
+        for value in plane.iter_mut().take(width) {
+            *value *= scale;
+        }
+    }
+    result
 }
 
 /// Applies an indirect-dimension exponential window in the indirect time
