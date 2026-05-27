@@ -26,14 +26,16 @@ mod ruviz_example {
     };
     use rspin_core::{Axis, Metadata, Nucleus, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
-        SpectrumBundle, load_spectra, read_analysis1d_json, read_processing_recipe_1d_json,
-        read_spectrum_bundle_json, read_spectrum1d_csv, read_spectrum1d_json, write_analysis1d_csv,
-        write_analysis1d_json, write_processing_recipe_1d_json, write_spectrum_bundle_json,
-        write_spectrum1d_csv, write_spectrum1d_json,
+        SpectrumBundle, load_spectra, read_analysis1d_json, read_jeol_jdf_2d_hypercomplex_file,
+        read_processing_recipe_1d_json, read_spectrum_bundle_json, read_spectrum1d_csv,
+        read_spectrum1d_json, write_analysis1d_csv, write_analysis1d_json,
+        write_processing_recipe_1d_json, write_spectrum_bundle_json, write_spectrum1d_csv,
+        write_spectrum1d_json,
     };
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, AutoProcessingOptions, BaselineMethod,
-        FftDirection, ProcessSpectrum2D, ProcessingRecipe1D, apply_subsample_shift,
+        FftDirection, HyperComplex2DOptions, ProcessSpectrum2D, ProcessingRecipe1D,
+        process_hypercomplex_planes_magnitude, apply_subsample_shift,
         auto_phase_correct, auto_phase_correct_with_peaks, convolution_difference_apodization,
         exponential_apodization, fit_baseline, gauss_multiply_bruker_apodization,
         gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, matched_filter_em,
@@ -61,6 +63,7 @@ mod ruviz_example {
         let vendor_dir = output_dir.join("vendors");
         write_vendor_showcase(&root, &vendor_dir)?;
         write_jeol_group_delay_comparison(&root, &output_dir)?;
+        write_hsqc_phase_sensitive_contours(&root, &output_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
         write_oracle_visual_artifacts(&root, &visual_output_dir)?;
 
@@ -1448,7 +1451,13 @@ mod ruviz_example {
         if !(max_abs > 0.0) {
             return vec![0.0];
         }
-        let base = max_abs * 0.005;
+        // Noise-aware base level: in a sparse 2D spectrum most cells are noise,
+        // so the median magnitude is a robust noise-floor proxy. Start contours
+        // well above it to clip the t1-noise floor rather than drawing it.
+        let mut sorted: Vec<f64> = z.iter().map(|value| value.abs()).collect();
+        sorted.sort_by(f64::total_cmp);
+        let median = sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
+        let base = (median * 8.0).max(max_abs * 0.03);
         let ratio = 1.3_f64;
         let count: usize = 20;
         (0..u32::try_from(count).unwrap_or(0))
@@ -1523,6 +1532,52 @@ mod ruviz_example {
         .line(&auto_swept.x.values, &auto_swept.intensities)
         .label("auto_group_delay_sweep (Δ±5, step 0.2)")
         .save(path_to_str(&png_path)?)?;
+        Ok(())
+    }
+
+    /// Hypercomplex-modulus HSQC contours via the four-plane JEOL path
+    /// (`read_jeol_jdf_2d_hypercomplex_file` → `process_hypercomplex_planes_magnitude`).
+    ///
+    /// Uses higher-resolution (256 t1 increment) HSQC fixtures from the cheminfo
+    /// jeol-data-test submodule, which give well-resolved cross-peaks; rendered
+    /// only when the submodule is initialized. (The committed nmrxiv eucalyptol
+    /// /myrcene HSQC have only 32 t1 increments, so they are t1-noise dominated
+    /// and not used for the showcase.)
+    fn write_hsqc_phase_sensitive_contours(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries = [
+            (
+                "external-testdata/cheminfo/jeol-data-test/data/Rutin_3080ug200uL_DMSOd6_HSQC_400MHz_Jeol.jdf",
+                "hsqc_rutin_hypercomplex_modulus_contour.png",
+                "JEOL HSQC — Rutin — hypercomplex modulus",
+            ),
+            (
+                "external-testdata/cheminfo/jeol-data-test/data/EC=8C_5m200u_MeOD_bzhou21_20190228__HSQC-1-1.jdf",
+                "hsqc_ec_hypercomplex_modulus_contour.png",
+                "JEOL HSQC — EC — hypercomplex modulus",
+            ),
+        ];
+        let options = HyperComplex2DOptions::default().with_indirect_zero_fill(512);
+        for (fixture, stem, title) in entries {
+            let path = root.join(fixture);
+            if !path.exists() {
+                // Submodule fixtures are optional; skip when not initialized.
+                continue;
+            }
+            let hc = read_jeol_jdf_2d_hypercomplex_file(&path)
+                .with_context(|| format!("failed to load HSQC hypercomplex {fixture}"))?;
+            // Hypercomplex-modulus display (sqrt of all four quadrants): a
+            // phase-insensitive 2D magnitude, so cross-peaks read cleanly
+            // without a perfect direct/indirect phase.
+            let display = process_hypercomplex_planes_magnitude(&hc, &options)
+                .context("phase-sensitive HSQC processing failed")?;
+            write_contour_plot(
+                &output_dir.join(stem),
+                title,
+                axis_label(display.x.unit),
+                axis_label(display.y.unit),
+                &display,
+            )?;
+        }
         Ok(())
     }
 
