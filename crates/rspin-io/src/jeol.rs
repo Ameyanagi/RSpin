@@ -383,6 +383,11 @@ fn build_metadata(header: &Header, parameters: &Parameters) -> Metadata {
     let frequency_mhz = parameters
         .magnitude("x_freq")
         .map(|(value, _unit)| value / 1_000_000.0);
+    // `y_freq` is present for 2D datasets and carries the indirect-dimension
+    // carrier (e.g. 13C for HSQC), so the indirect axis can be relabeled to ppm.
+    let indirect_frequency_mhz = parameters
+        .magnitude("y_freq")
+        .map(|(value, _unit)| value / 1_000_000.0);
     let solvent = parameters.string("solvent").map(ToOwned::to_owned);
     let temperature_k = parameters
         .magnitude("temp_get")
@@ -409,6 +414,7 @@ fn build_metadata(header: &Header, parameters: &Parameters) -> Metadata {
         name,
         nucleus,
         frequency_mhz,
+        indirect_frequency_mhz,
         solvent,
         temperature_k,
         origin: Some("JEOL".to_owned()),

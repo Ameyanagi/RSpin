@@ -231,6 +231,11 @@ fn reads_nmrxiv_cc0_eucalyptol_jeol_jdf_subset() -> anyhow::Result<()> {
     assert_eq!(hsqc.metadata.origin.as_deref(), Some("JEOL"));
     assert_eq!(hsqc.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_close(hsqc.metadata.frequency_mhz, Some(399.782_198_378_250_03));
+    // The indirect (13C) carrier is recorded from the JEOL `y_freq` parameter.
+    assert_close(
+        hsqc.metadata.indirect_frequency_mhz,
+        Some(100.525_303_325_165_41),
+    );
     assert!(hsqc.imaginary.is_some());
     assert!(has_signal(&hsqc.z, 1.0e-12));
     Ok(())
