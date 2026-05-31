@@ -23,7 +23,9 @@ fn reads_synthetic_complex_1d_jdf() -> Result<()> {
     assert_eq!(spectrum.x.unit, Unit::Seconds);
     assert_eq!(spectrum.x.values, vec![0.0, 0.25, 0.5, 0.75]);
     assert_eq!(spectrum.intensities, vec![1.0, 2.0, 3.0, 4.0]);
-    assert_eq!(spectrum.imaginary, Some(vec![0.1, 0.2, 0.3, 0.4]));
+    // Imaginary is conjugated on read to match Bruker/Agilent precession
+    // convention, so signs flip versus the on-disk bytes.
+    assert_eq!(spectrum.imaginary, Some(vec![-0.1, -0.2, -0.3, -0.4]));
     assert_eq!(spectrum.metadata.name.as_deref(), Some("sample"));
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.solvent.as_deref(), Some("DMSO-D6"));
@@ -49,7 +51,10 @@ fn reads_synthetic_complex_2d_jdf() -> Result<()> {
     assert_eq!(spectrum.y.unit, Unit::Seconds);
     assert_eq!(spectrum.y.values, vec![0.0, 0.5]);
     assert_eq!(spectrum.z, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0]);
-    assert_eq!(spectrum.imaginary, Some(vec![0.1, 0.2, 0.3, 0.4, 0.5, 0.6]));
+    assert_eq!(
+        spectrum.imaginary,
+        Some(vec![-0.1, -0.2, -0.3, -0.4, -0.5, -0.6])
+    );
     assert_eq!(spectrum.metadata.name.as_deref(), Some("sample"));
     assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(spectrum.metadata.origin.as_deref(), Some("JEOL"));

@@ -5,7 +5,10 @@ use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Unit};
 use super::*;
 
 #[test]
-fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
+fn remove_group_delay_drops_leading_samples_and_zero_pads() -> anyhow::Result<()> {
+    // The discarded pre-acquisition samples are dropped, not wrapped.
+    // This avoids the wrap-around baseline artefact on the spectrum
+    // edges that a circular shift produced.
     let axis = Axis::linear("time", Unit::Seconds, 0.0, 4.0, 5)?;
     let spectrum = Spectrum1D::new_complex(
         axis,
@@ -14,8 +17,8 @@ fn remove_group_delay_rotates_leading_samples() -> anyhow::Result<()> {
         Metadata::default(),
     )?;
     let shifted = remove_group_delay(&spectrum, 2.0)?;
-    assert_eq!(shifted.intensities, vec![30.0, 40.0, 50.0, 10.0, 20.0]);
-    assert_eq!(shifted.imaginary, Some(vec![3.0, 4.0, 5.0, 1.0, 2.0]));
+    assert_eq!(shifted.intensities, vec![30.0, 40.0, 50.0, 0.0, 0.0]);
+    assert_eq!(shifted.imaginary, Some(vec![3.0, 4.0, 5.0, 0.0, 0.0]));
     assert_eq!(
         shifted.processing.last().map(|r| r.operation.as_str()),
         Some("remove_group_delay")
@@ -287,6 +290,7 @@ fn bruker_gmb_rejects_invalid_parameters() -> anyhow::Result<()> {
     assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 1.5, 0.1).is_err());
     assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 0.5, 0.0).is_err());
     assert!(gauss_multiply_bruker_apodization(&spectrum, f64::NAN, 0.5, 0.1).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, -1.0, 0.0, 0.1).is_err());
     Ok(())
 }
 
@@ -328,6 +332,7 @@ fn convolution_difference_rejects_invalid_parameters() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     assert!(convolution_difference_apodization(&spectrum, -1.0, 1.0, 0.5, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, -1.0, 0.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 2.0, 1.0, 0.5, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 1.5, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, -0.1, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 0.5, 0.0).is_err());
@@ -395,6 +400,114 @@ fn matched_filter_em_rejects_frequency_domain_input() -> anyhow::Result<()> {
     let axis = Axis::linear("shift", Unit::Ppm, 0.0, 1.0, 16)?;
     let spectrum = Spectrum1D::new(axis, vec![1.0; 16], Metadata::default())?;
     assert!(matched_filter_em(&spectrum).is_err());
+    Ok(())
+}
+
+#[test]
+fn apply_subsample_shift_zero_is_identity() -> anyhow::Result<()> {
+    let axis = Axis::linear("freq", Unit::Hertz, -2.0, 2.0, 5)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 2.0, 3.0, 4.0, 5.0],
+        Some(vec![0.5, 1.5, 2.5, 3.5, 4.5]),
+        Metadata::default(),
+    )?;
+    let shifted = apply_subsample_shift(&spectrum, 0.0)?;
+    assert_vec_close(&shifted.intensities, &spectrum.intensities);
+    assert_vec_close(require_imaginary(&shifted)?, require_imaginary(&spectrum)?);
+    assert_eq!(
+        shifted.processing.last().map(|r| r.operation.as_str()),
+        Some("apply_subsample_shift")
+    );
+    Ok(())
+}
+
+#[test]
+fn apply_subsample_shift_round_trip_via_fft() -> anyhow::Result<()> {
+    // Build a small complex FID, FFT, apply +0.4 sub-sample shift,
+    // apply -0.4 sub-sample shift, inverse FFT — should recover the
+    // original FID to floating-point precision.
+    let n: u32 = 16;
+    let dwell = 0.01_f64;
+    let mut times = Vec::with_capacity(usize::try_from(n)?);
+    let mut real = Vec::with_capacity(usize::try_from(n)?);
+    let mut imag = Vec::with_capacity(usize::try_from(n)?);
+    for i in 0..n {
+        let t = f64::from(i) * dwell;
+        times.push(t);
+        real.push((2.0 * PI * 10.0 * t).cos() * (-PI * 2.0 * t).exp());
+        imag.push((2.0 * PI * 10.0 * t).sin() * (-PI * 2.0 * t).exp());
+    }
+    let axis = Axis::new("time", Unit::Seconds, times)?;
+    let fid = Spectrum1D::new_complex(axis, real.clone(), Some(imag.clone()), Metadata::default())?;
+    let forward = fft_1d(&fid, FftDirection::Forward)?;
+    let plus = apply_subsample_shift(&forward, 0.4)?;
+    let restored = apply_subsample_shift(&plus, -0.4)?;
+    let inverse = fft_1d(&restored, FftDirection::Inverse)?;
+    assert_vec_close(&inverse.intensities, &real);
+    assert_vec_close(require_imaginary(&inverse)?, &imag);
+    Ok(())
+}
+
+#[test]
+fn apply_subsample_shift_rejects_invalid_input() -> anyhow::Result<()> {
+    let freq_axis = Axis::linear("freq", Unit::Hertz, -1.0, 1.0, 3)?;
+    let real_only = Spectrum1D::new(freq_axis.clone(), vec![1.0, 2.0, 3.0], Metadata::default())?;
+    assert!(apply_subsample_shift(&real_only, 0.3).is_err());
+
+    let time_axis = Axis::linear("time", Unit::Seconds, 0.0, 0.2, 3)?;
+    let time_domain = Spectrum1D::new_complex(
+        time_axis,
+        vec![1.0, 2.0, 3.0],
+        Some(vec![0.0; 3]),
+        Metadata::default(),
+    )?;
+    assert!(apply_subsample_shift(&time_domain, 0.3).is_err());
+
+    let valid = Spectrum1D::new_complex(
+        freq_axis,
+        vec![1.0, 2.0, 3.0],
+        Some(vec![0.0; 3]),
+        Metadata::default(),
+    )?;
+    assert!(apply_subsample_shift(&valid, f64::NAN).is_err());
+    Ok(())
+}
+
+#[test]
+fn first_point_scale_halves_only_the_first_sample() -> anyhow::Result<()> {
+    let axis = Axis::linear("time", Unit::Seconds, 0.0, 0.3, 4)?;
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![2.0, 4.0, 6.0, 8.0],
+        Some(vec![1.0, 3.0, 5.0, 7.0]),
+        Metadata::default(),
+    )?;
+    let processed = first_point_scale(&spectrum, 0.5)?;
+    assert_vec_close(&processed.intensities, &[1.0, 4.0, 6.0, 8.0]);
+    assert_vec_close(require_imaginary(&processed)?, &[0.5, 3.0, 5.0, 7.0]);
+    assert_eq!(processed.processing[0].operation, "first_point_scale");
+    Ok(())
+}
+
+#[test]
+fn first_point_scale_with_unit_scale_is_identity() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    let processed = first_point_scale(&spectrum, 1.0)?;
+    assert_vec_close(&processed.intensities, &spectrum.intensities);
+    assert_vec_close(
+        require_imaginary(&processed)?,
+        require_imaginary(&spectrum)?,
+    );
+    Ok(())
+}
+
+#[test]
+fn first_point_scale_rejects_invalid_scale() -> anyhow::Result<()> {
+    let spectrum = complex_spectrum()?;
+    assert!(first_point_scale(&spectrum, 0.0).is_err());
+    assert!(first_point_scale(&spectrum, -1.0).is_err());
+    assert!(first_point_scale(&spectrum, f64::NAN).is_err());
     Ok(())
 }
 
@@ -584,5 +697,59 @@ fn fft_forward_relabels_to_ppm_when_metadata_has_frequency() -> anyhow::Result<(
     let sw_hz = 1.0 / dwell;
     let expected_first_ppm = -sw_hz / 2.0 / 500.0;
     assert_close(transformed.x.values[0], expected_first_ppm);
+    Ok(())
+}
+
+#[test]
+fn fft_forward_applies_bruker_o1_carrier_offset() -> anyhow::Result<()> {
+    let dwell = 1.0 / 8000.0_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    // O1 = 2000 Hz at SF = 400 MHz → centre at 5 ppm
+    let metadata = Metadata::default()
+        .with_frequency_mhz(400.0)
+        .with_property("bruker.acqus.O1", "2000");
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        metadata,
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Ppm);
+    let centre_index = len / 2;
+    assert_close(transformed.x.values[centre_index], 2000.0 / 400.0);
+    Ok(())
+}
+
+#[test]
+fn fft_forward_applies_jeol_x_offset_carrier() -> anyhow::Result<()> {
+    let dwell = 1.0 / 25000.0_f64;
+    let len = 8;
+    let axis_values: Vec<f64> = (0..u32::try_from(len)?)
+        .map(|i| f64::from(i) * dwell)
+        .collect();
+    let axis = Axis::new("time", Unit::Seconds, axis_values)?;
+    let metadata = Metadata::default()
+        .with_frequency_mhz(100.525)
+        .with_property("jeol.parameter.x_offset", "100")
+        .with_property("jeol.parameter.x_freq", "100525303.3");
+    let spectrum = Spectrum1D::new_complex(
+        axis,
+        vec![1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        Some(vec![0.0; 8]),
+        metadata,
+    )?;
+    let transformed = fft_1d(&spectrum, FftDirection::Forward)?;
+    assert_eq!(transformed.x.unit, Unit::Ppm);
+    let centre_index = len / 2;
+    let centre_ppm = transformed.x.values[centre_index];
+    assert!(
+        (centre_ppm - 100.0).abs() < 0.01,
+        "expected centre ≈ 100 ppm, got {centre_ppm}"
+    );
     Ok(())
 }

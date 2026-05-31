@@ -4,12 +4,17 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
-    auto_phase_spectrum_1d_json, crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json,
-    fft_spectrum_1d_json, gaussian_apodization_spectrum_1d_json, js_error,
+    apply_subsample_shift_spectrum_1d_json, auto_phase_spectrum_1d_json,
+    convolution_difference_apodization_spectrum_1d_json, crop_spectrum_1d_json,
+    exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
+    first_point_scale_spectrum_1d_json, gauss_multiply_bruker_apodization_spectrum_1d_json,
+    gaussian_apodization_spectrum_1d_json, js_error, linear_predict_backward_spectrum_1d_json,
+    linear_predict_forward_spectrum_1d_json, lorentz_to_gauss_apodization_spectrum_1d_json,
     magnitude_spectrum_1d_json, normalize_spectrum_1d_area_json, normalize_spectrum_1d_json,
     offset_spectrum_1d_json, phase_spectrum_1d_json, resample_spectrum_1d_json,
     scale_spectrum_1d_json, shift_spectrum_1d_axis_json, sine_bell_apodization_spectrum_1d_json,
-    subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
+    subtract_baseline_spectrum_1d_json, traf_apodization_spectrum_1d_json,
+    trapezoidal_apodization_spectrum_1d_json, zero_fill_spectrum_1d_json,
 };
 
 /// Scales a serialized one-dimensional spectrum.
@@ -200,6 +205,142 @@ pub fn gaussian_apodization_spectrum_1d(
     options_json: &str,
 ) -> std::result::Result<String, JsValue> {
     gaussian_apodization_spectrum_1d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies Lorentz-to-Gauss apodization to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = lorentzToGaussApodizationSpectrum1d)]
+pub fn lorentz_to_gauss_apodization_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    lorentz_to_gauss_apodization_spectrum_1d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies convolution-difference apodization to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = convolutionDifferenceApodizationSpectrum1d)]
+pub fn convolution_difference_apodization_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    convolution_difference_apodization_spectrum_1d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies Bruker-style GMB apodization to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = gaussMultiplyBrukerApodizationSpectrum1d)]
+pub fn gauss_multiply_bruker_apodization_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    gauss_multiply_bruker_apodization_spectrum_1d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies TRAF apodization to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = trafApodizationSpectrum1d)]
+pub fn traf_apodization_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    traf_apodization_spectrum_1d_json(spectrum_json, options_json).map_err(|error| js_error(&error))
+}
+
+/// Applies trapezoidal apodization to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = trapezoidalApodizationSpectrum1d)]
+pub fn trapezoidal_apodization_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    trapezoidal_apodization_spectrum_1d_json(spectrum_json, options_json)
+        .map_err(|error| js_error(&error))
+}
+
+/// Repairs leading FID samples with backward linear prediction.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = linearPredictBackwardSpectrum1d)]
+pub fn linear_predict_backward_spectrum_1d(
+    spectrum_json: &str,
+    order: usize,
+    n_repair: usize,
+) -> std::result::Result<String, JsValue> {
+    linear_predict_backward_spectrum_1d_json(spectrum_json, order, n_repair)
+        .map_err(|error| js_error(&error))
+}
+
+/// Extends the FID tail with forward linear prediction.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = linearPredictForwardSpectrum1d)]
+pub fn linear_predict_forward_spectrum_1d(
+    spectrum_json: &str,
+    order: usize,
+    n_extend: usize,
+) -> std::result::Result<String, JsValue> {
+    linear_predict_forward_spectrum_1d_json(spectrum_json, order, n_extend)
+        .map_err(|error| js_error(&error))
+}
+
+/// Applies a fractional sub-sample shift to a serialized one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = applySubsampleShiftSpectrum1d)]
+pub fn apply_subsample_shift_spectrum_1d(
+    spectrum_json: &str,
+    frac_samples: f64,
+) -> std::result::Result<String, JsValue> {
+    apply_subsample_shift_spectrum_1d_json(spectrum_json, frac_samples)
+        .map_err(|error| js_error(&error))
+}
+
+/// Scales the first sample of a serialized one-dimensional FID.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when deserialization, processing, or
+/// serialization fails.
+#[wasm_bindgen(js_name = firstPointScaleSpectrum1d)]
+pub fn first_point_scale_spectrum_1d(
+    spectrum_json: &str,
+    options_json: &str,
+) -> std::result::Result<String, JsValue> {
+    first_point_scale_spectrum_1d_json(spectrum_json, options_json)
         .map_err(|error| js_error(&error))
 }
 

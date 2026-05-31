@@ -7,6 +7,7 @@ use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
+use crate::apodization_weights::{lorentz_to_gauss_weights, traf_weights, trapezoidal_weights};
 
 /// Applies exponential apodization to real and imaginary channels.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,7 +90,7 @@ impl SineBellApodization {
     }
 
     /// Creates the cosine-bell window (`nmrPipe -fn SP -off 0.5 -end 1 -pow 1`),
-    /// equivalent to a Hann window.
+    /// a one-sided cosine taper that decays from 1 to 0 across the FID.
     #[must_use]
     pub fn cosine_bell() -> Self {
         Self::new(90.0, 180.0, 1.0)
@@ -550,6 +551,51 @@ impl ProcessingStep<Spectrum1D> for TrapezoidalApodization {
     }
 }
 
+/// Scales the first sample of a time-domain FID by a constant.
+///
+/// The canonical recipe is `s[0] *= 0.5` (the `FCOR = 0.5` convention
+/// from Bruker `procs` and nmrPipe's `-fn FT -auto`). A one-sided
+/// (causal) cosine-FT treats `s[0]` as if it spanned `[-Δt/2, Δt/2]`;
+/// without this correction `s[0]` contributes a constant DC bias that
+/// shows up as a half-height baseline offset under the whole spectrum
+/// and biases any downstream integration or baseline fit.
+///
+/// Apply this step **after** apodization and **before** zero-fill /
+/// FFT so it matches the `nmrPipe` / `TopSpin` pipeline order. Scaling
+/// always operates on the first sample of both the real and (when
+/// present) the imaginary channel.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FirstPointScale {
+    /// Multiplier applied to `s[0]`. Defaults to 0.5 (`FCOR = 0.5`).
+    pub scale: f64,
+}
+
+impl FirstPointScale {
+    /// Creates a first-point scaling step with an explicit scale.
+    #[must_use]
+    pub fn new(scale: f64) -> Self {
+        Self { scale }
+    }
+
+    /// Creates the standard `FCOR = 0.5` first-point scaling step.
+    #[must_use]
+    pub fn half() -> Self {
+        Self { scale: 0.5 }
+    }
+}
+
+impl Default for FirstPointScale {
+    fn default() -> Self {
+        Self::half()
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for FirstPointScale {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        first_point_scale(spectrum, self.scale)
+    }
+}
+
 /// Converts a complex spectrum to magnitude mode.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Magnitude;
@@ -1002,6 +1048,133 @@ pub fn trapezoidal_apodization(
     ))
 }
 
+/// Applies a fractional-sample circular shift to a frequency-domain
+/// spectrum via the Fourier-shift theorem.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SubsampleShift {
+    /// Fractional sample shift to apply (positive shifts toward `t = 0`).
+    pub frac_samples: f64,
+}
+
+impl SubsampleShift {
+    /// Creates a sub-sample shift step.
+    #[must_use]
+    pub fn new(frac_samples: f64) -> Self {
+        Self { frac_samples }
+    }
+}
+
+impl ProcessingStep<Spectrum1D> for SubsampleShift {
+    fn apply(&self, spectrum: &Spectrum1D) -> Result<Spectrum1D> {
+        apply_subsample_shift(spectrum, self.frac_samples)
+    }
+}
+
+/// Applies a fractional-sample circular shift via the Fourier-shift theorem.
+///
+/// A time-domain circular shift by `frac_samples` is equivalent to
+/// multiplying the corresponding frequency-domain spectrum by the
+/// linear phase ramp
+/// `exp(+2π · i · k · frac_samples / N)`, where `k` is the centred
+/// frequency-bin index (`k = index − N/2` so that `k = 0` lies at DC)
+/// and `N` is the spectrum length. Positive `frac_samples` shifts the
+/// time-domain FID toward `t = 0` (matches the sign convention used by
+/// [`remove_group_delay`]).
+///
+/// Use this to complete a Bruker / JEOL digital-filter group-delay
+/// removal: apply the integer part of `GRPDLY` (or
+/// `decimation_reg / filter_factor`) in the time domain via
+/// [`remove_group_delay`], FFT the FID, then apply the fractional
+/// residual here. Without this step the residual leaves a first-order
+/// phase ramp `2π · frac · sweep_width` across the spectrum that auto-
+/// phase has to over-correct, producing the multi-turn `ph1 ≈ ±1800°`
+/// signature familiar from un-corrected JEOL fixtures.
+///
+/// # Errors
+///
+/// Returns an error when `frac_samples` is non-finite, the input
+/// spectrum is not frequency-domain (`Unit::Hertz` or `Unit::Ppm`),
+/// the spectrum lacks an imaginary channel, or the point count is too
+/// large for safe numeric conversion.
+pub fn apply_subsample_shift(spectrum: &Spectrum1D, frac_samples: f64) -> Result<Spectrum1D> {
+    ensure_finite("frac_samples", frac_samples)?;
+    if !matches!(spectrum.x.unit, Unit::Hertz | Unit::Ppm) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "apply_subsample_shift requires a frequency-domain spectrum (Hertz or Ppm)"
+                .to_owned(),
+        });
+    }
+    let len = spectrum.len();
+    if len == 0 {
+        return Ok(spectrum.clone());
+    }
+    let imaginary = match spectrum.imaginary.as_ref() {
+        Some(imag) if imag.len() == len => imag.clone(),
+        _ => {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "apply_subsample_shift requires a complex (real + imaginary) spectrum"
+                    .to_owned(),
+            });
+        }
+    };
+
+    let n_f = safe_usize_to_f64(len, "spectrum length")?;
+    let half_f = safe_usize_to_f64(len / 2, "spectrum index")?;
+    let scale = 2.0 * PI * frac_samples / n_f;
+
+    let mut processed = spectrum.clone();
+    let imaginary_mut = processed
+        .imaginary
+        .as_mut()
+        .ok_or(RSpinError::InvalidSpectrum {
+            message: "apply_subsample_shift lost imaginary channel after clone".to_owned(),
+        })?;
+    for index in 0..len {
+        let index_f = safe_usize_to_f64(index, "spectrum index")?;
+        let k = index_f - half_f;
+        let phase = scale * k;
+        let cos_p = phase.cos();
+        let sin_p = phase.sin();
+        let re = processed.intensities[index];
+        let im = imaginary[index];
+        processed.intensities[index] = re * cos_p - im * sin_p;
+        imaginary_mut[index] = re * sin_p + im * cos_p;
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("apply_subsample_shift")
+            .with_details(format!("frac_samples={frac_samples}")),
+    ))
+}
+
+/// Scales the first sample of a time-domain FID by a constant.
+///
+/// See [`FirstPointScale`] for the recipe and motivation.
+///
+/// # Errors
+///
+/// Returns an error when `scale` is non-finite or non-positive.
+pub fn first_point_scale(spectrum: &Spectrum1D, scale: f64) -> Result<Spectrum1D> {
+    ensure_finite("scale", scale)?;
+    if scale <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "first-point scale must be positive".to_owned(),
+        });
+    }
+    let mut processed = spectrum.clone();
+    if let Some(first) = processed.intensities.get_mut(0) {
+        *first *= scale;
+    }
+    if let Some(imag) = processed.imaginary.as_mut()
+        && let Some(first) = imag.get_mut(0)
+    {
+        *first *= scale;
+    }
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("first_point_scale").with_details(format!("scale={scale}")),
+    ))
+}
+
 /// Converts a spectrum to magnitude mode.
 ///
 /// # Errors
@@ -1065,7 +1238,7 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
     }
 
     let new_axis = match direction {
-        FftDirection::Forward => frequency_axis_from_time(&spectrum.x, &spectrum.metadata, len)?,
+        FftDirection::Forward => frequency_axis_from_time(&spectrum.x, &spectrum.metadata, len, 0)?,
         FftDirection::Inverse => time_axis_from_frequency(&spectrum.x, &spectrum.metadata, len)?,
     };
 
@@ -1081,12 +1254,16 @@ pub fn fft_1d(spectrum: &Spectrum1D, direction: FftDirection) -> Result<Spectrum
 
 /// Removes a digital-filter group delay from a time-domain spectrum.
 ///
-/// Circularly shifts the FID samples left by `samples.trunc()` (so the
-/// early "pre-acquisition" points wrap to the end of the FID) and records
-/// the operation. The fractional part of `samples` is meant to be applied
-/// downstream as a frequency-domain linear phase
-/// `exp(-2*pi*frac*k/N)` after FFT; this function only handles the
-/// integer shift so the inverse `restore_group_delay` is a clean rotation.
+/// **Drops** the first `samples.trunc()` points of the FID and pads the
+/// tail with zeros to preserve length. The discarded points contain the
+/// receiver's filter ringing / pre-acquisition transient; replacing them
+/// with zeros (rather than wrapping them to the tail via a circular shift)
+/// avoids contaminating the apodised tail and the spectrum's edge
+/// baseline.
+///
+/// The fractional part of `samples` is *not* applied here. Use the
+/// frequency-domain helper [`apply_subsample_shift`] after FFT to apply
+/// the fractional residual as a linear phase ramp.
 ///
 /// `samples` must be finite and non-negative.
 ///
@@ -1109,15 +1286,24 @@ pub fn remove_group_delay(spectrum: &Spectrum1D, samples: f64) -> Result<Spectru
     if len == 0 {
         return Ok(processed);
     }
-    // Float-to-integer casts saturate on overflow (Rust ≥ 1.45), so
-    // `samples.trunc() as usize` clamps cleanly; we still cap at `len` to
-    // keep `rotate_left` in bounds.
+    // Float-to-integer casts saturate on overflow (Rust ≥ 1.45); cap at
+    // `len` so the shift never exceeds the FID length.
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let integer_shift = (samples.trunc() as usize).min(len);
     if integer_shift > 0 {
-        processed.intensities.rotate_left(integer_shift);
+        // Left-shift the surviving tail to position 0, then zero-pad
+        // the freed trailing slots. This is the non-destructive
+        // alternative to `rotate_left`: the discarded pre-acquisition
+        // samples do not wrap around to contaminate the tail.
+        processed.intensities.copy_within(integer_shift..len, 0);
+        for value in &mut processed.intensities[len - integer_shift..] {
+            *value = 0.0;
+        }
         if let Some(imag) = processed.imaginary.as_mut() {
-            imag.rotate_left(integer_shift);
+            imag.copy_within(integer_shift..len, 0);
+            for value in &mut imag[len - integer_shift..] {
+                *value = 0.0;
+            }
         }
     }
     Ok(processed.with_processing_record(
@@ -1170,6 +1356,7 @@ pub(crate) fn frequency_axis_from_time(
     x: &Axis,
     metadata: &rspin_core::Metadata,
     len: usize,
+    axis: usize,
 ) -> Result<Axis> {
     if x.unit != Unit::Seconds {
         return Ok(x.clone());
@@ -1185,10 +1372,14 @@ pub(crate) fn frequency_axis_from_time(
     let n_f = safe_usize_to_f64(len, "spectrum length")?;
     let half_f = safe_usize_to_f64(half, "spectrum index")?;
     let scale = sweep_width_hz / n_f;
+    let mut carrier_hz = 0.0;
+    if let Some(value) = carrier_offset_hz_from_metadata(metadata, axis) {
+        carrier_hz = value;
+    }
     let mut hz_values = Vec::with_capacity(len);
     for index in 0..len {
         let index_f = safe_usize_to_f64(index, "spectrum index")?;
-        hz_values.push((index_f - half_f) * scale);
+        hz_values.push((index_f - half_f) * scale + carrier_hz);
     }
     match metadata.frequency_mhz {
         Some(freq_mhz) if freq_mhz.is_finite() && freq_mhz.abs() > 0.0 => {
@@ -1197,6 +1388,69 @@ pub(crate) fn frequency_axis_from_time(
         }
         _ => Axis::new("frequency", Unit::Hertz, hz_values),
     }
+}
+
+/// Returns the carrier (transmitter) offset in Hz relative to the 0 ppm
+/// reference, read from vendor-namespaced metadata properties. Used to
+/// shift the FFT frequency axis so post-FFT ppm values match the
+/// conventional NMR range (≈ 0–10 for ¹H, 0–200 for ¹³C) rather than
+/// being centred on zero.
+fn carrier_offset_hz_from_metadata(metadata: &rspin_core::Metadata, axis: usize) -> Option<f64> {
+    // Pick the per-dimension vendor parameter keys: axis 0 is the direct
+    // dimension, axis 1 the indirect dimension of a 2D experiment.
+    let (bruker_offset_key, jeol_offset_key, jeol_freq_key) = if axis == 0 {
+        (
+            "bruker.acqus.O1",
+            "jeol.parameter.x_offset",
+            "jeol.parameter.x_freq",
+        )
+    } else {
+        (
+            "bruker.acqus.O2",
+            "jeol.parameter.y_offset",
+            "jeol.parameter.y_freq",
+        )
+    };
+
+    // Bruker: `O1`/`O2` (Hz) is the transmitter offset relative to the base
+    // frequency.
+    if let Some(offset) = metadata
+        .property(bruker_offset_key)
+        .and_then(|value| value.parse::<f64>().ok())
+        .filter(|value| value.is_finite())
+    {
+        return Some(offset);
+    }
+    // JEOL Delta: `x_offset`/`y_offset` are in ppm and `x_freq`/`y_freq` in Hz;
+    // the carrier offset in Hz is `offset_ppm * freq_hz / 1e6`.
+    let offset_ppm = metadata
+        .property(jeol_offset_key)
+        .and_then(|value| value.parse::<f64>().ok());
+    let freq_hz = metadata
+        .property(jeol_freq_key)
+        .and_then(|value| value.parse::<f64>().ok());
+    if let (Some(ppm), Some(hz)) = (offset_ppm, freq_hz)
+        && ppm.is_finite()
+        && hz.is_finite()
+        && hz != 0.0
+    {
+        return Some(ppm * hz / 1.0e6);
+    }
+    // Agilent/Varian: `tof` is the direct-dimension transmitter offset in Hz.
+    if axis == 0
+        && let Some(tof) = metadata
+            .property("agilent.procpar.tof")
+            .and_then(|value| value.parse::<f64>().ok())
+            .filter(|value| value.is_finite())
+    {
+        return Some(tof);
+    }
+    // Homonuclear experiments (e.g. COSY) carry no indirect-specific offset;
+    // the indirect dimension shares the direct carrier.
+    if axis != 0 {
+        return carrier_offset_hz_from_metadata(metadata, 0);
+    }
+    None
 }
 
 pub(crate) fn time_axis_from_frequency(
@@ -1294,6 +1548,84 @@ pub fn phase_correct(
     ))
 }
 
+/// Applies a polynomial phase correction up to cubic order to a
+/// complex one-dimensional spectrum.
+///
+/// The phase at point `i` is
+/// ```text
+/// φ(i) = ph0 + ph1·x + ph2·x² + ph3·x³
+/// ```
+/// where `x = fraction(i) − pivot_fraction` and `fraction(i)` spans
+/// `0..=1` across the spectrum. Passing `ph2 = ph3 = 0` reproduces the
+/// linear correction of [`phase_correct`].
+///
+/// Higher-order terms are needed when a digital-filter group-delay
+/// compensator introduces frequency-dependent phase (Bruker AVANCE,
+/// JEOL Delta) that linear `(ph0, ph1)` cannot represent. Following
+/// Cobas, *Magn. Reson. Chem.* 61, 75 (2023), DOI 10.1002/mrc.5320.
+///
+/// # Errors
+///
+/// Returns an error when any parameter is non-finite, the pivot is
+/// outside `[0, 1]`, or the point count is too large for safe
+/// conversion.
+pub fn phase_correct_polynomial(
+    spectrum: &Spectrum1D,
+    zero_order_deg: f64,
+    first_order_deg: f64,
+    second_order_deg: f64,
+    third_order_deg: f64,
+    pivot_fraction: f64,
+) -> Result<Spectrum1D> {
+    ensure_finite("zero_order_deg", zero_order_deg)?;
+    ensure_finite("first_order_deg", first_order_deg)?;
+    ensure_finite("second_order_deg", second_order_deg)?;
+    ensure_finite("third_order_deg", third_order_deg)?;
+    if !pivot_fraction.is_finite() || !(0.0..=1.0).contains(&pivot_fraction) {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "phase pivot fraction must be finite and between 0 and 1".to_owned(),
+        });
+    }
+
+    let denominator = index_denominator(spectrum.len())?;
+    let mut real = Vec::with_capacity(spectrum.len());
+    let mut imaginary = Vec::with_capacity(spectrum.len());
+    for (index, value) in complex_buffer(spectrum).into_iter().enumerate() {
+        let fraction = if denominator == 0.0 {
+            0.0
+        } else {
+            f64::from(
+                u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
+                    message: "spectrum is too large for phase correction".to_owned(),
+                })?,
+            ) / denominator
+        };
+        let x = fraction - pivot_fraction;
+        let phase_deg = zero_order_deg
+            + first_order_deg * x
+            + second_order_deg * x * x
+            + third_order_deg * x * x * x;
+        let phase_rad = phase_deg.to_radians();
+        let rotation = Complex::new(phase_rad.cos(), phase_rad.sin());
+        let corrected = value * rotation;
+        real.push(corrected.re);
+        imaginary.push(corrected.im);
+    }
+
+    let mut processed = Spectrum1D::new_complex(
+        spectrum.x.clone(),
+        real,
+        Some(imaginary),
+        spectrum.metadata.clone(),
+    )?;
+    processed.processing.clone_from(&spectrum.processing);
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("phase_correct_polynomial").with_details(format!(
+            "ph0={zero_order_deg},ph1={first_order_deg},ph2={second_order_deg},ph3={third_order_deg},pivot_fraction={pivot_fraction}"
+        )),
+    ))
+}
+
 pub(crate) fn complex_buffer(spectrum: &Spectrum1D) -> Vec<Complex<f64>> {
     match &spectrum.imaginary {
         Some(imaginary) => spectrum
@@ -1330,6 +1662,12 @@ fn convolution_difference_weights(
 ) -> Result<Vec<f64>> {
     ensure_non_negative("narrow_line_broadening_hz", narrow_line_broadening_hz)?;
     ensure_non_negative("broad_line_broadening_hz", broad_line_broadening_hz)?;
+    if narrow_line_broadening_hz > broad_line_broadening_hz {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "narrow_line_broadening_hz must not exceed broad_line_broadening_hz"
+                .to_owned(),
+        });
+    }
     ensure_finite("mixing", mixing)?;
     if !(0.0..=1.0).contains(&mixing) {
         return Err(RSpinError::InvalidSpectrum {
@@ -1364,6 +1702,12 @@ fn gauss_multiply_bruker_weights(
 ) -> Result<Vec<f64>> {
     ensure_finite("line_broadening_hz", line_broadening_hz)?;
     ensure_finite("gauss_position_fraction", gauss_position_fraction)?;
+    if line_broadening_hz < 0.0 && gauss_position_fraction <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "negative line_broadening_hz requires gauss_position_fraction greater than 0"
+                .to_owned(),
+        });
+    }
     if !(0.0..=1.0).contains(&gauss_position_fraction) {
         return Err(RSpinError::InvalidSpectrum {
             message: "gauss_position_fraction must be between 0 and 1".to_owned(),
@@ -1402,161 +1746,6 @@ fn gauss_multiply_bruker_weights(
                     })?,
                 );
             Ok((-a * index_f - b * index_f * index_f).exp())
-        })
-        .collect()
-}
-
-fn traf_weights(
-    len: usize,
-    line_broadening_hz: f64,
-    dwell_time_s: f64,
-    context: &'static str,
-) -> Result<Vec<f64>> {
-    ensure_non_negative("line_broadening_hz", line_broadening_hz)?;
-    ensure_positive("dwell_time_s", dwell_time_s)?;
-    let last_index = len.saturating_sub(1);
-    let last_index_f = if last_index == 0 {
-        0.0
-    } else {
-        f64::from(
-            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
-                message: format!("{context} input is too large"),
-            })?,
-        )
-    };
-    let scale = -PI * line_broadening_hz * dwell_time_s;
-    (0..len)
-        .map(|index| {
-            let index_f =
-                f64::from(
-                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
-                        message: format!("{context} input is too large"),
-                    })?,
-                );
-            let e_decay = (scale * index_f).exp();
-            let r_decay = (scale * (last_index_f - index_f)).exp();
-            let denominator = e_decay.powi(3) + r_decay.powi(3);
-            let weight = if denominator <= 0.0 {
-                0.0
-            } else {
-                e_decay.powi(2) / denominator
-            };
-            Ok(weight)
-        })
-        .collect()
-}
-
-fn trapezoidal_weights(
-    len: usize,
-    rise_end_fraction: f64,
-    fall_start_fraction: f64,
-    context: &'static str,
-) -> Result<Vec<f64>> {
-    ensure_finite("rise_end_fraction", rise_end_fraction)?;
-    ensure_finite("fall_start_fraction", fall_start_fraction)?;
-    if !(0.0..=1.0).contains(&rise_end_fraction) {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "rise_end_fraction must be between 0 and 1".to_owned(),
-        });
-    }
-    if !(0.0..=1.0).contains(&fall_start_fraction) {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "fall_start_fraction must be between 0 and 1".to_owned(),
-        });
-    }
-    if rise_end_fraction > fall_start_fraction {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "rise_end_fraction must not exceed fall_start_fraction".to_owned(),
-        });
-    }
-
-    let denominator = if len <= 1 {
-        0.0
-    } else {
-        f64::from(
-            u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
-                message: format!("{context} input is too large"),
-            })?,
-        )
-    };
-    (0..len)
-        .map(|index| {
-            let index_f =
-                f64::from(
-                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
-                        message: format!("{context} input is too large"),
-                    })?,
-                );
-            let fraction = if denominator == 0.0 {
-                0.0
-            } else {
-                index_f / denominator
-            };
-            let weight = if fraction < rise_end_fraction {
-                if rise_end_fraction <= 0.0 {
-                    1.0
-                } else {
-                    fraction / rise_end_fraction
-                }
-            } else if fraction > fall_start_fraction {
-                if fall_start_fraction >= 1.0 {
-                    1.0
-                } else {
-                    (1.0 - fraction) / (1.0 - fall_start_fraction)
-                }
-            } else {
-                1.0
-            };
-            Ok(weight.max(0.0))
-        })
-        .collect()
-}
-
-fn lorentz_to_gauss_weights(
-    len: usize,
-    lorentz_to_undo_hz: f64,
-    gauss_fwhm_hz: f64,
-    gauss_shift: f64,
-    dwell_time_s: f64,
-    context: &'static str,
-) -> Result<Vec<f64>> {
-    ensure_non_negative("lorentz_to_undo_hz", lorentz_to_undo_hz)?;
-    ensure_non_negative("gauss_fwhm_hz", gauss_fwhm_hz)?;
-    ensure_finite("gauss_shift", gauss_shift)?;
-    if !(0.0..=1.0).contains(&gauss_shift) {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "gauss_shift must be between 0 and 1".to_owned(),
-        });
-    }
-    ensure_positive("dwell_time_s", dwell_time_s)?;
-
-    let last_index = len.saturating_sub(1);
-    let last_index_f = if last_index == 0 {
-        0.0
-    } else {
-        f64::from(
-            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
-                message: format!("{context} input is too large"),
-            })?,
-        )
-    };
-    let t_max = last_index_f * dwell_time_s;
-    let lorentz_scale = PI * lorentz_to_undo_hz * dwell_time_s;
-    let gauss_scale = PI * gauss_fwhm_hz;
-    let gauss_norm = 4.0 * LN_2;
-    let center_time = gauss_shift * t_max;
-    (0..len)
-        .map(|index| {
-            let index_f =
-                f64::from(
-                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
-                        message: format!("{context} input is too large"),
-                    })?,
-                );
-            let lorentz_part = lorentz_scale * index_f;
-            let gauss_offset = gauss_scale * (index_f * dwell_time_s - center_time);
-            let gauss_part = -(gauss_offset * gauss_offset) / gauss_norm;
-            Ok((lorentz_part + gauss_part).exp())
         })
         .collect()
 }

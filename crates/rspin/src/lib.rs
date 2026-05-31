@@ -7,6 +7,9 @@ pub use rspin_prediction as prediction;
 pub use rspin_processing as processing;
 pub use rspin_simulation as simulation;
 
+pub mod pipeline;
+#[cfg(feature = "visualization")]
+pub mod plot;
 mod workflow;
 
 pub use analysis::{

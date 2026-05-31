@@ -7,6 +7,79 @@ use serde::{Deserialize, Serialize};
 use crate::Nucleus;
 use crate::{Molecule, RSpinError, Result};
 
+/// High-level NMR experiment classification.
+///
+/// Derived heuristically from vendor pulse-program names when available. The
+/// [`Self::Other`] variant carries the raw source token (for example the
+/// Bruker `PULPROG` string) so an unrecognized experiment still round-trips.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ExperimentKind {
+    /// A generic, non-edited 1D experiment (for example a simple `zg`).
+    Generic1D,
+    /// Heteronuclear single-quantum coherence.
+    Hsqc,
+    /// Heteronuclear multiple-bond correlation.
+    Hmbc,
+    /// Correlation spectroscopy.
+    Cosy,
+    /// Total correlation spectroscopy.
+    Tocsy,
+    /// Nuclear Overhauser effect spectroscopy.
+    Noesy,
+    /// Distortionless enhancement by polarization transfer.
+    Dept,
+    /// Attached proton test.
+    Apt,
+    /// Any experiment not covered by a dedicated variant; carries the raw
+    /// source token (for example the pulse-program name).
+    Other(String),
+}
+
+/// Indirect-dimension quadrature detection mode.
+///
+/// Mirrors the Bruker `FNMODE` acquisition parameter and determines how raw
+/// hypercomplex 2D data is assembled and transformed along the indirect
+/// dimension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QuadMode {
+    /// Undefined / no quadrature detection in the indirect dimension.
+    None,
+    /// Single-channel (magnitude) quadrature, Bruker `FNMODE = 1`.
+    Qf,
+    /// Sequential (Redfield) quadrature, Bruker `FNMODE = 2`.
+    Qseq,
+    /// Time-proportional phase incrementation, Bruker `FNMODE = 3`.
+    Tppi,
+    /// States (hypercomplex) quadrature, Bruker `FNMODE = 4`.
+    States,
+    /// States-TPPI quadrature, Bruker `FNMODE = 5`.
+    StatesTppi,
+    /// Echo / anti-echo (sensitivity-enhanced) quadrature, Bruker `FNMODE = 6`.
+    EchoAntiecho,
+}
+
+impl QuadMode {
+    /// Maps a Bruker `FNMODE` integer to a quadrature mode.
+    ///
+    /// Returns `None` for values outside the documented `0..=6` range.
+    #[must_use]
+    pub fn from_fnmode(value: i32) -> Option<Self> {
+        match value {
+            0 => Some(Self::None),
+            1 => Some(Self::Qf),
+            2 => Some(Self::Qseq),
+            3 => Some(Self::Tppi),
+            4 => Some(Self::States),
+            5 => Some(Self::StatesTppi),
+            6 => Some(Self::EchoAntiecho),
+            _ => None,
+        }
+    }
+}
+
 /// Descriptive metadata for a spectrum.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Metadata {
@@ -23,6 +96,16 @@ pub struct Metadata {
     /// indirect axis can be relabeled to ppm with the right carrier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub indirect_frequency_mhz: Option<f64>,
+    /// High-level experiment classification, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub experiment: Option<ExperimentKind>,
+    /// Indirect-dimension quadrature detection mode, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub quad_mode: Option<QuadMode>,
+    /// Editing pulse angle in degrees for multiplicity-edited experiments such
+    /// as DEPT (for example `135.0`), when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dept_angle_deg: Option<f64>,
     /// Solvent name or code.
     pub solvent: Option<String>,
     /// Sample temperature in kelvin.
@@ -111,6 +194,48 @@ impl Metadata {
     #[must_use]
     pub fn without_indirect_frequency_mhz(mut self) -> Self {
         self.indirect_frequency_mhz = None;
+        self
+    }
+
+    /// Sets the high-level experiment classification.
+    #[must_use]
+    pub fn with_experiment(mut self, experiment: ExperimentKind) -> Self {
+        self.experiment = Some(experiment);
+        self
+    }
+
+    /// Clears the high-level experiment classification.
+    #[must_use]
+    pub fn without_experiment(mut self) -> Self {
+        self.experiment = None;
+        self
+    }
+
+    /// Sets the indirect-dimension quadrature detection mode.
+    #[must_use]
+    pub fn with_quad_mode(mut self, quad_mode: QuadMode) -> Self {
+        self.quad_mode = Some(quad_mode);
+        self
+    }
+
+    /// Clears the indirect-dimension quadrature detection mode.
+    #[must_use]
+    pub fn without_quad_mode(mut self) -> Self {
+        self.quad_mode = None;
+        self
+    }
+
+    /// Sets the multiplicity-editing pulse angle in degrees.
+    #[must_use]
+    pub fn with_dept_angle_deg(mut self, dept_angle_deg: f64) -> Self {
+        self.dept_angle_deg = Some(dept_angle_deg);
+        self
+    }
+
+    /// Clears the multiplicity-editing pulse angle.
+    #[must_use]
+    pub fn without_dept_angle_deg(mut self) -> Self {
+        self.dept_angle_deg = None;
         self
     }
 
@@ -232,6 +357,17 @@ impl Metadata {
                 });
             }
         }
+        if self.dept_angle_deg.is_some_and(|angle| !angle.is_finite()) {
+            return Err(RSpinError::NonFinite {
+                field: "metadata.dept_angle_deg",
+            });
+        }
+        if matches!(&self.experiment, Some(ExperimentKind::Other(token)) if token.trim().is_empty())
+        {
+            return Err(RSpinError::InvalidMetadata {
+                message: "experiment kind token must not be empty".to_owned(),
+            });
+        }
         Ok(())
     }
 
@@ -265,6 +401,10 @@ mod tests {
             .with_name("demo")
             .with_nucleus(Nucleus::Hydrogen1)
             .with_frequency_mhz(400.0)
+            .with_indirect_frequency_mhz(100.0)
+            .with_experiment(ExperimentKind::Hsqc)
+            .with_quad_mode(QuadMode::States)
+            .with_dept_angle_deg(135.0)
             .with_solvent("CDCl3")
             .with_temperature_k(298.0)
             .with_origin("fixture")
@@ -274,6 +414,10 @@ mod tests {
         assert_eq!(metadata.name.as_deref(), Some("demo"));
         assert_eq!(metadata.nucleus, Some(Nucleus::Hydrogen1));
         assert_eq!(metadata.frequency_mhz, Some(400.0));
+        assert_eq!(metadata.indirect_frequency_mhz, Some(100.0));
+        assert_eq!(metadata.experiment, Some(ExperimentKind::Hsqc));
+        assert_eq!(metadata.quad_mode, Some(QuadMode::States));
+        assert_eq!(metadata.dept_angle_deg, Some(135.0));
         assert_eq!(metadata.solvent.as_deref(), Some("CDCl3"));
         assert_eq!(metadata.temperature_k, Some(298.0));
         assert_eq!(metadata.origin.as_deref(), Some("fixture"));
@@ -290,6 +434,10 @@ mod tests {
             .without_name()
             .without_nucleus()
             .without_frequency_mhz()
+            .without_indirect_frequency_mhz()
+            .without_experiment()
+            .without_quad_mode()
+            .without_dept_angle_deg()
             .without_solvent()
             .without_temperature_k()
             .without_origin()
@@ -298,6 +446,69 @@ mod tests {
 
         assert_eq!(cleared, Metadata::default());
         Ok(())
+    }
+
+    #[test]
+    fn quad_mode_maps_bruker_fnmode_values() {
+        assert_eq!(QuadMode::from_fnmode(0), Some(QuadMode::None));
+        assert_eq!(QuadMode::from_fnmode(4), Some(QuadMode::States));
+        assert_eq!(QuadMode::from_fnmode(5), Some(QuadMode::StatesTppi));
+        assert_eq!(QuadMode::from_fnmode(6), Some(QuadMode::EchoAntiecho));
+        assert_eq!(QuadMode::from_fnmode(7), None);
+        assert_eq!(QuadMode::from_fnmode(-1), None);
+    }
+
+    #[test]
+    fn experiment_and_quad_mode_round_trip_through_json() -> Result<()> {
+        let metadata = Metadata::new()
+            .with_experiment(ExperimentKind::Dept)
+            .with_quad_mode(QuadMode::EchoAntiecho)
+            .with_dept_angle_deg(90.0);
+        let json = serde_json::to_string(&metadata).map_err(|error| RSpinError::Parse {
+            format: "metadata-json",
+            message: error.to_string(),
+        })?;
+        let restored: Metadata =
+            serde_json::from_str(&json).map_err(|error| RSpinError::Parse {
+                format: "metadata-json",
+                message: error.to_string(),
+            })?;
+        assert_eq!(restored, metadata);
+        // Snake-case tags are stable for downstream consumers.
+        assert!(json.contains("\"dept\""));
+        assert!(json.contains("\"echo_antiecho\""));
+        Ok(())
+    }
+
+    #[test]
+    fn default_metadata_omits_new_optional_fields_in_json() -> Result<()> {
+        let json =
+            serde_json::to_string(&Metadata::default()).map_err(|error| RSpinError::Parse {
+                format: "metadata-json",
+                message: error.to_string(),
+            })?;
+        assert!(!json.contains("experiment"));
+        assert!(!json.contains("quad_mode"));
+        assert!(!json.contains("dept_angle_deg"));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_non_finite_dept_angle() {
+        let metadata = Metadata::new().with_dept_angle_deg(f64::NAN);
+        assert!(matches!(
+            metadata.validate(),
+            Err(RSpinError::NonFinite { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_empty_experiment_other_token() {
+        let metadata = Metadata::new().with_experiment(ExperimentKind::Other(" ".to_owned()));
+        assert!(matches!(
+            metadata.validate(),
+            Err(RSpinError::InvalidMetadata { .. })
+        ));
     }
 
     #[test]

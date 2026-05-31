@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
-    AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, auto_phase_correct,
-    convolution_difference_apodization, crop_1d, exponential_apodization, fft_1d,
-    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
+    AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, apply_subsample_shift,
+    auto_phase_correct, convolution_difference_apodization, crop_1d, exponential_apodization,
+    fft_1d, first_point_scale, gauss_multiply_bruker_apodization, gaussian_apodization,
+    linear_predict_backward, linear_predict_forward, lorentz_to_gauss_apodization,
     magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
     resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
     traf_apodization, trapezoidal_apodization, zero_fill,
@@ -121,6 +122,35 @@ pub enum ProcessingOperation1D {
         /// Fraction of the FID where the ramp-down begins, in `[0, 1]`.
         fall_start_fraction: f64,
     },
+    /// Scales the first sample of the FID (typically by 0.5).
+    FirstPointScale {
+        /// Multiplier applied to `s[0]`.
+        scale: f64,
+    },
+    /// Applies a fractional-sample circular shift via the Fourier-shift
+    /// theorem on a frequency-domain spectrum. Use after `Fft` to
+    /// finish a group-delay correction.
+    SubsampleShift {
+        /// Fractional sample shift (typically the residual of a
+        /// non-integer Bruker / JEOL group delay).
+        frac_samples: f64,
+    },
+    /// Repairs the first `n_repair` FID samples with backward complex
+    /// Burg linear prediction.
+    LinearPredictionBackward {
+        /// AR model order.
+        order: usize,
+        /// Number of leading samples to overwrite with predictions.
+        n_repair: usize,
+    },
+    /// Extends the FID tail by `n_extend` samples with forward complex
+    /// Burg linear prediction.
+    LinearPredictionForward {
+        /// AR model order.
+        order: usize,
+        /// Number of samples to append.
+        n_extend: usize,
+    },
     /// Applies sine-bell apodization to real and imaginary channels.
     SineBellApodization {
         /// Start angle in degrees.
@@ -226,6 +256,14 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
                 rise_end_fraction,
                 fall_start_fraction,
             } => trapezoidal_apodization(spectrum, *rise_end_fraction, *fall_start_fraction),
+            Self::FirstPointScale { scale } => first_point_scale(spectrum, *scale),
+            Self::SubsampleShift { frac_samples } => apply_subsample_shift(spectrum, *frac_samples),
+            Self::LinearPredictionBackward { order, n_repair } => {
+                linear_predict_backward(spectrum, *order, *n_repair)
+            }
+            Self::LinearPredictionForward { order, n_extend } => {
+                linear_predict_forward(spectrum, *order, *n_extend)
+            }
             Self::SineBellApodization {
                 start_angle_deg,
                 end_angle_deg,
@@ -487,6 +525,36 @@ impl ProcessingRecipe1D {
             rise_end_fraction,
             fall_start_fraction,
         })
+    }
+
+    /// Appends a first-point scaling operation (default 0.5).
+    #[must_use]
+    pub fn first_point_scale(self, scale: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::FirstPointScale { scale })
+    }
+
+    /// Appends a first-point scaling operation with `scale = 0.5`.
+    #[must_use]
+    pub fn first_point_half(self) -> Self {
+        self.first_point_scale(0.5)
+    }
+
+    /// Appends a fractional sub-sample circular-shift operation.
+    #[must_use]
+    pub fn subsample_shift(self, frac_samples: f64) -> Self {
+        self.with_operation(ProcessingOperation1D::SubsampleShift { frac_samples })
+    }
+
+    /// Appends a backward linear-prediction operation.
+    #[must_use]
+    pub fn linear_predict_backward(self, order: usize, n_repair: usize) -> Self {
+        self.with_operation(ProcessingOperation1D::LinearPredictionBackward { order, n_repair })
+    }
+
+    /// Appends a forward linear-prediction operation.
+    #[must_use]
+    pub fn linear_predict_forward(self, order: usize, n_extend: usize) -> Self {
+        self.with_operation(ProcessingOperation1D::LinearPredictionForward { order, n_extend })
     }
 
     /// Appends a sine-bell apodization operation.

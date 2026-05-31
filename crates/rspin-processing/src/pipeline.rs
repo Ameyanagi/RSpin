@@ -4,10 +4,11 @@ use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
     Abs1D, AutoPhaseOptions, BaselineMethod, ConvolutionDifferenceApodization, Crop1D,
-    ExponentialApodization, Fft1D, FftDirection, GaussMultiplyBrukerApodization,
-    GaussianApodization, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
-    OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
-    SineBellApodization, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
+    ExponentialApodization, Fft1D, FftDirection, FirstPointScale, GaussMultiplyBrukerApodization,
+    GaussianApodization, LinearPredictionBackward, LinearPredictionForward,
+    LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs, OffsetIntensity,
+    PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis, SineBellApodization,
+    SubsampleShift, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -206,6 +207,39 @@ impl Spectrum1DPipeline {
             rise_end_fraction,
             fall_start_fraction,
         ))
+    }
+
+    /// Scales the first sample of the FID by `scale` (typically 0.5).
+    #[must_use]
+    pub fn first_point_scale(self, scale: f64) -> Self {
+        self.then(FirstPointScale::new(scale))
+    }
+
+    /// Scales the first sample of the FID by 0.5 (the FCOR=0.5 default).
+    #[must_use]
+    pub fn first_point_half(self) -> Self {
+        self.then(FirstPointScale::half())
+    }
+
+    /// Applies a fractional-sample circular shift via the Fourier-shift
+    /// theorem (call after `fft(...)`).
+    #[must_use]
+    pub fn subsample_shift(self, frac_samples: f64) -> Self {
+        self.then(SubsampleShift::new(frac_samples))
+    }
+
+    /// Repairs the first `n_repair` FID samples with backward complex
+    /// Burg linear prediction.
+    #[must_use]
+    pub fn linear_predict_backward(self, order: usize, n_repair: usize) -> Self {
+        self.then(LinearPredictionBackward::new(order, n_repair))
+    }
+
+    /// Extends the FID tail by `n_extend` samples with forward complex
+    /// Burg linear prediction.
+    #[must_use]
+    pub fn linear_predict_forward(self, order: usize, n_extend: usize) -> Self {
+        self.then(LinearPredictionForward::new(order, n_extend))
     }
 
     /// Applies sine-bell apodization to real and imaginary channels.

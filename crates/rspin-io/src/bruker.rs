@@ -7,7 +7,7 @@ use std::{
     str::FromStr,
 };
 
-use rspin_core::{Axis, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
+use rspin_core::{Axis, ExperimentKind, Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 use serde::{Deserialize, Serialize};
 
 use crate::{JcampDxVersion, SpectrumPathReader, parse_jcamp_dx_version};
@@ -436,11 +436,24 @@ fn build_metadata(
     let origin = acqus
         .and_then(|parameters| text_parameter(parameters, "ORIGIN"))
         .or_else(|| acqus.and_then(|parameters| text_parameter(parameters, "OWNER")));
+    // SFO2 (indirect carrier) and the pulse program live in `acqus`. `FNMODE`
+    // is an `acqu2s` parameter not read on the processed path, so `quad_mode`
+    // stays unset here.
+    let indirect_frequency_mhz = match acqus {
+        Some(parameters) => optional_f64(parameters, "SFO2")?,
+        None => None,
+    };
+    let (experiment, dept_angle_deg) = acqus
+        .and_then(|parameters| text_parameter(parameters, "PULPROG"))
+        .map_or((None, None), |pulprog| experiment_from_pulprog(&pulprog));
 
     Ok(Metadata {
         name: title,
         nucleus,
         frequency_mhz,
+        indirect_frequency_mhz,
+        experiment,
+        dept_angle_deg,
         solvent,
         temperature_k,
         origin,
@@ -468,6 +481,53 @@ pub(super) fn prefixed_parameter_properties(
         .iter()
         .map(|(key, value)| (format!("{prefix}.{key}"), value.clone()))
         .collect()
+}
+
+/// Derives the experiment classification (and editing angle, when applicable)
+/// from a Bruker pulse-program name.
+///
+/// Clean-room heuristic based on conventional Bruker `PULPROG` naming. The
+/// match is ordered most-specific first; an unrecognized non-empty name maps
+/// to [`ExperimentKind::Other`] so the raw token round-trips. Never fails.
+pub(super) fn experiment_from_pulprog(pulprog: &str) -> (Option<ExperimentKind>, Option<f64>) {
+    let trimmed = pulprog.trim();
+    if trimmed.is_empty() {
+        return (None, None);
+    }
+    let lower = trimmed.to_ascii_lowercase();
+
+    if lower.contains("hsqc") {
+        (Some(ExperimentKind::Hsqc), None)
+    } else if lower.contains("hmbc") {
+        (Some(ExperimentKind::Hmbc), None)
+    } else if lower.contains("cosy") {
+        (Some(ExperimentKind::Cosy), None)
+    } else if lower.contains("tocsy") || lower.contains("mlev") || lower.contains("dipsi") {
+        (Some(ExperimentKind::Tocsy), None)
+    } else if lower.contains("noesy") {
+        (Some(ExperimentKind::Noesy), None)
+    } else if lower.contains("dept") {
+        (Some(ExperimentKind::Dept), dept_angle_from_pulprog(&lower))
+    } else if lower.contains("apt") || lower.contains("jmod") {
+        (Some(ExperimentKind::Apt), None)
+    } else if lower.starts_with("zg") {
+        (Some(ExperimentKind::Generic1D), None)
+    } else {
+        (Some(ExperimentKind::Other(trimmed.to_owned())), None)
+    }
+}
+
+/// Extracts the DEPT editing angle encoded in a (lowercased) pulse-program name.
+fn dept_angle_from_pulprog(lower: &str) -> Option<f64> {
+    if lower.contains("135") {
+        Some(135.0)
+    } else if lower.contains("90") {
+        Some(90.0)
+    } else if lower.contains("45") {
+        Some(45.0)
+    } else {
+        None
+    }
 }
 
 fn text_parameter(parameters: &BTreeMap<String, String>, key: &str) -> Option<String> {

@@ -4,7 +4,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use rspin_core::{Nucleus, RSpinError, Unit};
+use rspin_core::{ExperimentKind, Nucleus, QuadMode, RSpinError, Unit};
 
 use crate::SpectrumPathReader;
 
@@ -119,6 +119,35 @@ fn assert_close(actual: f64, expected: f64) {
         (actual - expected).abs() < 1.0e-12,
         "{actual} != {expected}"
     );
+}
+
+#[test]
+fn classifies_pulse_programs() {
+    assert_eq!(
+        experiment_from_pulprog("hsqcetgpsi"),
+        (Some(ExperimentKind::Hsqc), None)
+    );
+    assert_eq!(
+        experiment_from_pulprog("deptsp135"),
+        (Some(ExperimentKind::Dept), Some(135.0))
+    );
+    assert_eq!(
+        experiment_from_pulprog("DEPT90"),
+        (Some(ExperimentKind::Dept), Some(90.0))
+    );
+    assert_eq!(
+        experiment_from_pulprog("jmod"),
+        (Some(ExperimentKind::Apt), None)
+    );
+    assert_eq!(
+        experiment_from_pulprog("zg30"),
+        (Some(ExperimentKind::Generic1D), None)
+    );
+    assert_eq!(
+        experiment_from_pulprog("mysteryseq"),
+        (Some(ExperimentKind::Other("mysteryseq".to_owned())), None)
+    );
+    assert_eq!(experiment_from_pulprog("  "), (None, None));
 }
 
 #[test]

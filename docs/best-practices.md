@@ -140,6 +140,78 @@ frequency-domain inputs.
   entirely or use `GaussMultiplyBrukerApodization` with `procs`-style
   parameters so you can see what is happening.
 
+## One-shot processing: `process_spectrum_auto`
+
+For the common case where you just want a phased, baseline-corrected
+spectrum from a vendor FID, skip the recipe and call
+`process_spectrum_auto(&fid, &options)`. It chains, in order:
+
+1. Group-delay correction (integer drop + zero-pad, fractional residual
+   recorded for the post-FFT pass).
+2. Optional backward linear prediction.
+3. Nucleus-aware exponential apodization (LB from `NucleusLbDefaults`).
+4. First-point scaling `s[0] *= 0.5`.
+5. Zero-fill to the next power of two ≥ `2 × len`.
+6. Forward FFT.
+7. Fractional sub-sample shift (Fourier phase ramp for the residual
+   from step 1).
+8. Auto-phase (Regions or GlobalCost, configurable).
+9. Optional polynomial (ph2/ph3) refinement.
+10. Baseline subtraction.
+
+Every step records itself in `processed.processing` so the call is
+fully reproducible.
+
+### Opt-in `auto_group_delay_sweep`
+
+The vendor cascade formula for the digital-filter group delay is
+exact in theory but occasionally off in practice — JEOL Eucalyptol
+13C is the worked example: cascade predicts 19.66 samples while the
+true optimum (the value that leaves the post-pipeline `|ph1|`
+residual smallest) is 16.46. The resulting 3.2-sample miscalibration
+shows up as a 180°-flipped CDCl3 solvent peak between the two
+sample-peak clusters.
+
+When the cascade prediction is suspect, set
+`auto_group_delay_sweep` to opt into a brute-force search:
+
+```rust
+use rspin_processing::{
+    AutoProcessingOptions, GroupDelaySweepOptions, process_spectrum_auto,
+};
+
+let options = AutoProcessingOptions {
+    auto_group_delay_sweep: Some(GroupDelaySweepOptions {
+        delta_samples: 5.0,    // ±5 samples around the cascade value
+        step_samples: 0.1,     // 0.1-sample resolution → ~100 candidates
+    }),
+    ..AutoProcessingOptions::default()
+};
+let phased = process_spectrum_auto(&fid, &options)?;
+```
+
+The orchestrator runs the full pipeline once per candidate and keeps
+the result whose residual `|ph1|` from a second auto-phase pass is
+smallest. Cost scales linearly with the candidate count (≈ 100× the
+single-shot path for the defaults; tighter `±2.0 / step 0.5` is ~9×
+and is usually enough to catch a several-sample miscalibration).
+
+Recommended use:
+
+- **Off by default** — the cascade is correct on most fixtures and
+  the sweep is expensive.
+- **Turn it on when** an experienced eye sees a clearly inverted
+  solvent or reference peak with sample peaks otherwise phased
+  correctly, or when batch-processing fixtures from a previously
+  uncharacterised JEOL configuration.
+- **Tighten before disabling** — narrow `delta_samples` to ±2 once
+  you've measured the typical miscalibration for the instrument.
+
+See `docs/assets/examples/auto_processing_jeol_eucalyptol_13c_group_delay.png`
+for the three-trace comparison: cascade default, manual empirical
+override, and the auto-sweep result (which matches the empirical
+override without the caller knowing the right value).
+
 ## Reproducibility
 
 RSpin records every processing step in `Spectrum1D.processing` with

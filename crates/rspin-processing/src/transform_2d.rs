@@ -105,7 +105,7 @@ impl PhaseCorrection2D {
         self
     }
 
-    fn validate(self) -> Result<()> {
+    pub(crate) fn validate(self) -> Result<()> {
         ensure_finite("x_zero_order_deg", self.x_zero_order_deg)?;
         ensure_finite("x_first_order_deg", self.x_first_order_deg)?;
         ensure_finite("y_zero_order_deg", self.y_zero_order_deg)?;
@@ -189,8 +189,8 @@ pub fn fft_2d(spectrum: &Spectrum2D, direction: FftDirection) -> Result<Spectrum
     };
     let (new_x, new_y) = match direction {
         FftDirection::Forward => (
-            crate::transform::frequency_axis_from_time(&spectrum.x, &spectrum.metadata, width)?,
-            crate::transform::frequency_axis_from_time(&spectrum.y, &indirect_metadata, height)?,
+            crate::transform::frequency_axis_from_time(&spectrum.x, &spectrum.metadata, width, 0)?,
+            crate::transform::frequency_axis_from_time(&spectrum.y, &indirect_metadata, height, 1)?,
         ),
         FftDirection::Inverse => (
             crate::transform::time_axis_from_frequency(&spectrum.x, &spectrum.metadata, width)?,

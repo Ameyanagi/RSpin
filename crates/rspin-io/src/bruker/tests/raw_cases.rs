@@ -247,6 +247,67 @@ fn reads_raw_2d_ser_bytes_without_dataset_path() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reads_raw_2d_ser_phase_sensitive_metadata() -> anyhow::Result<()> {
+    let direct_parameters = "\
+##$TD= 4
+##$BYTORDA= 1
+##$DTYPA= 0
+##$NC= -1
+##$SW_h= 1000
+##$NUC1= <1H>
+##$SFO1= 400.25
+##$SFO2= 100.62
+##$PULPROG= <hsqcetgpsi>
+";
+    let indirect_parameters = "\
+##$TD= 2
+##$SW_h= 200
+##$FnMODE= 4
+";
+    let spectrum = read_bruker_ser_2d_bytes(
+        direct_parameters,
+        indirect_parameters,
+        &raw_ser_bytes(&[vec![1, 2, 3, 4], vec![5, 6, 7, 8]], ByteOrder::Big),
+    )?;
+
+    assert_eq!(spectrum.metadata.indirect_frequency_mhz, Some(100.62));
+    assert_eq!(spectrum.metadata.quad_mode, Some(QuadMode::States));
+    assert_eq!(spectrum.metadata.experiment, Some(ExperimentKind::Hsqc));
+    // The raw indirect parameters are preserved as namespaced properties.
+    assert_eq!(
+        spectrum.metadata.property("bruker.acqu2s.FNMODE"),
+        Some("4")
+    );
+    Ok(())
+}
+
+#[test]
+fn raw_2d_ser_leaves_indirect_metadata_absent_without_parameters() -> anyhow::Result<()> {
+    let direct_parameters = "\
+##$TD= 4
+##$BYTORDA= 1
+##$DTYPA= 0
+##$NC= -1
+##$SW_h= 1000
+##$SFO1= 400.25
+";
+    let indirect_parameters = "\
+##$TD= 2
+##$SW_h= 200
+";
+    let spectrum = read_bruker_ser_2d_bytes(
+        direct_parameters,
+        indirect_parameters,
+        &raw_ser_bytes(&[vec![1, 2, 3, 4], vec![5, 6, 7, 8]], ByteOrder::Big),
+    )?;
+
+    assert_eq!(spectrum.metadata.indirect_frequency_mhz, None);
+    assert_eq!(spectrum.metadata.quad_mode, None);
+    assert_eq!(spectrum.metadata.experiment, None);
+    Ok(())
+}
+
+#[test]
 fn rejects_raw_2d_ser_with_incomplete_padded_row() -> anyhow::Result<()> {
     let root = synthetic_dataset("raw-2d-short")?;
     write_text(
