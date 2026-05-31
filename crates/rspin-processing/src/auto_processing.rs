@@ -275,7 +275,8 @@ pub fn process_spectrum_auto(
         None if already_corrected => 0.0,
         None => group_delay_from_metadata(&fid.metadata),
     };
-    let group_delay_integer = group_delay.trunc().max(0.0);
+    let group_delay = validate_group_delay_samples(group_delay)?;
+    let group_delay_integer = group_delay.trunc();
     let group_delay_frac = group_delay - group_delay_integer;
     let after_group_delay = if group_delay_integer > 0.0 {
         remove_group_delay(fid, group_delay_integer)?
@@ -401,6 +402,20 @@ fn uniform_dwell(values: &[f64]) -> Option<f64> {
     Some(step.abs())
 }
 
+fn validate_group_delay_samples(samples: f64) -> Result<f64> {
+    if !samples.is_finite() {
+        return Err(RSpinError::NonFinite {
+            field: "group_delay_samples",
+        });
+    }
+    if samples < 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "group_delay_samples must be non-negative".to_owned(),
+        });
+    }
+    Ok(samples)
+}
+
 fn next_power_of_two(value: usize) -> usize {
     if value <= 1 {
         return 1;
@@ -435,7 +450,7 @@ fn next_power_of_two(value: usize) -> usize {
 ///   handled it. Provide an explicit override when you have provenance.
 ///
 /// Runs [`process_spectrum_auto`] across a sweep of group-delay
-/// candidates and keeps the result whose post-pipeline `|ph1|` is
+/// candidates and keeps the result whose pre-auto-phase `|ph1|` is
 /// smallest. Used internally when
 /// [`AutoProcessingOptions::auto_group_delay_sweep`] is `Some`.
 fn run_group_delay_sweep(
@@ -457,6 +472,7 @@ fn run_group_delay_sweep(
         Some(value) => value,
         None => group_delay_from_metadata(&fid.metadata),
     };
+    let baseline = validate_group_delay_samples(baseline)?;
     let total_span = 2.0 * sweep.delta_samples;
     let n_steps_f = (total_span / sweep.step_samples).round();
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -467,23 +483,28 @@ fn run_group_delay_sweep(
             message: "group-delay sweep candidate count out of range".to_owned(),
         });
     };
-    let mut best: Option<(f64, Spectrum1D)> = None;
+    let mut best: Option<(f64, f64)> = None;
     for index in 0..n_steps {
         let candidate = baseline - sweep.delta_samples + f64::from(index) * sweep.step_samples;
-        if candidate < 0.0 {
+        if candidate < 0.0 || !candidate.is_finite() {
             continue;
         }
-        // Build a sub-options that pins this group-delay and disables
-        // further sweeping so we don't recurse.
+        // Build sub-options that pin this group-delay and disable auto-phase
+        // before scoring. Scoring an already phased candidate collapses the
+        // residual ph1 for every candidate and makes ties choose the first
+        // nonnegative delay instead of the best delay.
         let sub_options = AutoProcessingOptions {
             group_delay_samples: Some(candidate),
             auto_group_delay_sweep: None,
+            auto_phase: false,
+            polynomial_phase_refine: false,
+            subtract_baseline: false,
             ..options.clone()
         };
         let candidate_spectrum = process_spectrum_auto(fid, &sub_options)?;
-        // Score: residual |ph1| from a second auto-phase pass. If the
-        // original group-delay was correct, the pipeline's auto-phase
-        // already converged to (ph0, ph1=0) so a second pass returns 0.
+        // Score: phase correction that would be needed before applying it.
+        // The original group-delay is correct when the unphased candidate
+        // requires the smallest residual linear phase.
         let probe_opts = match options.auto_phase_options {
             Some(options) => options,
             None => AutoPhaseOptions::default().with_strategy(crate::AutoPhaseStrategy::GlobalCost),
@@ -492,13 +513,18 @@ fn run_group_delay_sweep(
         let score = probe.first_order_deg.abs();
         match &best {
             Some((best_score, _)) if score >= *best_score => {}
-            _ => best = Some((score, candidate_spectrum)),
+            _ => best = Some((score, candidate)),
         }
     }
-    best.map(|(_, spectrum)| spectrum)
-        .ok_or_else(|| RSpinError::InvalidSpectrum {
-            message: "group-delay sweep produced no candidates (delta out of range)".to_owned(),
-        })
+    let (_, candidate) = best.ok_or_else(|| RSpinError::InvalidSpectrum {
+        message: "group-delay sweep produced no candidates (delta out of range)".to_owned(),
+    })?;
+    let final_options = AutoProcessingOptions {
+        group_delay_samples: Some(candidate),
+        auto_group_delay_sweep: None,
+        ..options.clone()
+    };
+    process_spectrum_auto(fid, &final_options)
 }
 
 /// Returns `0.0` when no recognised metadata is present.

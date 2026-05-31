@@ -75,6 +75,24 @@ fn process_spectrum_auto_rejects_frequency_domain_input() -> anyhow::Result<()> 
 }
 
 #[test]
+fn process_spectrum_auto_rejects_invalid_group_delay_override() -> anyhow::Result<()> {
+    let fid = synthetic_complex_fid(128, 2.0e-3, &[(40.0, 1.0, 4.0)])?;
+    for value in [f64::NAN, f64::INFINITY, -0.25] {
+        let options = AutoProcessingOptions {
+            group_delay_samples: Some(value),
+            ..AutoProcessingOptions::default()
+        };
+        let err = process_spectrum_auto(&fid, &options)
+            .expect_err("invalid group-delay override should fail");
+        match err {
+            RSpinError::InvalidSpectrum { .. } | RSpinError::NonFinite { .. } => {}
+            other => return Err(anyhow::anyhow!("unexpected error for {value}: {other}")),
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn process_spectrum_auto_can_disable_baseline_and_phase() -> anyhow::Result<()> {
     let fid = synthetic_complex_fid(256, 1.0e-3, &[(20.0, 1.0, 3.0)])?;
     let opts = AutoProcessingOptions {
@@ -135,5 +153,44 @@ fn group_delay_sweep_returns_one_of_the_candidates() -> anyhow::Result<()> {
     let processed = process_spectrum_auto(&fid, &options)?;
     assert_eq!(processed.x.unit, Unit::Hertz);
     assert!(!processed.intensities.is_empty());
+    Ok(())
+}
+
+#[test]
+fn group_delay_sweep_scores_before_auto_phase() -> anyhow::Result<()> {
+    let mut fid = synthetic_complex_fid(
+        256,
+        1.0e-3,
+        &[(30.0, 1.0, 2.0), (-85.0, 0.7, 3.0), (120.0, 0.4, 4.0)],
+    )?;
+    fid.intensities.copy_within(0..255, 1);
+    fid.intensities[0] = 0.0;
+    if let Some(imaginary) = fid.imaginary.as_mut() {
+        imaginary.copy_within(0..255, 1);
+        imaginary[0] = 0.0;
+    }
+
+    let options = AutoProcessingOptions {
+        group_delay_samples: Some(1.0),
+        auto_group_delay_sweep: Some(GroupDelaySweepOptions {
+            delta_samples: 1.0,
+            step_samples: 1.0,
+        }),
+        first_point_scale: false,
+        zero_fill_multiplier: 1,
+        subtract_baseline: false,
+        ..AutoProcessingOptions::default()
+    };
+    let processed = process_spectrum_auto(&fid, &options)?;
+    let group_delay_record = processed
+        .processing
+        .iter()
+        .find(|record| record.operation == "remove_group_delay")
+        .ok_or_else(|| anyhow::anyhow!("sweep did not select the one-sample correction"))?;
+    assert_eq!(
+        group_delay_record.details.as_deref(),
+        Some("samples=1"),
+        "sweep should select the actual one-sample delay before auto-phase"
+    );
     Ok(())
 }
