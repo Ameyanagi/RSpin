@@ -403,6 +403,14 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
 
     assert!(LoadedSourceFormat::all().contains(&LoadedSourceFormat::BrukerSer));
     assert!(LoadedSourceVendor::all().contains(&LoadedSourceVendor::Bruker));
+    assert_eq!(
+        LoadedSourceFormat::JcampDx.file_extensions(),
+        &["jdx", "dx", "jcamp"]
+    );
+    assert_eq!(
+        LoadedSourceFormat::BrukerSer.path_markers(),
+        &["ser", "acqus", "acqu2s"]
+    );
 
     let bruker_1d =
         load_spectrum_1d_by_source_format(&mixed_vendor_root, LoadedSourceFormat::BrukerFid)?;

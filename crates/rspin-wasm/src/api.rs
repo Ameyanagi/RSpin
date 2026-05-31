@@ -663,6 +663,8 @@ pub fn spectrum_bundle_source_formats_json() -> Result<String> {
         .map(|format| SpectrumBundleSourceFormatInfo {
             name: format.as_str(),
             vendor: format.vendor().map(LoadedSourceVendor::as_str),
+            extensions: format.file_extensions(),
+            path_markers: format.path_markers(),
         })
         .collect::<Vec<_>>();
     to_json(&formats)
@@ -1037,6 +1039,8 @@ struct SpectrumBundleSourceFormatInfo {
     name: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     vendor: Option<&'static str>,
+    extensions: &'static [&'static str],
+    path_markers: &'static [&'static str],
 }
 
 #[derive(Debug, Serialize)]

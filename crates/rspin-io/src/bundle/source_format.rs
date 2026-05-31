@@ -47,6 +47,20 @@ const LOADED_SOURCE_FORMATS: &[LoadedSourceFormat] = &[
     LoadedSourceFormat::AgilentFid,
 ];
 
+const JSON_EXTENSIONS: &[&str] = &["json"];
+const NMRML_EXTENSIONS: &[&str] = &["nmrml", "xml"];
+const JCAMP_DX_EXTENSIONS: &[&str] = &["jdx", "dx", "jcamp"];
+const CSV_EXTENSIONS: &[&str] = &["csv"];
+const JEOL_JDF_EXTENSIONS: &[&str] = &["jdf"];
+const NO_EXTENSIONS: &[&str] = &[];
+
+const NO_PATH_MARKERS: &[&str] = &[];
+const BRUKER_PROCESSED_MARKERS: &[&str] = &["1r", "2rr", "procs"];
+const BRUKER_FID_MARKERS: &[&str] = &["fid", "acqus"];
+const BRUKER_SER_MARKERS: &[&str] = &["ser", "acqus", "acqu2s"];
+const AGILENT_PROCESSED_MARKERS: &[&str] = &["phasefile", "procpar"];
+const AGILENT_FID_MARKERS: &[&str] = &["fid", "procpar"];
+
 /// Vendor families emitted by vendor-specific bundle readers.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -90,6 +104,43 @@ impl LoadedSourceFormat {
             Self::BrukerSer => "bruker_ser",
             Self::AgilentProcessed => "agilent_processed",
             Self::AgilentFid => "agilent_fid",
+        }
+    }
+
+    /// Returns file extensions commonly accepted for standalone files.
+    ///
+    /// Extensions do not include a leading dot. Vendor directory formats usually
+    /// return an empty slice because they are detected from required files
+    /// rather than from a container extension.
+    #[must_use]
+    pub const fn file_extensions(self) -> &'static [&'static str] {
+        match self {
+            Self::Json => JSON_EXTENSIONS,
+            Self::NmrMl => NMRML_EXTENSIONS,
+            Self::JcampDx => JCAMP_DX_EXTENSIONS,
+            Self::Csv => CSV_EXTENSIONS,
+            Self::JeolJdf => JEOL_JDF_EXTENSIONS,
+            Self::BrukerProcessed
+            | Self::BrukerFid
+            | Self::BrukerSer
+            | Self::AgilentProcessed
+            | Self::AgilentFid => NO_EXTENSIONS,
+        }
+    }
+
+    /// Returns file names used as directory or direct-file detection markers.
+    ///
+    /// This is discovery metadata for file pickers and diagnostics, not a full
+    /// validation schema. Use the reader itself for authoritative routing.
+    #[must_use]
+    pub const fn path_markers(self) -> &'static [&'static str] {
+        match self {
+            Self::Json | Self::NmrMl | Self::JcampDx | Self::Csv | Self::JeolJdf => NO_PATH_MARKERS,
+            Self::BrukerProcessed => BRUKER_PROCESSED_MARKERS,
+            Self::BrukerFid => BRUKER_FID_MARKERS,
+            Self::BrukerSer => BRUKER_SER_MARKERS,
+            Self::AgilentProcessed => AGILENT_PROCESSED_MARKERS,
+            Self::AgilentFid => AGILENT_FID_MARKERS,
         }
     }
 
@@ -312,6 +363,20 @@ mod tests {
             Some(LoadedSourceVendor::Jeol)
         );
         assert_eq!(LoadedSourceFormat::NmrMl.to_string(), "nmrml");
+        assert_eq!(
+            LoadedSourceFormat::JcampDx.file_extensions(),
+            &["jdx", "dx", "jcamp"]
+        );
+        assert_eq!(LoadedSourceFormat::JeolJdf.file_extensions(), &["jdf"]);
+        assert_eq!(LoadedSourceFormat::Json.path_markers(), &[] as &[&str]);
+        assert_eq!(
+            LoadedSourceFormat::BrukerSer.path_markers(),
+            &["ser", "acqus", "acqu2s"]
+        );
+        assert_eq!(
+            LoadedSourceFormat::AgilentFid.path_markers(),
+            &["fid", "procpar"]
+        );
 
         let error = parse_loaded_source_format("unknown-format")
             .expect_err("unsupported source format should fail");

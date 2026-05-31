@@ -137,6 +137,14 @@ fn supported_format_filters() -> Vec<&'static str> {
         .map(|format| format.as_str())
         .collect()
 }
+
+fn supported_standalone_extensions() -> Vec<&'static str> {
+    LoadedSourceFormat::all()
+        .iter()
+        .flat_map(|format| format.file_extensions())
+        .copied()
+        .collect()
+}
 ```
 
 The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,
@@ -145,7 +153,8 @@ format-specific readers. Browser callers should parse uploaded bytes with the
 format-specific WASM helpers, then use `createSpectrumBundle` to assemble the
 same versioned bundle JSON used by native code. Use
 `spectrumBundleSourceFormats` and `spectrumBundleSourceVendors` to populate
-browser format and vendor selectors from the same source list as native Rust.
+browser format, extension, vendor, and directory-marker selectors from the same
+source list as native Rust.
 
 The small committed loader fixtures under
 `crates/rspin-io/testdata/zenodo_7100132` come from the MIT-licensed Zenodo

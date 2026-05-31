@@ -239,10 +239,14 @@ fn exposes_supported_bundle_source_metadata_json() -> anyhow::Result<()> {
     assert!(formats.iter().any(|entry| {
         entry.get("name").and_then(serde_json::Value::as_str) == Some("jcamp_dx")
             && entry.get("vendor").is_none()
+            && json_array_contains(entry, "extensions", "jdx")
+            && !json_array_contains(entry, "path_markers", "jdx")
     }));
     assert!(formats.iter().any(|entry| {
         entry.get("name").and_then(serde_json::Value::as_str) == Some("bruker_ser")
             && entry.get("vendor").and_then(serde_json::Value::as_str) == Some("bruker")
+            && json_array_contains(entry, "path_markers", "ser")
+            && !json_array_contains(entry, "extensions", "ser")
     }));
 
     let vendors_json = spectrum_bundle_source_vendors_json()?;
@@ -269,6 +273,13 @@ fn exposes_supported_bundle_source_metadata_json() -> anyhow::Result<()> {
             .any(|value| value.as_str() == Some("bruker_ser"))
     );
     Ok(())
+}
+
+fn json_array_contains(entry: &serde_json::Value, key: &str, expected: &str) -> bool {
+    entry
+        .get(key)
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|values| values.iter().any(|value| value.as_str() == Some(expected)))
 }
 
 #[test]
