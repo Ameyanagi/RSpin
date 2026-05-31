@@ -230,6 +230,48 @@ fn creates_spectrum_bundle_json_from_spectrum_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn exposes_supported_bundle_source_metadata_json() -> anyhow::Result<()> {
+    let formats_json = spectrum_bundle_source_formats_json()?;
+    let formats: serde_json::Value = serde_json::from_str(&formats_json)?;
+    let formats = formats
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("source formats JSON should be an array"))?;
+    assert!(formats.iter().any(|entry| {
+        entry.get("name").and_then(serde_json::Value::as_str) == Some("jcamp_dx")
+            && entry.get("vendor").is_none()
+    }));
+    assert!(formats.iter().any(|entry| {
+        entry.get("name").and_then(serde_json::Value::as_str) == Some("bruker_ser")
+            && entry.get("vendor").and_then(serde_json::Value::as_str) == Some("bruker")
+    }));
+
+    let vendors_json = spectrum_bundle_source_vendors_json()?;
+    let vendors: serde_json::Value = serde_json::from_str(&vendors_json)?;
+    let vendors = vendors
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("source vendors JSON should be an array"))?;
+    let bruker = vendors
+        .iter()
+        .find(|entry| entry.get("name").and_then(serde_json::Value::as_str) == Some("bruker"))
+        .ok_or_else(|| anyhow::anyhow!("missing Bruker source vendor"))?;
+    let formats = bruker
+        .get("source_formats")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| anyhow::anyhow!("vendor source_formats should be an array"))?;
+    assert!(
+        formats
+            .iter()
+            .any(|value| value.as_str() == Some("bruker_fid"))
+    );
+    assert!(
+        formats
+            .iter()
+            .any(|value| value.as_str() == Some("bruker_ser"))
+    );
+    Ok(())
+}
+
+#[test]
 fn extracts_exact_spectrum_from_bundle_json() -> anyhow::Result<()> {
     let bundle = rspin_io::load_spectra(io_fixture_root().join("zenodo_7100132/varian_1h"))?;
     let bundle_json = rspin_io::write_spectrum_bundle_json(&bundle)?;

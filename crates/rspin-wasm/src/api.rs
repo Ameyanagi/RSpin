@@ -29,10 +29,10 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    LoadedSource, SpectrumBundle, inspect_agilent_procpar, inspect_bruker_parameter_file,
-    inspect_jeol_jdf_bytes, parse_jcamp_dx_version, parse_nmrml_version,
-    parse_spectrum_text_format, parse_spectrum1d_bytes_format, parse_spectrum1d_write_format,
-    parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
+    LoadedSource, LoadedSourceFormat, LoadedSourceVendor, SpectrumBundle, inspect_agilent_procpar,
+    inspect_bruker_parameter_file, inspect_jeol_jdf_bytes, parse_jcamp_dx_version,
+    parse_nmrml_version, parse_spectrum_text_format, parse_spectrum1d_bytes_format,
+    parse_spectrum1d_write_format, parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
     read_agilent_arrayed_fid_1d_bytes, read_agilent_arrayed_fid_2d_bytes,
     read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes,
     read_agilent_processed_2d_bytes, read_assignment_set_json, read_bruker_fid_1d_bytes,
@@ -649,6 +649,48 @@ pub fn validate_spectrum_bundle_json(input: &str) -> Result<String> {
     write_spectrum_bundle_json(&bundle)
 }
 
+/// Returns supported unified-loader source formats as JSON.
+///
+/// Each entry includes the canonical format name and, for vendor-specific
+/// formats, its vendor family.
+///
+/// # Errors
+///
+/// Returns an error only if serialization fails.
+pub fn spectrum_bundle_source_formats_json() -> Result<String> {
+    let formats = LoadedSourceFormat::all()
+        .iter()
+        .map(|format| SpectrumBundleSourceFormatInfo {
+            name: format.as_str(),
+            vendor: format.vendor().map(LoadedSourceVendor::as_str),
+        })
+        .collect::<Vec<_>>();
+    to_json(&formats)
+}
+
+/// Returns supported unified-loader vendor families as JSON.
+///
+/// Each entry includes the canonical vendor name and the source formats that
+/// belong to that vendor family.
+///
+/// # Errors
+///
+/// Returns an error only if serialization fails.
+pub fn spectrum_bundle_source_vendors_json() -> Result<String> {
+    let vendors = LoadedSourceVendor::all()
+        .iter()
+        .map(|vendor| SpectrumBundleSourceVendorInfo {
+            name: vendor.as_str(),
+            source_formats: vendor
+                .source_formats()
+                .iter()
+                .map(|format| format.as_str())
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    to_json(&vendors)
+}
+
 /// Builds versioned spectrum bundle JSON from serialized one- and
 /// two-dimensional spectrum entries.
 ///
@@ -988,6 +1030,19 @@ fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
 
 fn agilent_fid_loaded_source() -> LoadedSource {
     LoadedSource::new(None::<PathBuf>, "agilent_fid")
+}
+
+#[derive(Debug, Serialize)]
+struct SpectrumBundleSourceFormatInfo {
+    name: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    vendor: Option<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+struct SpectrumBundleSourceVendorInfo {
+    name: &'static str,
+    source_formats: Vec<&'static str>,
 }
 
 #[derive(Debug, Deserialize)]

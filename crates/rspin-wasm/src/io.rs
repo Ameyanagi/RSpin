@@ -19,6 +19,7 @@ use crate::{
     parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json,
     parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
     spectrum_bundle_counts_json, spectrum_bundle_only_1d_json, spectrum_bundle_only_2d_json,
+    spectrum_bundle_source_formats_json, spectrum_bundle_source_vendors_json,
     validate_spectrum_bundle_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
     write_jcamp_dx_2d_json, write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json,
     write_nmrml_2d_json, write_spectrum_1d_csv_json, write_spectrum_1d_text_json,
@@ -490,6 +491,26 @@ pub fn inspect_nmrml_document(input: &str) -> std::result::Result<String, JsValu
 #[wasm_bindgen(js_name = validateSpectrumBundle)]
 pub fn validate_spectrum_bundle(input: &str) -> std::result::Result<String, JsValue> {
     validate_spectrum_bundle_json(input).map_err(|error| js_error(&error))
+}
+
+/// Returns supported unified-loader source formats as JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string if serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleSourceFormats)]
+pub fn spectrum_bundle_source_formats() -> std::result::Result<String, JsValue> {
+    spectrum_bundle_source_formats_json().map_err(|error| js_error(&error))
+}
+
+/// Returns supported unified-loader vendor families as JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string if serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleSourceVendors)]
+pub fn spectrum_bundle_source_vendors() -> std::result::Result<String, JsValue> {
+    spectrum_bundle_source_vendors_json().map_err(|error| js_error(&error))
 }
 
 /// Creates versioned spectrum bundle JSON from one- and two-dimensional

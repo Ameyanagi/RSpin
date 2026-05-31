@@ -143,7 +143,9 @@ The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,
 JCAMP-DX, nmrML, NMReDATA, JSON, and CSV inputs without replacing the
 format-specific readers. Browser callers should parse uploaded bytes with the
 format-specific WASM helpers, then use `createSpectrumBundle` to assemble the
-same versioned bundle JSON used by native code.
+same versioned bundle JSON used by native code. Use
+`spectrumBundleSourceFormats` and `spectrumBundleSourceVendors` to populate
+browser format and vendor selectors from the same source list as native Rust.
 
 The small committed loader fixtures under
 `crates/rspin-io/testdata/zenodo_7100132` come from the MIT-licensed Zenodo
