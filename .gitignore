@@ -1,6 +1,7 @@
 target/
 Cargo.lock
 AGENTS.md
+CLAUDE.md
 *.profraw
 *.profdata
 .DS_Store
