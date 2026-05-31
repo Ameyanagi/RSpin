@@ -34,6 +34,19 @@ pub enum LoadedSourceFormat {
     AgilentFid,
 }
 
+const LOADED_SOURCE_FORMATS: &[LoadedSourceFormat] = &[
+    LoadedSourceFormat::Json,
+    LoadedSourceFormat::NmrMl,
+    LoadedSourceFormat::JcampDx,
+    LoadedSourceFormat::Csv,
+    LoadedSourceFormat::JeolJdf,
+    LoadedSourceFormat::BrukerProcessed,
+    LoadedSourceFormat::BrukerFid,
+    LoadedSourceFormat::BrukerSer,
+    LoadedSourceFormat::AgilentProcessed,
+    LoadedSourceFormat::AgilentFid,
+];
+
 /// Vendor families emitted by vendor-specific bundle readers.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -46,7 +59,23 @@ pub enum LoadedSourceVendor {
     AgilentVarian,
 }
 
+const LOADED_SOURCE_VENDORS: &[LoadedSourceVendor] = &[
+    LoadedSourceVendor::Bruker,
+    LoadedSourceVendor::Jeol,
+    LoadedSourceVendor::AgilentVarian,
+];
+
 impl LoadedSourceFormat {
+    /// Returns all known built-in source formats in stable display order.
+    ///
+    /// `LoadedSource` stores source formats as strings for forward-compatible
+    /// bundle JSON, so use this list for discovery and filters rather than as
+    /// an exhaustiveness check on serialized bundle data.
+    #[must_use]
+    pub const fn all() -> &'static [Self] {
+        LOADED_SOURCE_FORMATS
+    }
+
     /// Returns the canonical snake-case source format name.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -120,6 +149,12 @@ const AGILENT_VARIAN_SOURCE_FORMATS: &[LoadedSourceFormat] = &[
 ];
 
 impl LoadedSourceVendor {
+    /// Returns all known vendor families in stable display order.
+    #[must_use]
+    pub const fn all() -> &'static [Self] {
+        LOADED_SOURCE_VENDORS
+    }
+
     /// Returns the canonical snake-case vendor name.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
@@ -238,6 +273,24 @@ mod tests {
     #[test]
     fn parses_loaded_source_format_names_and_aliases() -> Result<()> {
         assert_eq!(
+            LoadedSourceFormat::all()
+                .iter()
+                .map(|format| format.as_str())
+                .collect::<Vec<_>>(),
+            vec![
+                "json",
+                "nmrml",
+                "jcamp_dx",
+                "csv",
+                "jeol_jdf",
+                "bruker_processed",
+                "bruker_fid",
+                "bruker_ser",
+                "agilent_processed",
+                "agilent_fid"
+            ]
+        );
+        assert_eq!(
             parse_loaded_source_format("jcamp_dx")?,
             LoadedSourceFormat::JcampDx
         );
@@ -268,6 +321,13 @@ mod tests {
 
     #[test]
     fn parses_loaded_source_vendor_names_and_lists_formats() -> Result<()> {
+        assert_eq!(
+            LoadedSourceVendor::all()
+                .iter()
+                .map(|vendor| vendor.as_str())
+                .collect::<Vec<_>>(),
+            vec!["bruker", "jeol", "agilent_varian"]
+        );
         assert_eq!(
             parse_loaded_source_vendor("bruker")?,
             LoadedSourceVendor::Bruker

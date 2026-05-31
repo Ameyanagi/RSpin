@@ -401,6 +401,9 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
 
+    assert!(LoadedSourceFormat::all().contains(&LoadedSourceFormat::BrukerSer));
+    assert!(LoadedSourceVendor::all().contains(&LoadedSourceVendor::Bruker));
+
     let bruker_1d =
         load_spectrum_1d_by_source_format(&mixed_vendor_root, LoadedSourceFormat::BrukerFid)?;
     assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));

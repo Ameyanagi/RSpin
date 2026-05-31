@@ -119,6 +119,26 @@ fn load_bruker_only() -> Result<SpectrumBundle> {
 }
 ```
 
+Use the type-safe discovery helpers when building format or vendor selectors:
+
+```rust,no_run
+use rspin::prelude::*;
+
+fn supported_vendor_filters() -> Vec<&'static str> {
+    LoadedSourceVendor::all()
+        .iter()
+        .map(|vendor| vendor.as_str())
+        .collect()
+}
+
+fn supported_format_filters() -> Vec<&'static str> {
+    LoadedSourceFormat::all()
+        .iter()
+        .map(|format| format.as_str())
+        .collect()
+}
+```
+
 The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,
 JCAMP-DX, nmrML, NMReDATA, JSON, and CSV inputs without replacing the
 format-specific readers. Browser callers should parse uploaded bytes with the
