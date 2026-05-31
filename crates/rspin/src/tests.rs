@@ -397,6 +397,53 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let bruker_1d =
+        load_spectrum_1d_by_source_format(&mixed_vendor_root, LoadedSourceFormat::BrukerFid)?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (bruker_1d, source) = load_spectrum_1d_with_source_by_source_format(
+        &mixed_vendor_root,
+        LoadedSourceFormat::BrukerFid,
+    )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.format(), "bruker_fid");
+
+    let bruker_2d =
+        load_spectrum_2d_by_source_format(&mixed_vendor_root, LoadedSourceFormat::BrukerSer)?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    let (bruker_2d, source) = load_spectrum_2d_with_source_by_source_format(
+        &mixed_vendor_root,
+        LoadedSourceFormat::BrukerSer,
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    assert_eq!(source.format(), "bruker_ser");
+
+    let bruker_1d =
+        load_spectrum_1d_by_source_vendor(&mixed_vendor_root, LoadedSourceVendor::Bruker)?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (bruker_1d, source) = load_spectrum_1d_with_source_by_source_vendor(
+        &mixed_vendor_root,
+        LoadedSourceVendor::Bruker,
+    )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.format(), "bruker_fid");
+
+    let bruker_2d =
+        load_spectrum_2d_by_source_vendor(&mixed_vendor_root, LoadedSourceVendor::Bruker)?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    let (bruker_2d, source) = load_spectrum_2d_with_source_by_source_vendor(
+        &mixed_vendor_root,
+        LoadedSourceVendor::Bruker,
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    assert_eq!(source.format(), "bruker_ser");
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_batch_integration() -> Result<()> {
     let integrals = integrate_regions(
         &read_spectrum1d_csv("x,intensity\n0,0\n1,1\n2,2\n")?,
