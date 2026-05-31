@@ -118,11 +118,16 @@ pub use prediction::{
 };
 pub use processing_1d::{
     abs_spectrum_1d, apply_processing_recipe_1d, apply_processing_recipe_1d_until,
-    auto_phase_spectrum_1d, crop_spectrum_1d, exponential_apodization_spectrum_1d, fft_spectrum_1d,
-    gaussian_apodization_spectrum_1d, magnitude_spectrum_1d, normalize_spectrum_1d,
+    apply_subsample_shift_spectrum_1d, auto_phase_spectrum_1d,
+    convolution_difference_apodization_spectrum_1d, crop_spectrum_1d,
+    exponential_apodization_spectrum_1d, fft_spectrum_1d, first_point_scale_spectrum_1d,
+    gauss_multiply_bruker_apodization_spectrum_1d, gaussian_apodization_spectrum_1d,
+    linear_predict_backward_spectrum_1d, linear_predict_forward_spectrum_1d,
+    lorentz_to_gauss_apodization_spectrum_1d, magnitude_spectrum_1d, normalize_spectrum_1d,
     normalize_spectrum_1d_area, offset_spectrum_1d, phase_spectrum_1d, resample_spectrum_1d,
     scale_spectrum_1d, shift_spectrum_1d_axis, sine_bell_apodization_spectrum_1d,
-    subtract_baseline_spectrum_1d, zero_fill_spectrum_1d,
+    subtract_baseline_spectrum_1d, traf_apodization_spectrum_1d,
+    trapezoidal_apodization_spectrum_1d, zero_fill_spectrum_1d,
 };
 pub use processing_2d::{
     abs_spectrum_2d, apply_processing_recipe_2d, apply_processing_recipe_2d_until,

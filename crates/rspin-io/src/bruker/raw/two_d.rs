@@ -150,7 +150,7 @@ fn decode_ser_values(
 ) -> Result<(Vec<f64>, Vec<f64>, usize, usize)> {
     ensure_i32_data(acqus)?;
     let direct_words = required_usize(acqus, "TD")?;
-    if direct_words == 0 || direct_words % 2 != 0 {
+    if direct_words == 0 || !direct_words.is_multiple_of(2) {
         return Err(RSpinError::InvalidSpectrum {
             message: "Bruker raw 2D direct TD must be a positive even value".to_owned(),
         });
@@ -161,7 +161,7 @@ fn decode_ser_values(
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "Bruker raw 2D row length is too large".to_owned(),
         })?;
-    if bytes.len() % row_bytes != 0 {
+    if !bytes.len().is_multiple_of(row_bytes) {
         return Err(RSpinError::Parse {
             format: "Bruker",
             message: format!(

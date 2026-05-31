@@ -475,7 +475,7 @@ fn should_decode_fid_complex64(payload: &[u8], declared_points: Option<usize>) -
         return false;
     };
     match points.checked_mul(4) {
-        Some(expected_bytes) => payload.len() == expected_bytes && payload.len() % 8 == 0,
+        Some(expected_bytes) => payload.len() == expected_bytes && payload.len().is_multiple_of(8),
         None => false,
     }
 }
@@ -540,7 +540,7 @@ fn binary_payload(binary: &BinaryDataArray) -> Result<Vec<u8>> {
 }
 
 fn decode_f64_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
-    if bytes.len() % 8 != 0 {
+    if !bytes.len().is_multiple_of(8) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} byte length is not divisible by 8"),
@@ -559,7 +559,7 @@ fn decode_f64_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
 }
 
 fn decode_f32_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} byte length is not divisible by 4"),
@@ -586,7 +586,7 @@ fn decode_f32_pairs(bytes: &[u8], field: &'static str) -> Result<(Vec<f64>, Vec<
 }
 
 fn split_pairs(values: &[f64], field: &'static str) -> Result<(Vec<f64>, Vec<f64>)> {
-    if values.len() % 2 != 0 {
+    if !values.len().is_multiple_of(2) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} pair data has an odd number of values"),

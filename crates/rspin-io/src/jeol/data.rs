@@ -121,7 +121,7 @@ pub(super) fn read_data_matrix_planes(
     // occur in synthetic fixtures, which are laid out row-major; read those
     // linearly.
     let edge = JEOL_2D_SUBMATRIX_EDGE;
-    let tiled_layout = x_count % edge == 0 && y_count % edge == 0;
+    let tiled_layout = x_count.is_multiple_of(edge) && y_count.is_multiple_of(edge);
 
     let wanted = section_count.min(max_sections);
     let mut planes = Vec::with_capacity(wanted);

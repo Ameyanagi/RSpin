@@ -579,13 +579,13 @@ fn infer_matrix_dimensions(raw: &RawNmrMl2D, points: usize) -> Result<(usize, us
     }
     if let Some(x_count) = raw.direct.point_count
         && x_count > 0
-        && points % x_count == 0
+        && points.is_multiple_of(x_count)
     {
         return Ok((x_count, points / x_count));
     }
     if let Some(y_count) = raw.indirect.point_count
         && y_count > 0
-        && points % y_count == 0
+        && points.is_multiple_of(y_count)
     {
         return Ok((points / y_count, y_count));
     }
@@ -619,7 +619,7 @@ fn should_decode_matrix_complex64(payload: &[u8], expected_points: Option<usize>
         return false;
     };
     match points.checked_mul(8) {
-        Some(expected_bytes) => payload.len() == expected_bytes && payload.len() % 8 == 0,
+        Some(expected_bytes) => payload.len() == expected_bytes && payload.len().is_multiple_of(8),
         None => false,
     }
 }
@@ -727,7 +727,7 @@ fn validate_encoded_length(
 }
 
 fn decode_f64_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
-    if bytes.len() % 8 != 0 {
+    if !bytes.len().is_multiple_of(8) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} byte length is not divisible by 8"),
@@ -746,7 +746,7 @@ fn decode_f64_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
 }
 
 fn decode_f32_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} byte length is not divisible by 4"),
@@ -773,7 +773,7 @@ fn decode_f32_pairs(bytes: &[u8], field: &'static str) -> Result<(Vec<f64>, Opti
 }
 
 fn split_pairs(values: &[f64], field: &'static str) -> Result<(Vec<f64>, Vec<f64>)> {
-    if values.len() % 2 != 0 {
+    if !values.len().is_multiple_of(2) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} pair data has an odd number of values"),

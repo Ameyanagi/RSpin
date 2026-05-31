@@ -363,17 +363,26 @@ pub fn read_jeol_jdf_2d_hypercomplex_bytes(bytes: &[u8]) -> Result<HyperComplex2
     // direct dimension quadrature clean (a single peak, no mirror image).
     let rr = iter.next().ok_or_else(|| missing_plane("rr"))?;
     let mut ri = iter.next().ok_or_else(|| missing_plane("ri"))?;
-    let ir = iter.next().ok_or_else(|| missing_plane("ir"))?;
+    let mut ir = iter.next().ok_or_else(|| missing_plane("ir"))?;
     let mut ii = iter.next().ok_or_else(|| missing_plane("ii"))?;
 
     let x = build_axis(&header, 0, planes.x_count)?;
     let y = build_indirect_time_axis(&header, &parameters, planes.y_count)?;
     let metadata = build_metadata(&header, &parameters);
 
-    // Same precession-sign correction as the single-plane path: negate the
-    // direct-imaginary quadrants for time-domain data.
+    // Same precession-sign correction as the single-plane path, applied to
+    // each complex time-domain dimension. The II quadrant is imaginary in both
+    // dimensions, so the two sign corrections cancel there.
     if x.unit == Unit::Seconds {
         for value in &mut ri {
+            *value = -*value;
+        }
+        for value in &mut ii {
+            *value = -*value;
+        }
+    }
+    if y.unit == Unit::Seconds {
+        for value in &mut ir {
             *value = -*value;
         }
         for value in &mut ii {
