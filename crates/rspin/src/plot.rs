@@ -27,14 +27,11 @@ use ruviz::prelude::{LegendPosition, Plot};
 /// Returns an error when ruviz cannot render or write the PNG, or when
 /// `path` is not valid UTF-8.
 pub fn plot_spectrum(path: &Path, title: &str, spectrum: &Spectrum1D) -> Result<()> {
-    plot_overlay(
-        path,
-        title,
-        &[(
-            spectrum.metadata.name.as_deref().unwrap_or("spectrum"),
-            spectrum,
-        )],
-    )
+    let mut label = "spectrum";
+    if let Some(name) = spectrum.metadata.name.as_deref() {
+        label = name;
+    }
+    plot_overlay(path, title, &[(label, spectrum)])
 }
 
 /// Saves an N-trace overlay PNG. The first trace drives the x-axis

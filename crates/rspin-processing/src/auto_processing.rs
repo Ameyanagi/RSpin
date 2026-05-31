@@ -231,6 +231,7 @@ impl NucleusLbDefaults {
 /// Returns the first processing error from any of the underlying
 /// steps; the FID must be time-domain (`axis.unit == Unit::Seconds`)
 /// and have uniform dwell.
+#[allow(clippy::too_many_lines)]
 pub fn process_spectrum_auto(
     fid: &Spectrum1D,
     options: &AutoProcessingOptions,
@@ -305,13 +306,16 @@ pub fn process_spectrum_auto(
     //    filter (which derives LB from the FID itself).
     let lb_hz = match options.apodization_lb_hz {
         Some(lb) => lb,
-        None => options
+        None => match options
             .nucleus_lb_hz
             .lookup(after_lp.metadata.nucleus.as_ref())
-            .unwrap_or_else(|| match matched_filter_em(&after_lp) {
+        {
+            Some(lb) => lb,
+            None => match matched_filter_em(&after_lp) {
                 Ok(step) => step.line_broadening_hz,
                 Err(_) => 0.5,
-            }),
+            },
+        },
     };
     let after_apod = exponential_apodization(&after_lp, lb_hz, dwell)?;
 
@@ -351,9 +355,10 @@ pub fn process_spectrum_auto(
         // solvent triplets contribute equally to the phase fit. The
         // Regions weighted regression is more robust on dense
         // multi-region spectra but underweights isolated outliers.
-        let phase_opts = options.auto_phase_options.unwrap_or_else(|| {
-            AutoPhaseOptions::default().with_strategy(crate::AutoPhaseStrategy::GlobalCost)
-        });
+        let phase_opts = match options.auto_phase_options {
+            Some(options) => options,
+            None => AutoPhaseOptions::default().with_strategy(crate::AutoPhaseStrategy::GlobalCost),
+        };
         if options.polynomial_phase_refine {
             auto_phase_correct_polynomial(&after_fft, phase_opts)?.spectrum
         } else {
@@ -464,8 +469,7 @@ fn run_group_delay_sweep(
     };
     let mut best: Option<(f64, Spectrum1D)> = None;
     for index in 0..n_steps {
-        let candidate =
-            baseline - sweep.delta_samples + f64::from(index) * sweep.step_samples;
+        let candidate = baseline - sweep.delta_samples + f64::from(index) * sweep.step_samples;
         if candidate < 0.0 {
             continue;
         }
@@ -480,9 +484,10 @@ fn run_group_delay_sweep(
         // Score: residual |ph1| from a second auto-phase pass. If the
         // original group-delay was correct, the pipeline's auto-phase
         // already converged to (ph0, ph1=0) so a second pass returns 0.
-        let probe_opts = options.auto_phase_options.unwrap_or_else(|| {
-            AutoPhaseOptions::default().with_strategy(crate::AutoPhaseStrategy::GlobalCost)
-        });
+        let probe_opts = match options.auto_phase_options {
+            Some(options) => options,
+            None => AutoPhaseOptions::default().with_strategy(crate::AutoPhaseStrategy::GlobalCost),
+        };
         let probe = auto_phase_correct(&candidate_spectrum, probe_opts)?;
         let score = probe.first_order_deg.abs();
         match &best {
@@ -631,7 +636,13 @@ pub fn bruker_group_delay(metadata: &Metadata) -> f64 {
         .get("bruker.acqus.DECIM")
         .and_then(|raw| raw.trim().parse::<i32>().ok());
     match (dspfvs, decim) {
-        (Some(d), Some(c)) => bruker_dsp_table(d, c).unwrap_or(0.0),
+        (Some(d), Some(c)) => {
+            let mut delay = 0.0;
+            if let Some(value) = bruker_dsp_table(d, c) {
+                delay = value;
+            }
+            delay
+        }
         _ => 0.0,
     }
 }

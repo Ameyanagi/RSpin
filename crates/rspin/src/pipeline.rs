@@ -96,9 +96,10 @@ pub fn quick_magnitude_spectrum_with(
         .ok_or_else(|| RSpinError::InvalidSpectrum {
             message: "quick_magnitude_spectrum target length overflow".to_owned(),
         })?;
-    let lb_hz = lb_defaults
-        .lookup(fid.metadata.nucleus.as_ref())
-        .unwrap_or(fallback_lb_hz);
+    let lb_hz = match lb_defaults.lookup(fid.metadata.nucleus.as_ref()) {
+        Some(value) => value,
+        None => fallback_lb_hz,
+    };
     ProcessingRecipe1D::new()
         .exponential_apodization(lb_hz, dwell)
         .zero_fill(target_len)
@@ -137,20 +138,20 @@ mod tests {
     use super::*;
     use rspin_core::{Axis, Metadata, Nucleus, Unit};
 
-    fn synthetic_fid(npts: u32, dwell: f64) -> Spectrum1D {
+    fn synthetic_fid(npts: u32, dwell: f64) -> Result<Spectrum1D> {
         let axis_values: Vec<f64> = (0..npts).map(|i| f64::from(i) * dwell).collect();
-        let axis = Axis::new("time", Unit::Seconds, axis_values).expect("axis");
+        let axis = Axis::new("time", Unit::Seconds, axis_values)?;
         let intensities: Vec<f64> = (0..npts).map(|i| (f64::from(i) * 0.1).cos()).collect();
         let imag: Vec<f64> = (0..npts).map(|i| (f64::from(i) * 0.1).sin()).collect();
         let metadata = Metadata::default()
             .with_frequency_mhz(400.0)
             .with_nucleus(Nucleus::Hydrogen1);
-        Spectrum1D::new_complex(axis, intensities, Some(imag), metadata).expect("spectrum")
+        Spectrum1D::new_complex(axis, intensities, Some(imag), metadata)
     }
 
     #[test]
     fn quick_magnitude_spectrum_picks_hydrogen_default_lb() -> Result<()> {
-        let fid = synthetic_fid(64, 1.0 / 4000.0);
+        let fid = synthetic_fid(64, 1.0 / 4000.0)?;
         let magnitude = quick_magnitude_spectrum(&fid)?;
         assert_eq!(magnitude.x.unit, Unit::Ppm);
         assert_eq!(magnitude.len(), 128);
@@ -164,10 +165,11 @@ mod tests {
     }
 
     #[test]
-    fn quick_magnitude_spectrum_rejects_frequency_domain() {
-        let mut fid = synthetic_fid(8, 0.001);
+    fn quick_magnitude_spectrum_rejects_frequency_domain() -> Result<()> {
+        let mut fid = synthetic_fid(8, 0.001)?;
         fid.x.unit = Unit::Ppm;
         let err = quick_magnitude_spectrum(&fid).expect_err("frequency-domain should reject");
         assert!(matches!(err, RSpinError::InvalidSpectrum { .. }));
+        Ok(())
     }
 }

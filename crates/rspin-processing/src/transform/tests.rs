@@ -290,6 +290,7 @@ fn bruker_gmb_rejects_invalid_parameters() -> anyhow::Result<()> {
     assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 1.5, 0.1).is_err());
     assert!(gauss_multiply_bruker_apodization(&spectrum, 1.0, 0.5, 0.0).is_err());
     assert!(gauss_multiply_bruker_apodization(&spectrum, f64::NAN, 0.5, 0.1).is_err());
+    assert!(gauss_multiply_bruker_apodization(&spectrum, -1.0, 0.0, 0.1).is_err());
     Ok(())
 }
 
@@ -331,6 +332,7 @@ fn convolution_difference_rejects_invalid_parameters() -> anyhow::Result<()> {
     let spectrum = complex_spectrum()?;
     assert!(convolution_difference_apodization(&spectrum, -1.0, 1.0, 0.5, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, -1.0, 0.5, 0.1).is_err());
+    assert!(convolution_difference_apodization(&spectrum, 2.0, 1.0, 0.5, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 1.5, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, -0.1, 0.1).is_err());
     assert!(convolution_difference_apodization(&spectrum, 1.0, 1.0, 0.5, 0.0).is_err());

@@ -25,7 +25,9 @@ fn argmax(spectrum: &Spectrum2D) -> (f64, f64) {
     let (mut bx, mut by, mut best) = (0usize, 0usize, f64::NEG_INFINITY);
     for y in 0..height {
         for x in 0..width {
-            let value = spectrum.value_at(x, y).unwrap_or(0.0);
+            let Some(value) = spectrum.value_at(x, y) else {
+                continue;
+            };
             if value > best {
                 best = value;
                 bx = x;

@@ -3,6 +3,7 @@
 mod abs_1d;
 mod abs_2d;
 mod apodization_2d;
+mod apodization_weights;
 mod auto_phase;
 mod auto_phase_2d;
 mod auto_processing;

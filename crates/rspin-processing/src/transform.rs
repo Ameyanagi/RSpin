@@ -7,6 +7,7 @@ use rustfft::{FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
+use crate::apodization_weights::{lorentz_to_gauss_weights, traf_weights, trapezoidal_weights};
 
 /// Applies exponential apodization to real and imaginary channels.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,7 +90,7 @@ impl SineBellApodization {
     }
 
     /// Creates the cosine-bell window (`nmrPipe -fn SP -off 0.5 -end 1 -pow 1`),
-    /// equivalent to a Hann window.
+    /// a one-sided cosine taper that decays from 1 to 0 across the FID.
     #[must_use]
     pub fn cosine_bell() -> Self {
         Self::new(90.0, 180.0, 1.0)
@@ -1371,7 +1372,10 @@ pub(crate) fn frequency_axis_from_time(
     let n_f = safe_usize_to_f64(len, "spectrum length")?;
     let half_f = safe_usize_to_f64(half, "spectrum index")?;
     let scale = sweep_width_hz / n_f;
-    let carrier_hz = carrier_offset_hz_from_metadata(metadata, axis).unwrap_or(0.0);
+    let mut carrier_hz = 0.0;
+    if let Some(value) = carrier_offset_hz_from_metadata(metadata, axis) {
+        carrier_hz = value;
+    }
     let mut hz_values = Vec::with_capacity(len);
     for index in 0..len {
         let index_f = safe_usize_to_f64(index, "spectrum index")?;
@@ -1658,6 +1662,12 @@ fn convolution_difference_weights(
 ) -> Result<Vec<f64>> {
     ensure_non_negative("narrow_line_broadening_hz", narrow_line_broadening_hz)?;
     ensure_non_negative("broad_line_broadening_hz", broad_line_broadening_hz)?;
+    if narrow_line_broadening_hz > broad_line_broadening_hz {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "narrow_line_broadening_hz must not exceed broad_line_broadening_hz"
+                .to_owned(),
+        });
+    }
     ensure_finite("mixing", mixing)?;
     if !(0.0..=1.0).contains(&mixing) {
         return Err(RSpinError::InvalidSpectrum {
@@ -1692,6 +1702,12 @@ fn gauss_multiply_bruker_weights(
 ) -> Result<Vec<f64>> {
     ensure_finite("line_broadening_hz", line_broadening_hz)?;
     ensure_finite("gauss_position_fraction", gauss_position_fraction)?;
+    if line_broadening_hz < 0.0 && gauss_position_fraction <= 0.0 {
+        return Err(RSpinError::InvalidSpectrum {
+            message: "negative line_broadening_hz requires gauss_position_fraction greater than 0"
+                .to_owned(),
+        });
+    }
     if !(0.0..=1.0).contains(&gauss_position_fraction) {
         return Err(RSpinError::InvalidSpectrum {
             message: "gauss_position_fraction must be between 0 and 1".to_owned(),
@@ -1730,161 +1746,6 @@ fn gauss_multiply_bruker_weights(
                     })?,
                 );
             Ok((-a * index_f - b * index_f * index_f).exp())
-        })
-        .collect()
-}
-
-fn traf_weights(
-    len: usize,
-    line_broadening_hz: f64,
-    dwell_time_s: f64,
-    context: &'static str,
-) -> Result<Vec<f64>> {
-    ensure_non_negative("line_broadening_hz", line_broadening_hz)?;
-    ensure_positive("dwell_time_s", dwell_time_s)?;
-    let last_index = len.saturating_sub(1);
-    let last_index_f = if last_index == 0 {
-        0.0
-    } else {
-        f64::from(
-            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
-                message: format!("{context} input is too large"),
-            })?,
-        )
-    };
-    let scale = -PI * line_broadening_hz * dwell_time_s;
-    (0..len)
-        .map(|index| {
-            let index_f =
-                f64::from(
-                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
-                        message: format!("{context} input is too large"),
-                    })?,
-                );
-            let e_decay = (scale * index_f).exp();
-            let r_decay = (scale * (last_index_f - index_f)).exp();
-            let denominator = e_decay.powi(3) + r_decay.powi(3);
-            let weight = if denominator <= 0.0 {
-                0.0
-            } else {
-                e_decay.powi(2) / denominator
-            };
-            Ok(weight)
-        })
-        .collect()
-}
-
-fn trapezoidal_weights(
-    len: usize,
-    rise_end_fraction: f64,
-    fall_start_fraction: f64,
-    context: &'static str,
-) -> Result<Vec<f64>> {
-    ensure_finite("rise_end_fraction", rise_end_fraction)?;
-    ensure_finite("fall_start_fraction", fall_start_fraction)?;
-    if !(0.0..=1.0).contains(&rise_end_fraction) {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "rise_end_fraction must be between 0 and 1".to_owned(),
-        });
-    }
-    if !(0.0..=1.0).contains(&fall_start_fraction) {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "fall_start_fraction must be between 0 and 1".to_owned(),
-        });
-    }
-    if rise_end_fraction > fall_start_fraction {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "rise_end_fraction must not exceed fall_start_fraction".to_owned(),
-        });
-    }
-
-    let denominator = if len <= 1 {
-        0.0
-    } else {
-        f64::from(
-            u32::try_from(len - 1).map_err(|_| RSpinError::InvalidSpectrum {
-                message: format!("{context} input is too large"),
-            })?,
-        )
-    };
-    (0..len)
-        .map(|index| {
-            let index_f =
-                f64::from(
-                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
-                        message: format!("{context} input is too large"),
-                    })?,
-                );
-            let fraction = if denominator == 0.0 {
-                0.0
-            } else {
-                index_f / denominator
-            };
-            let weight = if fraction < rise_end_fraction {
-                if rise_end_fraction <= 0.0 {
-                    1.0
-                } else {
-                    fraction / rise_end_fraction
-                }
-            } else if fraction > fall_start_fraction {
-                if fall_start_fraction >= 1.0 {
-                    1.0
-                } else {
-                    (1.0 - fraction) / (1.0 - fall_start_fraction)
-                }
-            } else {
-                1.0
-            };
-            Ok(weight.max(0.0))
-        })
-        .collect()
-}
-
-fn lorentz_to_gauss_weights(
-    len: usize,
-    lorentz_to_undo_hz: f64,
-    gauss_fwhm_hz: f64,
-    gauss_shift: f64,
-    dwell_time_s: f64,
-    context: &'static str,
-) -> Result<Vec<f64>> {
-    ensure_non_negative("lorentz_to_undo_hz", lorentz_to_undo_hz)?;
-    ensure_non_negative("gauss_fwhm_hz", gauss_fwhm_hz)?;
-    ensure_finite("gauss_shift", gauss_shift)?;
-    if !(0.0..=1.0).contains(&gauss_shift) {
-        return Err(RSpinError::InvalidSpectrum {
-            message: "gauss_shift must be between 0 and 1".to_owned(),
-        });
-    }
-    ensure_positive("dwell_time_s", dwell_time_s)?;
-
-    let last_index = len.saturating_sub(1);
-    let last_index_f = if last_index == 0 {
-        0.0
-    } else {
-        f64::from(
-            u32::try_from(last_index).map_err(|_| RSpinError::InvalidSpectrum {
-                message: format!("{context} input is too large"),
-            })?,
-        )
-    };
-    let t_max = last_index_f * dwell_time_s;
-    let lorentz_scale = PI * lorentz_to_undo_hz * dwell_time_s;
-    let gauss_scale = PI * gauss_fwhm_hz;
-    let gauss_norm = 4.0 * LN_2;
-    let center_time = gauss_shift * t_max;
-    (0..len)
-        .map(|index| {
-            let index_f =
-                f64::from(
-                    u32::try_from(index).map_err(|_| RSpinError::InvalidSpectrum {
-                        message: format!("{context} input is too large"),
-                    })?,
-                );
-            let lorentz_part = lorentz_scale * index_f;
-            let gauss_offset = gauss_scale * (index_f * dwell_time_s - center_time);
-            let gauss_part = -(gauss_offset * gauss_offset) / gauss_norm;
-            Ok((lorentz_part + gauss_part).exp())
         })
         .collect()
 }

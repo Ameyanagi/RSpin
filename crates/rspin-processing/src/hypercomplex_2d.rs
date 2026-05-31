@@ -120,7 +120,10 @@ pub fn assemble_hypercomplex_2d(raw: &Spectrum2D) -> Result<HyperComplex2D> {
             message: "hypercomplex assembly requires a non-empty spectrum".to_owned(),
         });
     }
-    let mode = raw.metadata.quad_mode.unwrap_or(QuadMode::Qf);
+    let mode = match raw.metadata.quad_mode {
+        Some(mode) => mode,
+        None => QuadMode::Qf,
+    };
     let direct = direct_ft_rows(raw, width, rows);
 
     let paired = mode_pairs_rows(mode);
@@ -568,7 +571,7 @@ fn indirect_exponential_apodization(
     let mut ir = hc.ir.clone();
     let mut ii = hc.ii.clone();
     for point in 0..points {
-        let time_s = hc.y.values.get(point).copied().unwrap_or(0.0);
+        let time_s = hc.y.values[point];
         let window = (-std::f64::consts::PI * line_broadening_hz * time_s).exp();
         for k in 0..width {
             let idx = point * width + k;
@@ -621,7 +624,7 @@ fn indirect_zero_fill(hc: &HyperComplex2D, target: usize) -> Result<HyperComplex
     } else {
         0.0
     };
-    let start = hc.y.values.first().copied().unwrap_or(0.0);
+    let start = hc.y.values[0];
     let mut y_values = Vec::with_capacity(target);
     for point in 0..target {
         if let Some(value) = hc.y.values.get(point) {

@@ -50,7 +50,9 @@ fn argmax(spectrum: &Spectrum2D) -> (usize, usize, f64) {
     let mut best = (0usize, 0usize, f64::NEG_INFINITY);
     for y in 0..height {
         for x in 0..width {
-            let value = spectrum.value_at(x, y).unwrap_or(0.0);
+            let Some(value) = spectrum.value_at(x, y) else {
+                continue;
+            };
             if value > best.2 {
                 best = (x, y, value);
             }
@@ -64,7 +66,7 @@ fn argmax(spectrum: &Spectrum2D) -> (usize, usize, f64) {
 fn count_indirect_peaks(spectrum: &Spectrum2D, x: usize) -> usize {
     let (_, height) = spectrum.shape();
     let column: Vec<f64> = (0..height)
-        .map(|y| spectrum.value_at(x, y).unwrap_or(0.0))
+        .filter_map(|y| spectrum.value_at(x, y))
         .collect();
     let max = column.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     if max <= 0.0 {
@@ -79,7 +81,11 @@ fn count_indirect_peaks(spectrum: &Spectrum2D, x: usize) -> usize {
         let left = index
             .checked_sub(1)
             .map_or(f64::NEG_INFINITY, |i| column[i]);
-        let right = column.get(index + 1).copied().unwrap_or(f64::NEG_INFINITY);
+        let right = if index + 1 < column.len() {
+            column[index + 1]
+        } else {
+            f64::NEG_INFINITY
+        };
         if *value >= left && *value >= right {
             count += 1;
         }
