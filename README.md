@@ -52,6 +52,14 @@ fn load_selected_inputs_with_stable_sources() -> Result<SpectrumBundle> {
 fn load_exactly_one_selected_spectrum() -> Result<Spectrum1D> {
     load_spectrum_1d_relative_to("data", "proton.fid")
 }
+
+fn load_exactly_one_bruker_spectrum() -> Result<Spectrum1D> {
+    load_spectrum_1d_by_source_vendor_relative_to(
+        "data",
+        "mixed-vendor",
+        LoadedSourceVendor::Bruker,
+    )
+}
 ```
 
 Bundles expose direct counts and owned extraction helpers for simple workflows:

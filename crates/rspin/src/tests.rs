@@ -451,6 +451,25 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
     )?;
     assert_eq!(bruker_2d.shape(), (2048, 512));
     assert_eq!(source.format(), "bruker_ser");
+
+    let mixed_vendor_base =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../rspin-io/testdata/nmrxiv/cc0");
+    let (bruker_1d, source) = load_spectrum_1d_with_source_by_source_format_relative_to(
+        &mixed_vendor_base,
+        "myrcene",
+        LoadedSourceFormat::BrukerFid,
+    )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(
+        source.path(),
+        Some(std::path::Path::new("myrcene/bruker_1h_raw"))
+    );
+    let bruker_2d = load_spectrum_2d_by_source_vendor_relative_to(
+        &mixed_vendor_base,
+        "myrcene",
+        LoadedSourceVendor::Bruker,
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
     Ok(())
 }
 
