@@ -1033,7 +1033,7 @@ impl FileHeader {
         self.nblocks > 0
             && self.ntraces > 0
             && self.np_values > 0
-            && (!self.is_complex() || self.np_values % 2 == 0)
+            && (!self.is_complex() || self.np_values.is_multiple_of(2))
             && matches!(self.ebytes, 2 | 4 | 8)
             && self.tbytes == self.np_values.saturating_mul(self.ebytes)
             && self.nbheaders > 0
@@ -1076,7 +1076,7 @@ impl FileHeader {
                 feature: "Agilent multidimensional phasefile",
             });
         }
-        if self.is_complex() && self.np_values % 2 != 0 {
+        if self.is_complex() && !self.np_values.is_multiple_of(2) {
             return Err(RSpinError::InvalidSpectrum {
                 message: "Agilent complex phasefile trace must contain an even value count"
                     .to_owned(),
@@ -1091,7 +1091,7 @@ impl FileHeader {
                 feature: "Agilent one-dimensional phasefile in 2D reader",
             });
         }
-        if self.is_complex() && self.np_values % 2 != 0 {
+        if self.is_complex() && !self.np_values.is_multiple_of(2) {
             return Err(RSpinError::InvalidSpectrum {
                 message: "Agilent complex phasefile trace must contain an even value count"
                     .to_owned(),
@@ -1106,7 +1106,7 @@ impl FileHeader {
                 feature: "Agilent real-only FID",
             });
         }
-        if self.np_values % 2 != 0 {
+        if !self.np_values.is_multiple_of(2) {
             return Err(RSpinError::InvalidSpectrum {
                 message: "Agilent complex FID trace must contain an even value count".to_owned(),
             });
@@ -1459,7 +1459,7 @@ fn arrayed_2d_trace_count(
             feature: "Agilent non-arrayed FID in arrayed 2D reader",
         });
     }
-    if total_y_count % y_count != 0 {
+    if !total_y_count.is_multiple_of(y_count) {
         return Err(RSpinError::InvalidSpectrum {
             message: format!(
                 "Agilent arrayed 2D FID has {total_y_count} traces but ni is {y_count}"

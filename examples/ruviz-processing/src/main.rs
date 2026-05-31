@@ -24,17 +24,22 @@ mod ruviz_example {
         PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
         SpectrumAnalysis1DOptions, analyze_spectrum_1d, pick_peaks,
     };
-    use rspin_core::{Axis, Metadata, Spectrum1D, Spectrum2D, Unit};
+    use rspin_core::{Axis, Metadata, Nucleus, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
-        SpectrumBundle, load_spectra, read_analysis1d_json, read_processing_recipe_1d_json,
-        read_spectrum_bundle_json, read_spectrum1d_csv, read_spectrum1d_json, write_analysis1d_csv,
-        write_analysis1d_json, write_processing_recipe_1d_json, write_spectrum_bundle_json,
-        write_spectrum1d_csv, write_spectrum1d_json,
+        SpectrumBundle, load_spectra, read_analysis1d_json, read_jeol_jdf_2d_hypercomplex_file,
+        read_processing_recipe_1d_json, read_spectrum_bundle_json, read_spectrum1d_csv,
+        read_spectrum1d_json, write_analysis1d_csv, write_analysis1d_json,
+        write_processing_recipe_1d_json, write_spectrum_bundle_json, write_spectrum1d_csv,
+        write_spectrum1d_json,
     };
     use rspin_processing::{
-        AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, BaselineMethod, FftDirection,
-        ProcessSpectrum2D, ProcessingRecipe1D, auto_phase_correct, auto_phase_correct_with_peaks,
-        fit_baseline, remove_group_delay,
+        AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, AutoProcessingOptions, BaselineMethod,
+        FftDirection, HyperComplex2DOptions, ProcessSpectrum2D, ProcessingRecipe1D,
+        process_hypercomplex_planes_magnitude, apply_subsample_shift,
+        auto_phase_correct, auto_phase_correct_with_peaks, convolution_difference_apodization,
+        exponential_apodization, fit_baseline, gauss_multiply_bruker_apodization,
+        gaussian_apodization, lorentz_to_gauss_apodization, magnitude_spectrum, matched_filter_em,
+        process_spectrum_auto, remove_group_delay, traf_apodization, trapezoidal_apodization,
     };
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
     use ruviz::core::subplot::subplots;
@@ -53,8 +58,12 @@ mod ruviz_example {
         write_baseline_plot(&output_dir.join("processed_baseline.png"))?;
         write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))?;
         write_curated_auto_phase_plot(&root, &output_dir)?;
+        write_apodization_comparison_plot(&root, &output_dir)?;
+        write_auto_processing_plot(&root, &output_dir)?;
         let vendor_dir = output_dir.join("vendors");
         write_vendor_showcase(&root, &vendor_dir)?;
+        write_jeol_group_delay_comparison(&root, &output_dir)?;
+        write_hsqc_phase_sensitive_contours(&root, &output_dir)?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
         write_oracle_visual_artifacts(&root, &visual_output_dir)?;
 
@@ -102,23 +111,32 @@ mod ruviz_example {
             .normalize_max_abs()
             .apply(&raw)?;
 
-        Plot::new()
-            .title("RSpin 1D Processing Recipe")
-            .xlabel("point")
-            .ylabel("intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::LowerLeft)
-            .line(&raw.x.values, &raw.intensities)
-            .label("raw")
-            .line(&raw.x.values, &scaled.intensities)
-            .label("scale x2")
-            .line(&raw.x.values, &offset.intensities)
-            .label("offset -2")
-            .line(&raw.x.values, &absolute.intensities)
-            .label("absolute")
-            .line(&raw.x.values, &normalized.intensities)
-            .label("normalized")
-            .save(path_to_str(path)?)?;
+        nmr_plot_base(
+            "RSpin 1D Processing Recipe",
+            "point",
+            "intensity",
+            &raw.x.values,
+            &[
+                &raw.intensities,
+                &scaled.intensities,
+                &offset.intensities,
+                &absolute.intensities,
+                &normalized.intensities,
+            ],
+            raw.x.unit,
+        )
+        .legend_position(LegendPosition::LowerLeft)
+        .line(&raw.x.values, &raw.intensities)
+        .label("raw")
+        .line(&raw.x.values, &scaled.intensities)
+        .label("scale x2")
+        .line(&raw.x.values, &offset.intensities)
+        .label("offset -2")
+        .line(&raw.x.values, &absolute.intensities)
+        .label("absolute")
+        .line(&raw.x.values, &normalized.intensities)
+        .label("normalized")
+        .save(path_to_str(path)?)?;
 
         Ok(())
     }
@@ -137,19 +155,21 @@ mod ruviz_example {
             .normalize_max_abs()
             .apply(&spectrum)?;
 
-        Plot::new()
-            .title("RSpin Baseline Correction")
-            .xlabel("chemical shift / ppm")
-            .ylabel("intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&spectrum.x.values, &spectrum.intensities)
-            .label("raw")
-            .line(&spectrum.x.values, &fit.baseline)
-            .label("fitted baseline")
-            .line(&processed.x.values, &processed.intensities)
-            .label("corrected normalized")
-            .save(path_to_str(path)?)?;
+        nmr_plot_base(
+            "RSpin Baseline Correction",
+            "chemical shift / ppm",
+            "intensity",
+            &spectrum.x.values,
+            &[&spectrum.intensities, &fit.baseline, &processed.intensities],
+            spectrum.x.unit,
+        )
+        .line(&spectrum.x.values, &spectrum.intensities)
+        .label("raw")
+        .line(&spectrum.x.values, &fit.baseline)
+        .label("fitted baseline")
+        .line(&processed.x.values, &processed.intensities)
+        .label("corrected normalized")
+        .save(path_to_str(path)?)?;
 
         Ok(())
     }
@@ -195,6 +215,410 @@ mod ruviz_example {
         }
         write_varian_method_panel(root, output_dir)?;
         Ok(())
+    }
+
+    struct ApodizationPanels {
+        raw: Spectrum1D,
+        em: Spectrum1D,
+        gm: Spectrum1D,
+        l2g: Spectrum1D,
+        traf: Spectrum1D,
+        gmb: Spectrum1D,
+        trap: Spectrum1D,
+        conv: Spectrum1D,
+        matched: Spectrum1D,
+        matched_lb_hz: f64,
+        ph0_deg: f64,
+        ph1_deg: f64,
+        subsample_frac: f64,
+    }
+
+    fn build_apodization_panels(
+        fid: &Spectrum1D,
+        lb_hz: f64,
+        gauss_fwhm_hz: f64,
+        conv_broad_hz: f64,
+    ) -> Result<ApodizationPanels> {
+        let group_delay = jeol_group_delay(fid);
+        let group_delay_integer = group_delay.trunc();
+        let group_delay_frac = group_delay - group_delay_integer;
+        let shifted = if group_delay_integer > 0.0 {
+            remove_group_delay(fid, group_delay_integer)?
+        } else {
+            fid.clone()
+        };
+        let dwell = dwell_time_seconds(&shifted)?;
+        let zero_fill_len = shifted
+            .len()
+            .checked_mul(2)
+            .context("apodization comparison target length overflow")?;
+        let pivot_fraction = 0.5_f64;
+
+        // Run auto-phase ONCE on a moderately broadened reference so it
+        // sees clean Lorentzian peaks, then apply that same (ph0, ph1)
+        // to every windowed version. Apodization is a real-valued
+        // multiplication and cannot change the FID's phase; phasing
+        // each panel independently introduces noise from the auto-phase
+        // search converging slightly differently per spectrum.
+        let fft_then_subsample = |windowed: &Spectrum1D| -> Result<Spectrum1D> {
+            let mut out = ProcessingRecipe1D::new()
+                .zero_fill(zero_fill_len)
+                .fft(FftDirection::Forward)
+                .apply(windowed)?;
+            if group_delay_frac.abs() > f64::EPSILON {
+                out = apply_subsample_shift(&out, group_delay_frac)?;
+            }
+            Ok(relabel_hz_to_ppm(out))
+        };
+
+        let reference_windowed = exponential_apodization(&shifted, lb_hz, dwell)?;
+        let reference_freq = fft_then_subsample(&reference_windowed)?;
+        let reference_spectrum = ProcessingRecipe1D::new()
+            .normalize_max_abs()
+            .apply(&reference_freq)?;
+        let reference = auto_phase_correct(
+            &reference_spectrum,
+            AutoPhaseOptions::default().pivot_fraction(pivot_fraction),
+        )?;
+        let ph0_deg = reference.zero_order_deg;
+        let ph1_deg = reference.first_order_deg;
+
+        let apodise_with_shared_phase = |windowed: Spectrum1D| -> Result<Spectrum1D> {
+            let processed = fft_then_subsample(&windowed)?;
+            let processed = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&processed)?;
+            // Manual phase with the same (ph0, ph1) recovered above.
+            let phased = ProcessingRecipe1D::new()
+                .phase(ph0_deg, ph1_deg, pivot_fraction)
+                .apply(&processed)?;
+            Ok(phased)
+        };
+        let magnitude_only = |windowed: Spectrum1D| -> Result<Spectrum1D> {
+            let processed = fft_then_subsample(&windowed)?;
+            let mag = magnitude_spectrum(&processed)?;
+            let mag = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&mag)?;
+            Ok(mag)
+        };
+
+        let raw = magnitude_only(shifted.clone())?;
+        // The reference itself becomes the EM panel — no duplicate work.
+        let em = reference.spectrum.clone();
+        let gm = apodise_with_shared_phase(gaussian_apodization(&shifted, lb_hz, dwell)?)?;
+        let l2g = apodise_with_shared_phase(lorentz_to_gauss_apodization(
+            &shifted,
+            lb_hz,
+            gauss_fwhm_hz,
+            0.0,
+            dwell,
+        )?)?;
+        let traf = apodise_with_shared_phase(traf_apodization(&shifted, lb_hz, dwell)?)?;
+        let gmb = apodise_with_shared_phase(gauss_multiply_bruker_apodization(
+            &shifted, -lb_hz, 0.3, dwell,
+        )?)?;
+        let trap = apodise_with_shared_phase(trapezoidal_apodization(&shifted, 0.0, 0.7)?)?;
+        let conv = apodise_with_shared_phase(convolution_difference_apodization(
+            &shifted,
+            lb_hz / 3.0,
+            conv_broad_hz,
+            0.5,
+            dwell,
+        )?)?;
+        let matched_step = matched_filter_em(&shifted)?;
+        let matched_lb_hz = matched_step.line_broadening_hz;
+        let matched = apodise_with_shared_phase(exponential_apodization(
+            &shifted,
+            matched_lb_hz,
+            matched_step.dwell_time_s,
+        )?)?;
+
+        Ok(ApodizationPanels {
+            raw,
+            em,
+            gm,
+            l2g,
+            traf,
+            gmb,
+            trap,
+            conv,
+            matched,
+            matched_lb_hz,
+            ph0_deg,
+            ph1_deg,
+            subsample_frac: group_delay_frac,
+        })
+    }
+
+    fn save_apodization_panel(
+        panels: &ApodizationPanels,
+        title_prefix: &str,
+        lb_hz: f64,
+        gauss_fwhm_hz: f64,
+        conv_broad_hz: f64,
+        zoom: Option<(f64, f64)>,
+        path: &Path,
+    ) -> Result<()> {
+        let zoom_suffix = zoom
+            .map(|(lo, hi)| format!(" — zoom {lo:.1}…{hi:.1} ppm"))
+            .unwrap_or_default();
+        let restrict = |spectrum: &Spectrum1D| -> (Vec<f64>, Vec<f64>) {
+            let Some((lo_raw, hi_raw)) = zoom else {
+                return (spectrum.x.values.clone(), spectrum.intensities.clone());
+            };
+            let lo = lo_raw.min(hi_raw);
+            let hi = lo_raw.max(hi_raw);
+            let mut xs = Vec::new();
+            let mut ys = Vec::new();
+            for (x, y) in spectrum.x.values.iter().zip(&spectrum.intensities) {
+                if *x >= lo && *x <= hi {
+                    xs.push(*x);
+                    ys.push(*y);
+                }
+            }
+            (xs, ys)
+        };
+        let mk = |title: String, spectrum: &Spectrum1D, label: &str| -> Plot {
+            let (xs, ys) = restrict(spectrum);
+            let mut plot = Plot::new()
+                .title(&title)
+                .xlabel("chemical shift / ppm")
+                .ylabel("intensity")
+                .max_resolution(900, 600)
+                .legend_position(LegendPosition::Best);
+            if let Some((x_max, x_min)) = nmr_x_limits(&xs, spectrum.x.unit) {
+                plot = plot.xlim(x_max, x_min);
+            }
+            if let Some((y_min, y_max)) = padded_y_limits(&[&ys]) {
+                plot = plot.ylim(y_min, y_max);
+            }
+            plot.line(&xs, &ys).label(label).into()
+        };
+        let phase_tag = format!(
+            "phased: ph0={:.0}°, ph1={:.0}°, frac={:+.3}",
+            panels.ph0_deg, panels.ph1_deg, panels.subsample_frac
+        );
+        let figure = subplots(3, 3, 2700, 1800)?
+            .subplot_at(
+                0,
+                mk(
+                    format!("{title_prefix} — |raw FFT|{zoom_suffix} ({phase_tag})"),
+                    &panels.raw,
+                    "|spectrum|",
+                ),
+            )?
+            .subplot_at(
+                1,
+                mk(
+                    format!("Exponential (EM, {lb_hz:.1} Hz)"),
+                    &panels.em,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                2,
+                mk(
+                    format!("Gaussian (GM, {lb_hz:.1} Hz)"),
+                    &panels.gm,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                3,
+                mk(
+                    format!("Lorentz→Gauss (lb={lb_hz:.1}, gb={gauss_fwhm_hz:.1})"),
+                    &panels.l2g,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                4,
+                mk(format!("TRAF (lb={lb_hz:.1} Hz)"), &panels.traf, "real"),
+            )?
+            .subplot_at(
+                5,
+                mk(
+                    format!("Bruker GMB (lb=-{lb_hz:.1}, gb=0.3)"),
+                    &panels.gmb,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                6,
+                mk("Trapezoidal (fall=0.7)".into(), &panels.trap, "real"),
+            )?
+            .subplot_at(
+                7,
+                mk(
+                    format!(
+                        "Conv-diff (lb={:.1}/{conv_broad_hz:.0}, k=0.5)",
+                        lb_hz / 3.0
+                    ),
+                    &panels.conv,
+                    "real",
+                ),
+            )?
+            .subplot_at(
+                8,
+                mk(
+                    format!(
+                        "Matched-filter EM (lb={:.2} Hz)",
+                        panels.matched_lb_hz
+                    ),
+                    &panels.matched,
+                    "real",
+                ),
+            )?;
+        figure.save(path_to_str(path)?)?;
+        Ok(())
+    }
+
+    fn write_apodization_comparison_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        // JEOL 13C Myrcene — full range + tight zoom on the aromatic cluster.
+        let fixture_13c = root.join(
+            "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+        );
+        if let Some(fid) = load_first_complex_fid(&fixture_13c)? {
+            let lb_13c = 3.0_f64;
+            let gauss_13c = 6.0_f64;
+            let conv_broad_13c = 20.0_f64;
+            let panels = build_apodization_panels(&fid, lb_13c, gauss_13c, conv_broad_13c)?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+                lb_13c,
+                gauss_13c,
+                conv_broad_13c,
+                None,
+                &output_dir.join("apodization_methods_jeol_13c.png"),
+            )?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+                lb_13c,
+                gauss_13c,
+                conv_broad_13c,
+                // Tight zoom on a small mid-range cluster so lineshape
+                // differences between EM/GM/L2G/TRAF are clearly visible.
+                Some((20.0, 70.0)),
+                &output_dir.join("apodization_methods_jeol_13c_zoom.png"),
+            )?;
+        }
+
+        // JEOL 1H Myrcene — same comparison on a 1H spectrum.
+        let fixture_1h = root.join(
+            "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+        );
+        if let Some(fid) = load_first_complex_fid(&fixture_1h)? {
+            let lb_1h = 0.5_f64;
+            let gauss_1h = 1.0_f64;
+            let conv_broad_1h = 4.0_f64;
+            let panels = build_apodization_panels(&fid, lb_1h, gauss_1h, conv_broad_1h)?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+                lb_1h,
+                gauss_1h,
+                conv_broad_1h,
+                None,
+                &output_dir.join("apodization_methods_jeol_myrcene_1h_full.png"),
+            )?;
+            save_apodization_panel(
+                &panels,
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+                lb_1h,
+                gauss_1h,
+                conv_broad_1h,
+                // JEOL writes carrier-centered ppm axes; the visible
+                // peak cluster sits at ±1 ppm around the carrier.
+                Some((-1.5, 1.5)),
+                &output_dir.join("apodization_methods_jeol_myrcene_1h_zoom.png"),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    fn write_auto_processing_plot(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries: &[(&str, &str, &str)] = &[
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
+                "JEOL 13C Myrcene (NMRXiv CC0)",
+                "auto_processing_jeol_13c",
+            ),
+            (
+                "crates/rspin-io/testdata/nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
+                "JEOL 1H Myrcene (NMRXiv CC0)",
+                "auto_processing_jeol_1h",
+            ),
+        ];
+        for (fixture_path, title, stem) in entries {
+            let fixture = root.join(fixture_path);
+            let Some(fid) = load_first_complex_fid(&fixture)? else {
+                continue;
+            };
+            let opts = AutoProcessingOptions {
+                // Let the orchestrator pick the JEOL group delay from
+                // metadata; the FIR cascade formula it now uses is
+                // more accurate than the example's local heuristic.
+                subtract_baseline: false,
+                ..AutoProcessingOptions::default()
+            };
+            let processed = process_spectrum_auto(&fid, &opts)?;
+            let processed = relabel_hz_to_ppm(processed);
+            let normalized = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&processed)?;
+
+            // Reference: raw |FFT| of the integer-shifted FID (no
+            // apodization, no LP, no phase). Use the example-local
+            // group-delay helper for parity with the apodization
+            // comparison PNG; process_spectrum_auto uses the cascade
+            // formula internally and may pick a different integer.
+            let group_delay = jeol_group_delay(&fid);
+            let integer_shift = group_delay.trunc().max(0.0);
+            let shifted = if integer_shift > 0.0 {
+                remove_group_delay(&fid, integer_shift)?
+            } else {
+                fid.clone()
+            };
+            let raw_magnitude = ProcessingRecipe1D::new()
+                .zero_fill(shifted.len() * 2)
+                .fft(FftDirection::Forward)
+                .apply(&shifted)?;
+            let raw_magnitude = magnitude_spectrum(&raw_magnitude)?;
+            let raw_magnitude = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&raw_magnitude)?;
+            let raw_magnitude = relabel_hz_to_ppm(raw_magnitude);
+
+            nmr_plot_base(
+                &format!("{title} — process_spectrum_auto"),
+                "chemical shift / ppm",
+                "normalized intensity",
+                &normalized.x.values,
+                &[&raw_magnitude.intensities, &normalized.intensities],
+                normalized.x.unit,
+            )
+            .line(&raw_magnitude.x.values, &raw_magnitude.intensities)
+            .label("|raw FFT| (no apodization)")
+            .line(&normalized.x.values, &normalized.intensities)
+            .label("process_spectrum_auto")
+            .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+        }
+        Ok(())
+    }
+
+    fn load_first_complex_fid(fixture: &Path) -> Result<Option<Spectrum1D>> {
+        let bundle = load_spectra(fixture)?;
+        let Some(fid) = bundle.spectra_1d().next() else {
+            return Ok(None);
+        };
+        if fid.x.unit != Unit::Seconds || fid.imaginary.is_none() {
+            return Ok(None);
+        }
+        Ok(Some(fid.clone()))
     }
 
     fn write_jeol_method_panel(
@@ -303,15 +727,19 @@ mod ruviz_example {
         regions: &rspin_processing::AutoPhaseResult,
     ) -> Result<()> {
         let mk = |panel_title: String, xs: &Vec<f64>, ys: &Vec<f64>, label: &str| -> Plot {
-            Plot::new()
+            let mut plot = Plot::new()
                 .title(&panel_title)
                 .xlabel("chemical shift / ppm")
                 .ylabel("intensity")
                 .max_resolution(900, 600)
-                .legend_position(LegendPosition::Best)
-                .line(xs, ys)
-                .label(label)
-                .into()
+                .legend_position(LegendPosition::Best);
+            if let Some((x_max, x_min)) = nmr_x_limits(xs, magnitude.x.unit) {
+                plot = plot.xlim(x_max, x_min);
+            }
+            if let Some((y_min, y_max)) = padded_y_limits(&[ys]) {
+                plot = plot.ylim(y_min, y_max);
+            }
+            plot.line(xs, ys).label(label).into()
         };
         let magnitude_panel = mk(
             format!("{title} — magnitude (reference)"),
@@ -410,21 +838,28 @@ mod ruviz_example {
                 )
             };
 
-            Plot::new()
-                .title(*title)
-                .xlabel("chemical shift / ppm")
-                .ylabel("normalized intensity")
-                .max_resolution(1600, 1000)
-                .legend_position(LegendPosition::Best)
-                .line(&magnitude.x.values, &magnitude.intensities)
-                .label(&format!("magnitude (shift={auto:.1})"))
-                .line(&legacy.spectrum.x.values, &legacy.spectrum.intensities)
-                .label(&fmt("legacy", &legacy))
-                .line(&acme.spectrum.x.values, &acme.spectrum.intensities)
-                .label(&fmt("ACME", &acme))
-                .line(&regions.spectrum.x.values, &regions.spectrum.intensities)
-                .label(&fmt("Regions (Zorin 2017)", &regions))
-                .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
+            nmr_plot_base(
+                title,
+                "chemical shift / ppm",
+                "normalized intensity",
+                &magnitude.x.values,
+                &[
+                    &magnitude.intensities,
+                    &legacy.spectrum.intensities,
+                    &acme.spectrum.intensities,
+                    &regions.spectrum.intensities,
+                ],
+                magnitude.x.unit,
+            )
+            .line(&magnitude.x.values, &magnitude.intensities)
+            .label(&format!("magnitude (shift={auto:.1})"))
+            .line(&legacy.spectrum.x.values, &legacy.spectrum.intensities)
+            .label(&fmt("legacy", &legacy))
+            .line(&acme.spectrum.x.values, &acme.spectrum.intensities)
+            .label(&fmt("ACME", &acme))
+            .line(&regions.spectrum.x.values, &regions.spectrum.intensities)
+            .label(&fmt("Regions (Zorin 2017)", &regions))
+            .save(path_to_str(&output_dir.join(format!("{stem}.png")))?)?;
         }
         Ok(())
     }
@@ -596,25 +1031,12 @@ mod ruviz_example {
         Ok((unphased, phased))
     }
 
+    /// JEOL Delta digital-filter group delay, sourced from the
+    /// library's `group_delay_from_metadata` which prefers the FIR
+    /// cascade formula but accepts other vendors too. Kept as a
+    /// one-line shim so callsites read naturally.
     fn jeol_group_delay(spectrum: &Spectrum1D) -> f64 {
-        let props = &spectrum.metadata.properties;
-        let factor = props
-            .get("jeol.parameter.filter_factor")
-            .and_then(|v| v.parse::<f64>().ok());
-        let decim_raw = props
-            .get("jeol.parameter.decimation_reg")
-            .and_then(|v| parse_decimation_reg(v));
-        match (decim_raw, factor) {
-            (Some(raw), Some(f)) if f > 0.0 => raw / f,
-            _ => 0.0,
-        }
-    }
-
-    fn parse_decimation_reg(raw: &str) -> Option<f64> {
-        let trimmed = raw.trim();
-        let after = trimmed.strip_prefix("r:")?.trim_start();
-        let first_token = after.split(|c: char| !c.is_ascii_digit()).next()?;
-        first_token.parse::<f64>().ok()
+        rspin_processing::group_delay_from_metadata(&spectrum.metadata)
     }
 
     fn write_auto_phase_peak_zoom_plot(output_dir: &Path, raw: &Spectrum1D) -> Result<()> {
@@ -704,11 +1126,15 @@ mod ruviz_example {
             let lo = center - half_window;
             let hi = center + half_window;
             let title = format!("{center:.2} ppm");
-            let panel = Plot::new()
+            let mut panel = Plot::new()
                 .title(&title)
                 .xlabel(axis_label(unphased.x.unit))
                 .ylabel("intensity")
-                .legend_position(LegendPosition::Best)
+                .legend_position(LegendPosition::Best);
+            if matches!(unphased.x.unit, Unit::Ppm | Unit::Hertz) {
+                panel = panel.xlim(hi, lo);
+            }
+            let panel = panel
                 .line(
                     &slice_window(&unphased.x.values, lo, hi),
                     &slice_window_y(&unphased.x.values, &unphased.intensities, lo, hi),
@@ -833,14 +1259,25 @@ mod ruviz_example {
             )
         };
 
-        Plot::new()
-            .title("Auto-Phase Comparison (Varian/Agilent 1H)")
-            .xlabel(axis_label(unphased.x.unit))
-            .ylabel("normalized intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&unphased.x.values, &unphased.intensities)
-            .label("unphased real")
+        nmr_plot_base(
+            "Auto-Phase Comparison (Varian/Agilent 1H)",
+            axis_label(unphased.x.unit),
+            "normalized intensity",
+            &unphased.x.values,
+            &[
+                &unphased.intensities,
+                &legacy_result.spectrum.intensities,
+                &acme_grid_result.spectrum.intensities,
+                &acme_refined_result.spectrum.intensities,
+                &acme_pivot_result.spectrum.intensities,
+                &acme_active_result.spectrum.intensities,
+                &acme_peak_result.spectrum.intensities,
+                &regions_result.spectrum.intensities,
+            ],
+            unphased.x.unit,
+        )
+        .line(&unphased.x.values, &unphased.intensities)
+        .label("unphased real")
             .line(
                 &legacy_result.spectrum.x.values,
                 &legacy_result.spectrum.intensities,
@@ -987,12 +1424,18 @@ mod ruviz_example {
         spectrum: &Spectrum2D,
     ) -> Result<()> {
         let levels = autoscale_contour_levels(&spectrum.z);
-        Plot::new()
+        let mut plot = Plot::new()
             .title(title)
             .xlabel(x_label)
             .ylabel(y_label)
-            .max_resolution(1400, 1200)
-            .contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
+            .max_resolution(1400, 1200);
+        if let Some((x_max, x_min)) = nmr_x_limits(&spectrum.x.values, spectrum.x.unit) {
+            plot = plot.xlim(x_max, x_min);
+        }
+        if let Some((y_max, y_min)) = nmr_x_limits(&spectrum.y.values, spectrum.y.unit) {
+            plot = plot.ylim(y_max, y_min);
+        }
+        plot.contour(&spectrum.x.values, &spectrum.y.values, &spectrum.z)
             .level_values(levels)
             .filled(false)
             .save(path_to_str(path)?)?;
@@ -1008,13 +1451,134 @@ mod ruviz_example {
         if !(max_abs > 0.0) {
             return vec![0.0];
         }
-        let base = max_abs * 0.005;
+        // Noise-aware base level: in a sparse 2D spectrum most cells are noise,
+        // so the median magnitude is a robust noise-floor proxy. Start contours
+        // well above it to clip the t1-noise floor rather than drawing it.
+        let mut sorted: Vec<f64> = z.iter().map(|value| value.abs()).collect();
+        sorted.sort_by(f64::total_cmp);
+        let median = sorted.get(sorted.len() / 2).copied().unwrap_or(0.0);
+        let base = (median * 8.0).max(max_abs * 0.03);
         let ratio = 1.3_f64;
         let count: usize = 20;
         (0..u32::try_from(count).unwrap_or(0))
             .map(|i| base * ratio.powi(i as i32))
             .filter(|level| *level <= max_abs)
             .collect()
+    }
+
+    /// Generates a single comparison PNG for the Eucalyptol 13C JEOL
+    /// fixture showing process_spectrum_auto output at the FIR-cascade
+    /// group-delay value (~19.66 samples, library default) overlaid
+    /// against the empirically-swept optimum (~16.46 samples).
+    fn write_jeol_group_delay_comparison(root: &Path, output_dir: &Path) -> Result<()> {
+        let fixture = root
+            .join("crates/rspin-io/testdata/nmrxiv/cc0/eucalyptol/jeol/eucalyptol_13cnmr_400mhz.jdf");
+        let bundle = load_spectra(&fixture)
+            .with_context(|| format!("failed to load fixture {}", fixture.display()))?;
+        let fid = bundle
+            .spectra_1d()
+            .next()
+            .context("eucalyptol 13C fixture has no 1D spectrum")?;
+
+        let run = |gd: Option<f64>| -> Result<Spectrum1D> {
+            let opts = AutoProcessingOptions {
+                group_delay_samples: gd,
+                subtract_baseline: false,
+                ..AutoProcessingOptions::default()
+            };
+            let processed = process_spectrum_auto(fid, &opts)?;
+            let normalized = ProcessingRecipe1D::new()
+                .normalize_max_abs()
+                .apply(&processed)?;
+            Ok(normalized)
+        };
+
+        let cascade = run(None)?;
+        let empirical = run(Some(16.46))?;
+        // Demonstrate the opt-in auto_group_delay_sweep: lets the
+        // orchestrator pick the best value automatically without the
+        // caller knowing the empirical optimum.
+        let sweep_opts = AutoProcessingOptions {
+            subtract_baseline: false,
+            auto_group_delay_sweep: Some(rspin_processing::GroupDelaySweepOptions {
+                delta_samples: 5.0,
+                step_samples: 0.2,
+            }),
+            ..AutoProcessingOptions::default()
+        };
+        let auto_swept = process_spectrum_auto(fid, &sweep_opts)?;
+        let auto_swept = ProcessingRecipe1D::new()
+            .normalize_max_abs()
+            .apply(&auto_swept)?;
+
+        let title = "JEOL 13C — Eucalyptol — group-delay cascade vs empirical vs auto-sweep";
+        let png_path = output_dir.join("auto_processing_jeol_eucalyptol_13c_group_delay.png");
+        nmr_plot_base(
+            title,
+            "chemical shift / ppm",
+            "normalized intensity",
+            &cascade.x.values,
+            &[
+                &cascade.intensities,
+                &empirical.intensities,
+                &auto_swept.intensities,
+            ],
+            cascade.x.unit,
+        )
+        .line(&cascade.x.values, &cascade.intensities)
+        .label("cascade (19.66, library default)")
+        .line(&empirical.x.values, &empirical.intensities)
+        .label("empirical override (16.46)")
+        .line(&auto_swept.x.values, &auto_swept.intensities)
+        .label("auto_group_delay_sweep (Δ±5, step 0.2)")
+        .save(path_to_str(&png_path)?)?;
+        Ok(())
+    }
+
+    /// Hypercomplex-modulus HSQC contours via the four-plane JEOL path
+    /// (`read_jeol_jdf_2d_hypercomplex_file` → `process_hypercomplex_planes_magnitude`).
+    ///
+    /// Uses higher-resolution (256 t1 increment) HSQC fixtures from the cheminfo
+    /// jeol-data-test submodule, which give well-resolved cross-peaks; rendered
+    /// only when the submodule is initialized. (The committed nmrxiv eucalyptol
+    /// /myrcene HSQC have only 32 t1 increments, so they are t1-noise dominated
+    /// and not used for the showcase.)
+    fn write_hsqc_phase_sensitive_contours(root: &Path, output_dir: &Path) -> Result<()> {
+        let entries = [
+            (
+                "external-testdata/cheminfo/jeol-data-test/data/Rutin_3080ug200uL_DMSOd6_HSQC_400MHz_Jeol.jdf",
+                "hsqc_rutin_hypercomplex_modulus_contour.png",
+                "JEOL HSQC — Rutin — hypercomplex modulus",
+            ),
+            (
+                "external-testdata/cheminfo/jeol-data-test/data/EC=8C_5m200u_MeOD_bzhou21_20190228__HSQC-1-1.jdf",
+                "hsqc_ec_hypercomplex_modulus_contour.png",
+                "JEOL HSQC — EC — hypercomplex modulus",
+            ),
+        ];
+        let options = HyperComplex2DOptions::default().with_indirect_zero_fill(512);
+        for (fixture, stem, title) in entries {
+            let path = root.join(fixture);
+            if !path.exists() {
+                // Submodule fixtures are optional; skip when not initialized.
+                continue;
+            }
+            let hc = read_jeol_jdf_2d_hypercomplex_file(&path)
+                .with_context(|| format!("failed to load HSQC hypercomplex {fixture}"))?;
+            // Hypercomplex-modulus display (sqrt of all four quadrants): a
+            // phase-insensitive 2D magnitude, so cross-peaks read cleanly
+            // without a perfect direct/indirect phase.
+            let display = process_hypercomplex_planes_magnitude(&hc, &options)
+                .context("phase-sensitive HSQC processing failed")?;
+            write_contour_plot(
+                &output_dir.join(stem),
+                title,
+                axis_label(display.x.unit),
+                axis_label(display.y.unit),
+                &display,
+            )?;
+        }
+        Ok(())
     }
 
     fn write_vendor_showcase(root: &Path, output_dir: &Path) -> Result<()> {
@@ -1026,59 +1590,108 @@ mod ruviz_example {
         })?;
         let fixture_root = root.join("crates/rspin-io/testdata");
 
+        // Vendor showcase matrix: every vendor gets ¹H + ¹³C entries
+        // (and 2D below) where a permissively-licensed fixture exists.
         let entries: &[VendorShowcaseEntry] = &[
+            // ── Bruker ─────────────────────────────────────────
             VendorShowcaseEntry {
                 vendor: "bruker",
-                stem: "processed_1h_zenodo",
-                title: "Bruker processed 1H (Zenodo MIT)",
-                fixture: "zenodo_7100132/bruker_without_expno",
-            },
-            VendorShowcaseEntry {
-                vendor: "bruker",
-                stem: "raw_1h_myrcene_nmrxiv",
-                title: "Bruker raw 1H FID (NMRXiv CC0 Myrcene)",
+                stem: "myrcene_1h_raw_nmrxiv",
+                title: "Bruker 1H raw FID — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/bruker_1h_raw",
             },
             VendorShowcaseEntry {
+                vendor: "bruker",
+                stem: "zenodo_processed_1h",
+                title: "Bruker 1H processed — Zenodo MIT",
+                fixture: "zenodo_7100132/bruker_without_expno",
+            },
+            // ── Varian / Agilent ───────────────────────────────
+            VendorShowcaseEntry {
                 vendor: "varian",
-                stem: "raw_1h_zenodo",
-                title: "Varian/Agilent raw 1H FID (Zenodo MIT)",
+                stem: "zenodo_1h_raw",
+                title: "Varian/Agilent 1H raw FID — Zenodo MIT",
                 fixture: "zenodo_7100132/varian_1h",
             },
+            // ── JEOL Delta ─────────────────────────────────────
             VendorShowcaseEntry {
                 vendor: "jeol",
                 stem: "myrcene_1h_nmrxiv",
-                title: "JEOL 1H (NMRXiv CC0 Myrcene)",
+                title: "JEOL 1H — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_1h_400mhz.jdf",
             },
             VendorShowcaseEntry {
                 vendor: "jeol",
                 stem: "myrcene_13c_nmrxiv",
-                title: "JEOL 13C (NMRXiv CC0 Myrcene)",
+                title: "JEOL 13C — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_13c_400mhz.jdf",
             },
             VendorShowcaseEntry {
                 vendor: "jeol",
                 stem: "rutin_qh_dataverse",
-                title: "JEOL 1H (Dataverse CC0 Rutin)",
+                title: "JEOL 1H — Rutin (Dataverse CC0)",
                 fixture: "dataverse/cc0/rutin/jeol/rutin_qhnmr_400mhz.jdf",
             },
             VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "rutin_13c_dataverse",
+                title: "JEOL 13C — Rutin (Dataverse CC0)",
+                fixture: "dataverse/cc0/rutin/jeol/rutin_13cnmr_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "eucalyptol_qh_nmrxiv",
+                title: "JEOL 1H — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jeol/eucalyptol_qhnmr_400mhz.jdf",
+            },
+            VendorShowcaseEntry {
+                vendor: "jeol",
+                stem: "eucalyptol_13c_nmrxiv",
+                title: "JEOL 13C — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jeol/eucalyptol_13cnmr_400mhz.jdf",
+            },
+            // ── JCAMP-DX ───────────────────────────────────────
+            VendorShowcaseEntry {
                 vendor: "jcamp",
                 stem: "myrcene_1h_nmrxiv",
-                title: "JCAMP-DX 1H (NMRXiv CC0 Myrcene)",
+                title: "JCAMP-DX 1H — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
             },
             VendorShowcaseEntry {
                 vendor: "jcamp",
+                stem: "myrcene_13c_nmrxiv",
+                title: "JCAMP-DX 13C — Myrcene (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
                 stem: "rutin_qh_dataverse",
-                title: "JCAMP-DX 1H (Dataverse CC0 Rutin)",
+                title: "JCAMP-DX 1H — Rutin (Dataverse CC0)",
                 fixture: "dataverse/cc0/rutin/jcamp/rutin_qh_400mhz.jdx",
             },
             VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "rutin_13c_dataverse",
+                title: "JCAMP-DX 13C — Rutin (Dataverse CC0)",
+                fixture: "dataverse/cc0/rutin/jcamp/rutin_13c_400mhz.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "eucalyptol_qh_nmrxiv",
+                title: "JCAMP-DX 1H — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jcamp/eucalyptol_qh_400mhz_jcamp_dx_6_link.jdx",
+            },
+            VendorShowcaseEntry {
+                vendor: "jcamp",
+                stem: "eucalyptol_13c_nmrxiv",
+                title: "JCAMP-DX 13C — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jcamp/eucalyptol_13c_400mhz_jcamp_dx_6_link.jdx",
+            },
+            // ── nmrML ──────────────────────────────────────────
+            VendorShowcaseEntry {
                 vendor: "nmrml",
                 stem: "mmbbi_10m12_mit",
-                title: "nmrML example (MIT)",
+                title: "nmrML 1H — MMBBI 10M12 (MIT)",
                 fixture: "nmrml/mit/MMBBI_10M12-CE01-1a.nmrML",
             },
         ];
@@ -1094,15 +1707,27 @@ mod ruviz_example {
         let contour_entries: &[VendorContourEntry] = &[
             VendorContourEntry {
                 vendor: "bruker",
-                stem: "cosy_2d_myrcene_nmrxiv",
-                title: "Bruker raw COSY 2D (NMRXiv CC0 Myrcene)",
+                stem: "myrcene_cosy_2d_nmrxiv",
+                title: "Bruker COSY 2D — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/bruker_cosy_raw",
             },
             VendorContourEntry {
                 vendor: "jeol",
-                stem: "hsqc_2d_myrcene_nmrxiv",
-                title: "JEOL HSQC 2D (NMRXiv CC0 Myrcene)",
+                stem: "myrcene_hsqc_2d_nmrxiv",
+                title: "JEOL HSQC 2D — Myrcene (NMRXiv CC0)",
                 fixture: "nmrxiv/cc0/myrcene/jeol/myrcene_hsqc_400mhz.jdf",
+            },
+            VendorContourEntry {
+                vendor: "jeol",
+                stem: "eucalyptol_hsqc_2d_nmrxiv",
+                title: "JEOL HSQC 2D — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jeol/eucalyptol_hsqc_400mhz.jdf",
+            },
+            VendorContourEntry {
+                vendor: "jcamp",
+                stem: "eucalyptol_hsqc_2d_nmrxiv",
+                title: "JCAMP-DX HSQC 2D — Eucalyptol (NMRXiv CC0)",
+                fixture: "nmrxiv/cc0/eucalyptol/jcamp/eucalyptol_hsqc_400mhz_jcamp_dx_6_link.jdx",
             },
         ];
         for entry in contour_entries {
@@ -1134,17 +1759,18 @@ mod ruviz_example {
             return Ok(());
         };
         let processed = if spectrum.x.unit == Unit::Seconds {
-            let target_len = spectrum
-                .len()
-                .checked_mul(2)
-                .context("vendor showcase target length overflow")?;
+            // Polynomial refine (ph2/ph3) is intentionally OFF here:
+            // it overfits the JEOL group-delay residual on Myrcene 13C,
+            // producing a 180°-flipped CDCl3 solvent peak even when
+            // the sample resonances are well-phased.
+            let opts = AutoProcessingOptions {
+                subtract_baseline: false,
+                ..AutoProcessingOptions::default()
+            };
+            let auto = process_spectrum_auto(spectrum, &opts)?;
             ProcessingRecipe1D::new()
-                .exponential_apodization(1.0, dwell_time_seconds(spectrum)?)
-                .zero_fill(target_len)
-                .fft(FftDirection::Forward)
-                .magnitude()
                 .normalize_max_abs()
-                .apply(spectrum)?
+                .apply(&auto)?
         } else {
             ProcessingRecipe1D::new()
                 .normalize_max_abs()
@@ -1162,7 +1788,79 @@ mod ruviz_example {
             &processed.intensities,
             "spectrum",
         )?;
+
+        // Companion zoom plot, clipped to the signal-bearing window.
+        // For 1H/13C spectra in ppm units the window is always extended
+        // to include 0 ppm so the absence of TMS / reference signal is
+        // visible too.
+        let include_zero = processed.x.unit == Unit::Ppm
+            && matches!(
+                processed.metadata.nucleus,
+                Some(Nucleus::Hydrogen1) | Some(Nucleus::Carbon13)
+            );
+        let window = signal_window(&processed.x.values, &processed.intensities, 0.08)
+            .map(|(lo, hi)| {
+                if include_zero {
+                    (lo.min(-0.2), hi.max(0.2))
+                } else {
+                    (lo, hi)
+                }
+            });
+        if let Some((lo, hi)) = window {
+            let mut xs = Vec::new();
+            let mut ys = Vec::new();
+            for (x, y) in processed.x.values.iter().zip(&processed.intensities) {
+                if *x >= lo && *x <= hi {
+                    xs.push(*x);
+                    ys.push(*y);
+                }
+            }
+            if xs.len() >= 4 {
+                let zoom_path = out_dir.join(format!("{}_zoom.png", entry.stem));
+                write_spectrum_plot(
+                    &zoom_path,
+                    &format!("{} — zoom", entry.title),
+                    axis_label(processed.x.unit),
+                    "normalized intensity",
+                    &xs,
+                    &ys,
+                    "spectrum (signal window)",
+                )?;
+            }
+        }
         Ok(())
+    }
+
+    /// Auto-detects the signal-bearing window on a normalized spectrum
+    /// by finding the leftmost/rightmost x where `|y|` first exceeds
+    /// `threshold_fraction × peak`, then padding 10 % on each side.
+    /// Returns `None` for spectra with no clear signal.
+    fn signal_window(x: &[f64], y: &[f64], threshold_fraction: f64) -> Option<(f64, f64)> {
+        let peak = y
+            .iter()
+            .copied()
+            .fold(0.0_f64, |acc, value| acc.max(value.abs()));
+        if !peak.is_finite() || peak <= 0.0 {
+            return None;
+        }
+        let threshold = peak * threshold_fraction;
+        let mut x_lo = f64::INFINITY;
+        let mut x_hi = f64::NEG_INFINITY;
+        for (xi, yi) in x.iter().zip(y) {
+            if yi.abs() >= threshold && xi.is_finite() {
+                if *xi < x_lo {
+                    x_lo = *xi;
+                }
+                if *xi > x_hi {
+                    x_hi = *xi;
+                }
+            }
+        }
+        if !x_lo.is_finite() || !x_hi.is_finite() || x_lo >= x_hi {
+            return None;
+        }
+        let pad = 0.10 * (x_hi - x_lo);
+        Some((x_lo - pad, x_hi + pad))
     }
 
     fn relabel_hz_to_ppm(mut spectrum: Spectrum1D) -> Spectrum1D {
@@ -1259,17 +1957,19 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
         let unphased = complex_recipe.apply(raw)?;
         let phased = auto_phase_correct(&unphased, AutoPhaseOptions::default())?.spectrum;
 
-        Plot::new()
-            .title("Oracle Varian/Agilent Auto-Phase")
-            .xlabel(axis_label(unphased.x.unit))
-            .ylabel("normalized intensity")
-            .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&unphased.x.values, &unphased.intensities)
-            .label("unphased real")
-            .line(&phased.x.values, &phased.intensities)
-            .label("auto-phased real")
-            .save(path_to_str(&output_dir.join("processed_auto_phase.png"))?)?;
+        nmr_plot_base(
+            "Oracle Varian/Agilent Auto-Phase",
+            axis_label(unphased.x.unit),
+            "normalized intensity",
+            &unphased.x.values,
+            &[&unphased.intensities, &phased.intensities],
+            unphased.x.unit,
+        )
+        .line(&unphased.x.values, &unphased.intensities)
+        .label("unphased real")
+        .line(&phased.x.values, &phased.intensities)
+        .label("auto-phased real")
+        .save(path_to_str(&output_dir.join("processed_auto_phase.png"))?)?;
 
         Ok(())
     }
@@ -1437,12 +2137,19 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             .collect::<Vec<_>>();
         let (range_x, range_y) = range_points(spectrum, &analysis.ranges);
 
-        let mut plot = Plot::new()
+        let mut base = Plot::new()
             .title(title)
             .xlabel(axis_label(spectrum.x.unit))
             .ylabel("intensity")
             .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
+            .legend_position(LegendPosition::Best);
+        if let Some((x_max, x_min)) = nmr_x_limits(&spectrum.x.values, spectrum.x.unit) {
+            base = base.xlim(x_max, x_min);
+        }
+        if let Some((y_min, y_max)) = padded_y_limits(&[&spectrum.intensities]) {
+            base = base.ylim(y_min, y_max);
+        }
+        let mut plot = base
             .line(&spectrum.x.values, &spectrum.intensities)
             .label("spectrum")
             .into_plot();
@@ -1474,16 +2181,114 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
         y: &[f64],
         series_label: &str,
     ) -> Result<()> {
-        Plot::new()
+        let mut plot = Plot::new()
             .title(title)
             .xlabel(x_label)
             .ylabel(y_label)
             .max_resolution(1600, 1000)
-            .legend_position(LegendPosition::Best)
-            .line(&x, &y)
+            .legend_position(LegendPosition::Best);
+        let unit = unit_from_label(x_label);
+        if let Some((x_max, x_min)) = nmr_x_limits(x, unit) {
+            plot = plot.xlim(x_max, x_min);
+        }
+        if let Some((y_min, y_max)) = padded_y_limits(&[y]) {
+            plot = plot.ylim(y_min, y_max);
+        }
+        plot.line(&x, &y)
             .label(series_label)
             .save(path_to_str(path)?)?;
         Ok(())
+    }
+
+    /// X-axis limits in NMR convention (high → low) for Ppm/Hz units;
+    /// returns `(x_max, x_min)` so callers can pass them straight to
+    /// `Plot::xlim` to invert the axis. Returns `None` for time-domain
+    /// or point-domain plots where NMR convention does not apply.
+    fn nmr_x_limits(x: &[f64], unit: Unit) -> Option<(f64, f64)> {
+        if !matches!(unit, Unit::Ppm | Unit::Hertz) {
+            return None;
+        }
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for value in x.iter().copied().filter(|value| value.is_finite()) {
+            if value < lo {
+                lo = value;
+            }
+            if value > hi {
+                hi = value;
+            }
+        }
+        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
+            return None;
+        }
+        Some((hi, lo))
+    }
+
+    /// Y-axis limits padded below the minimum and above the maximum so
+    /// small negative baseline excursions remain visible. Accepts any
+    /// number of overlaid traces.
+    fn padded_y_limits(series: &[&[f64]]) -> Option<(f64, f64)> {
+        let mut lo = f64::INFINITY;
+        let mut hi = f64::NEG_INFINITY;
+        for trace in series {
+            for value in trace.iter().copied().filter(|value| value.is_finite()) {
+                if value < lo {
+                    lo = value;
+                }
+                if value > hi {
+                    hi = value;
+                }
+            }
+        }
+        if !lo.is_finite() || !hi.is_finite() || lo >= hi {
+            return None;
+        }
+        let span = hi - lo;
+        Some((lo - 0.05 * span, hi + 0.10 * span))
+    }
+
+    /// Builds the standard NMR-styled `Plot` used by every panel in
+    /// this example: 1600×1000 resolution, "Best" legend position,
+    /// x-axis flipped high→low for Ppm/Hz units, and y-axis padded so
+    /// negative baseline excursions stay visible.
+    fn nmr_plot_base(
+        title: &str,
+        x_label: &str,
+        y_label: &str,
+        x: &[f64],
+        y_traces: &[&[f64]],
+        unit: Unit,
+    ) -> Plot {
+        let mut plot = Plot::new()
+            .title(title)
+            .xlabel(x_label)
+            .ylabel(y_label)
+            .max_resolution(1600, 1000)
+            .legend_position(LegendPosition::Best);
+        if let Some((x_max, x_min)) = nmr_x_limits(x, unit) {
+            plot = plot.xlim(x_max, x_min);
+        }
+        if let Some((y_min, y_max)) = padded_y_limits(y_traces) {
+            plot = plot.ylim(y_min, y_max);
+        }
+        plot
+    }
+
+    /// Best-effort mapping from a free-form axis label back to its
+    /// [`Unit`]; used by `write_spectrum_plot` to decide whether to
+    /// flip the x-axis. Falls back to [`Unit::Arbitrary`] when the
+    /// label is unrecognised.
+    fn unit_from_label(label: &str) -> Unit {
+        let lower = label.to_ascii_lowercase();
+        if lower.contains("ppm") {
+            Unit::Ppm
+        } else if lower.contains("hz") || lower.contains("hertz") || lower.contains("frequency") {
+            Unit::Hertz
+        } else if lower.contains("time") || lower.contains(" s") {
+            Unit::Seconds
+        } else {
+            Unit::Arbitrary
+        }
     }
 
     fn axis_label(unit: Unit) -> &'static str {

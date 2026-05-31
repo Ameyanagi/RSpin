@@ -20,6 +20,8 @@ pub(super) struct Header {
     pub(super) param_start: usize,
     pub(super) param_length: usize,
     pub(super) data_start: usize,
+    pub(super) data_offset_start: [u32; 8],
+    pub(super) data_offset_stop: [u32; 8],
     major_version: u8,
     minor_version: u16,
     data_dimension_number: u8,
@@ -55,8 +57,8 @@ impl Header {
         let title = super::binary::non_empty_string(reader.bytes(124, "title")?);
         reader.skip(4, "axis range table")?;
         let data_points = reader.u32_array::<8>("data point counts")?;
-        let _data_offset_start = reader.u32_array::<8>("data offset starts")?;
-        let _data_offset_stop = reader.u32_array::<8>("data offset stops")?;
+        let data_offset_start = reader.u32_array::<8>("data offset starts")?;
+        let data_offset_stop = reader.u32_array::<8>("data offset stops")?;
         let data_axis_start = reader.f64_array::<8>("axis starts")?;
         let data_axis_stop = reader.f64_array::<8>("axis stops")?;
 
@@ -89,6 +91,8 @@ impl Header {
             param_start,
             param_length,
             data_start,
+            data_offset_start,
+            data_offset_stop,
             major_version,
             minor_version,
             data_dimension_number,

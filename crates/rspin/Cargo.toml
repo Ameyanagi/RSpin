@@ -9,6 +9,9 @@ version.workspace = true
 [features]
 default = []
 external-baselines = ["rspin-processing/external-baselines"]
+# Enables `rspin::plot` (ruviz-backed PNG helpers). Off by default to
+# keep the headless build dependency-light and WASM-friendly.
+visualization = ["dep:ruviz"]
 
 [dependencies]
 rspin-analysis.workspace = true
@@ -17,6 +20,7 @@ rspin-io.workspace = true
 rspin-prediction.workspace = true
 rspin-processing.workspace = true
 rspin-simulation.workspace = true
+ruviz = { workspace = true, optional = true }
 
 [lints]
 workspace = true

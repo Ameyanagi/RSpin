@@ -4,10 +4,10 @@ use rspin_core::{Axis, Result, Spectrum1D, Spectrum2D};
 
 use crate::{
     Abs2D, AutoPhase2DOptions, AutoPhaseCorrection2D, Crop2D, ExponentialApodization2D, Fft2D,
-    FftDirection, GaussianApodization2D, Normalize2DMaxAbs, Normalize2DVolume, Offset2D,
-    PhaseCorrection2D, ProcessingStep, ProjectionMode, Resample2D, Scale2D, Shift2DAxes,
-    SineBellApodization2D, ZeroFill2D, project_x, project_y, slice_x_at_y, slice_x_at_y_index,
-    slice_y_at_x, slice_y_at_x_index,
+    FftDirection, GaussianApodization2D, HyperComplex2DOptions, Normalize2DMaxAbs,
+    Normalize2DVolume, Offset2D, PhaseCorrection2D, ProcessingStep, ProjectionMode, Resample2D,
+    Scale2D, Shift2DAxes, SineBellApodization2D, ZeroFill2D, process_hypercomplex_2d, project_x,
+    project_y, slice_x_at_y, slice_x_at_y_index, slice_y_at_x, slice_y_at_x_index,
 };
 
 /// Chainable processor for two-dimensional spectra.
@@ -39,6 +39,14 @@ impl Spectrum2DPipeline {
     #[must_use]
     pub fn from_result(result: Result<Spectrum2D>) -> Self {
         Self { result }
+    }
+
+    /// Starts a pipeline by processing a raw `ser`-style hypercomplex spectrum
+    /// into a phasable spectrum (direct FT, quadrature assembly, indirect FT,
+    /// phase), then continues as a normal 2D pipeline.
+    #[must_use]
+    pub fn from_raw_hypercomplex(raw: &Spectrum2D, options: &HyperComplex2DOptions) -> Self {
+        Self::from_result(process_hypercomplex_2d(raw, options))
     }
 
     /// Applies a reusable processing step.

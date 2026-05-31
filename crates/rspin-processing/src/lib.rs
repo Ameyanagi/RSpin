@@ -3,14 +3,18 @@
 mod abs_1d;
 mod abs_2d;
 mod apodization_2d;
+mod apodization_weights;
 mod auto_phase;
 mod auto_phase_2d;
+mod auto_processing;
 mod baseline;
 #[cfg(test)]
 mod builder_tests;
 mod contours;
 mod crop_1d;
 mod crop_2d;
+mod hypercomplex_2d;
+mod linear_prediction;
 mod one_d;
 mod pipeline;
 mod pipeline_2d;
@@ -29,16 +33,23 @@ mod zero_fill_2d;
 pub use abs_1d::{Abs1D, abs_1d};
 pub use abs_2d::{Abs2D, abs_2d};
 pub use apodization_2d::{
-    ExponentialApodization2D, GaussianApodization2D, SineBellApodization2D,
-    exponential_apodization_2d, gaussian_apodization_2d, sine_bell_apodization_2d,
+    ExponentialApodization2D, GaussianApodization2D, LorentzToGaussApodization2D,
+    SineBellApodization2D, TrafApodization2D, TrapezoidalApodization2D, exponential_apodization_2d,
+    gaussian_apodization_2d, lorentz_to_gauss_apodization_2d, sine_bell_apodization_2d,
+    traf_apodization_2d, trapezoidal_apodization_2d,
 };
 pub use auto_phase::{
-    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhaseResult, AutoPhaseStrategy,
-    RegionsOptions, RegionsResult, auto_phase_correct, auto_phase_correct_regions,
-    auto_phase_correct_with_peaks, peak_based_phase_estimate,
+    AutoPhaseCorrection, AutoPhaseCost, AutoPhaseOptions, AutoPhasePolynomialResult,
+    AutoPhaseResult, AutoPhaseStrategy, RegionsOptions, RegionsResult, auto_phase_correct,
+    auto_phase_correct_polynomial, auto_phase_correct_regions, auto_phase_correct_with_peaks,
+    peak_based_phase_estimate,
 };
 pub use auto_phase_2d::{
     AutoPhase2DOptions, AutoPhase2DResult, AutoPhaseCorrection2D, auto_phase_correct_2d,
+};
+pub use auto_processing::{
+    AutoProcessingOptions, GroupDelaySweepOptions, NucleusLbDefaults, bruker_group_delay,
+    group_delay_from_metadata, jeol_cascade_group_delay, process_spectrum_auto,
 };
 pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
@@ -46,6 +57,15 @@ pub use baseline::{
 pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, extract_contours};
 pub use crop_1d::{Crop1D, crop_1d};
 pub use crop_2d::{Crop2D, crop_2d};
+pub use hypercomplex_2d::{
+    HyperComplex2DOptions, assemble_hypercomplex_2d, direct_ft_hypercomplex_2d,
+    indirect_ft_hypercomplex_2d, phase_hypercomplex_2d, process_hypercomplex_2d,
+    process_hypercomplex_planes, process_hypercomplex_planes_magnitude,
+};
+pub use linear_prediction::{
+    LinearPredictionBackward, LinearPredictionForward, linear_predict_backward,
+    linear_predict_forward,
+};
 pub use one_d::{
     NormalizeArea, NormalizeMaxAbs, OffsetIntensity, ScaleIntensity, ShiftAxis, ZeroFill,
     normalize_area, normalize_max_abs, offset_intensity, scale_intensity, shift_axis,
@@ -63,13 +83,18 @@ pub use recipe_2d::{
 };
 pub use resample_1d::{Resample1D, resample_1d};
 pub use resample_2d::{Resample2D, resample_2d};
+pub use rspin_core::HyperComplex2D;
 pub use traits::ProcessingStep;
-pub use transform::remove_group_delay;
 pub use transform::{
-    ExponentialApodization, Fft1D, FftDirection, GaussianApodization, Magnitude, PhaseCorrection,
-    SineBellApodization, exponential_apodization, fft_1d, gaussian_apodization, magnitude_spectrum,
-    phase_correct, sine_bell_apodization,
+    ConvolutionDifferenceApodization, ExponentialApodization, Fft1D, FftDirection, FirstPointScale,
+    GaussMultiplyBrukerApodization, GaussianApodization, LorentzToGaussApodization, Magnitude,
+    PhaseCorrection, SineBellApodization, TrafApodization, TrapezoidalApodization,
+    convolution_difference_apodization, exponential_apodization, fft_1d, first_point_scale,
+    gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
+    magnitude_spectrum, matched_filter_em, phase_correct, phase_correct_polynomial,
+    sine_bell_apodization, traf_apodization, trapezoidal_apodization,
 };
+pub use transform::{SubsampleShift, apply_subsample_shift, remove_group_delay};
 pub use transform_2d::{Fft2D, PhaseCorrection2D, fft_2d, phase_correct_2d};
 pub use two_d::{
     Normalize2DMaxAbs, Normalize2DVolume, Offset2D, ProjectionMode, Scale2D, Shift2DAxes,

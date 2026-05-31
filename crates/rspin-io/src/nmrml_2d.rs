@@ -436,13 +436,13 @@ fn apply_metadata(
             raw.y_axis = Some(axis_from_start(start)?);
         }
         b"acquisitionNucleus" => {
-            if let Some(dimension) = dimension_mut(raw, dimension_context) {
-                if dimension.nucleus.is_none() {
-                    dimension.nucleus = attr_value(start, b"name")?
-                        .as_deref()
-                        .map(parse_nucleus)
-                        .transpose()?;
-                }
+            if let Some(dimension) = dimension_mut(raw, dimension_context)
+                && dimension.nucleus.is_none()
+            {
+                dimension.nucleus = attr_value(start, b"name")?
+                    .as_deref()
+                    .map(parse_nucleus)
+                    .transpose()?;
             }
         }
         b"irradiationFrequency" => {
@@ -457,23 +457,23 @@ fn apply_metadata(
             }
         }
         b"effectiveExcitationField" => {
-            if let Some(dimension) = dimension_mut(raw, dimension_context) {
-                if dimension.frequency_mhz.is_none() {
-                    let value = optional_f64_attr(start, b"value", "frequency value")?;
-                    let unit_name = attr_value(start, b"unitName")?;
-                    dimension.frequency_mhz = value
-                        .and_then(|frequency| frequency_to_mhz(frequency, unit_name.as_deref()));
-                }
+            if let Some(dimension) = dimension_mut(raw, dimension_context)
+                && dimension.frequency_mhz.is_none()
+            {
+                let value = optional_f64_attr(start, b"value", "frequency value")?;
+                let unit_name = attr_value(start, b"unitName")?;
+                dimension.frequency_mhz =
+                    value.and_then(|frequency| frequency_to_mhz(frequency, unit_name.as_deref()));
             }
         }
         b"sweepWidth" => {
-            if let Some(dimension) = dimension_mut(raw, dimension_context) {
-                if dimension.sweep_width_hz.is_none() {
-                    let value = optional_f64_attr(start, b"value", "sweep width value")?;
-                    let unit_name = attr_value(start, b"unitName")?;
-                    dimension.sweep_width_hz = value
-                        .and_then(|sweep_width| frequency_to_hz(sweep_width, unit_name.as_deref()));
-                }
+            if let Some(dimension) = dimension_mut(raw, dimension_context)
+                && dimension.sweep_width_hz.is_none()
+            {
+                let value = optional_f64_attr(start, b"value", "sweep width value")?;
+                let unit_name = attr_value(start, b"unitName")?;
+                dimension.sweep_width_hz = value
+                    .and_then(|sweep_width| frequency_to_hz(sweep_width, unit_name.as_deref()));
             }
         }
         b"sampleAcquisitionTemperature" if raw.temperature_k.is_none() => {
@@ -572,20 +572,22 @@ fn validate_declared_spectrum_points(declared: Option<usize>, actual: usize) -> 
 }
 
 fn infer_matrix_dimensions(raw: &RawNmrMl2D, points: usize) -> Result<(usize, usize)> {
-    if let (Some(x_count), Some(y_count)) = (raw.direct.point_count, raw.indirect.point_count) {
-        if x_count.checked_mul(y_count) == Some(points) {
-            return Ok((x_count, y_count));
-        }
+    if let (Some(x_count), Some(y_count)) = (raw.direct.point_count, raw.indirect.point_count)
+        && x_count.checked_mul(y_count) == Some(points)
+    {
+        return Ok((x_count, y_count));
     }
-    if let Some(x_count) = raw.direct.point_count {
-        if x_count > 0 && points % x_count == 0 {
-            return Ok((x_count, points / x_count));
-        }
+    if let Some(x_count) = raw.direct.point_count
+        && x_count > 0
+        && points.is_multiple_of(x_count)
+    {
+        return Ok((x_count, points / x_count));
     }
-    if let Some(y_count) = raw.indirect.point_count {
-        if y_count > 0 && points % y_count == 0 {
-            return Ok((points / y_count, y_count));
-        }
+    if let Some(y_count) = raw.indirect.point_count
+        && y_count > 0
+        && points.is_multiple_of(y_count)
+    {
+        return Ok((points / y_count, y_count));
     }
     Err(RSpinError::InvalidSpectrum {
         message: format!("cannot infer nmrML 2D matrix dimensions for {points} processed points"),
@@ -617,7 +619,7 @@ fn should_decode_matrix_complex64(payload: &[u8], expected_points: Option<usize>
         return false;
     };
     match points.checked_mul(8) {
-        Some(expected_bytes) => payload.len() == expected_bytes && payload.len() % 8 == 0,
+        Some(expected_bytes) => payload.len() == expected_bytes && payload.len().is_multiple_of(8),
         None => false,
     }
 }
@@ -665,15 +667,15 @@ fn validate_matrix_length(
             ),
         });
     }
-    if let Some(values) = imaginary.as_deref() {
-        if values.len() != expected_points {
-            return Err(RSpinError::InvalidSpectrum {
-                message: format!(
-                    "nmrML 2D fidData has {} imaginary points but dimensions require {expected_points}",
-                    values.len()
-                ),
-            });
-        }
+    if let Some(values) = imaginary.as_deref()
+        && values.len() != expected_points
+    {
+        return Err(RSpinError::InvalidSpectrum {
+            message: format!(
+                "nmrML 2D fidData has {} imaginary points but dimensions require {expected_points}",
+                values.len()
+            ),
+        });
     }
     Ok((z, imaginary))
 }
@@ -725,7 +727,7 @@ fn validate_encoded_length(
 }
 
 fn decode_f64_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
-    if bytes.len() % 8 != 0 {
+    if !bytes.len().is_multiple_of(8) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} byte length is not divisible by 8"),
@@ -744,7 +746,7 @@ fn decode_f64_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
 }
 
 fn decode_f32_values(bytes: &[u8], field: &'static str) -> Result<Vec<f64>> {
-    if bytes.len() % 4 != 0 {
+    if !bytes.len().is_multiple_of(4) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} byte length is not divisible by 4"),
@@ -771,7 +773,7 @@ fn decode_f32_pairs(bytes: &[u8], field: &'static str) -> Result<(Vec<f64>, Opti
 }
 
 fn split_pairs(values: &[f64], field: &'static str) -> Result<(Vec<f64>, Vec<f64>)> {
-    if values.len() % 2 != 0 {
+    if !values.len().is_multiple_of(2) {
         return Err(RSpinError::Parse {
             format: FORMAT,
             message: format!("{field} pair data has an odd number of values"),

@@ -91,11 +91,16 @@ pub use prediction::{
 };
 pub use processing_1d::{
     abs_spectrum_1d_json, apply_processing_recipe_1d_json, apply_processing_recipe_1d_until_json,
+    apply_subsample_shift_spectrum_1d_json, convolution_difference_apodization_spectrum_1d_json,
     crop_spectrum_1d_json, exponential_apodization_spectrum_1d_json, fft_spectrum_1d_json,
-    gaussian_apodization_spectrum_1d_json, magnitude_spectrum_1d_json,
-    normalize_spectrum_1d_area_json, offset_spectrum_1d_json, phase_spectrum_1d_json,
-    resample_spectrum_1d_json, shift_spectrum_1d_axis_json, sine_bell_apodization_spectrum_1d_json,
-    subtract_baseline_spectrum_1d_json, zero_fill_spectrum_1d_json,
+    first_point_scale_spectrum_1d_json, gauss_multiply_bruker_apodization_spectrum_1d_json,
+    gaussian_apodization_spectrum_1d_json, linear_predict_backward_spectrum_1d_json,
+    linear_predict_forward_spectrum_1d_json, lorentz_to_gauss_apodization_spectrum_1d_json,
+    magnitude_spectrum_1d_json, normalize_spectrum_1d_area_json, offset_spectrum_1d_json,
+    phase_spectrum_1d_json, resample_spectrum_1d_json, shift_spectrum_1d_axis_json,
+    sine_bell_apodization_spectrum_1d_json, subtract_baseline_spectrum_1d_json,
+    traf_apodization_spectrum_1d_json, trapezoidal_apodization_spectrum_1d_json,
+    zero_fill_spectrum_1d_json,
 };
 pub use processing_2d::{
     abs_spectrum_2d_json, apply_processing_recipe_2d_json, apply_processing_recipe_2d_until_json,
@@ -1061,6 +1066,8 @@ struct AutoPhaseOptionsJson {
     regularization_weight: f64,
     #[serde(default)]
     strategy: rspin_processing::AutoPhaseStrategy,
+    #[serde(default)]
+    allow_negative: bool,
 }
 
 fn default_regularization_weight() -> f64 {
@@ -1086,6 +1093,7 @@ impl Default for AutoPhaseOptionsJson {
             refine: options.refine,
             regularization_weight: options.regularization_weight,
             strategy: options.strategy,
+            allow_negative: options.allow_negative,
         }
     }
 }
@@ -1108,6 +1116,7 @@ impl From<AutoPhaseOptionsJson> for AutoPhaseOptions {
             refine: options.refine,
             regularization_weight: options.regularization_weight,
             strategy: options.strategy,
+            allow_negative: options.allow_negative,
         }
     }
 }

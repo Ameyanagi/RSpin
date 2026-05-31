@@ -6,6 +6,7 @@ use rspin_core::{ProcessingRecord, RSpinError, Result, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
 use crate::ProcessingStep;
+use crate::apodization_weights::{lorentz_to_gauss_weights, traf_weights, trapezoidal_weights};
 
 /// Applies separable exponential apodization to a two-dimensional spectrum.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -89,6 +90,163 @@ impl ProcessingStep<Spectrum2D> for GaussianApodization2D {
             self.y_gaussian_broadening_hz,
             self.x_dwell_time_s,
             self.y_dwell_time_s,
+        )
+    }
+}
+
+/// Applies separable Lorentz-to-Gauss apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct LorentzToGaussApodization2D {
+    /// X-dimension Lorentzian linewidth to undo, in hertz.
+    pub x_lorentz_to_undo_hz: f64,
+    /// X-dimension Gaussian full-width-at-half-maximum to impose, in hertz.
+    pub x_gauss_fwhm_hz: f64,
+    /// X-dimension Gaussian-peak shift in `[0, 1]`.
+    pub x_gauss_shift: f64,
+    /// X-dimension dwell time in seconds.
+    pub x_dwell_time_s: f64,
+    /// Y-dimension Lorentzian linewidth to undo, in hertz.
+    pub y_lorentz_to_undo_hz: f64,
+    /// Y-dimension Gaussian full-width-at-half-maximum to impose, in hertz.
+    pub y_gauss_fwhm_hz: f64,
+    /// Y-dimension Gaussian-peak shift in `[0, 1]`.
+    pub y_gauss_shift: f64,
+    /// Y-dimension dwell time in seconds.
+    pub y_dwell_time_s: f64,
+}
+
+impl LorentzToGaussApodization2D {
+    /// Creates a separable Lorentz-to-Gauss apodization step with Gaussian
+    /// shifts at `0` on both axes.
+    #[must_use]
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        x_lorentz_to_undo_hz: f64,
+        x_gauss_fwhm_hz: f64,
+        x_dwell_time_s: f64,
+        y_lorentz_to_undo_hz: f64,
+        y_gauss_fwhm_hz: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            x_lorentz_to_undo_hz,
+            x_gauss_fwhm_hz,
+            x_gauss_shift: 0.0,
+            x_dwell_time_s,
+            y_lorentz_to_undo_hz,
+            y_gauss_fwhm_hz,
+            y_gauss_shift: 0.0,
+            y_dwell_time_s,
+        }
+    }
+
+    /// Returns this step with explicit Gaussian-peak shifts.
+    #[must_use]
+    pub fn with_gauss_shifts(mut self, x_gauss_shift: f64, y_gauss_shift: f64) -> Self {
+        self.x_gauss_shift = x_gauss_shift;
+        self.y_gauss_shift = y_gauss_shift;
+        self
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for LorentzToGaussApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        lorentz_to_gauss_apodization_2d(
+            spectrum,
+            self.x_lorentz_to_undo_hz,
+            self.x_gauss_fwhm_hz,
+            self.x_gauss_shift,
+            self.x_dwell_time_s,
+            self.y_lorentz_to_undo_hz,
+            self.y_gauss_fwhm_hz,
+            self.y_gauss_shift,
+            self.y_dwell_time_s,
+        )
+    }
+}
+
+/// Applies separable TRAF (Traficante) apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrafApodization2D {
+    /// X-dimension line broadening in hertz.
+    pub x_line_broadening_hz: f64,
+    /// X-dimension dwell time in seconds.
+    pub x_dwell_time_s: f64,
+    /// Y-dimension line broadening in hertz.
+    pub y_line_broadening_hz: f64,
+    /// Y-dimension dwell time in seconds.
+    pub y_dwell_time_s: f64,
+}
+
+impl TrafApodization2D {
+    /// Creates a separable TRAF apodization step.
+    #[must_use]
+    pub fn new(
+        x_line_broadening_hz: f64,
+        x_dwell_time_s: f64,
+        y_line_broadening_hz: f64,
+        y_dwell_time_s: f64,
+    ) -> Self {
+        Self {
+            x_line_broadening_hz,
+            x_dwell_time_s,
+            y_line_broadening_hz,
+            y_dwell_time_s,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for TrafApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        traf_apodization_2d(
+            spectrum,
+            self.x_line_broadening_hz,
+            self.x_dwell_time_s,
+            self.y_line_broadening_hz,
+            self.y_dwell_time_s,
+        )
+    }
+}
+
+/// Applies separable trapezoidal apodization to a two-dimensional spectrum.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TrapezoidalApodization2D {
+    /// X-dimension fraction where the linear ramp-up reaches 1.
+    pub x_rise_end_fraction: f64,
+    /// X-dimension fraction where the linear ramp-down begins.
+    pub x_fall_start_fraction: f64,
+    /// Y-dimension fraction where the linear ramp-up reaches 1.
+    pub y_rise_end_fraction: f64,
+    /// Y-dimension fraction where the linear ramp-down begins.
+    pub y_fall_start_fraction: f64,
+}
+
+impl TrapezoidalApodization2D {
+    /// Creates a separable trapezoidal apodization step.
+    #[must_use]
+    pub fn new(
+        x_rise_end_fraction: f64,
+        x_fall_start_fraction: f64,
+        y_rise_end_fraction: f64,
+        y_fall_start_fraction: f64,
+    ) -> Self {
+        Self {
+            x_rise_end_fraction,
+            x_fall_start_fraction,
+            y_rise_end_fraction,
+            y_fall_start_fraction,
+        }
+    }
+}
+
+impl ProcessingStep<Spectrum2D> for TrapezoidalApodization2D {
+    fn apply(&self, spectrum: &Spectrum2D) -> Result<Spectrum2D> {
+        trapezoidal_apodization_2d(
+            spectrum,
+            self.x_rise_end_fraction,
+            self.x_fall_start_fraction,
+            self.y_rise_end_fraction,
+            self.y_fall_start_fraction,
         )
     }
 }
@@ -244,6 +402,159 @@ pub fn gaussian_apodization_2d(
     Ok(processed.with_processing_record(
         ProcessingRecord::new("gaussian_apodization_2d").with_details(format!(
             "x_gaussian_broadening_hz={x_gaussian_broadening_hz},y_gaussian_broadening_hz={y_gaussian_broadening_hz},x_dwell_time_s={x_dwell_time_s},y_dwell_time_s={y_dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies a separable Lorentz-to-Gauss window in x and y.
+///
+/// Each dimension uses
+/// `exp(+π · lorentz_to_undo · t) · exp(-(π · gauss_fwhm · (t - shift · t_max))² / (4 · ln 2))`.
+///
+/// # Errors
+///
+/// Returns an error when any broadening is negative, a dwell time is not
+/// positive, a shift is outside `[0, 1]`, any parameter is non-finite, or
+/// the shape is too large for checked numeric conversion.
+#[allow(clippy::too_many_arguments)]
+pub fn lorentz_to_gauss_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_lorentz_to_undo_hz: f64,
+    x_gauss_fwhm_hz: f64,
+    x_gauss_shift: f64,
+    x_dwell_time_s: f64,
+    y_lorentz_to_undo_hz: f64,
+    y_gauss_fwhm_hz: f64,
+    y_gauss_shift: f64,
+    y_dwell_time_s: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = lorentz_to_gauss_weights(
+        width,
+        x_lorentz_to_undo_hz,
+        x_gauss_fwhm_hz,
+        x_gauss_shift,
+        x_dwell_time_s,
+        "2D x Lorentz-to-Gauss apodization",
+    )?;
+    let y_weights = lorentz_to_gauss_weights(
+        height,
+        y_lorentz_to_undo_hz,
+        y_gauss_fwhm_hz,
+        y_gauss_shift,
+        y_dwell_time_s,
+        "2D y Lorentz-to-Gauss apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("lorentz_to_gauss_apodization_2d").with_details(format!(
+            "x_lorentz_to_undo_hz={x_lorentz_to_undo_hz},x_gauss_fwhm_hz={x_gauss_fwhm_hz},x_gauss_shift={x_gauss_shift},x_dwell_time_s={x_dwell_time_s},y_lorentz_to_undo_hz={y_lorentz_to_undo_hz},y_gauss_fwhm_hz={y_gauss_fwhm_hz},y_gauss_shift={y_gauss_shift},y_dwell_time_s={y_dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies a separable TRAF window in x and y.
+///
+/// # Errors
+///
+/// Returns an error when line broadening is negative, dwell times are not
+/// positive, any parameter is non-finite, or the shape is too large for
+/// checked numeric conversion.
+pub fn traf_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_line_broadening_hz: f64,
+    x_dwell_time_s: f64,
+    y_line_broadening_hz: f64,
+    y_dwell_time_s: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = traf_weights(
+        width,
+        x_line_broadening_hz,
+        x_dwell_time_s,
+        "2D x TRAF apodization",
+    )?;
+    let y_weights = traf_weights(
+        height,
+        y_line_broadening_hz,
+        y_dwell_time_s,
+        "2D y TRAF apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("traf_apodization_2d").with_details(format!(
+            "x_line_broadening_hz={x_line_broadening_hz},x_dwell_time_s={x_dwell_time_s},y_line_broadening_hz={y_line_broadening_hz},y_dwell_time_s={y_dwell_time_s}"
+        )),
+    ))
+}
+
+/// Applies a separable trapezoidal window in x and y.
+///
+/// # Errors
+///
+/// Returns an error when a fraction is outside `[0, 1]`, a rise fraction
+/// exceeds the corresponding fall fraction, any parameter is non-finite,
+/// or the shape is too large for checked numeric conversion.
+pub fn trapezoidal_apodization_2d(
+    spectrum: &Spectrum2D,
+    x_rise_end_fraction: f64,
+    x_fall_start_fraction: f64,
+    y_rise_end_fraction: f64,
+    y_fall_start_fraction: f64,
+) -> Result<Spectrum2D> {
+    let (width, height) = spectrum.shape();
+    let x_weights = trapezoidal_weights(
+        width,
+        x_rise_end_fraction,
+        x_fall_start_fraction,
+        "2D x trapezoidal apodization",
+    )?;
+    let y_weights = trapezoidal_weights(
+        height,
+        y_rise_end_fraction,
+        y_fall_start_fraction,
+        "2D y trapezoidal apodization",
+    )?;
+
+    let mut processed = spectrum.clone();
+    for (y_index, y_weight) in y_weights.iter().copied().enumerate() {
+        let row_start = y_index * width;
+        for (x_index, x_weight) in x_weights.iter().copied().enumerate() {
+            let weight = x_weight * y_weight;
+            processed.z[row_start + x_index] *= weight;
+            if let Some(imaginary) = &mut processed.imaginary {
+                imaginary[row_start + x_index] *= weight;
+            }
+        }
+    }
+
+    Ok(processed.with_processing_record(
+        ProcessingRecord::new("trapezoidal_apodization_2d").with_details(format!(
+            "x_rise_end_fraction={x_rise_end_fraction},x_fall_start_fraction={x_fall_start_fraction},y_rise_end_fraction={y_rise_end_fraction},y_fall_start_fraction={y_fall_start_fraction}"
         )),
     ))
 }

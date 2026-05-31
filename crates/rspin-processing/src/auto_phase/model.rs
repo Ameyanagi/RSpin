@@ -79,6 +79,14 @@ pub struct AutoPhaseOptions {
     /// over their small-`|ph1|` equivalents when the entropy or negativity
     /// terms are nearly tied.
     pub regularization_weight: f64,
+    /// Allow genuinely negative absorption peaks to remain negative.
+    ///
+    /// Multiplicity-edited experiments such as DEPT-135 and APT encode
+    /// information in peak *sign* (for example CH/CH3 up, CH2 down). When this
+    /// is `true` the negative-real-signal penalty is dropped so phasing is
+    /// driven by imaginary / dispersion content only, and no magnitude-mode
+    /// fallback is used. Defaults to `false` (peaks are driven positive).
+    pub allow_negative: bool,
 }
 
 impl AutoPhaseStrategy {
@@ -121,6 +129,7 @@ impl Default for AutoPhaseOptions {
             cost: AutoPhaseCost::AcmeEntropy,
             refine: true,
             regularization_weight: 0.05,
+            allow_negative: false,
         }
     }
 }
@@ -215,6 +224,13 @@ impl AutoPhaseOptions {
         self.active_region = None;
         self
     }
+
+    /// Returns options that preserve genuinely negative peaks (DEPT/APT).
+    #[must_use]
+    pub fn with_allow_negative(mut self, allow_negative: bool) -> Self {
+        self.allow_negative = allow_negative;
+        self
+    }
 }
 
 /// Automatic phase correction processing step.
@@ -264,6 +280,13 @@ impl AutoPhaseCorrection {
         self.options = self
             .options
             .scoring_weights(imaginary_weight, negative_weight);
+        self
+    }
+
+    /// Returns a step that preserves genuinely negative peaks (DEPT/APT).
+    #[must_use]
+    pub fn with_allow_negative(mut self, allow_negative: bool) -> Self {
+        self.options = self.options.with_allow_negative(allow_negative);
         self
     }
 }
