@@ -470,6 +470,23 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
         LoadedSourceVendor::Bruker,
     )?;
     assert_eq!(bruker_2d.shape(), (2048, 512));
+
+    let carbon = load_spectrum_1d_by_source_path_relative_to(
+        &mixed_vendor_base,
+        "myrcene",
+        std::path::Path::new("myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    let (hsqc, source) = load_spectrum_2d_with_source_by_source_path_relative_to(
+        &mixed_vendor_base,
+        "myrcene",
+        std::path::Path::new("myrcene/jeol/myrcene_hsqc_400mhz.jdf"),
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(
+        source.path(),
+        Some(std::path::Path::new("myrcene/jeol/myrcene_hsqc_400mhz.jdf"))
+    );
     Ok(())
 }
 

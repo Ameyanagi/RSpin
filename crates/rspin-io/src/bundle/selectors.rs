@@ -1,5 +1,7 @@
 //! Exact source-filtered bundle selectors.
 
+use std::path::Path;
+
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use super::{
@@ -148,6 +150,62 @@ impl SpectrumBundle {
         })
     }
 
+    /// Returns the only one-dimensional spectrum read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_1d_by_source_path(&self, path: impl AsRef<Path>) -> Result<&Spectrum1D> {
+        self.only_loaded_1d_by_source_path(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only one-dimensional spectrum and source read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_1d_by_source_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<(&Spectrum1D, &LoadedSource)> {
+        let path = path.as_ref().to_path_buf();
+        let label = source_path_filter_label(&path);
+        self.only_loaded_1d_matching_source(&label, move |source| {
+            source.path() == Some(path.as_path())
+        })
+    }
+
+    /// Returns the only two-dimensional spectrum read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_2d_by_source_path(&self, path: impl AsRef<Path>) -> Result<&Spectrum2D> {
+        self.only_loaded_2d_by_source_path(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only two-dimensional spectrum and source read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_2d_by_source_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<(&Spectrum2D, &LoadedSource)> {
+        let path = path.as_ref().to_path_buf();
+        let label = source_path_filter_label(&path);
+        self.only_loaded_2d_matching_source(&label, move |source| {
+            source.path() == Some(path.as_path())
+        })
+    }
+
     /// Consumes the bundle and returns the only one-dimensional spectrum read with a source format.
     ///
     /// Source format aliases such as `jdx` and `jdf` are accepted. Other
@@ -285,6 +343,62 @@ impl SpectrumBundle {
         self.into_only_loaded_2d_matching_source(&label, move |source| match parsed_vendor {
             Some(vendor) => source.vendor() == Some(vendor),
             None => false,
+        })
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_1d_by_source_path(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        self.into_only_loaded_1d_by_source_path(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum and source read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_1d_by_source_path(
+        self,
+        path: impl AsRef<Path>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        let path = path.as_ref().to_path_buf();
+        let label = source_path_filter_label(&path);
+        self.into_only_loaded_1d_matching_source(&label, move |source| {
+            source.path() == Some(path.as_path())
+        })
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_2d_by_source_path(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        self.into_only_loaded_2d_by_source_path(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum and source read from a tracked source path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_2d_by_source_path(
+        self,
+        path: impl AsRef<Path>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        let path = path.as_ref().to_path_buf();
+        let label = source_path_filter_label(&path);
+        self.into_only_loaded_2d_matching_source(&label, move |source| {
+            source.path() == Some(path.as_path())
         })
     }
 
@@ -441,4 +555,8 @@ fn source_vendor_filter_label(vendor: &str, parsed_vendor: Option<LoadedSourceVe
         None => vendor.trim(),
     };
     format!("source vendor {vendor}")
+}
+
+fn source_path_filter_label(path: &Path) -> String {
+    format!("source path {}", path.display())
 }

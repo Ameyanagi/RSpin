@@ -60,6 +60,14 @@ fn load_exactly_one_bruker_spectrum() -> Result<Spectrum1D> {
         LoadedSourceVendor::Bruker,
     )
 }
+
+fn load_exactly_one_tracked_source() -> Result<Spectrum2D> {
+    load_spectrum_2d_by_source_path_relative_to(
+        "data",
+        "mixed-vendor",
+        "mixed-vendor/jeol/hsqc.jdf",
+    )
+}
 ```
 
 Bundles expose direct counts and owned extraction helpers for simple workflows:
