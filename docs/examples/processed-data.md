@@ -18,6 +18,9 @@ Generated files:
 - `docs/assets/examples/analysis_peaks_ranges.png`: creates a synthetic 1D
   spectrum, runs the chain-friendly analysis workflow, and overlays detected
   threshold ranges and picked peaks.
+- `docs/assets/examples/vendors/jeol/eucalyptol_hsqc_2d_nmrxiv_with_1d.png`:
+  renders a JEOL HSQC contour with external 1H and 13C spectra in marginal
+  panels. See [2D contour plots with external 1D spectra](2d-plots.md).
 
 The same command also writes local visual-regression artifacts under
 `target/rspin-visual-tests`. That directory is ignored by git. It contains

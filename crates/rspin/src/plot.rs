@@ -17,6 +17,9 @@ use std::path::Path;
 use rspin_core::{RSpinError, Result, Spectrum1D, Unit};
 use ruviz::prelude::{LegendPosition, Plot};
 
+mod two_d;
+pub use two_d::{PlotTrace1D, Spectrum2DPlotOptions, plot_spectrum_2d, plot_spectrum_2d_with};
+
 /// Saves a single-trace PNG.
 ///
 /// `title` and `series_label` annotate the plot; `path` must end in
