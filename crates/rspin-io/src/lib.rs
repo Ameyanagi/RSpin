@@ -77,7 +77,10 @@ pub use bruker::{
 pub use bundle::{
     LoadWarning, LoadedSource, LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum, RSpinReader,
     SourceFormatCount, SourceVendorCount, SpectrumBundle, SpectrumBundleLoader,
-    SpectrumBundleSummary, load_spectra, load_spectra_many, load_spectra_many_relative_to,
+    SpectrumBundleSummary, load_spectra, load_spectra_by_source_format,
+    load_spectra_by_source_format_relative_to, load_spectra_by_source_path,
+    load_spectra_by_source_path_relative_to, load_spectra_by_source_vendor,
+    load_spectra_by_source_vendor_relative_to, load_spectra_many, load_spectra_many_relative_to,
     load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_by_source_format,
     load_spectrum_1d_by_source_format_relative_to, load_spectrum_1d_by_source_path,
     load_spectrum_1d_by_source_path_relative_to, load_spectrum_1d_by_source_vendor,

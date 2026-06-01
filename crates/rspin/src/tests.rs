@@ -375,7 +375,6 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
         path_filtered.source_format_count(LoadedSourceFormat::AgilentFid),
         1
     );
-
     let exact = load_spectrum_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));
     let exact = load_spectrum_1d_paths_relative_to(&fixture_root, ["varian_1h"])?;
@@ -401,6 +400,35 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
         })?;
     assert_eq!(agilent.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(agilent.x.unit, Unit::Seconds);
+    Ok(())
+}
+
+#[test]
+fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let source_path = load_spectra_by_source_path(&fixture_root, "varian_1h")?;
+    assert_eq!(source_path.len(), 1);
+    assert_eq!(
+        source_path.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let source_format = load_spectra_by_source_format(&fixture_root, "varian fid")?;
+    assert_eq!(source_format.len(), 1);
+    assert_eq!(
+        source_format.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+
+    let source_vendor =
+        load_spectra_by_source_vendor(&fixture_root, LoadedSourceVendor::AgilentVarian)?;
+    assert_eq!(source_vendor.len(), 1);
+    assert_eq!(
+        source_vendor.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
     Ok(())
 }
 

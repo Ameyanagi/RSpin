@@ -9,7 +9,10 @@ use std::{
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSource, LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum, RSpinReader,
-    SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra, load_spectra_many,
+    SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra,
+    load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
+    load_spectra_by_source_path, load_spectra_by_source_path_relative_to,
+    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to, load_spectra_many,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
     load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
@@ -1522,6 +1525,49 @@ fn loader_can_restrict_source_paths() -> anyhow::Result<()> {
         anyhow::bail!("missing source-path filter should leave no readable spectra");
     };
     assert!(error.to_string().contains("no readable bundle data found"));
+    Ok(())
+}
+
+#[test]
+fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+
+    let jcamp = load_spectra_by_source_format(&root, "jdx")?;
+    assert_eq!(jcamp.len(), 2);
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+
+    let relative_jcamp = load_spectra_by_source_format_relative_to(&root, "jcamp", "jcamp dx")?;
+    assert_eq!(relative_jcamp.len(), 2);
+    assert!(
+        relative_jcamp
+            .source_paths()
+            .all(|path| path.starts_with(Path::new("jcamp")))
+    );
+
+    let bruker = load_spectra_by_source_vendor(&root, LoadedSourceVendor::Bruker)?;
+    assert_eq!(bruker.len(), 2);
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let relative_jeol = load_spectra_by_source_vendor_relative_to(&root, "jeol", "jeol")?;
+    assert_eq!(relative_jeol.len(), 3);
+    assert_eq!(
+        relative_jeol.source_vendor_count(LoadedSourceVendor::Jeol),
+        3
+    );
+
+    let carbon = load_spectra_by_source_path(&root, carbon_path)?;
+    assert_eq!(carbon.len(), 1);
+    assert_eq!(first_1d(&carbon)?.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert!(carbon.has_source_path(carbon_path));
+
+    let relative_carbon = load_spectra_by_source_path_relative_to(&root, "jcamp", carbon_path)?;
+    assert_eq!(relative_carbon.len(), 1);
+    assert_eq!(
+        first_1d(&relative_carbon)?.metadata.nucleus,
+        Some(Nucleus::Carbon13)
+    );
+    assert!(relative_carbon.has_source_path(carbon_path));
     Ok(())
 }
 

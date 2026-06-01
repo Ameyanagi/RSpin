@@ -68,6 +68,18 @@ fn load_exactly_one_tracked_source() -> Result<Spectrum2D> {
         "mixed-vendor/jeol/hsqc.jdf",
     )
 }
+
+fn load_jcamp_bundle() -> Result<SpectrumBundle> {
+    load_spectra_by_source_format("data/mixed-vendor", LoadedSourceFormat::JcampDx)
+}
+
+fn load_bruker_bundle() -> Result<SpectrumBundle> {
+    load_spectra_by_source_vendor("data/mixed-vendor", LoadedSourceVendor::Bruker)
+}
+
+fn load_one_tracked_source_as_bundle() -> Result<SpectrumBundle> {
+    load_spectra_by_source_path("data/mixed-vendor", "jcamp/carbon_13c.jdx")
+}
 ```
 
 Bundles expose direct counts and owned extraction helpers for simple workflows:

@@ -87,6 +87,116 @@ pub fn load_spectra_relative_to(
     SpectrumBundleLoader::new().read_path_relative_to(base, path)
 }
 
+/// Loads supported spectra from a file or directory, restricted to one source format.
+///
+/// Source format aliases such as `jdx`, `jdf`, and `varian fid` are accepted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_format(
+    path: impl AsRef<Path>,
+    format: impl AsRef<str>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_format(format)
+        .read_path(path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to one source format.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_format_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    format: impl AsRef<str>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_format(format)
+        .read_path_relative_to(base, path)
+}
+
+/// Loads supported spectra from a file or directory, restricted to one vendor family.
+///
+/// Vendor aliases such as `agilent` and `varian` are accepted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_vendor(
+    path: impl AsRef<Path>,
+    vendor: impl AsRef<str>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_vendor(vendor)
+        .read_path(path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to one vendor family.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_vendor_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    vendor: impl AsRef<str>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_vendor(vendor)
+        .read_path_relative_to(base, path)
+}
+
+/// Loads supported spectra from a file or directory, restricted to one tracked source path.
+///
+/// The source path is matched against relative paths recorded in the loaded
+/// bundle, such as `jcamp/carbon_13c.jdx`.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_path(
+    path: impl AsRef<Path>,
+    source_path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_path(source_path)
+        .read_path(path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to one tracked source path.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. The source path is matched after anchoring source
+/// metadata to `base`.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_path_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    source_path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_path(source_path)
+        .read_path_relative_to(base, path)
+}
+
 /// Loads supported spectra from multiple file or directory paths.
 ///
 /// # Errors
