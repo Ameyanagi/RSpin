@@ -371,7 +371,9 @@ fn preflight_sources() -> Result<Vec<DiscoveredSpectrumSource>> {
 
 fn summarize_preflight() -> Result<DiscoveredSpectrumSummary> {
     let sources = discover_spectra("data/mixed-vendor")?;
-    Ok(summarize_discovered_spectra(&sources))
+    let summary = summarize_discovered_spectra(&sources);
+    assert!(summary.has_source_path_prefix("bruker"));
+    Ok(summary)
 }
 
 fn load_selected_after_preflight() -> Result<SpectrumBundle> {

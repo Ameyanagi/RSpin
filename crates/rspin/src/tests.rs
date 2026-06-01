@@ -454,6 +454,13 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
     let summary: DiscoveredSpectrumSummary = summarize_discovered_spectra(&sources);
     assert_eq!(summary.source_format_count("jdx"), 2);
     assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+    assert_eq!(summary.source_path_count("varian_1h"), 1);
+    assert!(summary.has_source_path_prefix("bruker_without_expno"));
+    assert!(
+        summary
+            .source_paths
+            .contains(&DiscoveredSpectrumPathCount::new("varian_1h", 1))
+    );
     assert!(summary.has_dimension(DiscoveredSpectrumDimension::OneD));
     assert!(sources.iter().any(|source| {
         source.path() == Some(std::path::Path::new("varian_1h"))

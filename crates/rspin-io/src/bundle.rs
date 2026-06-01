@@ -132,9 +132,9 @@ pub use exact::{
 };
 use loader::FileCandidateKind;
 pub use loader::{
-    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
-    DiscoveredSpectrumSummary, SpectrumBundleLoader, load_discovered_spectra,
-    load_discovered_spectra_relative_to, summarize_discovered_spectra,
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, SpectrumBundleLoader,
+    load_discovered_spectra, load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
 pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,

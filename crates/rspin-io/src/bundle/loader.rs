@@ -18,9 +18,9 @@ use super::{
     supported_bundle_source_vendors,
 };
 pub use discovery::{
-    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
-    DiscoveredSpectrumSummary, load_discovered_spectra, load_discovered_spectra_relative_to,
-    summarize_discovered_spectra,
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, load_discovered_spectra,
+    load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.

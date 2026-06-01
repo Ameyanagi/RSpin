@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use rspin_io::{
-    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
-    DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor,
-    RSpinReader, discover_spectra, discover_spectra_many, discover_spectra_many_relative_to,
-    load_discovered_spectra, load_discovered_spectra_relative_to, summarize_discovered_spectra,
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFormat,
+    LoadedSourceVendor, RSpinReader, discover_spectra, discover_spectra_many,
+    discover_spectra_many_relative_to, load_discovered_spectra,
+    load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
 
 #[test]
@@ -119,6 +120,26 @@ fn source_discovery_summary_counts_candidates() -> Result<()> {
             DiscoveredSpectrumDimensionCount::new(DiscoveredSpectrumDimension::OneD, 4),
             DiscoveredSpectrumDimensionCount::new(DiscoveredSpectrumDimension::TwoD, 1),
         ]
+    );
+    assert_eq!(summary.source_path_count("varian_1h"), 1);
+    assert_eq!(summary.source_path_prefix_count("bruker_without_expno"), 2);
+    assert_eq!(summary.source_path_count("empty_jcamp/empty.jdx"), 2);
+    assert!(summary.has_source_path("bruker_without_expno/pdata/1"));
+    assert!(summary.has_source_path_prefix("empty_jcamp"));
+    assert!(!summary.has_source_path("missing"));
+    assert_eq!(summary.source_paths.len(), 4);
+    assert!(
+        summary
+            .source_paths
+            .contains(&DiscoveredSpectrumPathCount::new("varian_1h", 1))
+    );
+    assert!(
+        summary
+            .source_paths
+            .contains(&DiscoveredSpectrumPathCount::new(
+                "bruker_without_expno/pdata/1",
+                1
+            ))
     );
 
     Ok(())

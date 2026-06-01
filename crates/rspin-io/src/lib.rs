@@ -75,12 +75,12 @@ pub use bruker::{
     read_bruker_ser_2d_dir,
 };
 pub use bundle::{
-    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
-    DiscoveredSpectrumSummary, LoadWarning, LoadedSource, LoadedSourceDataKind,
-    LoadedSourceDataKindInfo, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceFormatInfo,
-    LoadedSourceVendor, LoadedSourceVendorInfo, LoadedSpectrum, RSpinReader, SourceDataKindCount,
-    SourceFormatCount, SourceVendorCount, SpectrumBundle, SpectrumBundleLoader,
-    SpectrumBundleSummary, discover_spectra, discover_spectra_many,
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, LoadWarning, LoadedSource,
+    LoadedSourceDataKind, LoadedSourceDataKindInfo, LoadedSourceFilter, LoadedSourceFormat,
+    LoadedSourceFormatInfo, LoadedSourceVendor, LoadedSourceVendorInfo, LoadedSpectrum,
+    RSpinReader, SourceDataKindCount, SourceFormatCount, SourceVendorCount, SpectrumBundle,
+    SpectrumBundleLoader, SpectrumBundleSummary, discover_spectra, discover_spectra_many,
     discover_spectra_many_relative_to, discover_spectra_relative_to, load_discovered_spectra,
     load_discovered_spectra_relative_to, load_spectra, load_spectra_by_source,
     load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
