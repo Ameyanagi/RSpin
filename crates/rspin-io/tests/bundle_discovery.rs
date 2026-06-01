@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow};
 use rspin_io::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
-    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFilter,
-    LoadedSourceFormat, LoadedSourceVendor, RSpinReader, discover_spectra,
-    discover_spectra_by_source, discover_spectra_by_source_relative_to,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary,
+    LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader,
+    discover_spectra, discover_spectra_by_source, discover_spectra_by_source_relative_to,
     discover_spectra_by_sources, discover_spectra_by_sources_relative_to, discover_spectra_many,
     discover_spectra_many_by_source, discover_spectra_many_by_source_relative_to,
     discover_spectra_many_by_sources, discover_spectra_many_by_sources_relative_to,
@@ -195,6 +195,83 @@ fn discovered_dimension_selection_helpers_filter_candidates() -> Result<()> {
         ],
     );
     assert_eq!(selected_1d.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn discovered_source_slice_methods_match_free_helpers() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+
+    assert_eq!(sources.summarize(), summarize_discovered_spectra(&sources));
+    assert_eq!(sources.select_1d(), select_discovered_spectra_1d(&sources));
+    assert_eq!(sources.select_2d(), select_discovered_spectra_2d(&sources));
+    assert_eq!(
+        sources.select_1d_by_source(LoadedSourceVendor::Jeol),
+        select_discovered_spectra_1d_by_source(&sources, LoadedSourceVendor::Jeol)
+    );
+    assert_eq!(
+        sources.select_1d_by_sources([LoadedSourceFilter::vendor("jeol")]),
+        select_discovered_spectra_1d_by_sources(&sources, [LoadedSourceFilter::vendor("jeol")])
+    );
+    assert_eq!(
+        sources.select_2d_by_source(LoadedSourceFilter::path(hsqc_path)),
+        select_discovered_spectra_2d_by_source(&sources, LoadedSourceFilter::path(hsqc_path))
+    );
+    assert_eq!(
+        sources.select_2d_by_sources([
+            LoadedSourceFilter::path(hsqc_path),
+            LoadedSourceFilter::path_prefix("bruker_cosy_raw"),
+        ]),
+        select_discovered_spectra_2d_by_sources(
+            &sources,
+            [
+                LoadedSourceFilter::path(hsqc_path),
+                LoadedSourceFilter::path_prefix("bruker_cosy_raw"),
+            ],
+        )
+    );
+    assert_eq!(
+        sources.select_by_dimension(DiscoveredSpectrumDimension::TwoD),
+        select_discovered_spectra_by_dimension(&sources, DiscoveredSpectrumDimension::TwoD)
+    );
+    assert_eq!(
+        sources.select_by_dimension_and_source(
+            DiscoveredSpectrumDimension::Unknown,
+            LoadedSourceFilter::vendor("jeol"),
+        ),
+        select_discovered_spectra_by_dimension_and_source(
+            &sources,
+            DiscoveredSpectrumDimension::Unknown,
+            LoadedSourceFilter::vendor("jeol"),
+        )
+    );
+    assert_eq!(
+        sources.select_by_dimension_and_sources(
+            DiscoveredSpectrumDimension::OneD,
+            [
+                LoadedSourceFilter::path(proton_path),
+                LoadedSourceFilter::path("missing"),
+            ],
+        ),
+        select_discovered_spectra_by_dimension_and_sources(
+            &sources,
+            DiscoveredSpectrumDimension::OneD,
+            [
+                LoadedSourceFilter::path(proton_path),
+                LoadedSourceFilter::path("missing"),
+            ],
+        )
+    );
+    assert_eq!(
+        sources.select_by_source(LoadedSourceFilter::path(proton_path)),
+        select_discovered_spectra_by_source(&sources, LoadedSourceFilter::path(proton_path))
+    );
+    assert_eq!(
+        sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
+        select_discovered_spectra_by_sources(&sources, [LoadedSourceFilter::path(proton_path)])
+    );
     Ok(())
 }
 

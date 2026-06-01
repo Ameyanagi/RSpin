@@ -914,6 +914,70 @@ fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+
+    assert_eq!(sources.summarize().sources(), sources.len());
+    assert_eq!(sources.select_1d(), select_discovered_spectra_1d(&sources));
+    assert_eq!(sources.select_2d(), select_discovered_spectra_2d(&sources));
+    assert_eq!(
+        sources.select_1d_by_source(LoadedSourceVendor::Jeol),
+        select_discovered_spectra_1d_by_source(&sources, LoadedSourceVendor::Jeol)
+    );
+    assert_eq!(
+        sources.select_1d_by_sources([LoadedSourceFilter::vendor("jeol")]),
+        select_discovered_spectra_1d_by_sources(&sources, [LoadedSourceFilter::vendor("jeol")])
+    );
+    assert_eq!(
+        sources.select_2d_by_source(LoadedSourceFilter::path(hsqc_path)),
+        select_discovered_spectra_2d_by_source(&sources, LoadedSourceFilter::path(hsqc_path))
+    );
+    assert_eq!(
+        sources.select_2d_by_sources([LoadedSourceFilter::path(hsqc_path)]),
+        select_discovered_spectra_2d_by_sources(&sources, [LoadedSourceFilter::path(hsqc_path)])
+    );
+    assert_eq!(
+        sources.select_by_dimension(DiscoveredSpectrumDimension::TwoD),
+        select_discovered_spectra_by_dimension(&sources, DiscoveredSpectrumDimension::TwoD)
+    );
+    assert_eq!(
+        sources.select_by_dimension_and_source(
+            DiscoveredSpectrumDimension::Unknown,
+            LoadedSourceFilter::vendor("jeol"),
+        ),
+        select_discovered_spectra_by_dimension_and_source(
+            &sources,
+            DiscoveredSpectrumDimension::Unknown,
+            LoadedSourceFilter::vendor("jeol"),
+        )
+    );
+    assert_eq!(
+        sources.select_by_dimension_and_sources(
+            DiscoveredSpectrumDimension::OneD,
+            [LoadedSourceFilter::path(proton_path)],
+        ),
+        select_discovered_spectra_by_dimension_and_sources(
+            &sources,
+            DiscoveredSpectrumDimension::OneD,
+            [LoadedSourceFilter::path(proton_path)],
+        )
+    );
+    assert_eq!(
+        sources.select_by_source(LoadedSourceFilter::path(proton_path)),
+        select_discovered_spectra_by_source(&sources, LoadedSourceFilter::path(proton_path))
+    );
+    assert_eq!(
+        sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
+        select_discovered_spectra_by_sources(&sources, [LoadedSourceFilter::path(proton_path)])
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_exact_discovered_free_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

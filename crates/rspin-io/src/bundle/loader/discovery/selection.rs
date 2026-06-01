@@ -1,7 +1,185 @@
 //! Selection helpers for discovered spectrum source candidates.
 
+use super::summary::DiscoveredSpectrumSummary;
 use super::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 use crate::bundle::LoadedSourceFilter;
+
+/// Slice extension methods for discovered spectrum source candidates.
+///
+/// This keeps preflight workflows readable without replacing the free
+/// selection helpers:
+///
+/// ```ignore
+/// let sources = RSpinReader::new().discover("data")?;
+/// let selected = sources.select_1d_by_source(LoadedSourceVendor::Jeol);
+/// ```
+pub trait DiscoveredSpectrumSourcesExt {
+    /// Selects discovered one-dimensional source candidates.
+    #[must_use]
+    fn select_1d(&self) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered one-dimensional source candidates matching one source filter.
+    #[must_use]
+    fn select_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered one-dimensional source candidates matching any source filter.
+    #[must_use]
+    fn select_1d_by_sources<I, F>(&self, filters: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>;
+
+    /// Selects discovered two-dimensional source candidates.
+    #[must_use]
+    fn select_2d(&self) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered two-dimensional source candidates matching one source filter.
+    #[must_use]
+    fn select_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered two-dimensional source candidates matching any source filter.
+    #[must_use]
+    fn select_2d_by_sources<I, F>(&self, filters: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>;
+
+    /// Selects discovered source candidates with one inferred dimension.
+    #[must_use]
+    fn select_by_dimension(
+        &self,
+        dimension: DiscoveredSpectrumDimension,
+    ) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered source candidates with one inferred dimension and source filter.
+    #[must_use]
+    fn select_by_dimension_and_source(
+        &self,
+        dimension: DiscoveredSpectrumDimension,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered source candidates with one inferred dimension and any source filter.
+    #[must_use]
+    fn select_by_dimension_and_sources<I, F>(
+        &self,
+        dimension: DiscoveredSpectrumDimension,
+        filters: I,
+    ) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>;
+
+    /// Selects discovered source candidates matching one source filter.
+    #[must_use]
+    fn select_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered source candidates matching any source filter.
+    #[must_use]
+    fn select_by_sources<I, F>(&self, filters: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>;
+
+    /// Summarizes discovered source candidates.
+    #[must_use]
+    fn summarize(&self) -> DiscoveredSpectrumSummary;
+}
+
+impl DiscoveredSpectrumSourcesExt for [DiscoveredSpectrumSource] {
+    fn select_1d(&self) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_1d(self)
+    }
+
+    fn select_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_1d_by_source(self, filter)
+    }
+
+    fn select_1d_by_sources<I, F>(&self, filters: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        select_discovered_spectra_1d_by_sources(self, filters)
+    }
+
+    fn select_2d(&self) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_2d(self)
+    }
+
+    fn select_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_2d_by_source(self, filter)
+    }
+
+    fn select_2d_by_sources<I, F>(&self, filters: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        select_discovered_spectra_2d_by_sources(self, filters)
+    }
+
+    fn select_by_dimension(
+        &self,
+        dimension: DiscoveredSpectrumDimension,
+    ) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_by_dimension(self, dimension)
+    }
+
+    fn select_by_dimension_and_source(
+        &self,
+        dimension: DiscoveredSpectrumDimension,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_by_dimension_and_source(self, dimension, filter)
+    }
+
+    fn select_by_dimension_and_sources<I, F>(
+        &self,
+        dimension: DiscoveredSpectrumDimension,
+        filters: I,
+    ) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        select_discovered_spectra_by_dimension_and_sources(self, dimension, filters)
+    }
+
+    fn select_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<&DiscoveredSpectrumSource> {
+        select_discovered_spectra_by_source(self, filter)
+    }
+
+    fn select_by_sources<I, F>(&self, filters: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        select_discovered_spectra_by_sources(self, filters)
+    }
+
+    fn summarize(&self) -> DiscoveredSpectrumSummary {
+        DiscoveredSpectrumSummary::new(self)
+    }
+}
 
 /// Selects discovered one-dimensional source candidates.
 #[must_use]

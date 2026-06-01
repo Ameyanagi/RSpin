@@ -19,8 +19,8 @@ use super::{
 };
 pub use discovery::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
-    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, load_discovered_spectra,
-    load_discovered_spectra_1d, load_discovered_spectra_1d_by_source,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary,
+    load_discovered_spectra, load_discovered_spectra_1d, load_discovered_spectra_1d_by_source,
     load_discovered_spectra_1d_by_source_relative_to, load_discovered_spectra_1d_by_sources,
     load_discovered_spectra_1d_by_sources_relative_to, load_discovered_spectra_1d_relative_to,
     load_discovered_spectra_1d_strict, load_discovered_spectra_1d_strict_by_source,
