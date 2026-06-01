@@ -654,6 +654,34 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_path_prefix_bundle_helpers() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let bundle = load_spectra(mixed_vendor_root)?;
+
+    assert_eq!(bundle.source_path_prefix_count("jcamp"), 2);
+    assert!(bundle.has_source_path_prefix("jeol"));
+    assert_eq!(
+        bundle
+            .source_paths_for_path_prefix("jcamp")
+            .collect::<Vec<_>>(),
+        vec![
+            std::path::Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+            std::path::Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
+        ]
+    );
+
+    let jeol = bundle.source_path_prefix_subset("jeol");
+    assert_eq!(jeol.len(), 3);
+    assert_eq!(jeol.loaded_2d_by_source_path_prefix("jeol").count(), 1);
+    assert_eq!(
+        bundle.into_spectra_1d_by_source_path_prefix("jcamp").len(),
+        2
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

@@ -1618,6 +1618,104 @@ fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_source_path_prefix_helpers_filter_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    assert_eq!(bundle.source_path_prefix_count("jcamp"), 2);
+    assert!(bundle.has_source_path_prefix("jeol"));
+    assert!(!bundle.has_source_path_prefix("missing"));
+    assert_eq!(
+        bundle
+            .source_paths_for_path_prefix("jcamp")
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+            Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
+        ]
+    );
+
+    let jcamp = bundle.source_path_prefix_subset("jcamp");
+    assert_eq!(jcamp.len(), 2);
+    assert_eq!(jcamp.len_1d(), 2);
+    assert_eq!(jcamp.len_2d(), 0);
+
+    let jeol_2d = bundle
+        .loaded_2d_by_source_path_prefix("jeol")
+        .collect::<Vec<_>>();
+    assert_eq!(jeol_2d.len(), 1);
+    assert_eq!(jeol_2d[0].0.shape(), (1024, 32));
+
+    let jcamp_1d = bundle
+        .loaded_1d_by_source_path_prefix("jcamp")
+        .collect::<Vec<_>>();
+    assert_eq!(jcamp_1d.len(), 2);
+    assert!(jcamp_1d.iter().all(|(_, source)| {
+        source
+            .path()
+            .is_some_and(|path| path.starts_with(Path::new("jcamp")))
+    }));
+
+    let consumed = bundle.clone().into_source_path_prefix_subset("jeol");
+    assert_eq!(consumed.len(), 3);
+    assert_eq!(consumed.len_2d(), 1);
+    assert_eq!(
+        bundle
+            .clone()
+            .into_loaded_by_source_path_prefix("jcamp")
+            .len(),
+        2
+    );
+    assert_eq!(
+        bundle
+            .clone()
+            .into_loaded_1d_by_source_path_prefix("jcamp")
+            .len(),
+        2
+    );
+    assert_eq!(
+        bundle
+            .clone()
+            .into_loaded_2d_by_source_path_prefix("jeol")
+            .len(),
+        1
+    );
+    assert_eq!(
+        bundle
+            .clone()
+            .into_spectra_1d_by_source_path_prefix("jcamp")
+            .len(),
+        2
+    );
+    assert_eq!(
+        bundle.into_spectra_2d_by_source_path_prefix("jeol").len(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn bundle_source_path_prefix_helpers_filter_warnings() -> anyhow::Result<()> {
+    let bundle = SpectrumBundleLoader::new()
+        .with_source_paths(true)
+        .read_path(fixture_root())?;
+
+    let warnings = bundle
+        .warnings_for_source_path_prefix("empty_jcamp")
+        .collect::<Vec<_>>();
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(warnings[0].path(), Some(Path::new("empty_jcamp/empty.jdx")));
+
+    let subset = bundle.source_path_prefix_subset("empty_jcamp");
+    assert_eq!(subset.len(), 0);
+    assert_eq!(subset.warning_count(), 1);
+
+    let missing_subset = bundle.into_source_path_prefix_subset("missing");
+    assert_eq!(missing_subset.len(), 0);
+    assert_eq!(missing_subset.warning_count(), 0);
+    Ok(())
+}
+
+#[test]
 fn bundle_generic_source_helpers_filter_many_entries() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
     let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");

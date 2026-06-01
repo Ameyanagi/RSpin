@@ -178,6 +178,9 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     for path in bundle.source_paths_for_source(LoadedSourceFilter::vendor("bruker")) {
         println!("Bruker source: {}", path.display());
     }
+    for path in bundle.source_paths_for_path_prefix("bruker/pdata") {
+        println!("processed source: {}", path.display());
+    }
     Ok(bundle.into_spectra_1d())
 }
 
@@ -210,6 +213,11 @@ fn keep_bruker_subset_as_bundle() -> Result<SpectrumBundle> {
 fn keep_processed_subset_as_bundle() -> Result<SpectrumBundle> {
     let bundle = load_spectra("data/mixed-vendor")?;
     Ok(bundle.processed_source_subset())
+}
+
+fn keep_one_source_directory_as_bundle() -> Result<SpectrumBundle> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle.source_path_prefix_subset("bruker/pdata"))
 }
 
 fn load_named_carbon_spectrum() -> Result<Spectrum1D> {

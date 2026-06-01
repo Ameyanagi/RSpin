@@ -16,6 +16,7 @@ use crate::{
 mod exact;
 mod loader;
 mod model;
+mod path_prefix;
 mod selectors;
 mod source_filter;
 mod source_format;
