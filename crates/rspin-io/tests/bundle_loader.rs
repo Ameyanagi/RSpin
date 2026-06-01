@@ -2299,6 +2299,29 @@ fn loader_can_restrict_source_paths() -> anyhow::Result<()> {
         .read_path(nmrxiv_fixture_root())?;
     assert_eq!(cleared.len(), 7);
 
+    let prefix_cleared = RSpinReader::new()
+        .only_source_path_prefix("jeol")
+        .all_source_paths()
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(prefix_cleared.len(), 7);
+
+    let runtime_path_cleared = RSpinReader::new()
+        .only_sources([
+            LoadedSourceFilter::path_prefix("jeol"),
+            LoadedSourceFilter::data_kind(LoadedSourceDataKind::Raw),
+        ])
+        .all_source_paths()
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(runtime_path_cleared.len(), 2);
+    assert_eq!(
+        runtime_path_cleared.source_data_kind_count(LoadedSourceDataKind::Raw),
+        2
+    );
+    assert_eq!(
+        runtime_path_cleared.source_vendor_count(LoadedSourceVendor::Jeol),
+        0
+    );
+
     let filtered_out = RSpinReader::new()
         .only_source_path("missing.jdx")
         .read_path(nmrxiv_fixture_root());

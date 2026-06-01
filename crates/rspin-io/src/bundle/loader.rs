@@ -437,6 +437,12 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn all_source_paths(mut self) -> Self {
         self.source_path_filters.clear();
+        self.source_filters.retain(|filter| {
+            !matches!(
+                filter,
+                LoadedSourceFilter::Path { .. } | LoadedSourceFilter::PathPrefix { .. }
+            )
+        });
         self
     }
 
