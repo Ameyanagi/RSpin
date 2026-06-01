@@ -1593,8 +1593,8 @@ mod ruviz_example {
         let carbon = process_1d_for_plot(carbon)?;
 
         let options = Spectrum2DPlotOptions::new()
-            .with_x_overlay("1H", &proton)
-            .with_y_overlay("13C", &carbon);
+            .with_top_trace("1H", &proton)
+            .with_left_trace("13C", &carbon);
         plot_spectrum_2d_with(
             &out_dir.join("eucalyptol_hsqc_2d_nmrxiv_with_1d.png"),
             "JEOL HSQC 2D — Eucalyptol with external 1D spectra",

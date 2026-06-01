@@ -49,11 +49,27 @@ impl<'a> Spectrum2DPlotOptions<'a> {
         self
     }
 
+    /// Adds a one-dimensional trace above the 2D plot.
+    ///
+    /// This is a layout-named alias for [`Self::with_x_overlay`].
+    #[must_use]
+    pub fn with_top_trace(self, label: &'a str, spectrum: &'a Spectrum1D) -> Self {
+        self.with_x_overlay(label, spectrum)
+    }
+
     /// Adds a one-dimensional overlay to the left of the 2D plot.
     #[must_use]
     pub fn with_y_overlay(mut self, label: &'a str, spectrum: &'a Spectrum1D) -> Self {
         self.y_overlays.push(PlotTrace1D { label, spectrum });
         self
+    }
+
+    /// Adds a one-dimensional trace to the left of the 2D plot.
+    ///
+    /// This is a layout-named alias for [`Self::with_y_overlay`].
+    #[must_use]
+    pub fn with_left_trace(self, label: &'a str, spectrum: &'a Spectrum1D) -> Self {
+        self.with_y_overlay(label, spectrum)
     }
 
     /// Uses explicit contour levels instead of the noise-aware default.
@@ -80,10 +96,26 @@ impl<'a> Spectrum2DPlotOptions<'a> {
         &self.x_overlays
     }
 
+    /// One-dimensional traces rendered above the 2D plot.
+    ///
+    /// This is a layout-named alias for [`Self::x_overlays`].
+    #[must_use]
+    pub fn top_traces(&self) -> &[PlotTrace1D<'a>] {
+        self.x_overlays()
+    }
+
     /// Y-axis overlays rendered to the left of the 2D plot.
     #[must_use]
     pub fn y_overlays(&self) -> &[PlotTrace1D<'a>] {
         &self.y_overlays
+    }
+
+    /// One-dimensional traces rendered to the left of the 2D plot.
+    ///
+    /// This is a layout-named alias for [`Self::y_overlays`].
+    #[must_use]
+    pub fn left_traces(&self) -> &[PlotTrace1D<'a>] {
+        self.y_overlays()
     }
 }
 
@@ -691,8 +723,8 @@ mod tests {
         let y_overlay = demo_1d(Unit::Ppm, 10.0, 12.0)?;
         let options = Spectrum2DPlotOptions::new()
             .with_size(1_000, 800)
-            .with_x_overlay("1H", &x_overlay)
-            .with_y_overlay("13C", &y_overlay);
+            .with_top_trace("1H", &x_overlay)
+            .with_left_trace("13C", &y_overlay);
         let image = render_spectrum_2d_image("overlay", &spectrum, &options)?;
         assert_eq!(image.width, 1_000);
         assert_eq!(image.height, 800);
@@ -740,6 +772,40 @@ mod tests {
         assert_eq!(prepared.len(), 2);
         assert!((prepared[0].intensities[1] - 0.5).abs() < 1.0e-12);
         assert!((prepared[1].intensities[1] - 1.0).abs() < 1.0e-12);
+        Ok(())
+    }
+
+    #[test]
+    fn layout_named_trace_methods_match_existing_overlay_slots() -> Result<()> {
+        let top = demo_1d(Unit::Ppm, 0.0, 2.0)?;
+        let left = demo_1d(Unit::Ppm, 10.0, 12.0)?;
+        let options = Spectrum2DPlotOptions::new()
+            .with_size(1_000, 800)
+            .with_top_trace("top", &top)
+            .with_left_trace("left", &left);
+
+        assert_eq!(options.x_overlays().len(), 1);
+        assert_eq!(options.y_overlays().len(), 1);
+        assert_eq!(options.top_traces()[0].label, "top");
+        assert_eq!(options.left_traces()[0].label, "left");
+
+        let layout = plot_2d_layout(&options)?;
+        let Some(top_rect) = layout.x_overlay else {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "top trace should create a top panel".to_owned(),
+            });
+        };
+        let Some(left_rect) = layout.y_overlay else {
+            return Err(RSpinError::InvalidSpectrum {
+                message: "left trace should create a left panel".to_owned(),
+            });
+        };
+        assert_eq!(top_rect.y, 0);
+        assert_eq!(top_rect.x, layout.main.x);
+        assert_eq!(top_rect.width, layout.main.width);
+        assert_eq!(left_rect.x, 0);
+        assert_eq!(left_rect.y, layout.main.y);
+        assert_eq!(left_rect.height, layout.main.height);
         Ok(())
     }
 

@@ -9,8 +9,8 @@ use rspin::plot::{Spectrum2DPlotOptions, plot_spectrum_2d_with};
 use rspin::prelude::*;
 
 let options = Spectrum2DPlotOptions::new()
-    .with_x_overlay("1H", &proton_spectrum)
-    .with_y_overlay("13C", &carbon_spectrum);
+    .with_top_trace("1H", &proton_spectrum)
+    .with_left_trace("13C", &carbon_spectrum);
 
 plot_spectrum_2d_with(
     "hsqc_with_1d.png".as_ref(),
