@@ -287,7 +287,9 @@ same versioned bundle JSON used by native code. Use
 `spectrumBundleSourceFormats`, `spectrumBundleSourceVendors`, and
 `spectrumBundleSourceDataKinds` to populate browser format, extension, vendor,
 data-kind, and directory-marker selectors from the same source list as native
-Rust.
+Rust. Use `spectrumBundle1dBySourceDataKind` or
+`spectrumBundle2dBySourceDataKind` when browser code needs to extract the only
+raw, processed, or other spectrum of one dimension from a bundle.
 
 The small committed loader fixtures under
 `crates/rspin-io/testdata/zenodo_7100132` come from the MIT-licensed Zenodo

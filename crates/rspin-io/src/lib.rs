@@ -148,8 +148,8 @@ pub use bundle::{
     load_spectrum_2d_with_source_by_source_relative_to,
     load_spectrum_2d_with_source_by_source_vendor,
     load_spectrum_2d_with_source_by_source_vendor_relative_to,
-    load_spectrum_2d_with_source_relative_to, parse_loaded_source_format,
-    parse_loaded_source_vendor,
+    load_spectrum_2d_with_source_relative_to, parse_loaded_source_data_kind,
+    parse_loaded_source_format, parse_loaded_source_vendor,
 };
 pub use bundle_json::{
     JsonSpectrumBundle, SPECTRUM_BUNDLE_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_VERSION,

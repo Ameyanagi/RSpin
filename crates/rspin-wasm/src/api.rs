@@ -31,20 +31,21 @@ use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor, SpectrumBundle,
     inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
-    parse_jcamp_dx_version, parse_nmrml_version, parse_spectrum_text_format,
-    parse_spectrum1d_bytes_format, parse_spectrum1d_write_format, parse_spectrum2d_bytes_format,
-    parse_spectrum2d_write_format, read_agilent_arrayed_fid_1d_bytes,
-    read_agilent_arrayed_fid_2d_bytes, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
-    read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
-    read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes,
-    read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d,
-    read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes, read_nmredata_record_json,
-    read_nmredata_records_json, read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str,
-    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum_bundle_json,
-    read_spectrum1d_bytes_as, read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as,
-    read_spectrum2d_bytes_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
-    write_assignment_set_json, write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d,
-    write_nmredata_record, write_nmredata_record_json, write_nmredata_records,
+    parse_jcamp_dx_version, parse_loaded_source_data_kind, parse_nmrml_version,
+    parse_spectrum_text_format, parse_spectrum1d_bytes_format, parse_spectrum1d_write_format,
+    parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
+    read_agilent_arrayed_fid_1d_bytes, read_agilent_arrayed_fid_2d_bytes,
+    read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes,
+    read_agilent_processed_2d_bytes, read_assignment_set_json, read_bruker_fid_1d_bytes,
+    read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes,
+    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_bytes,
+    read_jeol_jdf_2d_bytes, read_nmredata_record_json, read_nmredata_records_json,
+    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
+    read_nmrml_document_info_str, read_spectrum_bundle_json, read_spectrum1d_bytes_as,
+    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as,
+    read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
+    write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record,
+    write_nmredata_record_json, write_nmredata_records,
     write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
     write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum1d_text,
     write_spectrum2d_json, write_spectrum2d_text,
@@ -825,6 +826,32 @@ pub fn spectrum_bundle_1d_by_source_vendor_json(input: &str, vendor: &str) -> Re
 pub fn spectrum_bundle_2d_by_source_vendor_json(input: &str, vendor: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
     write_spectrum2d_json(bundle.only_2d_by_source_vendor(vendor)?)
+}
+
+/// Extracts exactly one one-dimensional spectrum with a source data kind from bundle JSON.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, the source data kind is known, or when
+/// serialization fails.
+pub fn spectrum_bundle_1d_by_source_data_kind_json(input: &str, data_kind: &str) -> Result<String> {
+    let data_kind = parse_loaded_source_data_kind(data_kind)?;
+    let bundle = read_spectrum_bundle_json(input)?;
+    write_spectrum1d_json(bundle.only_1d_by_source(data_kind)?)
+}
+
+/// Extracts exactly one two-dimensional spectrum with a source data kind from bundle JSON.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, the source data kind is known, or when
+/// serialization fails.
+pub fn spectrum_bundle_2d_by_source_data_kind_json(input: &str, data_kind: &str) -> Result<String> {
+    let data_kind = parse_loaded_source_data_kind(data_kind)?;
+    let bundle = read_spectrum_bundle_json(input)?;
+    write_spectrum2d_json(bundle.only_2d_by_source(data_kind)?)
 }
 
 /// Extracts exactly one one-dimensional spectrum with a tracked source path from bundle JSON.

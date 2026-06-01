@@ -339,6 +339,10 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
         parse_loaded_source_vendor("varian")?,
         LoadedSourceVendor::AgilentVarian
     );
+    assert_eq!(
+        parse_loaded_source_data_kind("processed")?,
+        LoadedSourceDataKind::Processed
+    );
     let source_format_counts = bundle.source_format_counts();
     assert!(
         source_format_counts

@@ -389,6 +389,29 @@ fn extracts_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
         Some("wasm selected 2d")
     );
 
+    let by_data_kind = spectrum_bundle_1d_by_source_data_kind_json(&bundle_json, "raw")?;
+    assert_eq!(
+        spectrum1d_from_json(&by_data_kind)?
+            .metadata
+            .name
+            .as_deref(),
+        Some("wasm selected 1d")
+    );
+    let by_data_kind = spectrum_bundle_2d_by_source_data_kind_json(&bundle_json, "other")?;
+    assert_eq!(
+        spectrum2d_from_json(&by_data_kind)?
+            .metadata
+            .name
+            .as_deref(),
+        Some("wasm selected 2d")
+    );
+    let unknown_data_kind =
+        spectrum_bundle_1d_by_source_data_kind_json(&bundle_json, "unknown-data-kind");
+    assert!(matches!(
+        unknown_data_kind,
+        Err(RSpinError::Unsupported { .. })
+    ));
+
     let by_path = spectrum_bundle_1d_by_source_path_json(&bundle_json, "vendor/fid")?;
     assert_eq!(
         spectrum1d_from_json(&by_path)?.metadata.name.as_deref(),

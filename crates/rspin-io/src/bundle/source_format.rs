@@ -248,6 +248,16 @@ impl LoadedSourceDataKind {
             Self::Other => "other",
         }
     }
+
+    /// Parses a source data-kind name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-feature error when `input` is not a known source
+    /// data-kind name.
+    pub fn parse(input: &str) -> Result<Self> {
+        parse_loaded_source_data_kind(input)
+    }
 }
 
 impl AsRef<str> for LoadedSourceDataKind {
@@ -259,6 +269,14 @@ impl AsRef<str> for LoadedSourceDataKind {
 impl fmt::Display for LoadedSourceDataKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(self.as_str())
+    }
+}
+
+impl FromStr for LoadedSourceDataKind {
+    type Err = RSpinError;
+
+    fn from_str(input: &str) -> Result<Self> {
+        parse_loaded_source_data_kind(input)
     }
 }
 
@@ -362,6 +380,25 @@ pub fn parse_loaded_source_format(input: &str) -> Result<LoadedSourceFormat> {
     }
 }
 
+/// Parses a bundle source data-kind name.
+///
+/// Accepted names are `raw`, `processed`, and `other`.
+///
+/// # Errors
+///
+/// Returns an unsupported-feature error when `input` is not a known source
+/// data-kind name.
+pub fn parse_loaded_source_data_kind(input: &str) -> Result<LoadedSourceDataKind> {
+    match normalized_source_format_name(input).as_str() {
+        "raw" => Ok(LoadedSourceDataKind::Raw),
+        "processed" => Ok(LoadedSourceDataKind::Processed),
+        "other" => Ok(LoadedSourceDataKind::Other),
+        _ => Err(RSpinError::Unsupported {
+            feature: "bundle source data kind name",
+        }),
+    }
+}
+
 /// Parses a bundle source vendor name.
 ///
 /// Accepted aliases include `bruker`, `jeol`, `agilent`, `varian`, and
@@ -452,6 +489,22 @@ mod tests {
         );
         assert_eq!(LoadedSourceDataKind::Raw.as_str(), "raw");
         assert_eq!(LoadedSourceDataKind::Processed.to_string(), "processed");
+        assert_eq!(
+            parse_loaded_source_data_kind("raw")?,
+            LoadedSourceDataKind::Raw
+        );
+        let error = "source-processed"
+            .parse::<LoadedSourceDataKind>()
+            .expect_err("prefixed data kind should fail");
+        assert!(matches!(error, RSpinError::Unsupported { .. }));
+        assert_eq!(
+            LoadedSourceDataKind::parse("processed")?,
+            LoadedSourceDataKind::Processed
+        );
+        assert_eq!(
+            "other".parse::<LoadedSourceDataKind>()?,
+            LoadedSourceDataKind::Other
+        );
         assert_eq!(
             LoadedSourceDataKind::all(),
             &[
