@@ -604,6 +604,15 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
         varian.source_vendor_count(LoadedSourceVendor::AgilentVarian),
         1
     );
+
+    let mixed = load_spectra(fixture_root.join("bruker_without_expno"))?;
+    assert_eq!(mixed.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
+    assert_eq!(
+        mixed.source_data_kind_count(LoadedSourceDataKind::Processed),
+        1
+    );
+    assert_eq!(mixed.raw_source_subset().len(), 1);
+    assert_eq!(mixed.into_processed_source_subset().len(), 1);
     Ok(())
 }
 

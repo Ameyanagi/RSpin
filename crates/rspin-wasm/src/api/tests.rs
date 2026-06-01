@@ -239,12 +239,14 @@ fn exposes_supported_bundle_source_metadata_json() -> anyhow::Result<()> {
     assert!(formats.iter().any(|entry| {
         entry.get("name").and_then(serde_json::Value::as_str) == Some("jcamp_dx")
             && entry.get("vendor").is_none()
+            && entry.get("data_kind").and_then(serde_json::Value::as_str) == Some("other")
             && json_array_contains(entry, "extensions", "jdx")
             && !json_array_contains(entry, "path_markers", "jdx")
     }));
     assert!(formats.iter().any(|entry| {
         entry.get("name").and_then(serde_json::Value::as_str) == Some("bruker_ser")
             && entry.get("vendor").and_then(serde_json::Value::as_str) == Some("bruker")
+            && entry.get("data_kind").and_then(serde_json::Value::as_str) == Some("raw")
             && json_array_contains(entry, "path_markers", "ser")
             && !json_array_contains(entry, "extensions", "ser")
     }));

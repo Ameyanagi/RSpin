@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use super::source_filter::source_filters;
 use super::{
-    LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, only_error_from_counts,
-    push_source_vendor_count, source_format_count_name, source_format_matches,
-    source_vendor_counts_from_format_counts, spectrum_dimension_counts,
+    LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
+    only_error_from_counts, push_source_vendor_count, source_format_count_name,
+    source_format_matches, source_vendor_counts_from_format_counts, spectrum_dimension_counts,
 };
 
 /// Source metadata for a loaded spectrum.
@@ -56,6 +56,18 @@ impl LoadedSource {
         self.format_kind().and_then(LoadedSourceFormat::vendor)
     }
 
+    /// Returns the coarse raw/processed classification for this source.
+    ///
+    /// Unknown custom formats and open exchange formats are classified as
+    /// [`LoadedSourceDataKind::Other`].
+    #[must_use]
+    pub fn data_kind(&self) -> LoadedSourceDataKind {
+        match self.format_kind() {
+            Some(format) => format.data_kind(),
+            None => LoadedSourceDataKind::Other,
+        }
+    }
+
     /// Returns true when this source was read with a source format.
     #[must_use]
     pub fn is_format(&self, format: impl AsRef<str>) -> bool {
@@ -69,6 +81,18 @@ impl LoadedSource {
             return false;
         };
         self.vendor() == Some(vendor)
+    }
+
+    /// Returns true when this source represents vendor raw acquisition data.
+    #[must_use]
+    pub fn is_raw(&self) -> bool {
+        self.data_kind() == LoadedSourceDataKind::Raw
+    }
+
+    /// Returns true when this source represents vendor processed data.
+    #[must_use]
+    pub fn is_processed(&self) -> bool {
+        self.data_kind() == LoadedSourceDataKind::Processed
     }
 }
 
@@ -113,6 +137,18 @@ impl SourceFormatCount {
     #[must_use]
     pub fn vendor(&self) -> Option<LoadedSourceVendor> {
         self.format_kind().and_then(LoadedSourceFormat::vendor)
+    }
+
+    /// Returns the coarse raw/processed classification for this source format count.
+    ///
+    /// Unknown custom formats and open exchange formats are classified as
+    /// [`LoadedSourceDataKind::Other`].
+    #[must_use]
+    pub fn data_kind(&self) -> LoadedSourceDataKind {
+        match self.format_kind() {
+            Some(format) => format.data_kind(),
+            None => LoadedSourceDataKind::Other,
+        }
     }
 }
 
@@ -477,6 +513,33 @@ impl SpectrumBundle {
         self.source_subset(LoadedSourceFilter::vendor(vendor))
     }
 
+    /// Returns a cloned bundle containing spectra with one raw/processed source data kind.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn source_data_kind_subset(&self, data_kind: LoadedSourceDataKind) -> Self {
+        self.clone().into_source_data_kind_subset(data_kind)
+    }
+
+    /// Returns a cloned bundle containing spectra from vendor raw acquisition data.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn raw_source_subset(&self) -> Self {
+        self.source_data_kind_subset(LoadedSourceDataKind::Raw)
+    }
+
+    /// Returns a cloned bundle containing spectra from vendor processed data.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn processed_source_subset(&self) -> Self {
+        self.source_data_kind_subset(LoadedSourceDataKind::Processed)
+    }
+
     /// Returns a cloned bundle containing spectra read from one tracked source path.
     ///
     /// Molecule metadata is preserved. Loader warnings are retained when they
@@ -561,6 +624,11 @@ impl SpectrumBundle {
     /// Returns an iterator over vendor families for vendor-specific spectra.
     pub fn source_vendors(&self) -> impl Iterator<Item = LoadedSourceVendor> + '_ {
         self.loaded_sources().filter_map(LoadedSource::vendor)
+    }
+
+    /// Returns an iterator over raw/processed classifications for loaded spectra.
+    pub fn source_data_kinds(&self) -> impl Iterator<Item = LoadedSourceDataKind> + '_ {
+        self.loaded_sources().map(LoadedSource::data_kind)
     }
 
     /// Returns loaded spectra read with a source format.
@@ -656,6 +724,46 @@ impl SpectrumBundle {
                 Some(vendor) => source.vendor() == Some(vendor),
                 None => false,
             })
+            .filter_map(LoadedSource::path)
+    }
+
+    /// Returns loaded spectra with one raw/processed source data kind.
+    pub fn loaded_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> impl Iterator<Item = &LoadedSpectrum> + '_ {
+        self.spectra
+            .iter()
+            .filter(move |entry| entry.source().data_kind() == data_kind)
+    }
+
+    /// Returns one-dimensional spectra and sources with one raw/processed source data kind.
+    pub fn loaded_1d_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_ {
+        self.loaded_1d()
+            .filter(move |(_, source)| source.data_kind() == data_kind)
+    }
+
+    /// Returns two-dimensional spectra and sources with one raw/processed source data kind.
+    pub fn loaded_2d_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_ {
+        self.loaded_2d()
+            .filter(move |(_, source)| source.data_kind() == data_kind)
+    }
+
+    /// Returns tracked source paths for spectra with one raw/processed source data kind.
+    ///
+    /// Spectra loaded while source path tracking is disabled are skipped.
+    pub fn source_paths_for_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> impl Iterator<Item = &Path> + '_ {
+        self.loaded_sources()
+            .filter(move |source| source.data_kind() == data_kind)
             .filter_map(LoadedSource::path)
     }
 
@@ -863,6 +971,20 @@ impl SpectrumBundle {
         self.source_vendor_count(vendor) > 0
     }
 
+    /// Returns the number of loaded spectra with one raw/processed source data kind.
+    #[must_use]
+    pub fn source_data_kind_count(&self, data_kind: LoadedSourceDataKind) -> usize {
+        self.loaded_sources()
+            .filter(|source| source.data_kind() == data_kind)
+            .count()
+    }
+
+    /// Returns true when a loaded spectrum has one raw/processed source data kind.
+    #[must_use]
+    pub fn has_source_data_kind(&self, data_kind: LoadedSourceDataKind) -> bool {
+        self.source_data_kind_count(data_kind) > 0
+    }
+
     /// Returns deterministic source format counts in first-seen order.
     #[must_use]
     pub fn source_format_counts(&self) -> Vec<SourceFormatCount> {
@@ -994,6 +1116,35 @@ impl SpectrumBundle {
     #[must_use]
     pub fn into_source_vendor_subset(self, vendor: impl AsRef<str>) -> Self {
         self.into_source_subset(LoadedSourceFilter::vendor(vendor))
+    }
+
+    /// Consumes the bundle and keeps spectra with one raw/processed source data kind.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn into_source_data_kind_subset(mut self, data_kind: LoadedSourceDataKind) -> Self {
+        self.spectra
+            .retain(|entry| entry.source().data_kind() == data_kind);
+        self
+    }
+
+    /// Consumes the bundle and keeps spectra from vendor raw acquisition data.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn into_raw_source_subset(self) -> Self {
+        self.into_source_data_kind_subset(LoadedSourceDataKind::Raw)
+    }
+
+    /// Consumes the bundle and keeps spectra from vendor processed data.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn into_processed_source_subset(self) -> Self {
+        self.into_source_data_kind_subset(LoadedSourceDataKind::Processed)
     }
 
     /// Consumes the bundle and keeps spectra read from one tracked source path.

@@ -8,9 +8,9 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSource, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum,
-    RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra,
-    load_spectra_by_source, load_spectra_by_source_format,
+    LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
+    LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
+    load_spectra, load_spectra_by_source, load_spectra_by_source_format,
     load_spectra_by_source_format_relative_to, load_spectra_by_source_path,
     load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
     load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
@@ -1704,6 +1704,63 @@ fn bundle_typed_source_subset_helpers_cover_common_filters() -> anyhow::Result<(
         .source_path_subset("empty_jcamp/empty.jdx");
     assert_eq!(warning_subset.len(), 0);
     assert_eq!(warning_subset.warning_count(), 1);
+    Ok(())
+}
+
+#[test]
+fn bundle_source_data_kind_helpers_cover_raw_and_processed_sources() -> anyhow::Result<()> {
+    let bundle = load_spectra_relative_to(fixture_root(), "bruker_without_expno")?;
+
+    assert_eq!(bundle.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
+    assert_eq!(
+        bundle.source_data_kind_count(LoadedSourceDataKind::Processed),
+        1
+    );
+    assert_eq!(
+        bundle.source_data_kind_count(LoadedSourceDataKind::Other),
+        0
+    );
+    assert!(bundle.has_source_data_kind(LoadedSourceDataKind::Raw));
+    assert!(bundle.loaded_sources().any(LoadedSource::is_raw));
+    assert!(bundle.loaded_sources().any(LoadedSource::is_processed));
+    assert_eq!(
+        bundle.source_data_kinds().collect::<Vec<_>>(),
+        vec![LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed]
+    );
+
+    let raw = bundle.raw_source_subset();
+    assert_eq!(raw.len(), 1);
+    assert_eq!(first_1d(&raw)?.x.unit, Unit::Seconds);
+    assert_eq!(
+        raw.source_paths_for_data_kind(LoadedSourceDataKind::Raw)
+            .collect::<Vec<_>>(),
+        vec![Path::new("bruker_without_expno")]
+    );
+    assert_eq!(
+        raw.loaded_by_source_data_kind(LoadedSourceDataKind::Raw)
+            .count(),
+        1
+    );
+    assert_eq!(
+        raw.loaded_1d_by_source_data_kind(LoadedSourceDataKind::Raw)
+            .count(),
+        1
+    );
+    assert_eq!(
+        raw.loaded_2d_by_source_data_kind(LoadedSourceDataKind::Raw)
+            .count(),
+        0
+    );
+
+    let processed = bundle.into_processed_source_subset();
+    assert_eq!(processed.len(), 1);
+    assert_eq!(first_1d(&processed)?.x.unit, Unit::Ppm);
+    assert_eq!(
+        processed
+            .source_paths_for_data_kind(LoadedSourceDataKind::Processed)
+            .collect::<Vec<_>>(),
+        vec![Path::new("bruker_without_expno/pdata/1")]
+    );
     Ok(())
 }
 

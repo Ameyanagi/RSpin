@@ -3,6 +3,7 @@
 use std::{fmt, str::FromStr};
 
 use rspin_core::{RSpinError, Result};
+use serde::{Deserialize, Serialize};
 
 /// Known spectrum source formats emitted by the bundle loader.
 ///
@@ -32,6 +33,25 @@ pub enum LoadedSourceFormat {
     AgilentProcessed,
     /// Agilent/Varian raw FID dataset.
     AgilentFid,
+}
+
+/// Raw/processed classification for a loaded source format.
+///
+/// This is intentionally coarse: open exchange formats such as JCAMP-DX,
+/// nmrML, JSON, and CSV may contain processed or raw-like data depending on
+/// their payload, so they are classified as `Other`. Vendor formats with
+/// clear acquisition or processing directory semantics are classified as
+/// `Raw` or `Processed`.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoadedSourceDataKind {
+    /// Vendor raw acquisition data, such as FID or SER datasets.
+    Raw,
+    /// Vendor processed data, such as processed Bruker or Agilent/Varian spectra.
+    Processed,
+    /// Open exchange data or unknown/custom formats without a raw/processed guarantee.
+    Other,
 }
 
 const LOADED_SOURCE_FORMATS: &[LoadedSourceFormat] = &[
@@ -166,6 +186,30 @@ impl LoadedSourceFormat {
             Self::Json | Self::NmrMl | Self::JcampDx | Self::Csv => None,
         }
     }
+
+    /// Returns the coarse raw/processed classification for this source format.
+    #[must_use]
+    pub const fn data_kind(self) -> LoadedSourceDataKind {
+        match self {
+            Self::BrukerFid | Self::BrukerSer | Self::AgilentFid => LoadedSourceDataKind::Raw,
+            Self::BrukerProcessed | Self::AgilentProcessed => LoadedSourceDataKind::Processed,
+            Self::Json | Self::NmrMl | Self::JcampDx | Self::Csv | Self::JeolJdf => {
+                LoadedSourceDataKind::Other
+            }
+        }
+    }
+
+    /// Returns true when this source format represents vendor raw acquisition data.
+    #[must_use]
+    pub const fn is_raw(self) -> bool {
+        matches!(self.data_kind(), LoadedSourceDataKind::Raw)
+    }
+
+    /// Returns true when this source format represents vendor processed data.
+    #[must_use]
+    pub const fn is_processed(self) -> bool {
+        matches!(self.data_kind(), LoadedSourceDataKind::Processed)
+    }
 }
 
 impl AsRef<str> for LoadedSourceFormat {
@@ -185,6 +229,36 @@ impl FromStr for LoadedSourceFormat {
 
     fn from_str(input: &str) -> Result<Self> {
         parse_loaded_source_format(input)
+    }
+}
+
+impl LoadedSourceDataKind {
+    /// Returns all known data kinds in stable display order.
+    #[must_use]
+    pub const fn all() -> &'static [Self] {
+        &[Self::Raw, Self::Processed, Self::Other]
+    }
+
+    /// Returns the canonical snake-case data kind name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Raw => "raw",
+            Self::Processed => "processed",
+            Self::Other => "other",
+        }
+    }
+}
+
+impl AsRef<str> for LoadedSourceDataKind {
+    fn as_ref(&self) -> &str {
+        (*self).as_str()
+    }
+}
+
+impl fmt::Display for LoadedSourceDataKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
     }
 }
 
@@ -361,6 +435,30 @@ mod tests {
         assert_eq!(
             LoadedSourceFormat::JeolJdf.vendor(),
             Some(LoadedSourceVendor::Jeol)
+        );
+        assert_eq!(
+            LoadedSourceFormat::BrukerFid.data_kind(),
+            LoadedSourceDataKind::Raw
+        );
+        assert!(LoadedSourceFormat::BrukerSer.is_raw());
+        assert_eq!(
+            LoadedSourceFormat::AgilentProcessed.data_kind(),
+            LoadedSourceDataKind::Processed
+        );
+        assert!(LoadedSourceFormat::BrukerProcessed.is_processed());
+        assert_eq!(
+            LoadedSourceFormat::JcampDx.data_kind(),
+            LoadedSourceDataKind::Other
+        );
+        assert_eq!(LoadedSourceDataKind::Raw.as_str(), "raw");
+        assert_eq!(LoadedSourceDataKind::Processed.to_string(), "processed");
+        assert_eq!(
+            LoadedSourceDataKind::all(),
+            &[
+                LoadedSourceDataKind::Raw,
+                LoadedSourceDataKind::Processed,
+                LoadedSourceDataKind::Other
+            ]
         );
         assert_eq!(LoadedSourceFormat::NmrMl.to_string(), "nmrml");
         assert_eq!(

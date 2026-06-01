@@ -134,11 +134,15 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     for count in &summary.source_vendors {
         println!("{} vendor spectra: {}", count.vendor(), count.count());
     }
+    println!(
+        "loaded {} raw vendor spectra",
+        bundle.source_data_kind_count(LoadedSourceDataKind::Raw)
+    );
     for (spectrum, source) in bundle.loaded_1d_by_source_format(LoadedSourceFormat::JcampDx) {
         let label = source
             .path()
             .map_or_else(|| "<memory>".to_owned(), |path| path.display().to_string());
-        println!("{label} has {} points", spectrum.len());
+        println!("{label} has {} points from {}", spectrum.len(), source.data_kind());
     }
     for path in bundle.source_paths_for_source(LoadedSourceFilter::vendor("bruker")) {
         println!("Bruker source: {}", path.display());
@@ -170,6 +174,11 @@ fn keep_runtime_subset_as_bundle() -> Result<SpectrumBundle> {
 fn keep_bruker_subset_as_bundle() -> Result<SpectrumBundle> {
     let bundle = load_spectra("data/mixed-vendor")?;
     Ok(bundle.source_vendor_subset(LoadedSourceVendor::Bruker))
+}
+
+fn keep_processed_subset_as_bundle() -> Result<SpectrumBundle> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle.processed_source_subset())
 }
 
 fn load_named_carbon_spectrum() -> Result<Spectrum1D> {

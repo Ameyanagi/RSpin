@@ -87,7 +87,8 @@ pub use model::{
 };
 pub use source_filter::LoadedSourceFilter;
 pub use source_format::{
-    LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_format, parse_loaded_source_vendor,
+    LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_format,
+    parse_loaded_source_vendor,
 };
 
 /// High-level reader for supported `RSpin` spectrum inputs.
