@@ -6,8 +6,10 @@ mod loaded_summary;
 mod model;
 mod selected;
 mod selection;
+mod source_path;
 mod strict;
 mod summary;
+mod summary_path;
 
 use std::path::Path;
 
@@ -85,8 +87,17 @@ pub use selection::{
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
     select_discovered_spectra_by_sources,
 };
+pub use source_path::{
+    load_discovered_spectra_by_source_path, load_discovered_spectra_by_source_path_prefix,
+    load_discovered_spectra_by_source_path_prefix_relative_to,
+    load_discovered_spectra_by_source_path_relative_to,
+};
 pub use strict::{
     load_discovered_spectra_strict, load_discovered_spectra_strict_by_source,
+    load_discovered_spectra_strict_by_source_path,
+    load_discovered_spectra_strict_by_source_path_prefix,
+    load_discovered_spectra_strict_by_source_path_prefix_relative_to,
+    load_discovered_spectra_strict_by_source_path_relative_to,
     load_discovered_spectra_strict_by_source_relative_to,
     load_discovered_spectra_strict_by_sources,
     load_discovered_spectra_strict_by_sources_relative_to,
@@ -95,6 +106,16 @@ pub use strict::{
 pub use summary::{
     DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount, DiscoveredSpectrumSummary,
     summarize_discovered_spectra,
+};
+pub use summary_path::{
+    load_discovered_spectra_summary_by_source_path,
+    load_discovered_spectra_summary_by_source_path_prefix,
+    load_discovered_spectra_summary_by_source_path_prefix_relative_to,
+    load_discovered_spectra_summary_by_source_path_relative_to,
+    load_discovered_spectra_summary_strict_by_source_path,
+    load_discovered_spectra_summary_strict_by_source_path_prefix,
+    load_discovered_spectra_summary_strict_by_source_path_prefix_relative_to,
+    load_discovered_spectra_summary_strict_by_source_path_relative_to,
 };
 
 /// Loads selected discovered source candidates relative to a common base directory.

@@ -569,12 +569,53 @@ fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
         1
     );
 
+    let selected_by_path = load_discovered_spectra_summary_by_source_path(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno/pdata/1",
+    )?;
+    assert_eq!(selected_by_path, selected);
+
+    let selected_by_prefix = load_discovered_spectra_summary_by_source_path_prefix(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(selected_by_prefix.spectra(), 2);
+
+    let selected_by_path_reader = RSpinReader::new().read_discovered_summary_by_source_path(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno/pdata/1",
+    )?;
+    assert_eq!(selected_by_path_reader, selected);
+
+    let selected_by_prefix_reader = RSpinReader::new()
+        .read_discovered_summary_by_source_path_prefix(
+            &fixture_root,
+            &sources,
+            "bruker_without_expno",
+        )?;
+    assert_eq!(selected_by_prefix_reader.spectra(), 2);
+
     let strict = load_discovered_spectra_summary_strict_by_source(
         &fixture_root,
         &sources,
         LoadedSourceFilter::vendor("varian"),
     )?;
     assert_eq!(strict.spectra(), 1);
+    let strict_by_path = load_discovered_spectra_summary_strict_by_source_path(
+        &fixture_root,
+        &sources,
+        "varian_1h",
+    )?;
+    assert_eq!(strict_by_path, strict);
+    let strict_by_prefix = load_discovered_spectra_summary_strict_by_source_path_prefix(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(strict_by_prefix.spectra(), 2);
     Ok(())
 }
 
@@ -892,6 +933,47 @@ fn prelude_exports_discovered_source_filter_loaders() -> Result<()> {
         [LoadedSourceFilter::path("varian_1h")],
     )?;
     assert_eq!(loaded.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn prelude_exports_discovered_source_path_loaders() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let loaded = load_discovered_spectra_by_source_path(&fixture_root, &sources, "varian_1h")?;
+    assert_eq!(loaded.len(), 1);
+    assert!(loaded.has_source_path(std::path::Path::new("varian_1h")));
+
+    let loaded = load_discovered_spectra_by_source_path_prefix(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(loaded.len(), 2);
+
+    let loaded =
+        RSpinReader::new().read_discovered_by_source_path(&fixture_root, &sources, "varian_1h")?;
+    assert_eq!(loaded.len(), 1);
+
+    let loaded = RSpinReader::new().read_discovered_by_source_path_prefix(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(loaded.len(), 2);
+
+    let loaded =
+        load_discovered_spectra_strict_by_source_path(&fixture_root, &sources, "varian_1h")?;
+    assert_eq!(loaded.len(), 1);
+
+    let loaded = load_discovered_spectra_strict_by_source_path_prefix(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(loaded.len(), 2);
     Ok(())
 }
 

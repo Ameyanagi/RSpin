@@ -67,6 +67,66 @@ pub fn load_discovered_spectra_strict_by_source<'a>(
     load_discovered_spectra_strict_by_source_relative_to(base, sources, filter)
 }
 
+/// Strictly loads discovered source candidates matching one source path.
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching discovered sources fails.
+pub fn load_discovered_spectra_strict_by_source_path_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_discovered_by_source_path_relative_to(base, sources, path)
+}
+
+/// Strictly loads discovered source candidates matching one source path.
+///
+/// This short alias mirrors [`load_discovered_spectra_strict_by_source_path_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching discovered sources fails.
+pub fn load_discovered_spectra_strict_by_source_path<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    load_discovered_spectra_strict_by_source_path_relative_to(base, sources, path)
+}
+
+/// Strictly loads discovered source candidates below one source path prefix.
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching discovered sources fails.
+pub fn load_discovered_spectra_strict_by_source_path_prefix_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_discovered_by_source_path_prefix_relative_to(base, sources, path)
+}
+
+/// Strictly loads discovered source candidates below one source path prefix.
+///
+/// This short alias mirrors [`load_discovered_spectra_strict_by_source_path_prefix_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching discovered sources fails.
+pub fn load_discovered_spectra_strict_by_source_path_prefix<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    load_discovered_spectra_strict_by_source_path_prefix_relative_to(base, sources, path)
+}
+
 /// Strictly loads discovered source candidates matching any generic source filter.
 ///
 /// Filters are combined with logical OR. Passing an empty iterator strictly

@@ -26,6 +26,9 @@ use rspin_io::{
     load_discovered_spectra_1d_strict_by_source_relative_to,
     load_discovered_spectra_2d_by_sources_relative_to, load_discovered_spectra_2d_relative_to,
     load_discovered_spectra_2d_strict_by_sources, load_discovered_spectra_by_source,
+    load_discovered_spectra_by_source_path, load_discovered_spectra_by_source_path_prefix,
+    load_discovered_spectra_by_source_path_prefix_relative_to,
+    load_discovered_spectra_by_source_path_relative_to,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
     select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
@@ -1331,6 +1334,54 @@ fn discovered_source_filter_helpers_load_matching_candidates() -> Result<()> {
     )?;
     assert_eq!(unrestricted.len(), 3);
     assert_eq!(unrestricted.warning_count(), 2);
+    Ok(())
+}
+
+#[test]
+fn discovered_source_path_helpers_load_matching_candidates() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+
+    let varian = load_discovered_spectra_by_source(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    let varian_by_path =
+        load_discovered_spectra_by_source_path_relative_to(fixture_root(), &sources, "varian_1h")?;
+    assert_eq!(varian_by_path, varian);
+
+    let varian_by_path_alias =
+        load_discovered_spectra_by_source_path(fixture_root(), &sources, "varian_1h")?;
+    assert_eq!(varian_by_path_alias, varian);
+
+    let reader_varian_by_path =
+        RSpinReader::new().read_discovered_by_source_path(fixture_root(), &sources, "varian_1h")?;
+    assert_eq!(reader_varian_by_path, varian);
+
+    let bruker_by_prefix = load_discovered_spectra_by_source_path_prefix_relative_to(
+        fixture_root(),
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(bruker_by_prefix.len(), 2);
+    assert_eq!(
+        bruker_by_prefix.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+
+    let bruker_by_prefix_alias = load_discovered_spectra_by_source_path_prefix(
+        fixture_root(),
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(bruker_by_prefix_alias, bruker_by_prefix);
+
+    let reader_bruker_by_prefix = RSpinReader::new().read_discovered_by_source_path_prefix(
+        fixture_root(),
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(reader_bruker_by_prefix, bruker_by_prefix);
     Ok(())
 }
 
