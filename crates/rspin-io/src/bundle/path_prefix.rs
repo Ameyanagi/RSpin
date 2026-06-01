@@ -131,6 +131,62 @@ impl SpectrumBundle {
             .filter(move |(_, source)| source_path_matches_prefix(source, &path))
     }
 
+    /// Returns the only one-dimensional spectrum from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_1d_by_source_path_prefix(&self, path: impl AsRef<Path>) -> Result<&Spectrum1D> {
+        self.only_loaded_1d_by_source_path_prefix(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only one-dimensional spectrum and source from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_1d_by_source_path_prefix(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<(&Spectrum1D, &LoadedSource)> {
+        self.only_loaded_1d_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Returns the only two-dimensional spectrum from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_2d_by_source_path_prefix(&self, path: impl AsRef<Path>) -> Result<&Spectrum2D> {
+        self.only_loaded_2d_by_source_path_prefix(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only two-dimensional spectrum and source from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_2d_by_source_path_prefix(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<(&Spectrum2D, &LoadedSource)> {
+        self.only_loaded_2d_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
     /// Returns tracked source paths below a prefix.
     pub fn source_paths_for_path_prefix(
         &self,
@@ -196,6 +252,62 @@ impl SpectrumBundle {
         path: impl AsRef<Path>,
     ) -> Vec<(Spectrum2D, LoadedSource)> {
         self.into_loaded_2d_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_1d_by_source_path_prefix(self, path: impl AsRef<Path>) -> Result<Spectrum1D> {
+        self.into_only_loaded_1d_by_source_path_prefix(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum and source from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_1d_by_source_path_prefix(
+        self,
+        path: impl AsRef<Path>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.into_only_loaded_1d_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_2d_by_source_path_prefix(self, path: impl AsRef<Path>) -> Result<Spectrum2D> {
+        self.into_only_loaded_2d_by_source_path_prefix(path)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum and source from tracked source paths below a prefix.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_2d_by_source_path_prefix(
+        self,
+        path: impl AsRef<Path>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.into_only_loaded_2d_by_source(LoadedSourceFilter::path_prefix(path))
     }
 
     /// Consumes the bundle and returns one-dimensional spectra from tracked source paths below a prefix.

@@ -3,6 +3,7 @@
 mod data_kind_filtered;
 mod generic_source_filtered;
 mod many_source_filtered;
+mod path_prefix_filtered;
 mod source_filtered;
 
 use std::path::Path;
@@ -57,6 +58,22 @@ pub use many_source_filtered::{
     load_spectrum_2d_many_with_source_by_source_path_relative_to,
     load_spectrum_2d_many_with_source_by_source_vendor,
     load_spectrum_2d_many_with_source_by_source_vendor_relative_to,
+};
+pub use path_prefix_filtered::{
+    load_spectrum_1d_by_source_path_prefix, load_spectrum_1d_by_source_path_prefix_relative_to,
+    load_spectrum_1d_many_by_source_path_prefix,
+    load_spectrum_1d_many_by_source_path_prefix_relative_to,
+    load_spectrum_1d_many_with_source_by_source_path_prefix,
+    load_spectrum_1d_many_with_source_by_source_path_prefix_relative_to,
+    load_spectrum_1d_with_source_by_source_path_prefix,
+    load_spectrum_1d_with_source_by_source_path_prefix_relative_to,
+    load_spectrum_2d_by_source_path_prefix, load_spectrum_2d_by_source_path_prefix_relative_to,
+    load_spectrum_2d_many_by_source_path_prefix,
+    load_spectrum_2d_many_by_source_path_prefix_relative_to,
+    load_spectrum_2d_many_with_source_by_source_path_prefix,
+    load_spectrum_2d_many_with_source_by_source_path_prefix_relative_to,
+    load_spectrum_2d_with_source_by_source_path_prefix,
+    load_spectrum_2d_with_source_by_source_path_prefix_relative_to,
 };
 pub use source_filtered::{
     load_spectrum_1d_by_source_format, load_spectrum_1d_by_source_format_relative_to,

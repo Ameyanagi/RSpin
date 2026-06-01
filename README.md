@@ -113,6 +113,10 @@ fn load_exactly_one_tracked_source() -> Result<Spectrum2D> {
     )
 }
 
+fn load_exactly_one_source_directory() -> Result<Spectrum1D> {
+    load_spectrum_1d_by_source_path_prefix("data/mixed-vendor", "bruker/pdata")
+}
+
 fn load_jcamp_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_format("data/mixed-vendor", LoadedSourceFormat::JcampDx)
 }
