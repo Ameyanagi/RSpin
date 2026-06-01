@@ -29,8 +29,8 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor, SpectrumBundle,
-    inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
+    LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
+    SpectrumBundle, inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
     parse_jcamp_dx_version, parse_loaded_source_data_kind, parse_nmrml_version,
     parse_spectrum_text_format, parse_spectrum1d_bytes_format, parse_spectrum1d_write_format,
     parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
@@ -1044,6 +1044,86 @@ pub fn spectrum_bundle_loaded_2d_by_source_path_json(
     loaded_spectrum2d_to_json(spectrum, source)
 }
 
+/// Extracts exactly one one-dimensional spectrum matching any source filter from bundle JSON.
+///
+/// `filters_json` is an array of `LoadedSourceFilter` objects, for example:
+///
+/// ```json
+/// [
+///   {"kind": "vendor", "vendor": "bruker"},
+///   {"kind": "path", "path": "jcamp/carbon_13c.jdx"}
+/// ]
+/// ```
+///
+/// Filters are combined with logical OR. An empty array leaves source matching
+/// unrestricted.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_1d_by_sources_json(input: &str, filters_json: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filters = source_filters_from_json(filters_json)?;
+    write_spectrum1d_json(bundle.only_1d_by_sources(filters)?)
+}
+
+/// Extracts exactly one one-dimensional loaded spectrum matching any source filter from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+/// `filters_json` is an array of `LoadedSourceFilter` objects. Filters are
+/// combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_loaded_1d_by_sources_json(
+    input: &str,
+    filters_json: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filters = source_filters_from_json(filters_json)?;
+    let (spectrum, source) = bundle.only_loaded_1d_by_sources(filters)?;
+    loaded_spectrum1d_to_json(spectrum, source)
+}
+
+/// Extracts exactly one two-dimensional spectrum matching any source filter from bundle JSON.
+///
+/// `filters_json` is an array of `LoadedSourceFilter` objects. Filters are
+/// combined with logical OR. An empty array leaves source matching
+/// unrestricted.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_2d_by_sources_json(input: &str, filters_json: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filters = source_filters_from_json(filters_json)?;
+    write_spectrum2d_json(bundle.only_2d_by_sources(filters)?)
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum matching any source filter from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+/// `filters_json` is an array of `LoadedSourceFilter` objects. Filters are
+/// combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_loaded_2d_by_sources_json(
+    input: &str,
+    filters_json: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filters = source_filters_from_json(filters_json)?;
+    let (spectrum, source) = bundle.only_loaded_2d_by_sources(filters)?;
+    loaded_spectrum2d_to_json(spectrum, source)
+}
+
 /// Scales serialized `Spectrum1D` JSON.
 ///
 /// # Errors
@@ -1321,6 +1401,10 @@ fn loaded_spectrum1d_to_json(spectrum: &Spectrum1D, source: &LoadedSource) -> Re
 
 fn loaded_spectrum2d_to_json(spectrum: &Spectrum2D, source: &LoadedSource) -> Result<String> {
     to_json(&LoadedSpectrum2DJson::TwoD { spectrum, source })
+}
+
+fn source_filters_from_json(input: &str) -> Result<Vec<LoadedSourceFilter>> {
+    from_json(input)
 }
 
 fn agilent_fid_loaded_source() -> LoadedSource {
