@@ -29,15 +29,25 @@ pub use data_kind_filtered::{
 };
 pub use generic_source_filtered::{
     load_spectrum_1d_by_source, load_spectrum_1d_by_source_relative_to,
+    load_spectrum_1d_by_sources, load_spectrum_1d_by_sources_relative_to,
     load_spectrum_1d_many_by_source, load_spectrum_1d_many_by_source_relative_to,
+    load_spectrum_1d_many_by_sources, load_spectrum_1d_many_by_sources_relative_to,
     load_spectrum_1d_many_with_source_by_source,
     load_spectrum_1d_many_with_source_by_source_relative_to,
+    load_spectrum_1d_many_with_source_by_sources,
+    load_spectrum_1d_many_with_source_by_sources_relative_to,
     load_spectrum_1d_with_source_by_source, load_spectrum_1d_with_source_by_source_relative_to,
+    load_spectrum_1d_with_source_by_sources, load_spectrum_1d_with_source_by_sources_relative_to,
     load_spectrum_2d_by_source, load_spectrum_2d_by_source_relative_to,
+    load_spectrum_2d_by_sources, load_spectrum_2d_by_sources_relative_to,
     load_spectrum_2d_many_by_source, load_spectrum_2d_many_by_source_relative_to,
+    load_spectrum_2d_many_by_sources, load_spectrum_2d_many_by_sources_relative_to,
     load_spectrum_2d_many_with_source_by_source,
     load_spectrum_2d_many_with_source_by_source_relative_to,
+    load_spectrum_2d_many_with_source_by_sources,
+    load_spectrum_2d_many_with_source_by_sources_relative_to,
     load_spectrum_2d_with_source_by_source, load_spectrum_2d_with_source_by_source_relative_to,
+    load_spectrum_2d_with_source_by_sources, load_spectrum_2d_with_source_by_sources_relative_to,
 };
 pub use many_source_filtered::{
     load_spectrum_1d_many_by_source_format, load_spectrum_1d_many_by_source_format_relative_to,

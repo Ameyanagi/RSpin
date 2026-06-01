@@ -4,6 +4,7 @@ use std::path::Path;
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
+use super::source_filter::source_filters;
 use super::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceVendor, LoadedSpectrum,
     SpectrumBundle, source_format_count_name, source_format_matches,
@@ -330,6 +331,90 @@ impl SpectrumBundle {
         let filter = filter.into();
         let label = source_filter_label(&filter);
         self.only_loaded_2d_matching_source(&label, move |source| filter.matches_source(source))
+    }
+
+    /// Returns the only one-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_1d_by_sources<I, F>(&self, filters: I) -> Result<&Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.only_loaded_1d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only one-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_1d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> Result<(&Spectrum1D, &LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        let label = source_filters_label(&filters);
+        self.only_loaded_1d_matching_source(&label, move |source| {
+            source_matches_any(&filters, source)
+        })
+    }
+
+    /// Returns the only two-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_2d_by_sources<I, F>(&self, filters: I) -> Result<&Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.only_loaded_2d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only two-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_2d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> Result<(&Spectrum2D, &LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        let label = source_filters_label(&filters);
+        self.only_loaded_2d_matching_source(&label, move |source| {
+            source_matches_any(&filters, source)
+        })
     }
 
     /// Consumes the bundle and returns the only one-dimensional spectrum read with a source format.
@@ -664,6 +749,90 @@ impl SpectrumBundle {
         })
     }
 
+    /// Consumes the bundle and returns the only one-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_1d_by_sources<I, F>(self, filters: I) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.into_only_loaded_1d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_1d_by_sources<I, F>(
+        self,
+        filters: I,
+    ) -> Result<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        let label = source_filters_label(&filters);
+        self.into_only_loaded_1d_matching_source(&label, move |source| {
+            source_matches_any(&filters, source)
+        })
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_2d_by_sources<I, F>(self, filters: I) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.into_only_loaded_2d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_2d_by_sources<I, F>(
+        self,
+        filters: I,
+    ) -> Result<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        let label = source_filters_label(&filters);
+        self.into_only_loaded_2d_matching_source(&label, move |source| {
+            source_matches_any(&filters, source)
+        })
+    }
+
     fn only_loaded_1d_matching_source(
         &self,
         filter: &str,
@@ -839,4 +1008,20 @@ fn source_filter_label(filter: &LoadedSourceFilter) -> String {
             format!("source path prefix {}", path.display())
         }
     }
+}
+
+fn source_filters_label(filters: &[LoadedSourceFilter]) -> String {
+    if filters.is_empty() {
+        return "any source".to_owned();
+    }
+
+    filters
+        .iter()
+        .map(source_filter_label)
+        .collect::<Vec<_>>()
+        .join(" or ")
+}
+
+fn source_matches_any(filters: &[LoadedSourceFilter], source: &LoadedSource) -> bool {
+    filters.is_empty() || filters.iter().any(|filter| filter.matches_source(source))
 }

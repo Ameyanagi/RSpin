@@ -75,6 +75,84 @@ impl SpectrumBundleLoader {
         self.read_path(path)?.into_only_loaded_2d_by_source(filter)
     }
 
+    /// Loads exactly one one-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_by_sources<I, F>(&self, path: impl AsRef<Path>, filters: I) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path(path)?.into_only_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one one-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_with_source_by_sources<I, F>(
+        &self,
+        path: impl AsRef<Path>,
+        filters: I,
+    ) -> Result<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path(path)?
+            .into_only_loaded_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_by_sources<I, F>(&self, path: impl AsRef<Path>, filters: I) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path(path)?.into_only_2d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_with_source_by_sources<I, F>(
+        &self,
+        path: impl AsRef<Path>,
+        filters: I,
+    ) -> Result<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path(path)?
+            .into_only_loaded_2d_by_sources(filters)
+    }
+
     /// Loads exactly one one-dimensional spectrum matching a generic source filter from a path relative to a base directory.
     ///
     /// # Errors
@@ -137,6 +215,98 @@ impl SpectrumBundleLoader {
     ) -> Result<(Spectrum2D, LoadedSource)> {
         self.read_path_relative_to(base, path)?
             .into_only_loaded_2d_by_source(filter)
+    }
+
+    /// Loads exactly one one-dimensional spectrum matching any generic source filter from a path relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_by_sources_relative_to<I, F>(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+        filters: I,
+    ) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path_relative_to(base, path)?
+            .into_only_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one one-dimensional spectrum and source matching any generic source filter from a path relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_with_source_by_sources_relative_to<I, F>(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+        filters: I,
+    ) -> Result<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path_relative_to(base, path)?
+            .into_only_loaded_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum matching any generic source filter from a path relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_by_sources_relative_to<I, F>(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+        filters: I,
+    ) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path_relative_to(base, path)?
+            .into_only_2d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum and source matching any generic source filter from a path relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_with_source_by_sources_relative_to<I, F>(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+        filters: I,
+    ) -> Result<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_path_relative_to(base, path)?
+            .into_only_loaded_2d_by_sources(filters)
     }
 
     /// Loads exactly one one-dimensional spectrum matching a generic source filter from selected paths.
@@ -211,6 +381,92 @@ impl SpectrumBundleLoader {
     {
         self.read_paths(paths)?
             .into_only_loaded_2d_by_source(filter)
+    }
+
+    /// Loads exactly one one-dimensional spectrum matching any generic source filter from selected paths.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_many_by_sources<I, P, J, F>(&self, paths: I, filters: J) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths(paths)?.into_only_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one one-dimensional spectrum and source matching any generic source filter from selected paths.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_many_with_source_by_sources<I, P, J, F>(
+        &self,
+        paths: I,
+        filters: J,
+    ) -> Result<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths(paths)?
+            .into_only_loaded_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum matching any generic source filter from selected paths.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_many_by_sources<I, P, J, F>(&self, paths: I, filters: J) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths(paths)?.into_only_2d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum and source matching any generic source filter from selected paths.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_many_with_source_by_sources<I, P, J, F>(
+        &self,
+        paths: I,
+        filters: J,
+    ) -> Result<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths(paths)?
+            .into_only_loaded_2d_by_sources(filters)
     }
 
     /// Loads exactly one one-dimensional spectrum matching a generic source filter from selected paths relative to a base directory.
@@ -292,6 +548,106 @@ impl SpectrumBundleLoader {
         self.read_paths_relative_to(base, paths)?
             .into_only_loaded_2d_by_source(filter)
     }
+
+    /// Loads exactly one one-dimensional spectrum matching any generic source filter from selected paths relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_many_by_sources_relative_to<I, P, J, F>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+        filters: J,
+    ) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths_relative_to(base, paths)?
+            .into_only_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one one-dimensional spectrum and source matching any generic source filter from selected paths relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// one-dimensional spectrum is not found.
+    pub fn read_1d_many_with_source_by_sources_relative_to<I, P, J, F>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+        filters: J,
+    ) -> Result<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths_relative_to(base, paths)?
+            .into_only_loaded_1d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum matching any generic source filter from selected paths relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_many_by_sources_relative_to<I, P, J, F>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+        filters: J,
+    ) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths_relative_to(base, paths)?
+            .into_only_2d_by_sources(filters)
+    }
+
+    /// Loads exactly one two-dimensional spectrum and source matching any generic source filter from selected paths relative to a base directory.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or exactly one matching
+    /// two-dimensional spectrum is not found.
+    pub fn read_2d_many_with_source_by_sources_relative_to<I, P, J, F>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+        filters: J,
+    ) -> Result<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+        J: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_paths_relative_to(base, paths)?
+            .into_only_loaded_2d_by_sources(filters)
+    }
 }
 
 /// Loads exactly one one-dimensional spectrum matching a generic source filter.
@@ -344,6 +700,68 @@ pub fn load_spectrum_2d_with_source_by_source(
     filter: impl Into<LoadedSourceFilter>,
 ) -> Result<(Spectrum2D, LoadedSource)> {
     SpectrumBundleLoader::new().read_2d_with_source_by_source(path, filter)
+}
+
+/// Loads exactly one one-dimensional spectrum matching any generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_by_sources<I, F>(path: impl AsRef<Path>, filters: I) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_by_sources(path, filters)
+}
+
+/// Loads exactly one one-dimensional spectrum and source matching any generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_with_source_by_sources<I, F>(
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_with_source_by_sources(path, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum matching any generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_by_sources<I, F>(path: impl AsRef<Path>, filters: I) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_by_sources(path, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum and source matching any generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_with_source_by_sources<I, F>(
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_with_source_by_sources(path, filters)
 }
 
 /// Loads exactly one one-dimensional spectrum matching a generic source filter from a path relative to a base directory.
@@ -400,6 +818,78 @@ pub fn load_spectrum_2d_with_source_by_source_relative_to(
     filter: impl Into<LoadedSourceFilter>,
 ) -> Result<(Spectrum2D, LoadedSource)> {
     SpectrumBundleLoader::new().read_2d_with_source_by_source_relative_to(base, path, filter)
+}
+
+/// Loads exactly one one-dimensional spectrum matching any generic source filter from a path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_by_sources_relative_to<I, F>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_by_sources_relative_to(base, path, filters)
+}
+
+/// Loads exactly one one-dimensional spectrum and source matching any generic source filter from a path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_with_source_by_sources_relative_to<I, F>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_with_source_by_sources_relative_to(base, path, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum matching any generic source filter from a path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_by_sources_relative_to<I, F>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_by_sources_relative_to(base, path, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum and source matching any generic source filter from a path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_with_source_by_sources_relative_to<I, F>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_with_source_by_sources_relative_to(base, path, filters)
 }
 
 /// Loads exactly one one-dimensional spectrum matching a generic source filter from selected paths.
@@ -468,6 +958,76 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_2d_many_with_source_by_source(paths, filter)
+}
+
+/// Loads exactly one one-dimensional spectrum matching any generic source filter from selected paths.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_many_by_sources<I, P, J, F>(paths: I, filters: J) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_many_by_sources(paths, filters)
+}
+
+/// Loads exactly one one-dimensional spectrum and source matching any generic source filter from selected paths.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_many_with_source_by_sources<I, P, J, F>(
+    paths: I,
+    filters: J,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_many_with_source_by_sources(paths, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum matching any generic source filter from selected paths.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_many_by_sources<I, P, J, F>(paths: I, filters: J) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_many_by_sources(paths, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum and source matching any generic source filter from selected paths.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_many_with_source_by_sources<I, P, J, F>(
+    paths: I,
+    filters: J,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_many_with_source_by_sources(paths, filters)
 }
 
 /// Loads exactly one one-dimensional spectrum matching a generic source filter from selected paths relative to a base directory.
@@ -540,4 +1100,86 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_2d_many_with_source_by_source_relative_to(base, paths, filter)
+}
+
+/// Loads exactly one one-dimensional spectrum matching any generic source filter from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_many_by_sources_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filters: J,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_1d_many_by_sources_relative_to(base, paths, filters)
+}
+
+/// Loads exactly one one-dimensional spectrum and source matching any generic source filter from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching one-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_1d_many_with_source_by_sources_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filters: J,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .read_1d_many_with_source_by_sources_relative_to(base, paths, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum matching any generic source filter from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_many_by_sources_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filters: J,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_2d_many_by_sources_relative_to(base, paths, filters)
+}
+
+/// Loads exactly one two-dimensional spectrum and source matching any generic source filter from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or exactly one matching two-dimensional
+/// spectrum is not found.
+pub fn load_spectrum_2d_many_with_source_by_sources_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filters: J,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .read_2d_many_with_source_by_sources_relative_to(base, paths, filters)
 }

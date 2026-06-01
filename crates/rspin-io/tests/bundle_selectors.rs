@@ -11,18 +11,21 @@ use rspin_io::{
     load_spectrum_1d_by_source_path_prefix, load_spectrum_1d_by_source_path_prefix_relative_to,
     load_spectrum_1d_by_source_path_relative_to, load_spectrum_1d_by_source_relative_to,
     load_spectrum_1d_by_source_vendor, load_spectrum_1d_by_source_vendor_relative_to,
-    load_spectrum_1d_many_by_source, load_spectrum_1d_many_by_source_data_kind,
+    load_spectrum_1d_by_sources, load_spectrum_1d_many_by_source,
+    load_spectrum_1d_many_by_source_data_kind,
     load_spectrum_1d_many_by_source_data_kind_relative_to, load_spectrum_1d_many_by_source_format,
     load_spectrum_1d_many_by_source_path_prefix,
     load_spectrum_1d_many_by_source_path_prefix_relative_to,
-    load_spectrum_1d_many_by_source_path_relative_to, load_spectrum_1d_many_with_source_by_source,
+    load_spectrum_1d_many_by_source_path_relative_to, load_spectrum_1d_many_by_sources,
+    load_spectrum_1d_many_with_source_by_source,
     load_spectrum_1d_many_with_source_by_source_data_kind,
     load_spectrum_1d_many_with_source_by_source_data_kind_relative_to,
     load_spectrum_1d_many_with_source_by_source_path_prefix,
     load_spectrum_1d_many_with_source_by_source_path_prefix_relative_to,
     load_spectrum_1d_many_with_source_by_source_relative_to,
-    load_spectrum_1d_many_with_source_by_source_vendor, load_spectrum_1d_with_source_by_source,
-    load_spectrum_1d_with_source_by_source_data_kind,
+    load_spectrum_1d_many_with_source_by_source_vendor,
+    load_spectrum_1d_many_with_source_by_sources_relative_to,
+    load_spectrum_1d_with_source_by_source, load_spectrum_1d_with_source_by_source_data_kind,
     load_spectrum_1d_with_source_by_source_data_kind_relative_to,
     load_spectrum_1d_with_source_by_source_format,
     load_spectrum_1d_with_source_by_source_format_relative_to,
@@ -39,11 +42,12 @@ use rspin_io::{
     load_spectrum_2d_by_source_path_prefix_relative_to,
     load_spectrum_2d_by_source_path_relative_to, load_spectrum_2d_by_source_relative_to,
     load_spectrum_2d_by_source_vendor, load_spectrum_2d_by_source_vendor_relative_to,
-    load_spectrum_2d_many_by_source_data_kind,
+    load_spectrum_2d_by_sources, load_spectrum_2d_many_by_source_data_kind,
     load_spectrum_2d_many_by_source_data_kind_relative_to,
     load_spectrum_2d_many_by_source_format_relative_to,
     load_spectrum_2d_many_by_source_path_prefix_relative_to,
-    load_spectrum_2d_many_by_source_relative_to, load_spectrum_2d_many_with_source_by_source,
+    load_spectrum_2d_many_by_source_relative_to, load_spectrum_2d_many_by_sources_relative_to,
+    load_spectrum_2d_many_with_source_by_source,
     load_spectrum_2d_many_with_source_by_source_data_kind,
     load_spectrum_2d_many_with_source_by_source_data_kind_relative_to,
     load_spectrum_2d_many_with_source_by_source_path,
@@ -58,6 +62,7 @@ use rspin_io::{
     load_spectrum_2d_with_source_by_source_path_relative_to,
     load_spectrum_2d_with_source_by_source_vendor,
     load_spectrum_2d_with_source_by_source_vendor_relative_to,
+    load_spectrum_2d_with_source_by_sources,
 };
 
 #[test]
@@ -282,6 +287,57 @@ fn generic_source_filter_exact_helpers_select_matching_dimension() -> anyhow::Re
         .into_only_loaded_2d_by_source(LoadedSourceFilter::from(LoadedSourceVendor::Bruker))?;
     assert_eq!(bruker_2d.shape(), (2048, 512));
     assert_eq!(bruker_source.format(), "bruker_ser");
+    Ok(())
+}
+
+#[test]
+fn generic_source_set_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let carbon = bundle.only_1d_by_sources([
+        LoadedSourceFilter::path(carbon_path),
+        LoadedSourceFilter::vendor("missing"),
+    ])?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let (hsqc, source) = bundle.only_loaded_2d_by_sources([
+        LoadedSourceFilter::path(hsqc_path),
+        LoadedSourceFilter::vendor("missing"),
+    ])?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(source.path(), Some(hsqc_path));
+
+    assert_single_error(
+        bundle.only_1d_by_sources([LoadedSourceFilter::vendor("jeol")]),
+        "expected exactly one one-dimensional spectrum for source vendor jeol",
+        "found 2 one-dimensional and 1 two-dimensional spectra",
+    )?;
+
+    let varian = load_spectra(fixture_root().join("varian_1h"))?;
+    let only = varian.only_1d_by_sources(std::iter::empty::<LoadedSourceFilter>())?;
+    assert_eq!(only.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    Ok(())
+}
+
+#[test]
+fn consuming_generic_source_set_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let carbon = load_spectra(nmrxiv_fixture_root())?.into_only_1d_by_sources([
+        LoadedSourceFilter::path(carbon_path),
+        LoadedSourceFilter::vendor("missing"),
+    ])?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let (hsqc, source) = load_spectra(nmrxiv_fixture_root())?.into_only_loaded_2d_by_sources([
+        LoadedSourceFilter::path(hsqc_path),
+        LoadedSourceFilter::vendor("missing"),
+    ])?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(source.path(), Some(hsqc_path));
     Ok(())
 }
 
@@ -527,6 +583,43 @@ fn reader_generic_source_filter_exact_helpers_select_matching_dimension() -> any
         LoadedSourceFilter::from(LoadedSourceVendor::Bruker),
     )?;
     assert_eq!(bruker_2d.shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
+fn reader_generic_source_set_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let root = nmrxiv_fixture_root();
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let bruker_1d = reader.read_1d_by_sources(
+        &root,
+        [
+            LoadedSourceFilter::vendor("bruker"),
+            LoadedSourceFilter::path("missing"),
+        ],
+    )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (hsqc, source) = reader.read_2d_with_source_by_sources(
+        &root,
+        [
+            LoadedSourceFilter::path(hsqc_path),
+            LoadedSourceFilter::vendor("missing"),
+        ],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(source.path(), Some(hsqc_path));
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let anchored_bruker_path = Path::new("myrcene/bruker_1h_raw");
+    let (bruker_1d, bruker_source) = reader.read_1d_with_source_by_sources_relative_to(
+        &base,
+        "myrcene",
+        [LoadedSourceFilter::path(anchored_bruker_path)],
+    )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(bruker_source.path(), Some(anchored_bruker_path));
     Ok(())
 }
 
@@ -917,6 +1010,53 @@ fn free_generic_source_filter_exact_helpers_select_matching_dimension() -> anyho
 }
 
 #[test]
+fn free_generic_source_set_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let carbon = load_spectrum_1d_by_sources(&root, [LoadedSourceFilter::path(carbon_path)])?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let (hsqc, source) =
+        load_spectrum_2d_with_source_by_sources(&root, [LoadedSourceFilter::path(hsqc_path)])?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(source.path(), Some(hsqc_path));
+
+    let hsqc = load_spectrum_2d_by_sources(
+        &root,
+        [
+            LoadedSourceFilter::vendor("missing"),
+            LoadedSourceFilter::path(hsqc_path),
+        ],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let base = fixture_root();
+    let paths = [base.join("varian_1h"), base.join("bruker_without_expno")];
+    let processed =
+        load_spectrum_1d_many_by_sources(&paths, [LoadedSourceFilter::path("pdata/1")])?;
+    assert_eq!(processed.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (varian, source) = load_spectrum_1d_many_with_source_by_sources_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        [LoadedSourceFilter::path("varian_1h")],
+    )?;
+    assert_eq!(varian.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let nmrxiv_base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let bruker_2d = load_spectrum_2d_many_by_sources_relative_to(
+        &nmrxiv_base,
+        ["myrcene/bruker_cosy_raw"],
+        [LoadedSourceFilter::vendor("bruker")],
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
 fn free_many_source_filtered_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
     let root = nmrxiv_fixture_root();
     let proton_jcamp = root.join("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
@@ -1147,6 +1287,10 @@ fn free_many_generic_source_filter_exact_helpers_select_matching_dimension() -> 
 
 fn nmrxiv_fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene")
+}
+
+fn fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/zenodo_7100132")
 }
 
 fn assert_single_error<T>(

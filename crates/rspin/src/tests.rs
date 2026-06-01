@@ -1068,6 +1068,27 @@ fn prelude_exports_generic_source_filtered_exact_bundle_loaders() -> Result<()> 
 }
 
 #[test]
+fn prelude_exports_generic_source_set_exact_bundle_loaders() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let carbon_path = std::path::Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = std::path::Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let carbon =
+        load_spectrum_1d_by_sources(&mixed_vendor_root, [LoadedSourceFilter::path(carbon_path)])?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let hsqc =
+        load_spectrum_2d_by_sources(&mixed_vendor_root, [LoadedSourceFilter::path(hsqc_path)])?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let raw =
+        RSpinReader::new().read_1d_by_sources(&mixed_vendor_root, [LoadedSourceFilter::raw()])?;
+    assert_eq!(raw.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_batch_integration() -> Result<()> {
     let integrals = integrate_regions(
         &read_spectrum1d_csv("x,intensity\n0,0\n1,1\n2,2\n")?,
