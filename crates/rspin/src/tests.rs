@@ -433,6 +433,41 @@ fn prelude_supports_first_bundle_accessors() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_first_source_filter_accessors() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let bundle = load_spectra(&fixture_root)?;
+
+    let first = bundle
+        .first_by_source(LoadedSourceFilter::vendor("bruker"))
+        .ok_or_else(|| RSpinError::Parse {
+            format: "facade bundle accessor",
+            message: "missing first Bruker spectrum".to_owned(),
+        })?;
+    assert_eq!(first.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let (carbon, source) = bundle
+        .first_loaded_1d_by_source(LoadedSourceFilter::path(
+            "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+        ))
+        .ok_or_else(|| RSpinError::Parse {
+            format: "facade bundle accessor",
+            message: "missing selected carbon spectrum".to_owned(),
+        })?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(source.format(), "jcamp_dx");
+
+    let hsqc = bundle
+        .first_2d_by_sources([LoadedSourceFilter::path_prefix("jeol")])
+        .ok_or_else(|| RSpinError::Parse {
+            format: "facade bundle accessor",
+            message: "missing JEOL two-dimensional spectrum".to_owned(),
+        })?;
+    assert!(hsqc.shape().0 > 0);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_strict_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

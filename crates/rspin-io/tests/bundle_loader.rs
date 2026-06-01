@@ -286,6 +286,63 @@ fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()
 }
 
 #[test]
+fn bundle_first_source_filter_accessors_cover_quick_selection() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    let first_any = bundle
+        .first_by_sources(Vec::<LoadedSourceFilter>::new())
+        .ok_or_else(|| anyhow::anyhow!("missing first loaded spectrum"))?;
+    assert!(first_any.source().path().is_some());
+
+    let jeol = bundle
+        .first_by_source(LoadedSourceFilter::vendor("jeol"))
+        .ok_or_else(|| anyhow::anyhow!("missing first JEOL spectrum"))?;
+    assert_eq!(jeol.source().vendor(), Some(LoadedSourceVendor::Jeol));
+
+    let jcamp = bundle
+        .first_1d_by_source(LoadedSourceFormat::JcampDx)
+        .ok_or_else(|| anyhow::anyhow!("missing first JCAMP-DX one-dimensional spectrum"))?;
+    assert!(jcamp.metadata.nucleus.is_some());
+
+    let (carbon, source) = bundle
+        .first_loaded_1d_by_sources([
+            LoadedSourceFilter::path("missing"),
+            LoadedSourceFilter::path("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+        ])
+        .ok_or_else(|| anyhow::anyhow!("missing selected carbon spectrum"))?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"))
+    );
+
+    let bruker_2d = bundle
+        .first_2d_by_source(LoadedSourceVendor::Bruker)
+        .ok_or_else(|| anyhow::anyhow!("missing Bruker two-dimensional spectrum"))?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+
+    let (_, jeol_2d_source) = bundle
+        .first_loaded_2d_by_sources([LoadedSourceFilter::path_prefix("jeol")])
+        .ok_or_else(|| anyhow::anyhow!("missing JEOL two-dimensional spectrum"))?;
+    let jeol_2d_path = jeol_2d_source
+        .path()
+        .ok_or_else(|| anyhow::anyhow!("missing JEOL two-dimensional source path"))?;
+    assert!(jeol_2d_path.starts_with("jeol"));
+
+    assert!(
+        bundle
+            .first_1d_by_source(LoadedSourceFilter::vendor("unknown-vendor"))
+            .is_none()
+    );
+    assert!(
+        bundle
+            .first_loaded_2d_by_source(LoadedSourceFormat::JcampDx)
+            .is_none()
+    );
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

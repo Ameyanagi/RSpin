@@ -883,6 +883,120 @@ impl SpectrumBundle {
         self.loaded_2d().next()
     }
 
+    /// Returns the first loaded spectrum matching a generic source filter, if present.
+    #[must_use]
+    pub fn first_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Option<&LoadedSpectrum> {
+        self.loaded_by_source(filter).next()
+    }
+
+    /// Returns the first loaded spectrum matching any generic source filter, if present.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator matches
+    /// the first loaded spectrum.
+    #[must_use]
+    pub fn first_by_sources<I, F>(&self, filters: I) -> Option<&LoadedSpectrum>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.loaded_by_sources(filters).next()
+    }
+
+    /// Returns the first one-dimensional spectrum matching a generic source filter, if present.
+    #[must_use]
+    pub fn first_1d_by_source(&self, filter: impl Into<LoadedSourceFilter>) -> Option<&Spectrum1D> {
+        self.first_loaded_1d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the first one-dimensional spectrum and source matching a generic source filter.
+    #[must_use]
+    pub fn first_loaded_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Option<(&Spectrum1D, &LoadedSource)> {
+        self.loaded_1d_by_source(filter).next()
+    }
+
+    /// Returns the first one-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator matches
+    /// the first loaded one-dimensional spectrum.
+    #[must_use]
+    pub fn first_1d_by_sources<I, F>(&self, filters: I) -> Option<&Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_loaded_1d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the first one-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator matches
+    /// the first loaded one-dimensional spectrum.
+    #[must_use]
+    pub fn first_loaded_1d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> Option<(&Spectrum1D, &LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.loaded_1d_by_sources(filters).next()
+    }
+
+    /// Returns the first two-dimensional spectrum matching a generic source filter, if present.
+    #[must_use]
+    pub fn first_2d_by_source(&self, filter: impl Into<LoadedSourceFilter>) -> Option<&Spectrum2D> {
+        self.first_loaded_2d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the first two-dimensional spectrum and source matching a generic source filter.
+    #[must_use]
+    pub fn first_loaded_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Option<(&Spectrum2D, &LoadedSource)> {
+        self.loaded_2d_by_source(filter).next()
+    }
+
+    /// Returns the first two-dimensional spectrum matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator matches
+    /// the first loaded two-dimensional spectrum.
+    #[must_use]
+    pub fn first_2d_by_sources<I, F>(&self, filters: I) -> Option<&Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_loaded_2d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the first two-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator matches
+    /// the first loaded two-dimensional spectrum.
+    #[must_use]
+    pub fn first_loaded_2d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> Option<(&Spectrum2D, &LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.loaded_2d_by_sources(filters).next()
+    }
+
     /// Returns an iterator over loaded spectrum sources.
     pub fn loaded_sources(&self) -> impl Iterator<Item = &LoadedSource> {
         self.spectra.iter().map(LoadedSpectrum::source)

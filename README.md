@@ -38,6 +38,13 @@ fn load_first_1d_point_count() -> Result<Option<usize>> {
     Ok(bundle.first_1d().map(|spectrum| spectrum.len()))
 }
 
+fn load_first_bruker_2d_shape() -> Result<Option<(usize, usize)>> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle
+        .first_2d_by_source(LoadedSourceFilter::vendor("bruker"))
+        .map(|spectrum| spectrum.shape()))
+}
+
 fn load_one_dataset_with_stable_sources() -> Result<SpectrumBundle> {
     load_spectra_relative_to("data", "experiment")
 }
