@@ -588,25 +588,40 @@ fn prelude_exports_dimension_bundle_loader_helpers() -> Result<()> {
     let one_d = load_spectra_1d_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(one_d.len_1d(), 2);
     assert_eq!(one_d.len_2d(), 0);
+    let one_d_summary = load_spectra_1d_summary_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(one_d_summary, one_d.summary());
 
     let two_d = load_spectra_2d_relative_to(&mixed, "bruker_cosy_raw")?;
     assert_eq!(two_d.len_2d(), 1);
     assert_eq!(two_d.source_vendor_count(LoadedSourceVendor::Bruker), 1);
+    let two_d_summary = load_spectra_2d_summary_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(two_d_summary, two_d.summary());
 
     let many = load_spectra_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(many.len_1d(), 1);
+    let many_summary = load_spectra_1d_many_summary_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(many_summary, many.summary());
 
     let strict = load_spectra_1d_many_strict_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(strict.len_1d(), 1);
+    let strict_summary =
+        load_spectra_1d_many_summary_strict_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(strict_summary, strict.summary());
 
     let strict_2d = load_spectra_2d_strict_relative_to(&mixed, "bruker_cosy_raw")?;
     assert_eq!(strict_2d.len_2d(), 1);
+    let strict_2d_summary = load_spectra_2d_summary_strict_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(strict_2d_summary, strict_2d.summary());
 
     let reader = RSpinReader::new()
         .source_vendor("bruker")
         .read_bundle_2d_many_relative_to(&mixed, ["bruker_cosy_raw", "jeol"])?;
     assert_eq!(reader.len_2d(), 1);
     assert!(reader.has_source_path("bruker_cosy_raw"));
+    let reader_summary = RSpinReader::new()
+        .source_vendor("bruker")
+        .read_bundle_2d_summary_many_relative_to(&mixed, ["bruker_cosy_raw", "jeol"])?;
+    assert_eq!(reader_summary, reader.summary());
     Ok(())
 }
 

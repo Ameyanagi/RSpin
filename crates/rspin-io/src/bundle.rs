@@ -31,10 +31,18 @@ pub use aliases::{
 pub use dimension::{
     load_spectra_1d, load_spectra_1d_many, load_spectra_1d_many_relative_to,
     load_spectra_1d_many_strict, load_spectra_1d_many_strict_relative_to,
+    load_spectra_1d_many_summary, load_spectra_1d_many_summary_relative_to,
+    load_spectra_1d_many_summary_strict, load_spectra_1d_many_summary_strict_relative_to,
     load_spectra_1d_relative_to, load_spectra_1d_strict, load_spectra_1d_strict_relative_to,
-    load_spectra_2d, load_spectra_2d_many, load_spectra_2d_many_relative_to,
-    load_spectra_2d_many_strict, load_spectra_2d_many_strict_relative_to,
-    load_spectra_2d_relative_to, load_spectra_2d_strict, load_spectra_2d_strict_relative_to,
+    load_spectra_1d_summary, load_spectra_1d_summary_relative_to, load_spectra_1d_summary_strict,
+    load_spectra_1d_summary_strict_relative_to, load_spectra_2d, load_spectra_2d_many,
+    load_spectra_2d_many_relative_to, load_spectra_2d_many_strict,
+    load_spectra_2d_many_strict_relative_to, load_spectra_2d_many_summary,
+    load_spectra_2d_many_summary_relative_to, load_spectra_2d_many_summary_strict,
+    load_spectra_2d_many_summary_strict_relative_to, load_spectra_2d_relative_to,
+    load_spectra_2d_strict, load_spectra_2d_strict_relative_to, load_spectra_2d_summary,
+    load_spectra_2d_summary_relative_to, load_spectra_2d_summary_strict,
+    load_spectra_2d_summary_strict_relative_to,
 };
 pub use exact::{
     load_spectrum_1d, load_spectrum_1d_by_source, load_spectrum_1d_by_source_data_kind,
