@@ -474,6 +474,50 @@ fn generic_source_path_filters_skip_excluded_selected_paths_in_strict_mode() -> 
 }
 
 #[test]
+fn mixed_generic_source_filters_preflight_excluded_vendor_candidates() -> anyhow::Result<()> {
+    let root = temp_dir("mixed-generic-source-filter-preflight")?;
+    let bruker = fixture_root().join("bruker_without_expno");
+
+    let good_bruker = root.join("good_bruker");
+    fs::create_dir_all(&good_bruker)?;
+    fs::copy(bruker.join("fid"), good_bruker.join("fid"))?;
+    fs::copy(bruker.join("acqus"), good_bruker.join("acqus"))?;
+
+    let bad_varian = root.join("bad_varian");
+    fs::create_dir_all(&bad_varian)?;
+    fs::write(bad_varian.join("fid"), [1_u8, 2, 3])?;
+    fs::write(bad_varian.join("procpar"), "not a valid procpar file")?;
+
+    let bundle = RSpinReader::new()
+        .sources([
+            LoadedSourceFilter::path_prefix("good_bruker"),
+            LoadedSourceFilter::format(LoadedSourceFormat::JcampDx),
+        ])
+        .strict()
+        .read_paths_relative_to(&root, ["bad_varian/fid", "good_bruker"])?;
+    assert_eq!(bundle.len(), 1);
+    assert!(bundle.warnings().is_empty());
+    assert!(bundle.has_source_path(Path::new("good_bruker")));
+    assert_eq!(bundle.source_format_count(LoadedSourceFormat::BrukerFid), 1);
+
+    let bad_selected = RSpinReader::new()
+        .sources([
+            LoadedSourceFilter::path_prefix("bad_varian"),
+            LoadedSourceFilter::format(LoadedSourceFormat::JcampDx),
+        ])
+        .strict()
+        .read_paths_relative_to(&root, ["bad_varian/fid"]);
+    let Err(error) = bad_selected else {
+        remove_dir(root)?;
+        anyhow::bail!("selected malformed Agilent candidate should fail in strict mode");
+    };
+    assert!(error.to_string().contains("Agilent"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 
