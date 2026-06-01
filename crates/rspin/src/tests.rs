@@ -584,6 +584,23 @@ fn prelude_exports_discovered_source_filter_loaders() -> Result<()> {
         .join("../rspin-io/testdata/zenodo_7100132");
     let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
 
+    let selected =
+        select_discovered_spectra_by_source(&sources, LoadedSourceFilter::vendor("varian"));
+    assert_eq!(selected.len(), 1);
+    assert_eq!(
+        selected[0].vendor(),
+        Some(LoadedSourceVendor::AgilentVarian)
+    );
+
+    let selected = select_discovered_spectra_by_sources(
+        &sources,
+        [
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ],
+    );
+    assert_eq!(selected.len(), 2);
+
     let loaded = load_discovered_spectra_by_source_relative_to(
         &fixture_root,
         &sources,

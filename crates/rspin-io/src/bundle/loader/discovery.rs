@@ -1,5 +1,6 @@
 //! Source discovery for the spectrum bundle loader.
 
+mod selection;
 mod summary;
 
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ use crate::bundle::{
     is_bruker_processed_2d_dir, is_bruker_ser_dir, is_nmredata_file, is_standalone_spectrum_file,
     no_data_error_in_inputs, selected_path_from_base,
 };
+pub use selection::{select_discovered_spectra_by_source, select_discovered_spectra_by_sources};
 pub use summary::{
     DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount, DiscoveredSpectrumSummary,
     summarize_discovered_spectra,
@@ -729,11 +731,7 @@ impl SpectrumBundleLoader {
         I: IntoIterator<Item = F>,
         F: Into<LoadedSourceFilter>,
     {
-        let filters = discovered_source_filters(filters);
-        let selected = sources
-            .into_iter()
-            .filter(|source| filters.is_empty() || source.matches_any_source(filters.iter()))
-            .collect::<Vec<_>>();
+        let selected = selection::select_discovered_source_refs(sources, filters);
         self.read_discovered_relative_to(base, selected)
     }
 
@@ -1008,21 +1006,6 @@ fn no_discovered_sources_error() -> RSpinError {
         format: "spectrum bundle",
         message: "no discovered sources provided".to_owned(),
     }
-}
-
-fn discovered_source_filters<I, F>(filters: I) -> Vec<LoadedSourceFilter>
-where
-    I: IntoIterator<Item = F>,
-    F: Into<LoadedSourceFilter>,
-{
-    let mut unique = Vec::new();
-    for filter in filters {
-        let filter = filter.into();
-        if !unique.iter().any(|existing| existing == &filter) {
-            unique.push(filter);
-        }
-    }
-    unique
 }
 
 fn path_format_1d(

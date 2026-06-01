@@ -382,15 +382,27 @@ fn summarize_preflight() -> Result<DiscoveredSpectrumSummary> {
     Ok(summary)
 }
 
+fn count_runtime_selection() -> Result<usize> {
+    let sources = discover_spectra("data/mixed-vendor")?;
+    let selected = select_discovered_spectra_by_sources(
+        &sources,
+        [
+            LoadedSourceFilter::vendor("bruker"),
+            LoadedSourceFilter::path_prefix("jcamp"),
+        ],
+    );
+    Ok(selected.len())
+}
+
 fn load_selected_after_preflight() -> Result<SpectrumBundle> {
     let sources = RSpinReader::new()
         .processed_sources()
         .discover("data/mixed-vendor")?;
-    let selected = sources
-        .iter()
-        .filter(|source| source.matches_source(LoadedSourceFilter::vendor("bruker")))
-        .collect::<Vec<_>>();
-    load_discovered_spectra_relative_to("data/mixed-vendor", selected)
+    load_discovered_spectra_by_source_relative_to(
+        "data/mixed-vendor",
+        &sources,
+        LoadedSourceFilter::vendor("bruker"),
+    )
 }
 ```
 

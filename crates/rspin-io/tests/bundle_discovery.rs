@@ -16,7 +16,8 @@ use rspin_io::{
     discover_spectra_summary_relative_to, load_discovered_spectra,
     load_discovered_spectra_by_source, load_discovered_spectra_by_source_relative_to,
     load_discovered_spectra_by_sources, load_discovered_spectra_by_sources_relative_to,
-    load_discovered_spectra_relative_to, summarize_discovered_spectra,
+    load_discovered_spectra_relative_to, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_sources, summarize_discovered_spectra,
 };
 
 #[test]
@@ -463,6 +464,32 @@ fn discovered_source_free_helpers_load_selected_sources() -> Result<()> {
 #[test]
 fn discovered_source_filter_helpers_load_matching_candidates() -> Result<()> {
     let sources = discover_spectra(fixture_root())?;
+
+    let selected_processed =
+        select_discovered_spectra_by_source(&sources, LoadedSourceFilter::processed());
+    assert_eq!(selected_processed.len(), 1);
+    assert!(selected_processed[0].is_processed());
+
+    let selected_varian_or_processed = select_discovered_spectra_by_sources(
+        &sources,
+        [
+            LoadedSourceFilter::vendor("varian"),
+            LoadedSourceFilter::processed(),
+        ],
+    );
+    assert_eq!(selected_varian_or_processed.len(), 2);
+    assert!(selected_varian_or_processed.iter().any(|source| {
+        source.path() == Some(Path::new("varian_1h"))
+            && source.is_format(LoadedSourceFormat::AgilentFid)
+    }));
+    assert!(selected_varian_or_processed.iter().any(|source| {
+        source.path() == Some(Path::new("bruker_without_expno/pdata/1"))
+            && source.is_format(LoadedSourceFormat::BrukerProcessed)
+    }));
+
+    let selected_all =
+        select_discovered_spectra_by_sources(&sources, Vec::<LoadedSourceFilter>::new());
+    assert_eq!(selected_all.len(), sources.len());
 
     let processed = RSpinReader::new().read_discovered_by_source_relative_to(
         fixture_root(),

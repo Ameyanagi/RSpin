@@ -22,7 +22,8 @@ pub use discovery::{
     DiscoveredSpectrumSource, DiscoveredSpectrumSummary, load_discovered_spectra,
     load_discovered_spectra_by_source, load_discovered_spectra_by_source_relative_to,
     load_discovered_spectra_by_sources, load_discovered_spectra_by_sources_relative_to,
-    load_discovered_spectra_relative_to, summarize_discovered_spectra,
+    load_discovered_spectra_relative_to, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_sources, summarize_discovered_spectra,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.
