@@ -165,6 +165,17 @@ impl DiscoveredSpectrumSource {
             .read_discovered_relative_to(base, [self])
     }
 
+    /// Loads this discovered source in strict mode relative to a common base directory.
+    ///
+    /// This short alias mirrors [`Self::load_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails.
+    pub fn load_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
+        self.load_strict_relative_to(base)
+    }
+
     /// Loads this discovered source as exactly one one-dimensional spectrum.
     ///
     /// # Errors
@@ -185,6 +196,28 @@ impl DiscoveredSpectrumSource {
     /// not resolve to exactly one one-dimensional spectrum.
     pub fn load_1d(&self, base: impl AsRef<Path>) -> Result<Spectrum1D> {
         self.load_1d_relative_to(base)
+    }
+
+    /// Loads this discovered source in strict mode as exactly one one-dimensional spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_strict_relative_to(&self, base: impl AsRef<Path>) -> Result<Spectrum1D> {
+        self.load_strict_relative_to(base)?.into_only_1d()
+    }
+
+    /// Loads this discovered source in strict mode as exactly one one-dimensional spectrum.
+    ///
+    /// This short alias mirrors [`Self::load_1d_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_strict(&self, base: impl AsRef<Path>) -> Result<Spectrum1D> {
+        self.load_1d_strict_relative_to(base)
     }
 
     /// Loads this discovered source as exactly one one-dimensional spectrum with source metadata.
@@ -215,6 +248,34 @@ impl DiscoveredSpectrumSource {
         self.load_1d_with_source_relative_to(base)
     }
 
+    /// Loads this discovered source in strict mode as exactly one one-dimensional spectrum with source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_with_source_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.load_strict_relative_to(base)?.into_only_loaded_1d()
+    }
+
+    /// Loads this discovered source in strict mode as exactly one one-dimensional spectrum with source metadata.
+    ///
+    /// This short alias mirrors [`Self::load_1d_with_source_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_with_source_strict(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.load_1d_with_source_strict_relative_to(base)
+    }
+
     /// Loads this discovered source as exactly one two-dimensional spectrum.
     ///
     /// # Errors
@@ -235,6 +296,28 @@ impl DiscoveredSpectrumSource {
     /// not resolve to exactly one two-dimensional spectrum.
     pub fn load_2d(&self, base: impl AsRef<Path>) -> Result<Spectrum2D> {
         self.load_2d_relative_to(base)
+    }
+
+    /// Loads this discovered source in strict mode as exactly one two-dimensional spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_strict_relative_to(&self, base: impl AsRef<Path>) -> Result<Spectrum2D> {
+        self.load_strict_relative_to(base)?.into_only_2d()
+    }
+
+    /// Loads this discovered source in strict mode as exactly one two-dimensional spectrum.
+    ///
+    /// This short alias mirrors [`Self::load_2d_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_strict(&self, base: impl AsRef<Path>) -> Result<Spectrum2D> {
+        self.load_2d_strict_relative_to(base)
     }
 
     /// Loads this discovered source as exactly one two-dimensional spectrum with source metadata.
@@ -263,6 +346,34 @@ impl DiscoveredSpectrumSource {
         base: impl AsRef<Path>,
     ) -> Result<(Spectrum2D, LoadedSource)> {
         self.load_2d_with_source_relative_to(base)
+    }
+
+    /// Loads this discovered source in strict mode as exactly one two-dimensional spectrum with source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_with_source_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.load_strict_relative_to(base)?.into_only_loaded_2d()
+    }
+
+    /// Loads this discovered source in strict mode as exactly one two-dimensional spectrum with source metadata.
+    ///
+    /// This short alias mirrors [`Self::load_2d_with_source_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails or when
+    /// it does not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_with_source_strict(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.load_2d_with_source_strict_relative_to(base)
     }
 
     /// Returns true when this discovered source matches a generic source filter.

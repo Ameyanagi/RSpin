@@ -420,6 +420,19 @@ fn load_first_selected_spectrum() -> Result<Spectrum1D> {
     source.load_1d_relative_to("data/mixed-vendor")
 }
 
+fn load_first_selected_spectrum_strict() -> Result<Spectrum1D> {
+    let sources = discover_spectra("data/mixed-vendor")?;
+    let selected = select_discovered_spectra_by_source(
+        &sources,
+        LoadedSourceFilter::path_prefix("bruker/pdata"),
+    );
+    let source = selected.first().ok_or_else(|| RSpinError::Parse {
+        format: "spectrum source discovery",
+        message: "no matching source found".to_owned(),
+    })?;
+    source.load_1d_strict_relative_to("data/mixed-vendor")
+}
+
 fn load_selected_spectrum_with_reader() -> Result<Spectrum1D> {
     let sources = discover_spectra("data/mixed-vendor")?;
     let selected = select_discovered_spectra_by_source(
