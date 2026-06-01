@@ -251,6 +251,38 @@ impl SourcePathCount {
     }
 }
 
+/// Deterministic count of loader warnings for one tracked source path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WarningPathCount {
+    /// Source path relative to the loader root.
+    pub path: PathBuf,
+    /// Number of loader warnings with this source path.
+    pub count: usize,
+}
+
+impl WarningPathCount {
+    /// Creates a warning path count.
+    #[must_use]
+    pub fn new(path: impl AsRef<Path>, count: usize) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+            count,
+        }
+    }
+
+    /// Returns the warning source path.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Returns the number of loader warnings with this source path.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+}
+
 /// Summary counts for a loaded spectrum bundle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpectrumBundleSummary {
@@ -275,6 +307,9 @@ pub struct SpectrumBundleSummary {
     /// Counts of loaded spectra by tracked source path.
     #[serde(default)]
     pub source_paths: Vec<SourcePathCount>,
+    /// Counts of non-fatal loader warnings by tracked source path.
+    #[serde(default)]
+    pub warning_paths: Vec<WarningPathCount>,
 }
 
 impl SpectrumBundleSummary {
@@ -300,6 +335,7 @@ impl SpectrumBundleSummary {
             source_vendors,
             source_data_kinds,
             source_paths: Vec::new(),
+            warning_paths: Vec::new(),
         }
     }
 
@@ -307,6 +343,13 @@ impl SpectrumBundleSummary {
     #[must_use]
     pub fn with_source_path_counts(mut self, source_paths: Vec<SourcePathCount>) -> Self {
         self.source_paths = source_paths;
+        self
+    }
+
+    /// Adds tracked warning path counts to this summary.
+    #[must_use]
+    pub fn with_warning_path_counts(mut self, warning_paths: Vec<WarningPathCount>) -> Self {
+        self.warning_paths = warning_paths;
         self
     }
 
@@ -424,6 +467,40 @@ impl SpectrumBundleSummary {
         self.source_path_prefix_count(path) > 0
     }
 
+    /// Returns the number of non-fatal loader warnings with a tracked source path.
+    #[must_use]
+    pub fn warning_path_count(&self, path: impl AsRef<Path>) -> usize {
+        let path = path.as_ref();
+        self.warning_paths
+            .iter()
+            .filter(|count| count.path() == path)
+            .map(WarningPathCount::count)
+            .sum()
+    }
+
+    /// Returns true when a non-fatal loader warning has a tracked source path.
+    #[must_use]
+    pub fn has_warning_path(&self, path: impl AsRef<Path>) -> bool {
+        self.warning_path_count(path) > 0
+    }
+
+    /// Returns the number of non-fatal loader warnings below a tracked source path prefix.
+    #[must_use]
+    pub fn warning_path_prefix_count(&self, path: impl AsRef<Path>) -> usize {
+        let path = path.as_ref();
+        self.warning_paths
+            .iter()
+            .filter(|count| count.path().starts_with(path))
+            .map(WarningPathCount::count)
+            .sum()
+    }
+
+    /// Returns true when a non-fatal loader warning has a tracked source path below a prefix.
+    #[must_use]
+    pub fn has_warning_path_prefix(&self, path: impl AsRef<Path>) -> bool {
+        self.warning_path_prefix_count(path) > 0
+    }
+
     /// Returns deterministic source vendor counts in first-seen order.
     ///
     /// For summaries deserialized from older JSON that does not contain the
@@ -456,6 +533,16 @@ impl SpectrumBundleSummary {
     #[must_use]
     pub fn source_path_counts(&self) -> Vec<SourcePathCount> {
         self.source_paths.clone()
+    }
+
+    /// Returns deterministic warning path counts in first-seen order.
+    ///
+    /// For summaries deserialized from older JSON that does not contain the
+    /// `warning_paths` field, this returns an empty vector because warning
+    /// paths cannot be reconstructed from warning totals alone.
+    #[must_use]
+    pub fn warning_path_counts(&self) -> Vec<WarningPathCount> {
+        self.warning_paths.clone()
     }
 }
 
@@ -725,6 +812,7 @@ impl SpectrumBundle {
             self.source_format_counts(),
         )
         .with_source_path_counts(self.source_path_counts())
+        .with_warning_path_counts(self.warning_path_counts())
     }
 
     /// Returns an iterator over one-dimensional spectra.
@@ -1229,6 +1317,18 @@ impl SpectrumBundle {
             .filter(move |warning| warning.path() == Some(path.as_path()))
     }
 
+    /// Returns the number of non-fatal loader warnings with the given tracked source path.
+    #[must_use]
+    pub fn warning_path_count(&self, path: impl AsRef<Path>) -> usize {
+        self.warnings_for_source_path(path).count()
+    }
+
+    /// Returns true when a non-fatal loader warning has the given tracked source path.
+    #[must_use]
+    pub fn has_warning_path(&self, path: impl AsRef<Path>) -> bool {
+        self.warnings_for_source_path(path).next().is_some()
+    }
+
     /// Returns an iterator over tracked source paths for loader warnings.
     ///
     /// Warnings emitted while source path tracking is disabled are skipped.
@@ -1239,6 +1339,19 @@ impl SpectrumBundle {
     /// Returns an iterator over loader warning messages.
     pub fn warning_messages(&self) -> impl Iterator<Item = &str> {
         self.warnings.iter().map(LoadWarning::message)
+    }
+
+    /// Returns deterministic warning path counts in first-seen order.
+    #[must_use]
+    pub fn warning_path_counts(&self) -> Vec<WarningPathCount> {
+        let mut counts: Vec<WarningPathCount> = Vec::new();
+        for path in self.warning_paths() {
+            match counts.iter_mut().find(|count| count.path() == path) {
+                Some(count) => count.count += 1,
+                None => counts.push(WarningPathCount::new(path, 1)),
+            }
+        }
+        counts
     }
 
     /// Consumes the bundle and returns loaded one-dimensional spectra with sources.

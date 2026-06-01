@@ -10,8 +10,8 @@ use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
     LoadedSpectrum, RSpinReader, SourceDataKindCount, SourcePathCount, SpectrumBundle,
-    SpectrumBundleLoader, SpectrumBundleSummary, SpectrumPathReader, load_spectra,
-    load_spectra_by_source, load_spectra_by_source_data_kind,
+    SpectrumBundleLoader, SpectrumBundleSummary, SpectrumPathReader, WarningPathCount,
+    load_spectra, load_spectra_by_source, load_spectra_by_source_data_kind,
     load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_data_kinds,
     load_spectra_by_source_data_kinds_relative_to, load_spectra_by_source_format,
     load_spectra_by_source_format_relative_to, load_spectra_by_source_formats,
@@ -1667,6 +1667,29 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
         bundle_with_warning.warning_paths().collect::<Vec<_>>(),
         vec![Path::new("empty_jcamp/empty.jdx")]
     );
+    assert_eq!(
+        bundle_with_warning.warning_path_counts(),
+        vec![WarningPathCount::new("empty_jcamp/empty.jdx", 1)]
+    );
+    assert_eq!(
+        bundle_with_warning.warning_path_count("empty_jcamp/empty.jdx"),
+        1
+    );
+    assert!(bundle_with_warning.has_warning_path("empty_jcamp/empty.jdx"));
+    assert!(!bundle_with_warning.has_warning_path("missing"));
+    let warning_summary = bundle_with_warning.summary();
+    assert_eq!(
+        warning_summary.warning_paths,
+        vec![WarningPathCount::new("empty_jcamp/empty.jdx", 1)]
+    );
+    assert_eq!(
+        warning_summary.warning_path_count("empty_jcamp/empty.jdx"),
+        1
+    );
+    assert_eq!(warning_summary.warning_path_prefix_count("empty_jcamp"), 1);
+    assert!(warning_summary.has_warning_path("empty_jcamp/empty.jdx"));
+    assert!(warning_summary.has_warning_path_prefix("empty_jcamp"));
+    assert!(!warning_summary.has_warning_path("missing"));
     let warning_messages = bundle_with_warning.warning_messages().collect::<Vec<_>>();
     assert_eq!(warning_messages.len(), 1);
     assert!(warning_messages[0].contains("missing XYDATA values"));
@@ -2420,9 +2443,13 @@ fn bundle_summary_reconstructs_source_data_kind_counts_from_legacy_json() -> any
 
     assert!(summary.source_data_kinds.is_empty());
     assert!(summary.source_paths.is_empty());
+    assert!(summary.warning_paths.is_empty());
     assert!(summary.source_path_counts().is_empty());
+    assert!(summary.warning_path_counts().is_empty());
     assert_eq!(summary.source_path_count("missing"), 0);
+    assert_eq!(summary.warning_path_count("missing"), 0);
     assert!(!summary.has_source_path_prefix("missing"));
+    assert!(!summary.has_warning_path_prefix("missing"));
     assert_eq!(
         summary.source_data_kind_counts(),
         vec![

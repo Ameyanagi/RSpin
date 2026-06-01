@@ -420,6 +420,8 @@ fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBu
     assert_eq!(summary.source_path_count("varian_1h"), 1);
     assert!(summary.has_source_path_prefix("bruker_without_expno"));
     assert!(bundle.has_source_path(std::path::Path::new("varian_1h")));
+    let empty_warning_paths: Vec<WarningPathCount> = Vec::new();
+    assert_eq!(summary.warning_path_counts(), empty_warning_paths);
 }
 
 #[test]
