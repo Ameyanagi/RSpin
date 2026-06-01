@@ -408,6 +408,44 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_discovery_metadata() -> Result<()> {
+    let formats: Vec<LoadedSourceFormatInfo> = supported_bundle_source_formats();
+    assert_eq!(formats, RSpinReader::supported_source_formats());
+    assert!(formats.iter().any(|info| {
+        info.name == "jcamp_dx"
+            && info.vendor.is_none()
+            && info.data_kind == LoadedSourceDataKind::Other
+            && info.extensions.contains(&"jdx")
+            && info.path_markers.is_empty()
+    }));
+
+    let vendors: Vec<LoadedSourceVendorInfo> = supported_bundle_source_vendors();
+    assert_eq!(vendors, RSpinReader::supported_source_vendors());
+    let bruker = vendors
+        .iter()
+        .find(|info| info.name == "bruker")
+        .ok_or_else(|| RSpinError::Parse {
+            format: "spectrum bundle source metadata",
+            message: "missing Bruker source vendor metadata".to_owned(),
+        })?;
+    assert!(bruker.source_formats.contains(&"bruker_fid"));
+    assert!(bruker.source_formats.contains(&"bruker_ser"));
+
+    let data_kinds: Vec<LoadedSourceDataKindInfo> = supported_bundle_source_data_kinds();
+    assert_eq!(data_kinds, RSpinReader::supported_source_data_kinds());
+    let raw = data_kinds
+        .iter()
+        .find(|info| info.name == "raw")
+        .ok_or_else(|| RSpinError::Parse {
+            format: "spectrum bundle source metadata",
+            message: "missing raw source data-kind metadata".to_owned(),
+        })?;
+    assert!(raw.source_formats.contains(&"agilent_fid"));
+    assert!(!raw.source_formats.contains(&"jcamp_dx"));
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");
