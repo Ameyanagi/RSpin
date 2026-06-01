@@ -406,6 +406,32 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_strict_bundle_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let single = load_spectra_strict_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(single.len(), 1);
+    assert!(single.has_source_path("varian_1h"));
+
+    let many = load_spectra_many_strict_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(many.len(), 1);
+    assert!(many.warnings().is_empty());
+
+    let malformed_fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132/empty_jcamp/empty.jdx");
+    let bad = load_spectra_strict(malformed_fixture);
+    let Err(error) = bad else {
+        return Err(RSpinError::Parse {
+            format: "prelude strict bundle loader",
+            message: "strict loading should reject malformed candidates".to_owned(),
+        });
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
 fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
     assert_eq!(bundle.source_paths().count(), 3);
     assert_eq!(

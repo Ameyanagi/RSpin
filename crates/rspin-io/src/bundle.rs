@@ -167,6 +167,19 @@ pub fn load_spectra(path: impl AsRef<Path>) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path(path)
 }
 
+/// Loads all supported spectrum bundle data from a file or directory path in strict mode.
+///
+/// In strict mode, the first unreadable candidate aborts loading instead of
+/// being retained as a loader warning.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing, any candidate fails to read, or
+/// no readable bundle data is found.
+pub fn load_spectra_strict(path: impl AsRef<Path>) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new().strict().read_path(path)
+}
+
 /// Loads one selected path while anchoring source paths to a common base directory.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are loaded
@@ -181,6 +194,25 @@ pub fn load_spectra_relative_to(
     path: impl AsRef<Path>,
 ) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path_relative_to(base, path)
+}
+
+/// Loads one selected path in strict mode while anchoring source paths to a common base directory.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are loaded
+/// as provided. In strict mode, the first unreadable candidate aborts loading
+/// instead of being retained as a loader warning.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable, any candidate fails to read, or no readable bundle data is found.
+pub fn load_spectra_strict_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_path_relative_to(base, path)
 }
 
 /// Discovers source candidates below a file or directory without loading full spectra.
@@ -656,6 +688,23 @@ where
     SpectrumBundleLoader::new().read_paths(paths)
 }
 
+/// Loads supported spectra from multiple file or directory paths in strict mode.
+///
+/// In strict mode, the first unreadable input path or candidate aborts loading
+/// instead of being retained as a loader warning.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, any path or candidate
+/// fails to read, or no readable bundle data is found.
+pub fn load_spectra_many_strict<I, P>(paths: I) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().strict().read_paths(paths)
+}
+
 /// Loads selected paths while anchoring source paths to a common base directory.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are loaded
@@ -674,6 +723,30 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_paths_relative_to(base, paths)
+}
+
+/// Loads selected paths in strict mode while anchoring source paths to a common base directory.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are loaded
+/// as provided. In strict mode, the first unreadable input path or candidate
+/// aborts loading instead of being retained as a loader warning.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input paths
+/// are provided, any path or candidate fails to read, or no readable bundle data
+/// is found.
+pub fn load_spectra_many_strict_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_paths_relative_to(base, paths)
 }
 
 /// Discovers source candidates below multiple file or directory paths.

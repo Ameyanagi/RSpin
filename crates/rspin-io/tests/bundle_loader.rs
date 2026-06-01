@@ -31,10 +31,11 @@ use rspin_io::{
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
     load_spectra_many_by_source_vendors, load_spectra_many_by_source_vendors_relative_to,
     load_spectra_many_by_sources, load_spectra_many_by_sources_relative_to,
-    load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
-    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
-    load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
-    load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
+    load_spectra_many_relative_to, load_spectra_many_strict, load_spectra_many_strict_relative_to,
+    load_spectra_relative_to, load_spectra_strict, load_spectra_strict_relative_to,
+    load_spectrum_1d, load_spectrum_1d_many, load_spectrum_1d_many_relative_to,
+    load_spectrum_1d_many_with_source, load_spectrum_1d_many_with_source_relative_to,
+    load_spectrum_1d_paths, load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
     load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
     load_spectrum_1d_with_source, load_spectrum_1d_with_source_relative_to, load_spectrum_2d,
     load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_many_with_source,
@@ -881,6 +882,34 @@ fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     assert!(has_source_path(&bundle, Path::new("varian_1h")));
     assert!(has_source_path(&bundle, Path::new("bruker_without_expno")));
     assert!(has_source_path(&bundle, Path::new("pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn free_strict_bundle_loader_helpers_abort_on_bad_candidates() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let single = load_spectra_strict(base.join("varian_1h"))?;
+    assert_eq!(single.len(), 1);
+    assert!(single.warnings().is_empty());
+
+    let relative = load_spectra_strict_relative_to(&base, "varian_1h")?;
+    assert_eq!(relative.len(), 1);
+    assert!(relative.has_source_path("varian_1h"));
+
+    let many = load_spectra_many_strict([base.join("varian_1h")])?;
+    assert_eq!(many.len(), 1);
+    assert!(many.warnings().is_empty());
+
+    let many_relative = load_spectra_many_strict_relative_to(&base, ["varian_1h"])?;
+    assert_eq!(many_relative.len(), 1);
+    assert!(many_relative.has_source_path("varian_1h"));
+
+    let bad_file = load_spectra_strict(base.join("empty_jcamp/empty.jdx"));
+    let Err(error) = bad_file else {
+        anyhow::bail!("strict loading should reject malformed candidates");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
     Ok(())
 }
 
