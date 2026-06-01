@@ -864,7 +864,12 @@ impl SpectrumBundleLoader {
         }
     }
 
-    fn allows_source(&self, root: &Path, path: &Path, format: &str) -> bool {
+    pub(in crate::bundle::loader) fn allows_source(
+        &self,
+        root: &Path,
+        path: &Path,
+        format: &str,
+    ) -> bool {
         self.allows_source_format(format)
             && self.allows_source_candidate_kind(format)
             && self.allows_source_path(root, path)
@@ -915,7 +920,10 @@ impl SpectrumBundleLoader {
                 .any(|format| self.allows_routed_source_format_at_path(root, file, format))
     }
 
-    fn allows_file_candidate_kind(&self, kind: FileCandidateKind) -> bool {
+    pub(in crate::bundle::loader) fn allows_file_candidate_kind(
+        &self,
+        kind: FileCandidateKind,
+    ) -> bool {
         let allowed_by_toggle = match kind {
             FileCandidateKind::Raw => self.raw.is_enabled(),
             FileCandidateKind::Processed => self.processed.is_enabled(),
@@ -1037,7 +1045,11 @@ impl SpectrumBundleLoader {
         bundle
     }
 
-    fn source_path_for_metadata(&self, root: &Path, path: &Path) -> Option<PathBuf> {
+    pub(in crate::bundle::loader) fn source_path_for_metadata(
+        &self,
+        root: &Path,
+        path: &Path,
+    ) -> Option<PathBuf> {
         if !self.source_paths.is_enabled() {
             return None;
         }

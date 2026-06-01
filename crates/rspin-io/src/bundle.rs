@@ -131,7 +131,7 @@ pub use exact::{
     load_spectrum_2d_with_source_relative_to,
 };
 use loader::FileCandidateKind;
-pub use loader::SpectrumBundleLoader;
+pub use loader::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource, SpectrumBundleLoader};
 pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,
     SourceVendorCount, SpectrumBundle, SpectrumBundleSummary,
@@ -177,6 +177,31 @@ pub fn load_spectra_relative_to(
     path: impl AsRef<Path>,
 ) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path_relative_to(base, path)
+}
+
+/// Discovers source candidates below a file or directory without loading full spectra.
+///
+/// Empty results are allowed so callers can preflight picker selections before
+/// calling [`load_spectra`].
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra(path: impl AsRef<Path>) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new().discover_path(path)
+}
+
+/// Discovers one selected path while anchoring source paths to a common base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, or the
+/// selected path is missing.
+pub fn discover_spectra_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new().discover_path_relative_to(base, path)
 }
 
 /// Loads supported spectra from a file or directory, restricted by one generic source filter.
@@ -570,6 +595,37 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_paths_relative_to(base, paths)
+}
+
+/// Discovers source candidates below multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_many<I, P>(paths: I) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_paths(paths)
+}
+
+/// Discovers selected paths while anchoring source paths to a common base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_paths_relative_to(base, paths)
 }
 
 /// Loads supported spectra from multiple paths, restricted by one generic source filter.

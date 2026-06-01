@@ -446,6 +446,27 @@ fn prelude_exports_source_discovery_metadata() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_candidate_discovery() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+    assert!(sources.iter().any(|source| {
+        source.path() == Some(std::path::Path::new("varian_1h"))
+            && source.is_format(LoadedSourceFormat::AgilentFid)
+            && source.dimension() == DiscoveredSpectrumDimension::OneD
+            && source.data_kind() == LoadedSourceDataKind::Raw
+    }));
+
+    let processed = RSpinReader::new()
+        .processed_sources()
+        .discover_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(processed.len(), 1);
+    assert!(processed.iter().all(DiscoveredSpectrumSource::is_processed));
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

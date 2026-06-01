@@ -361,6 +361,13 @@ fn supported_standalone_extensions() -> Vec<&'static str> {
         .copied()
         .collect()
 }
+
+fn preflight_sources() -> Result<Vec<DiscoveredSpectrumSource>> {
+    RSpinReader::new()
+        .source_vendor("bruker")
+        .processed_sources()
+        .discover("data/mixed-vendor")
+}
 ```
 
 The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,
