@@ -71,7 +71,11 @@ pub use loaded_summary::{
     load_discovered_spectra_summary_strict_relative_to,
 };
 pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
-pub use selection::{select_discovered_spectra_by_source, select_discovered_spectra_by_sources};
+pub use selection::{
+    select_discovered_spectra_1d, select_discovered_spectra_2d,
+    select_discovered_spectra_by_dimension, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_sources,
+};
 pub use strict::{
     load_discovered_spectra_strict, load_discovered_spectra_strict_by_source,
     load_discovered_spectra_strict_by_source_relative_to,

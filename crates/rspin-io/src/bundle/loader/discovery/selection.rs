@@ -1,7 +1,32 @@
 //! Selection helpers for discovered spectrum source candidates.
 
-use super::DiscoveredSpectrumSource;
+use super::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 use crate::bundle::LoadedSourceFilter;
+
+/// Selects discovered one-dimensional source candidates.
+#[must_use]
+pub fn select_discovered_spectra_1d(
+    sources: &[DiscoveredSpectrumSource],
+) -> Vec<&DiscoveredSpectrumSource> {
+    select_discovered_spectra_by_dimension(sources, DiscoveredSpectrumDimension::OneD)
+}
+
+/// Selects discovered two-dimensional source candidates.
+#[must_use]
+pub fn select_discovered_spectra_2d(
+    sources: &[DiscoveredSpectrumSource],
+) -> Vec<&DiscoveredSpectrumSource> {
+    select_discovered_spectra_by_dimension(sources, DiscoveredSpectrumDimension::TwoD)
+}
+
+/// Selects discovered source candidates with one inferred dimension.
+#[must_use]
+pub fn select_discovered_spectra_by_dimension(
+    sources: &[DiscoveredSpectrumSource],
+    dimension: DiscoveredSpectrumDimension,
+) -> Vec<&DiscoveredSpectrumSource> {
+    select_discovered_source_refs_by_dimension(sources.iter(), dimension)
+}
 
 /// Selects discovered source candidates matching one generic source filter.
 ///
@@ -31,6 +56,19 @@ where
     F: Into<LoadedSourceFilter>,
 {
     select_discovered_source_refs(sources.iter(), filters)
+}
+
+pub(super) fn select_discovered_source_refs_by_dimension<'a, S>(
+    sources: S,
+    dimension: DiscoveredSpectrumDimension,
+) -> Vec<&'a DiscoveredSpectrumSource>
+where
+    S: IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+{
+    sources
+        .into_iter()
+        .filter(|source| source.dimension() == dimension)
+        .collect()
 }
 
 pub(super) fn select_discovered_source_refs<'a, S, I, F>(

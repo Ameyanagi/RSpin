@@ -847,6 +847,15 @@ fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
     let myrcene_sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
 
+    let selected_1d = select_discovered_spectra_1d(&myrcene_sources);
+    assert_eq!(selected_1d.len(), 5);
+    let selected_2d =
+        select_discovered_spectra_by_dimension(&myrcene_sources, DiscoveredSpectrumDimension::TwoD);
+    assert_eq!(
+        selected_2d.len(),
+        select_discovered_spectra_2d(&myrcene_sources).len()
+    );
+
     let jeol_1d = load_discovered_spectra_1d_by_source_relative_to(
         &myrcene_root,
         &myrcene_sources,

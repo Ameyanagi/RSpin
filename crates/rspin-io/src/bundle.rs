@@ -191,8 +191,10 @@ pub use loader::{
     load_discovered_spectrum_2d_with_source_by_source_relative_to,
     load_discovered_spectrum_2d_with_source_by_sources,
     load_discovered_spectrum_2d_with_source_by_sources_relative_to,
-    load_discovered_spectrum_2d_with_source_relative_to, select_discovered_spectra_by_source,
-    select_discovered_spectra_by_sources, summarize_discovered_spectra,
+    load_discovered_spectrum_2d_with_source_relative_to, select_discovered_spectra_1d,
+    select_discovered_spectra_2d, select_discovered_spectra_by_dimension,
+    select_discovered_spectra_by_source, select_discovered_spectra_by_sources,
+    summarize_discovered_spectra,
 };
 pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,

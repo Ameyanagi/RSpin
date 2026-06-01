@@ -20,8 +20,9 @@ use rspin_io::{
     load_discovered_spectra_2d_strict_by_sources, load_discovered_spectra_by_source,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
-    select_discovered_spectra_by_source, select_discovered_spectra_by_sources,
-    summarize_discovered_spectra,
+    select_discovered_spectra_1d, select_discovered_spectra_2d,
+    select_discovered_spectra_by_dimension, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_sources, summarize_discovered_spectra,
 };
 
 #[test]
@@ -127,6 +128,30 @@ fn discovered_sources_match_generic_source_filters() -> Result<()> {
     ]));
     assert!(!empty_jcamp.matches_any_source(Vec::<LoadedSourceFilter>::new()));
 
+    Ok(())
+}
+
+#[test]
+fn discovered_dimension_selection_helpers_filter_candidates() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let summary = summarize_discovered_spectra(&sources);
+
+    let one_d = select_discovered_spectra_1d(&sources);
+    assert_eq!(one_d.len(), summary.sources_1d());
+    assert!(one_d.iter().all(|source| source.is_1d()));
+
+    let two_d = select_discovered_spectra_2d(&sources);
+    assert_eq!(two_d.len(), summary.sources_2d());
+    assert!(two_d.iter().all(|source| source.is_2d()));
+    assert!(
+        two_d
+            .iter()
+            .any(|source| source.path() == Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf")))
+    );
+
+    let unknown =
+        select_discovered_spectra_by_dimension(&sources, DiscoveredSpectrumDimension::Unknown);
+    assert!(unknown.is_empty());
     Ok(())
 }
 
