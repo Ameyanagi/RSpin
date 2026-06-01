@@ -451,6 +451,54 @@ fn discovered_source_can_load_itself_relative_to_base() -> Result<()> {
         1
     );
 
+    let spectrum = varian.load_1d_relative_to(fixture_root())?;
+    assert_eq!(spectrum.len(), 16_384);
+    let spectrum = varian.load_1d(fixture_root())?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (spectrum, source) = varian.load_1d_with_source_relative_to(fixture_root())?;
+    assert_eq!(spectrum.len(), 16_384);
+    assert_eq!(source.format(), "agilent_fid");
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+    let (_, source) = varian.load_1d_with_source(fixture_root())?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let Err(error) = varian.load_2d_relative_to(fixture_root()) else {
+        return Err(anyhow!(
+            "one-dimensional discovered source should reject exact two-dimensional loading"
+        ));
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("expected exactly one two-dimensional spectrum")
+    );
+
+    let myrcene_sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let hsqc = discovered_source(
+        &myrcene_sources,
+        "jeol/myrcene_hsqc_400mhz.jdf",
+        LoadedSourceFormat::JeolJdf,
+    )?;
+    let hsqc_spectrum = hsqc.load_2d_relative_to(cc0_myrcene_fixture_root())?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+    let hsqc_spectrum = hsqc.load_2d(cc0_myrcene_fixture_root())?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+
+    let (hsqc_spectrum, source) =
+        hsqc.load_2d_with_source_relative_to(cc0_myrcene_fixture_root())?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+    assert_eq!(source.format(), "jeol_jdf");
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+    let (_, source) = hsqc.load_2d_with_source(cc0_myrcene_fixture_root())?;
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+
     let empty_jcamp = discovered_source(
         &sources,
         "empty_jcamp/empty.jdx",
@@ -659,6 +707,10 @@ fn discovered_source_loading_rejects_missing_source_paths() -> Result<()> {
 
 fn fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/zenodo_7100132")
+}
+
+fn cc0_myrcene_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene")
 }
 
 fn discovered_source<'a>(

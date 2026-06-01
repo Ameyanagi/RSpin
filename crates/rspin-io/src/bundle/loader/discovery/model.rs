@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use rspin_core::Result;
+use rspin_core::{Result, Spectrum1D, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
 use super::super::SpectrumBundleLoader;
@@ -163,6 +163,106 @@ impl DiscoveredSpectrumSource {
         SpectrumBundleLoader::new()
             .strict()
             .read_discovered_relative_to(base, [self])
+    }
+
+    /// Loads this discovered source as exactly one one-dimensional spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_relative_to(&self, base: impl AsRef<Path>) -> Result<Spectrum1D> {
+        self.load_relative_to(base)?.into_only_1d()
+    }
+
+    /// Loads this discovered source as exactly one one-dimensional spectrum.
+    ///
+    /// This short alias mirrors [`Self::load_1d_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d(&self, base: impl AsRef<Path>) -> Result<Spectrum1D> {
+        self.load_1d_relative_to(base)
+    }
+
+    /// Loads this discovered source as exactly one one-dimensional spectrum with source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_with_source_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.load_relative_to(base)?.into_only_loaded_1d()
+    }
+
+    /// Loads this discovered source as exactly one one-dimensional spectrum with source metadata.
+    ///
+    /// This short alias mirrors [`Self::load_1d_with_source_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one one-dimensional spectrum.
+    pub fn load_1d_with_source(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.load_1d_with_source_relative_to(base)
+    }
+
+    /// Loads this discovered source as exactly one two-dimensional spectrum.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_relative_to(&self, base: impl AsRef<Path>) -> Result<Spectrum2D> {
+        self.load_relative_to(base)?.into_only_2d()
+    }
+
+    /// Loads this discovered source as exactly one two-dimensional spectrum.
+    ///
+    /// This short alias mirrors [`Self::load_2d_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d(&self, base: impl AsRef<Path>) -> Result<Spectrum2D> {
+        self.load_2d_relative_to(base)
+    }
+
+    /// Loads this discovered source as exactly one two-dimensional spectrum with source metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_with_source_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.load_relative_to(base)?.into_only_loaded_2d()
+    }
+
+    /// Loads this discovered source as exactly one two-dimensional spectrum with source metadata.
+    ///
+    /// This short alias mirrors [`Self::load_2d_with_source_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails or when it does
+    /// not resolve to exactly one two-dimensional spectrum.
+    pub fn load_2d_with_source(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.load_2d_with_source_relative_to(base)
     }
 
     /// Returns true when this discovered source matches a generic source filter.

@@ -597,6 +597,10 @@ fn prelude_exports_discovered_source_filter_loaders() -> Result<()> {
         loaded.source_vendor_count(LoadedSourceVendor::AgilentVarian),
         1
     );
+    let spectrum = selected[0].load_1d_relative_to(&fixture_root)?;
+    assert_eq!(spectrum.len(), 16_384);
+    let (_, source) = selected[0].load_1d_with_source_relative_to(&fixture_root)?;
+    assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
 
     let selected = select_discovered_spectra_by_sources(
         &sources,
