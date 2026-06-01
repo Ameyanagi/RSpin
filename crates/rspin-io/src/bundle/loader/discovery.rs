@@ -4,6 +4,7 @@ mod dimension;
 mod exact;
 mod loaded_summary;
 mod model;
+mod selected;
 mod selection;
 mod strict;
 mod summary;
@@ -71,6 +72,7 @@ pub use loaded_summary::{
     load_discovered_spectra_summary_strict_relative_to,
 };
 pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
+pub use selected::SelectedDiscoveredSpectrumSourcesExt;
 pub use selection::{
     DiscoveredSpectrumSourcesExt, select_discovered_spectra_1d,
     select_discovered_spectra_1d_by_source, select_discovered_spectra_1d_by_sources,

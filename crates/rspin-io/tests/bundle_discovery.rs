@@ -7,8 +7,9 @@ use rspin_io::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
     DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary,
     LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader,
-    discover_spectra, discover_spectra_by_source, discover_spectra_by_source_relative_to,
-    discover_spectra_by_sources, discover_spectra_by_sources_relative_to, discover_spectra_many,
+    SelectedDiscoveredSpectrumSourcesExt, discover_spectra, discover_spectra_by_source,
+    discover_spectra_by_source_relative_to, discover_spectra_by_sources,
+    discover_spectra_by_sources_relative_to, discover_spectra_many,
     discover_spectra_many_by_source, discover_spectra_many_by_source_relative_to,
     discover_spectra_many_by_sources, discover_spectra_many_by_sources_relative_to,
     discover_spectra_many_relative_to, discover_spectra_many_summary,
@@ -808,6 +809,49 @@ fn discovered_dimension_bundle_helpers_load_matching_candidates() -> Result<()> 
             .to_string()
             .contains("no one-dimensional discovered sources selected")
     );
+
+    Ok(())
+}
+
+#[test]
+fn selected_discovered_source_slices_load_chainably() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let jeol_1d = sources.select_1d_by_source(LoadedSourceVendor::Jeol);
+    let bundle = jeol_1d.load_1d_relative_to(&root)?;
+    assert_eq!(bundle.len_1d(), 2);
+    assert_eq!(bundle.len_2d(), 0);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(jeol_1d.load(&root)?.len_1d(), 2);
+    assert_eq!(jeol_1d.load_1d(&root)?.len_1d(), 2);
+    assert_eq!(jeol_1d.load_1d_strict_relative_to(&root)?.len_1d(), 2);
+    assert_eq!(jeol_1d.load_1d_strict(&root)?.len_1d(), 2);
+
+    let summary = jeol_1d.load_summary(&root)?;
+    assert_eq!(summary.spectra_1d(), 2);
+    assert_eq!(summary.spectra_2d(), 0);
+    assert_eq!(jeol_1d.load_summary_relative_to(&root)?.spectra_1d(), 2);
+
+    let strict_summary = jeol_1d.load_summary_strict_relative_to(&root)?;
+    assert_eq!(strict_summary.spectra_1d(), 2);
+    assert_eq!(jeol_1d.load_summary_strict(&root)?.spectra_1d(), 2);
+
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let hsqc = sources.select_2d_by_source(LoadedSourceFilter::path(hsqc_path));
+    let hsqc_bundle = hsqc.load_2d(&root)?;
+    assert_eq!(hsqc_bundle.len_1d(), 0);
+    assert_eq!(hsqc_bundle.len_2d(), 1);
+    assert!(hsqc_bundle.has_source_path(hsqc_path));
+    assert_eq!(hsqc.load_2d_relative_to(&root)?.len_2d(), 1);
+
+    let strict_hsqc = hsqc.load_strict_relative_to(&root)?;
+    assert_eq!(strict_hsqc.len(), 1);
+    assert_eq!(hsqc.load_strict(&root)?.len(), 1);
+
+    let strict_hsqc_2d = hsqc.load_2d_strict(&root)?;
+    assert_eq!(strict_hsqc_2d.len_2d(), 1);
+    assert_eq!(hsqc.load_2d_strict_relative_to(&root)?.len_2d(), 1);
 
     Ok(())
 }

@@ -978,6 +978,26 @@ fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_selected_discovered_source_load_methods() -> Result<()> {
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
+
+    let jeol_1d = sources.select_1d_by_source(LoadedSourceVendor::Jeol);
+    let loaded_1d = jeol_1d.load_1d_relative_to(&myrcene_root)?;
+    assert_eq!(loaded_1d.len_1d(), 2);
+    assert_eq!(loaded_1d.len_2d(), 0);
+    assert_eq!(jeol_1d.load_summary(&myrcene_root)?.spectra_1d(), 2);
+
+    let hsqc =
+        sources.select_2d_by_source(LoadedSourceFilter::path("jeol/myrcene_hsqc_400mhz.jdf"));
+    let loaded_2d = hsqc.load_2d(&myrcene_root)?;
+    assert_eq!(loaded_2d.len_1d(), 0);
+    assert_eq!(loaded_2d.len_2d(), 1);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_exact_discovered_free_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");
