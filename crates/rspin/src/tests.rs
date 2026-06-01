@@ -599,6 +599,42 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
         source.path(),
         Some(std::path::Path::new("myrcene/jeol/myrcene_hsqc_400mhz.jdf"))
     );
+
+    Ok(())
+}
+
+#[test]
+fn prelude_exports_generic_source_filtered_exact_bundle_loaders() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let mixed_vendor_base =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../rspin-io/testdata/nmrxiv/cc0");
+
+    let bruker_1d =
+        load_spectrum_1d_by_source(&mixed_vendor_root, LoadedSourceFilter::vendor("bruker"))?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (bruker_2d, source) = load_spectrum_2d_with_source_by_source(
+        &mixed_vendor_root,
+        LoadedSourceFilter::from(LoadedSourceVendor::Bruker),
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    assert_eq!(source.format(), "bruker_ser");
+    let carbon = load_spectrum_1d_many_by_source_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_cosy_raw", "myrcene"],
+        LoadedSourceFilter::path("myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    let (bruker_1d, source) = load_spectrum_1d_many_with_source_by_source_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceFilter::path("myrcene/bruker_1h_raw"),
+    )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(
+        source.path(),
+        Some(std::path::Path::new("myrcene/bruker_1h_raw"))
+    );
     Ok(())
 }
 

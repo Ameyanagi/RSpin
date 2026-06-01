@@ -71,6 +71,10 @@ fn load_selected_with_runtime_filters() -> Result<SpectrumBundle> {
     )
 }
 
+fn load_one_with_runtime_filter() -> Result<Spectrum1D> {
+    load_spectrum_1d_by_source("data/mixed-vendor", LoadedSourceFilter::vendor("bruker"))
+}
+
 fn load_one_bruker_spectrum_from_selected_inputs() -> Result<Spectrum1D> {
     load_spectrum_1d_many_by_source_vendor(
         ["data/proton.fid", "data/bruker/pdata/1"],

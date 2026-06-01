@@ -5,8 +5,8 @@ use std::path::Path;
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use super::{
-    LoadedSource, LoadedSourceVendor, LoadedSpectrum, SpectrumBundle, source_format_count_name,
-    source_format_matches,
+    LoadedSource, LoadedSourceFilter, LoadedSourceVendor, LoadedSpectrum, SpectrumBundle,
+    source_format_count_name, source_format_matches,
 };
 
 impl SpectrumBundle {
@@ -206,6 +206,70 @@ impl SpectrumBundle {
         })
     }
 
+    /// Returns the only one-dimensional spectrum matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_1d_by_source(&self, filter: impl Into<LoadedSourceFilter>) -> Result<&Spectrum1D> {
+        self.only_loaded_1d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only one-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(&Spectrum1D, &LoadedSource)> {
+        let filter = filter.into();
+        let label = source_filter_label(&filter);
+        self.only_loaded_1d_matching_source(&label, move |source| filter.matches_source(source))
+    }
+
+    /// Returns the only two-dimensional spectrum matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_2d_by_source(&self, filter: impl Into<LoadedSourceFilter>) -> Result<&Spectrum2D> {
+        self.only_loaded_2d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only two-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(&Spectrum2D, &LoadedSource)> {
+        let filter = filter.into();
+        let label = source_filter_label(&filter);
+        self.only_loaded_2d_matching_source(&label, move |source| filter.matches_source(source))
+    }
+
     /// Consumes the bundle and returns the only one-dimensional spectrum read with a source format.
     ///
     /// Source format aliases such as `jdx` and `jdf` are accepted. Other
@@ -402,6 +466,80 @@ impl SpectrumBundle {
         })
     }
 
+    /// Consumes the bundle and returns the only one-dimensional spectrum matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_1d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<Spectrum1D> {
+        self.into_only_loaded_1d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_1d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        let filter = filter.into();
+        let label = source_filter_label(&filter);
+        self.into_only_loaded_1d_matching_source(&label, move |source| {
+            filter.matches_source(source)
+        })
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_2d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<Spectrum2D> {
+        self.into_only_loaded_2d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path. Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_2d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        let filter = filter.into();
+        let label = source_filter_label(&filter);
+        self.into_only_loaded_2d_matching_source(&label, move |source| {
+            filter.matches_source(source)
+        })
+    }
+
     fn only_loaded_1d_matching_source(
         &self,
         filter: &str,
@@ -559,4 +697,16 @@ fn source_vendor_filter_label(vendor: &str, parsed_vendor: Option<LoadedSourceVe
 
 fn source_path_filter_label(path: &Path) -> String {
     format!("source path {}", path.display())
+}
+
+fn source_filter_label(filter: &LoadedSourceFilter) -> String {
+    match filter {
+        LoadedSourceFilter::Format { format } => {
+            format!("source format {}", source_format_count_name(format))
+        }
+        LoadedSourceFilter::Vendor { vendor } => {
+            source_vendor_filter_label(vendor, LoadedSourceVendor::parse(vendor).ok())
+        }
+        LoadedSourceFilter::Path { path } => source_path_filter_label(path),
+    }
 }
