@@ -457,6 +457,35 @@ impl SpectrumBundle {
         self.source_subset_by_sources([filter.into()])
     }
 
+    /// Returns a cloned bundle containing spectra read with a source format.
+    ///
+    /// Source format aliases such as `jdx` and `jdf` are accepted. Molecule
+    /// metadata is preserved. Loader warnings are retained conservatively
+    /// because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn source_format_subset(&self, format: impl AsRef<str>) -> Self {
+        self.source_subset(LoadedSourceFilter::format(format))
+    }
+
+    /// Returns a cloned bundle containing spectra read with a vendor-specific reader.
+    ///
+    /// Vendor aliases such as `agilent` and `varian` are accepted. Molecule
+    /// metadata is preserved. Loader warnings are retained conservatively
+    /// because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn source_vendor_subset(&self, vendor: impl AsRef<str>) -> Self {
+        self.source_subset(LoadedSourceFilter::vendor(vendor))
+    }
+
+    /// Returns a cloned bundle containing spectra read from one tracked source path.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained when they
+    /// match the same tracked source path.
+    #[must_use]
+    pub fn source_path_subset(&self, path: impl AsRef<Path>) -> Self {
+        self.source_subset(LoadedSourceFilter::path(path))
+    }
+
     /// Returns a cloned bundle containing spectra that match any generic source filter.
     ///
     /// Filters are combined with logical OR. Passing an empty iterator returns
@@ -945,6 +974,35 @@ impl SpectrumBundle {
     #[must_use]
     pub fn into_source_subset(self, filter: impl Into<LoadedSourceFilter>) -> Self {
         self.into_source_subset_by_sources([filter.into()])
+    }
+
+    /// Consumes the bundle and keeps spectra read with a source format.
+    ///
+    /// Source format aliases such as `jdx` and `jdf` are accepted. Molecule
+    /// metadata is preserved. Loader warnings are retained conservatively
+    /// because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn into_source_format_subset(self, format: impl AsRef<str>) -> Self {
+        self.into_source_subset(LoadedSourceFilter::format(format))
+    }
+
+    /// Consumes the bundle and keeps spectra read with a vendor-specific reader.
+    ///
+    /// Vendor aliases such as `agilent` and `varian` are accepted. Molecule
+    /// metadata is preserved. Loader warnings are retained conservatively
+    /// because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn into_source_vendor_subset(self, vendor: impl AsRef<str>) -> Self {
+        self.into_source_subset(LoadedSourceFilter::vendor(vendor))
+    }
+
+    /// Consumes the bundle and keeps spectra read from one tracked source path.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained when they
+    /// match the same tracked source path.
+    #[must_use]
+    pub fn into_source_path_subset(self, path: impl AsRef<Path>) -> Self {
+        self.into_source_subset(LoadedSourceFilter::path(path))
     }
 
     /// Consumes the bundle and keeps spectra that match any generic source filter.

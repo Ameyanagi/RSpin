@@ -1669,6 +1669,45 @@ fn bundle_source_subset_helpers_preserve_relevant_context() -> anyhow::Result<()
 }
 
 #[test]
+fn bundle_typed_source_subset_helpers_cover_common_filters() -> anyhow::Result<()> {
+    let mixed = load_spectra(nmrxiv_fixture_root())?;
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let jcamp = mixed.source_format_subset("jdx");
+    assert_eq!(jcamp.len(), 2);
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+
+    let bruker = mixed.source_vendor_subset(LoadedSourceVendor::Bruker);
+    assert_eq!(bruker.len(), 2);
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let hsqc = mixed.source_path_subset(hsqc_path);
+    assert_eq!(hsqc.len(), 1);
+    assert_eq!(first_2d(&hsqc)?.shape(), (1024, 32));
+
+    let jeol = mixed.clone().into_source_vendor_subset("jeol");
+    assert_eq!(jeol.len(), 3);
+    assert_eq!(jeol.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+
+    let carbon = mixed
+        .clone()
+        .into_source_format_subset(LoadedSourceFormat::JcampDx);
+    assert_eq!(carbon.len(), 2);
+    assert_eq!(carbon.len_1d(), 2);
+
+    let hsqc = mixed.into_source_path_subset(hsqc_path);
+    assert_eq!(hsqc.len(), 1);
+    assert!(hsqc.has_source_path(hsqc_path));
+
+    let warning_subset = RSpinReader::new()
+        .read_path(fixture_root())?
+        .source_path_subset("empty_jcamp/empty.jdx");
+    assert_eq!(warning_subset.len(), 0);
+    assert_eq!(warning_subset.warning_count(), 1);
+    Ok(())
+}
+
+#[test]
 fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
     let jcamp = RSpinReader::new()
         .only_source_format(LoadedSourceFormat::JcampDx)

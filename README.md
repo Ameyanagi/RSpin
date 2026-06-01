@@ -167,6 +167,11 @@ fn keep_runtime_subset_as_bundle() -> Result<SpectrumBundle> {
     ]))
 }
 
+fn keep_bruker_subset_as_bundle() -> Result<SpectrumBundle> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle.source_vendor_subset(LoadedSourceVendor::Bruker))
+}
+
 fn load_named_carbon_spectrum() -> Result<Spectrum1D> {
     let bundle = load_spectra("data/sample")?;
     let (spectrum, _) = bundle

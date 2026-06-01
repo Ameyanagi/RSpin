@@ -592,6 +592,18 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
         consumed.source_paths().collect::<Vec<_>>(),
         vec![std::path::Path::new("bruker_without_expno/pdata/1")]
     );
+
+    let processed = bundle.source_format_subset(LoadedSourceFormat::BrukerProcessed);
+    assert_eq!(processed.len(), 1);
+    assert_eq!(
+        processed.source_paths().collect::<Vec<_>>(),
+        vec![std::path::Path::new("bruker_without_expno/pdata/1")]
+    );
+    let varian = bundle.into_source_vendor_subset("varian");
+    assert_eq!(
+        varian.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
     Ok(())
 }
 
