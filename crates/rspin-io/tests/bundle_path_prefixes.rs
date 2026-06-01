@@ -198,10 +198,26 @@ fn bundle_source_path_prefix_set_selectors_filter_warnings() -> anyhow::Result<(
         Some(PathBuf::from("empty_jcamp/empty.jdx"))
     );
 
+    assert_eq!(bundle.warning_path_prefix_count("empty_jcamp"), 1);
+    assert_eq!(bundle.warning_path_prefix_count("missing"), 0);
+    assert!(bundle.has_warning_path_prefix("empty_jcamp"));
+    assert!(!bundle.has_warning_path_prefix("missing"));
+    assert_eq!(
+        bundle.warning_path_prefix_count_by_prefixes(["empty_jcamp", "missing"]),
+        1
+    );
+
     let all_warnings = bundle
         .warnings_for_source_path_prefixes(std::iter::empty::<PathBuf>())
         .count();
     assert_eq!(all_warnings, bundle.warning_count());
+    assert_eq!(
+        bundle.warning_path_prefix_count_by_prefixes(std::iter::empty::<PathBuf>()),
+        bundle.warning_count()
+    );
+    assert!(bundle.has_any_warning_path_prefix(["empty_jcamp", "missing"]));
+    assert!(!bundle.has_any_warning_path_prefix(["missing"]));
+    assert!(bundle.has_any_warning_path_prefix(std::iter::empty::<PathBuf>()));
 
     let subset = bundle.source_path_prefix_subset_by_prefixes(["empty_jcamp"]);
     assert_eq!(subset.len(), 0);

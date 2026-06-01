@@ -2078,6 +2078,9 @@ fn bundle_source_path_prefix_helpers_filter_warnings() -> anyhow::Result<()> {
         .collect::<Vec<_>>();
     assert_eq!(warnings.len(), 1);
     assert_eq!(warnings[0].path(), Some(Path::new("empty_jcamp/empty.jdx")));
+    assert_eq!(bundle.warning_path_prefix_count("empty_jcamp"), 1);
+    assert!(bundle.has_warning_path_prefix("empty_jcamp"));
+    assert!(!bundle.has_warning_path_prefix("missing"));
 
     let subset = bundle.source_path_prefix_subset("empty_jcamp");
     assert_eq!(subset.len(), 0);

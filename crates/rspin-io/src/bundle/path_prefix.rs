@@ -395,6 +395,45 @@ impl SpectrumBundle {
             .filter(move |warning| warning_matches_any_prefix(warning, &paths))
     }
 
+    /// Returns the number of non-fatal loader warnings from tracked source paths below a prefix.
+    #[must_use]
+    pub fn warning_path_prefix_count(&self, path: impl AsRef<Path>) -> usize {
+        self.warnings_for_source_path_prefix(path).count()
+    }
+
+    /// Returns the number of non-fatal loader warnings from tracked source paths below any prefix.
+    ///
+    /// Passing an empty iterator counts all warnings.
+    #[must_use]
+    pub fn warning_path_prefix_count_by_prefixes<I, P>(&self, paths: I) -> usize
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.warnings_for_source_path_prefixes(paths).count()
+    }
+
+    /// Returns true when at least one non-fatal loader warning has a tracked source path below a prefix.
+    #[must_use]
+    pub fn has_warning_path_prefix(&self, path: impl AsRef<Path>) -> bool {
+        self.warnings_for_source_path_prefix(path).next().is_some()
+    }
+
+    /// Returns true when at least one non-fatal loader warning has a tracked source path below any prefix.
+    ///
+    /// Passing an empty iterator returns true when the bundle contains any
+    /// warning.
+    #[must_use]
+    pub fn has_any_warning_path_prefix<I, P>(&self, paths: I) -> bool
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.warnings_for_source_path_prefixes(paths)
+            .next()
+            .is_some()
+    }
+
     /// Returns the number of loaded spectra from tracked source paths below a prefix.
     #[must_use]
     pub fn source_path_prefix_count(&self, path: impl AsRef<Path>) -> usize {

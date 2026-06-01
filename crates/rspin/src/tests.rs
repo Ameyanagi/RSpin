@@ -908,6 +908,8 @@ fn prelude_exports_source_path_prefix_bundle_helpers() -> Result<()> {
 
     assert_eq!(bundle.source_path_prefix_count("jcamp"), 2);
     assert!(bundle.has_source_path_prefix("jeol"));
+    assert_eq!(bundle.warning_path_prefix_count("jcamp"), 0);
+    assert!(!bundle.has_warning_path_prefix("jcamp"));
     assert_eq!(
         bundle
             .source_paths_for_path_prefix("jcamp")
