@@ -845,6 +845,13 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
         1
     );
 
+    let warning_bundle = load_spectra(&fixture_root)?;
+    assert_eq!(
+        warning_bundle.warning_count_for_source(LoadedSourceFilter::path("empty_jcamp/empty.jdx")),
+        1
+    );
+    assert!(warning_bundle.has_warning_for_source(LoadedSourceFilter::vendor("varian")));
+
     let mixed = load_spectra(fixture_root.join("bruker_without_expno"))?;
     assert_eq!(mixed.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
     assert_eq!(

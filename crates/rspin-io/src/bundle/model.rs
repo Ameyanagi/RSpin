@@ -1306,6 +1306,75 @@ impl SpectrumBundle {
             .find(|(_, source)| source.path() == Some(path))
     }
 
+    /// Returns warnings associated with a generic source filter.
+    ///
+    /// Path filters only return warnings for matching tracked paths. Format,
+    /// vendor, and data-kind filters return all warnings conservatively because
+    /// warnings do not carry source-format metadata.
+    pub fn warnings_for_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> impl Iterator<Item = &LoadWarning> + '_ {
+        let filter = filter.into();
+        self.warnings
+            .iter()
+            .filter(move |warning| warning_matches_any(std::slice::from_ref(&filter), warning))
+    }
+
+    /// Returns warnings associated with any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator returns
+    /// all warnings. Path filters only return warnings for matching tracked
+    /// paths. Format, vendor, and data-kind filters return all warnings
+    /// conservatively because warnings do not carry source-format metadata.
+    pub fn warnings_for_sources<I, F>(&self, filters: I) -> impl Iterator<Item = &LoadWarning> + '_
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.warnings
+            .iter()
+            .filter(move |warning| warning_matches_any(&filters, warning))
+    }
+
+    /// Returns the number of non-fatal loader warnings associated with a generic source filter.
+    #[must_use]
+    pub fn warning_count_for_source(&self, filter: impl Into<LoadedSourceFilter>) -> usize {
+        self.warnings_for_source(filter).count()
+    }
+
+    /// Returns the number of non-fatal loader warnings associated with any generic source filter.
+    ///
+    /// Passing an empty iterator counts all warnings.
+    #[must_use]
+    pub fn warning_count_for_sources<I, F>(&self, filters: I) -> usize
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.warnings_for_sources(filters).count()
+    }
+
+    /// Returns true when a non-fatal loader warning is associated with a generic source filter.
+    #[must_use]
+    pub fn has_warning_for_source(&self, filter: impl Into<LoadedSourceFilter>) -> bool {
+        self.warnings_for_source(filter).next().is_some()
+    }
+
+    /// Returns true when a non-fatal loader warning is associated with any generic source filter.
+    ///
+    /// Passing an empty iterator returns true when the bundle contains any
+    /// warning.
+    #[must_use]
+    pub fn has_any_warning_for_sources<I, F>(&self, filters: I) -> bool
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.warnings_for_sources(filters).next().is_some()
+    }
+
     /// Returns warnings associated with a source path.
     pub fn warnings_for_source_path(
         &self,
@@ -1915,7 +1984,7 @@ fn source_matches_any(filters: &[LoadedSourceFilter], source: &LoadedSource) -> 
 }
 
 fn warning_matches_any(filters: &[LoadedSourceFilter], warning: &LoadWarning) -> bool {
-    if filters.iter().any(|filter| !filter.is_path_filter()) {
+    if filters.is_empty() || filters.iter().any(|filter| !filter.is_path_filter()) {
         return true;
     }
 

@@ -2285,6 +2285,29 @@ fn bundle_source_subset_helpers_preserve_relevant_context() -> anyhow::Result<()
         .ok_or_else(|| anyhow::anyhow!("missing retained source warning"))?;
     assert!(warning.message().contains("missing XYDATA values"));
 
+    assert_eq!(
+        bundle.warning_count_for_source(LoadedSourceFilter::path("empty_jcamp/empty.jdx")),
+        1
+    );
+    assert_eq!(
+        bundle.warning_count_for_source(LoadedSourceFilter::path("varian_1h")),
+        0
+    );
+    assert!(bundle.has_warning_for_source(LoadedSourceFilter::path("empty_jcamp/empty.jdx")));
+    assert!(!bundle.has_warning_for_source(LoadedSourceFilter::path("varian_1h")));
+    assert_eq!(
+        bundle.warning_count_for_sources([
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("empty_jcamp/empty.jdx")
+        ]),
+        1
+    );
+    assert_eq!(
+        bundle.warning_count_for_sources(Vec::<LoadedSourceFilter>::new()),
+        bundle.warning_count()
+    );
+    assert!(bundle.has_any_warning_for_sources(Vec::<LoadedSourceFilter>::new()));
+
     let vendor_subset = bundle.source_subset(LoadedSourceFilter::vendor("varian"));
     assert_eq!(vendor_subset.len(), 1);
     assert_eq!(
@@ -2292,6 +2315,12 @@ fn bundle_source_subset_helpers_preserve_relevant_context() -> anyhow::Result<()
         1
     );
     assert_eq!(vendor_subset.warning_count(), 1);
+    assert_eq!(
+        bundle
+            .warnings_for_source(LoadedSourceFilter::vendor("varian"))
+            .count(),
+        bundle.warning_count()
+    );
 
     let all_subset = bundle.source_subset_by_sources(Vec::<LoadedSourceFilter>::new());
     assert_eq!(all_subset, bundle);
