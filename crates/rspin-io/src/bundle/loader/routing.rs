@@ -55,7 +55,9 @@ impl SpectrumBundleLoader {
         }
         for file in &tree.files {
             if is_nmredata_file(file) {
-                self.read_nmredata_candidate(source_root, file, bundle)?;
+                if self.allows_source_path(source_root, file) {
+                    self.read_nmredata_candidate(source_root, file, bundle)?;
+                }
             } else if is_standalone_spectrum_file(file) {
                 self.read_file_candidate(source_root, file, bundle)?;
             }

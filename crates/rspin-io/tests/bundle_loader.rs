@@ -1417,6 +1417,52 @@ fn scans_nmredata_directory_without_requiring_spectra() -> anyhow::Result<()> {
 }
 
 #[test]
+fn nmredata_directory_candidates_respect_source_path_filters() -> anyhow::Result<()> {
+    let root = temp_dir("nmredata-source-path-filter")?;
+    let kept = root.join("kept");
+    let skipped = root.join("skipped");
+    fs::create_dir_all(&kept)?;
+    fs::create_dir_all(&skipped)?;
+    fs::copy(
+        nmredata_fixture_root().join("ethanol.sdf"),
+        kept.join("ethanol.sdf"),
+    )?;
+    fs::write(
+        skipped.join("bad.sdf"),
+        ">  <NMREDATA_VERSION>\ninvalid\n\n$$$$\n",
+    )?;
+
+    let bundle = RSpinReader::new()
+        .source_path("kept/ethanol.sdf")
+        .strict()
+        .read_path(&root)?;
+    assert_eq!(bundle.len(), 0);
+    assert_eq!(bundle.molecule_count(), 1);
+    assert!(bundle.warnings().is_empty());
+    assert_eq!(bundle.molecules()[0].id, "nmredata:kept/ethanol.sdf:1");
+
+    let prefix_bundle = RSpinReader::new()
+        .source_path_prefix("kept")
+        .strict()
+        .read_path(&root)?;
+    assert_eq!(prefix_bundle.molecule_count(), 1);
+    assert!(prefix_bundle.warnings().is_empty());
+
+    let bad_selected = RSpinReader::new()
+        .source_path("skipped/bad.sdf")
+        .strict()
+        .read_path(&root);
+    let Err(error) = bad_selected else {
+        remove_dir(root)?;
+        anyhow::bail!("selected malformed NMReDATA file should fail in strict mode");
+    };
+    assert!(error.to_string().contains("NMReDATA"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn bundle_accessors_count_and_consume_loaded_dimensions() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
 
