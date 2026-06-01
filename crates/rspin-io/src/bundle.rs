@@ -124,7 +124,10 @@ pub use model::{
 };
 pub use path_prefix::{
     load_spectra_by_source_path_prefix, load_spectra_by_source_path_prefix_relative_to,
+    load_spectra_by_source_path_prefixes, load_spectra_by_source_path_prefixes_relative_to,
     load_spectra_many_by_source_path_prefix, load_spectra_many_by_source_path_prefix_relative_to,
+    load_spectra_many_by_source_path_prefixes,
+    load_spectra_many_by_source_path_prefixes_relative_to,
 };
 pub use source_filter::LoadedSourceFilter;
 pub use source_format::{

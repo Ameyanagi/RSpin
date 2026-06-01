@@ -27,6 +27,29 @@ pub fn load_spectra_by_source_path_prefix(
         .read_path(path)
 }
 
+/// Loads supported spectra from a file or directory, restricted to tracked source paths below any prefix.
+///
+/// The source path prefixes are matched against relative paths recorded in the
+/// loaded bundle. Prefixes are combined with logical OR. Passing an empty
+/// iterator leaves source loading unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_path_prefixes<I, P>(
+    path: impl AsRef<Path>,
+    source_path_prefixes: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path_prefixes(source_path_prefixes)
+        .read_path(path)
+}
+
 /// Loads one selected path relative to a base directory, restricted to tracked source paths below a prefix.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -47,6 +70,30 @@ pub fn load_spectra_by_source_path_prefix_relative_to(
         .read_path_relative_to(base, path)
 }
 
+/// Loads one selected path relative to a base directory, restricted to tracked source paths below any prefix.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Prefixes are matched after anchoring source metadata to
+/// `base` and are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_path_prefixes_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    source_path_prefixes: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path_prefixes(source_path_prefixes)
+        .read_path_relative_to(base, path)
+}
+
 /// Loads supported spectra from multiple paths, restricted to tracked source paths below a prefix.
 ///
 /// # Errors
@@ -63,6 +110,30 @@ where
 {
     SpectrumBundleLoader::new()
         .only_source_path_prefix(source_path_prefix)
+        .read_paths(paths)
+}
+
+/// Loads supported spectra from multiple paths, restricted to tracked source paths below any prefix.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source loading unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_path_prefixes<I, P, J, F>(
+    paths: I,
+    source_path_prefixes: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path_prefixes(source_path_prefixes)
         .read_paths(paths)
 }
 
@@ -87,6 +158,32 @@ where
 {
     SpectrumBundleLoader::new()
         .only_source_path_prefix(source_path_prefix)
+        .read_paths_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to tracked source paths below any prefix.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Prefixes are matched after anchoring source metadata to
+/// `base` and are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_path_prefixes_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    source_path_prefixes: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path_prefixes(source_path_prefixes)
         .read_paths_relative_to(base, paths)
 }
 

@@ -616,6 +616,27 @@ fn prelude_exports_source_path_prefix_loader_helpers() -> Result<()> {
     )?;
     assert_eq!(multi_prefix_path.len(), 1);
     assert_eq!(multi_prefix_path.only_1d()?.x.unit, Unit::Ppm);
+
+    let prefix_paths = load_spectra_by_source_path_prefixes(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno/pdata"],
+    )?;
+    assert_eq!(prefix_paths.len(), 2);
+    assert_eq!(
+        prefix_paths.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        prefix_paths.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let multi_prefix_paths = load_spectra_many_by_source_path_prefixes_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+        ["varian_1h", "bruker_without_expno/pdata"],
+    )?;
+    assert_eq!(multi_prefix_paths.len(), 2);
     Ok(())
 }
 
