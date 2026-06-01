@@ -239,6 +239,61 @@ pub fn load_spectra_strict_relative_to(
         .read_path_relative_to(base, path)
 }
 
+/// Loads all supported spectrum bundle data and returns only summary counts.
+///
+/// This follows the same loading, warning, and error behavior as
+/// [`load_spectra`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra`] would return an error.
+pub fn load_spectra_summary(path: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+    SpectrumBundleLoader::new().read_summary_path(path)
+}
+
+/// Loads all supported spectrum bundle data in strict mode and returns only summary counts.
+///
+/// This follows the same loading and error behavior as [`load_spectra_strict`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_strict`] would return an error.
+pub fn load_spectra_summary_strict(path: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+    SpectrumBundleLoader::new().strict().read_summary_path(path)
+}
+
+/// Loads one selected path relative to a base directory and returns only summary counts.
+///
+/// This follows the same loading, warning, and error behavior as
+/// [`load_spectra_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_relative_to`] would return an error.
+pub fn load_spectra_summary_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundleSummary> {
+    SpectrumBundleLoader::new().read_summary_path_relative_to(base, path)
+}
+
+/// Loads one selected path in strict mode relative to a base directory and returns summary counts.
+///
+/// This follows the same loading and error behavior as
+/// [`load_spectra_strict_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_strict_relative_to`] would return an error.
+pub fn load_spectra_summary_strict_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<SpectrumBundleSummary> {
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_summary_path_relative_to(base, path)
+}
+
 /// Discovers source candidates below a file or directory without loading full spectra.
 ///
 /// Empty results are allowed so callers can preflight picker selections before
@@ -796,6 +851,79 @@ where
     SpectrumBundleLoader::new()
         .strict()
         .read_paths_relative_to(base, paths)
+}
+
+/// Loads supported spectra from multiple paths and returns only summary counts.
+///
+/// This follows the same loading, warning, and error behavior as
+/// [`load_spectra_many`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_many`] would return an error.
+pub fn load_spectra_many_summary<I, P>(paths: I) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_summary_paths(paths)
+}
+
+/// Loads supported spectra from multiple paths in strict mode and returns only summary counts.
+///
+/// This follows the same loading and error behavior as [`load_spectra_many_strict`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_many_strict`] would return an error.
+pub fn load_spectra_many_summary_strict<I, P>(paths: I) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_summary_paths(paths)
+}
+
+/// Loads selected paths relative to a base directory and returns only summary counts.
+///
+/// This follows the same loading, warning, and error behavior as
+/// [`load_spectra_many_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_many_relative_to`] would return an error.
+pub fn load_spectra_many_summary_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_summary_paths_relative_to(base, paths)
+}
+
+/// Loads selected paths in strict mode relative to a base directory and returns summary counts.
+///
+/// This follows the same loading and error behavior as
+/// [`load_spectra_many_strict_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when [`load_spectra_many_strict_relative_to`] would return an error.
+pub fn load_spectra_many_summary_strict_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_summary_paths_relative_to(base, paths)
 }
 
 /// Discovers source candidates below multiple file or directory paths.

@@ -32,10 +32,14 @@ use rspin_io::{
     load_spectra_many_by_source_vendors, load_spectra_many_by_source_vendors_relative_to,
     load_spectra_many_by_sources, load_spectra_many_by_sources_relative_to,
     load_spectra_many_relative_to, load_spectra_many_strict, load_spectra_many_strict_relative_to,
+    load_spectra_many_summary, load_spectra_many_summary_relative_to,
+    load_spectra_many_summary_strict, load_spectra_many_summary_strict_relative_to,
     load_spectra_relative_to, load_spectra_strict, load_spectra_strict_relative_to,
-    load_spectrum_1d, load_spectrum_1d_many, load_spectrum_1d_many_relative_to,
-    load_spectrum_1d_many_with_source, load_spectrum_1d_many_with_source_relative_to,
-    load_spectrum_1d_paths, load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
+    load_spectra_summary, load_spectra_summary_relative_to, load_spectra_summary_strict,
+    load_spectra_summary_strict_relative_to, load_spectrum_1d, load_spectrum_1d_many,
+    load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
+    load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
+    load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
     load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
     load_spectrum_1d_with_source, load_spectrum_1d_with_source_relative_to, load_spectrum_2d,
     load_spectrum_2d_many, load_spectrum_2d_many_relative_to, load_spectrum_2d_many_with_source,
@@ -1005,6 +1009,89 @@ fn free_strict_bundle_loader_helpers_abort_on_bad_candidates() -> anyhow::Result
     let bad_file = load_spectra_strict(base.join("empty_jcamp/empty.jdx"));
     let Err(error) = bad_file else {
         anyhow::bail!("strict loading should reject malformed candidates");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
+fn bundle_summary_loader_methods_cover_common_paths() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let reader = RSpinReader::new();
+
+    let direct = reader.read_summary_path(base.join("varian_1h"))?;
+    assert_eq!(direct.spectra(), 1);
+    assert_eq!(direct.spectra_1d(), 1);
+    assert_eq!(
+        direct.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let alias = reader.read_summary(base.join("varian_1h"))?;
+    assert_eq!(alias, direct);
+
+    let relative = reader.read_summary_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(relative.spectra(), 2);
+    assert_eq!(
+        relative.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert_eq!(
+        relative.source_path_count("bruker_without_expno/pdata/1"),
+        1
+    );
+
+    let many =
+        reader.read_summary_many([base.join("varian_1h"), base.join("bruker_without_expno")])?;
+    assert_eq!(many.spectra(), 3);
+    assert_eq!(many.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let many_relative =
+        reader.read_summary_many_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+    assert_eq!(many_relative.spectra(), 3);
+    assert_eq!(
+        many_relative.source_path_count("bruker_without_expno/pdata/1"),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn free_bundle_summary_helpers_share_loader_behavior() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    assert_eq!(load_spectra_summary(base.join("varian_1h"))?.spectra(), 1);
+    assert_eq!(
+        load_spectra_summary_relative_to(&base, "bruker_without_expno")?.spectra(),
+        2
+    );
+    assert_eq!(
+        load_spectra_many_summary([base.join("varian_1h"), base.join("bruker_without_expno")])?
+            .spectra(),
+        3
+    );
+    assert_eq!(
+        load_spectra_many_summary_relative_to(&base, ["varian_1h", "bruker_without_expno"])?
+            .spectra(),
+        3
+    );
+
+    assert_eq!(
+        load_spectra_summary_strict_relative_to(&base, "varian_1h")?.spectra(),
+        1
+    );
+    assert_eq!(
+        load_spectra_many_summary_strict_relative_to(&base, ["varian_1h"])?.spectra(),
+        1
+    );
+    assert_eq!(
+        load_spectra_many_summary_strict([base.join("varian_1h")])?.spectra(),
+        1
+    );
+
+    let malformed = load_spectra_summary_strict(base.join("empty_jcamp/empty.jdx"));
+    let Err(error) = malformed else {
+        anyhow::bail!("strict summary loading should reject malformed candidates");
     };
     assert!(error.to_string().contains("missing XYDATA values"));
     Ok(())

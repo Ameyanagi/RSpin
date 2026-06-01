@@ -493,6 +493,35 @@ fn prelude_exports_strict_bundle_loader_helpers() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_bundle_summary_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let summary = load_spectra_summary_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(summary.spectra(), 1);
+    assert_eq!(
+        summary.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let many = load_spectra_many_summary_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+    )?;
+    assert_eq!(many.spectra(), 3);
+    assert_eq!(many.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let strict = load_spectra_many_summary_strict_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(strict.spectra_1d(), 1);
+
+    let raw = RSpinReader::new()
+        .raw_sources()
+        .read_summary_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(raw.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
+    Ok(())
+}
+
 fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
     assert_eq!(bundle.source_paths().count(), 3);
     assert_eq!(

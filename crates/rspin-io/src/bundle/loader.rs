@@ -12,9 +12,9 @@ use crate::SpectrumPathReader;
 use super::source_filter::source_filters;
 use super::{
     LoadedSourceDataKind, LoadedSourceDataKindInfo, LoadedSourceFilter, LoadedSourceFormatInfo,
-    LoadedSourceVendorInfo, SpectrumBundle, canonical_source_format_filter, no_data_error_at,
-    no_data_error_in_inputs, selected_path_from_base, source_format_filters, source_vendor_filters,
-    supported_bundle_source_data_kinds, supported_bundle_source_formats,
+    LoadedSourceVendorInfo, SpectrumBundle, SpectrumBundleSummary, canonical_source_format_filter,
+    no_data_error_at, no_data_error_in_inputs, selected_path_from_base, source_format_filters,
+    source_vendor_filters, supported_bundle_source_data_kinds, supported_bundle_source_formats,
     supported_bundle_source_vendors,
 };
 pub use discovery::{
@@ -601,6 +601,29 @@ impl SpectrumBundleLoader {
         self.read_path(path)
     }
 
+    /// Loads a file or directory path and returns only bundle summary counts.
+    ///
+    /// This follows the same loading, filtering, strict-mode, and warning
+    /// behavior as [`Self::read_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_path`] would return an error.
+    pub fn read_summary_path(&self, path: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.read_path(path).map(|bundle| bundle.summary())
+    }
+
+    /// Loads a file or directory path and returns only bundle summary counts.
+    ///
+    /// This is a short alias for [`Self::read_summary_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_summary_path`] would return an error.
+    pub fn read_summary(&self, path: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.read_summary_path(path)
+    }
+
     /// Loads one selected file or directory path while anchoring source paths to a base directory.
     ///
     /// Relative input paths are resolved below `base`. Absolute input paths are
@@ -633,6 +656,38 @@ impl SpectrumBundleLoader {
         path: impl AsRef<Path>,
     ) -> Result<SpectrumBundle> {
         self.read_path_relative_to(base, path)
+    }
+
+    /// Loads one selected path relative to a base directory and returns summary counts.
+    ///
+    /// This follows the same loading, filtering, strict-mode, and warning
+    /// behavior as [`Self::read_path_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_path_relative_to`] would return an error.
+    pub fn read_summary_path_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary> {
+        self.read_path_relative_to(base, path)
+            .map(|bundle| bundle.summary())
+    }
+
+    /// Loads one selected path relative to a base directory and returns summary counts.
+    ///
+    /// This is a short alias for [`Self::read_summary_path_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_summary_path_relative_to`] would return an error.
+    pub fn read_summary_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary> {
+        self.read_summary_path_relative_to(base, path)
     }
 
     /// Loads supported spectra from multiple file or directory paths.
@@ -713,6 +768,37 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.read_paths(paths)
+    }
+
+    /// Loads multiple file or directory paths and returns only bundle summary counts.
+    ///
+    /// This follows the same loading, filtering, strict-mode, and warning
+    /// behavior as [`Self::read_paths`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_paths`] would return an error.
+    pub fn read_summary_paths<I, P>(&self, paths: I) -> Result<SpectrumBundleSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths(paths).map(|bundle| bundle.summary())
+    }
+
+    /// Loads multiple file or directory paths and returns only bundle summary counts.
+    ///
+    /// This is a short alias for [`Self::read_summary_paths`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_summary_paths`] would return an error.
+    pub fn read_summary_many<I, P>(&self, paths: I) -> Result<SpectrumBundleSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_summary_paths(paths)
     }
 
     /// Loads selected paths while anchoring source paths to a common base directory.
@@ -818,6 +904,46 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.read_paths_relative_to(base, paths)
+    }
+
+    /// Loads selected paths relative to a base directory and returns summary counts.
+    ///
+    /// This follows the same loading, filtering, strict-mode, and warning
+    /// behavior as [`Self::read_paths_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_paths_relative_to`] would return an error.
+    pub fn read_summary_paths_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<SpectrumBundleSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths_relative_to(base, paths)
+            .map(|bundle| bundle.summary())
+    }
+
+    /// Loads selected paths relative to a base directory and returns summary counts.
+    ///
+    /// This is a short alias for [`Self::read_summary_paths_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when [`Self::read_summary_paths_relative_to`] would return an error.
+    pub fn read_summary_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<SpectrumBundleSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_summary_paths_relative_to(base, paths)
     }
 }
 
