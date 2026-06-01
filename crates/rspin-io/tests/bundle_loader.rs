@@ -1391,6 +1391,57 @@ fn bundle_source_vendor_helpers_group_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    assert_eq!(bundle.source_count(LoadedSourceFilter::format("jdx")), 2);
+    assert_eq!(bundle.source_count(LoadedSourceFilter::vendor("bruker")), 2);
+    assert_eq!(bundle.source_count(LoadedSourceFilter::path(hsqc_path)), 1);
+    assert!(bundle.has_source(LoadedSourceFilter::path(carbon_path)));
+    assert!(!bundle.has_source(LoadedSourceFilter::path("missing.jdx")));
+
+    let jcamp = bundle
+        .loaded_by_source(LoadedSourceFilter::format(LoadedSourceFormat::JcampDx))
+        .collect::<Vec<_>>();
+    assert_eq!(jcamp.len(), 2);
+    assert!(jcamp.iter().all(|entry| entry.is_1d()));
+
+    let bruker_1d = bundle
+        .loaded_1d_by_source(LoadedSourceFilter::from(LoadedSourceVendor::Bruker))
+        .collect::<Vec<_>>();
+    assert_eq!(bruker_1d.len(), 1);
+    assert_eq!(bruker_1d[0].0.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(bruker_1d[0].1.format(), "bruker_fid");
+
+    let hsqc = bundle
+        .loaded_2d_by_source(LoadedSourceFilter::path(hsqc_path))
+        .collect::<Vec<_>>();
+    assert_eq!(hsqc.len(), 1);
+    assert_eq!(hsqc[0].0.shape(), (1024, 32));
+    assert_eq!(hsqc[0].1.path(), Some(hsqc_path));
+
+    assert_eq!(
+        bundle
+            .source_paths_for_source(LoadedSourceFilter::vendor("jeol"))
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("jeol/myrcene_13c_400mhz.jdf"),
+            Path::new("jeol/myrcene_1h_400mhz.jdf"),
+            Path::new("jeol/myrcene_hsqc_400mhz.jdf")
+        ]
+    );
+    assert!(
+        bundle
+            .loaded_by_source(LoadedSourceFilter::vendor("unknown-vendor"))
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    Ok(())
+}
+
+#[test]
 fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
     let jcamp = RSpinReader::new()
         .only_source_format(LoadedSourceFormat::JcampDx)

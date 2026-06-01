@@ -6,9 +6,9 @@ use rspin_core::{Molecule, RSpinError, Result, Spectrum1D, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    LoadedSourceFormat, LoadedSourceVendor, only_error_from_counts, push_source_vendor_count,
-    source_format_count_name, source_format_matches, source_vendor_counts_from_format_counts,
-    spectrum_dimension_counts,
+    LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, only_error_from_counts,
+    push_source_vendor_count, source_format_count_name, source_format_matches,
+    source_vendor_counts_from_format_counts, spectrum_dimension_counts,
 };
 
 /// Source metadata for a loaded spectrum.
@@ -601,6 +601,71 @@ impl SpectrumBundle {
                 None => false,
             })
             .filter_map(LoadedSource::path)
+    }
+
+    /// Returns loaded spectra matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path.
+    pub fn loaded_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> impl Iterator<Item = &LoadedSpectrum> + '_ {
+        let filter = filter.into();
+        self.spectra
+            .iter()
+            .filter(move |entry| filter.matches_source(entry.source()))
+    }
+
+    /// Returns one-dimensional spectra and sources matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path.
+    pub fn loaded_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_ {
+        let filter = filter.into();
+        self.loaded_1d()
+            .filter(move |(_, source)| filter.matches_source(source))
+    }
+
+    /// Returns two-dimensional spectra and sources matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path.
+    pub fn loaded_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_ {
+        let filter = filter.into();
+        self.loaded_2d()
+            .filter(move |(_, source)| filter.matches_source(source))
+    }
+
+    /// Returns tracked source paths for spectra matching a generic source filter.
+    ///
+    /// Spectra loaded while source path tracking is disabled are skipped.
+    pub fn source_paths_for_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> impl Iterator<Item = &Path> + '_ {
+        let filter = filter.into();
+        self.loaded_sources()
+            .filter(move |source| filter.matches_source(source))
+            .filter_map(LoadedSource::path)
+    }
+
+    /// Returns the number of loaded spectra matching a generic source filter.
+    #[must_use]
+    pub fn source_count(&self, filter: impl Into<LoadedSourceFilter>) -> usize {
+        self.loaded_by_source(filter).count()
+    }
+
+    /// Returns true when a loaded spectrum matches a generic source filter.
+    #[must_use]
+    pub fn has_source(&self, filter: impl Into<LoadedSourceFilter>) -> bool {
+        self.loaded_by_source(filter).next().is_some()
     }
 
     /// Returns a loaded spectrum by its source path, if present.

@@ -140,6 +140,9 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
             .map_or_else(|| "<memory>".to_owned(), |path| path.display().to_string());
         println!("{label} has {} points", spectrum.len());
     }
+    for path in bundle.source_paths_for_source(LoadedSourceFilter::vendor("bruker")) {
+        println!("Bruker source: {}", path.display());
+    }
     Ok(bundle.into_spectra_1d())
 }
 

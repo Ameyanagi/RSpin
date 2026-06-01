@@ -439,6 +439,22 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
         generic_sources.source_format_count(LoadedSourceFormat::BrukerProcessed),
         1
     );
+    assert_eq!(
+        generic_sources.source_count(LoadedSourceFilter::vendor("varian")),
+        1
+    );
+    assert_eq!(
+        generic_sources
+            .loaded_1d_by_source(LoadedSourceFilter::path("bruker_without_expno/pdata/1"))
+            .count(),
+        1
+    );
+    assert_eq!(
+        generic_sources
+            .source_paths_for_source(LoadedSourceFilter::vendor("bruker"))
+            .collect::<Vec<_>>(),
+        vec![std::path::Path::new("bruker_without_expno/pdata/1")]
+    );
 
     let source_format = load_spectra_by_source_format(&fixture_root, "varian fid")?;
     assert_eq!(source_format.len(), 1);
