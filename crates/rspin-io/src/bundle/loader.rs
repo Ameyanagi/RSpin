@@ -26,6 +26,8 @@ pub struct SpectrumBundleLoader {
     source_paths: Toggle,
     source_formats: Vec<String>,
     source_path_filters: Vec<PathBuf>,
+    source_path_prefix_filters: Vec<PathBuf>,
+    source_data_kind_filters: Vec<LoadedSourceDataKind>,
     source_filters: Vec<LoadedSourceFilter>,
 }
 
@@ -194,7 +196,7 @@ impl SpectrumBundleLoader {
     /// data, or open/custom data without matching specific vendor formats.
     #[must_use]
     pub fn only_source_data_kind(self, data_kind: LoadedSourceDataKind) -> Self {
-        self.only_source(LoadedSourceFilter::data_kind(data_kind))
+        self.only_source_data_kinds([data_kind])
     }
 
     /// Restricts loading to spectra with one raw/processed source data kind.
@@ -209,11 +211,12 @@ impl SpectrumBundleLoader {
     ///
     /// Passing an empty iterator leaves source loading unrestricted.
     #[must_use]
-    pub fn only_source_data_kinds<I>(self, data_kinds: I) -> Self
+    pub fn only_source_data_kinds<I>(mut self, data_kinds: I) -> Self
     where
         I: IntoIterator<Item = LoadedSourceDataKind>,
     {
-        self.only_sources(data_kinds.into_iter().map(LoadedSourceFilter::data_kind))
+        self.source_data_kind_filters = source_data_kind_filters(data_kinds);
+        self
     }
 
     /// Restricts loading to spectra with any raw/processed source data kinds.
@@ -323,13 +326,9 @@ impl SpectrumBundleLoader {
         match filter.into() {
             LoadedSourceFilter::Format { format } => self.only_source_format(format),
             LoadedSourceFilter::Vendor { vendor } => self.only_source_vendor(vendor),
-            LoadedSourceFilter::DataKind { data_kind } => {
-                self.only_sources([LoadedSourceFilter::data_kind(data_kind)])
-            }
+            LoadedSourceFilter::DataKind { data_kind } => self.only_source_data_kind(data_kind),
             LoadedSourceFilter::Path { path } => self.only_source_path(path),
-            LoadedSourceFilter::PathPrefix { path } => {
-                self.only_sources([LoadedSourceFilter::path_prefix(path)])
-            }
+            LoadedSourceFilter::PathPrefix { path } => self.only_source_path_prefix(path),
         }
     }
 
@@ -356,6 +355,8 @@ impl SpectrumBundleLoader {
         self.source_filters = source_filters(filters);
         self.source_formats.clear();
         self.source_path_filters.clear();
+        self.source_path_prefix_filters.clear();
+        self.source_data_kind_filters.clear();
         self
     }
 
@@ -377,8 +378,9 @@ impl SpectrumBundleLoader {
     /// base directory. Exact path matching remains available with
     /// [`Self::only_source_path`].
     #[must_use]
-    pub fn only_source_path_prefix(self, path: impl AsRef<Path>) -> Self {
-        self.only_source(LoadedSourceFilter::path_prefix(path))
+    pub fn only_source_path_prefix(mut self, path: impl AsRef<Path>) -> Self {
+        self.source_path_prefix_filters = vec![path.as_ref().to_path_buf()];
+        self
     }
 
     /// Restricts loading to spectra whose tracked source path starts with a prefix.
@@ -393,16 +395,13 @@ impl SpectrumBundleLoader {
     ///
     /// Passing an empty iterator leaves source loading unrestricted.
     #[must_use]
-    pub fn only_source_path_prefixes<I, P>(self, paths: I) -> Self
+    pub fn only_source_path_prefixes<I, P>(mut self, paths: I) -> Self
     where
         I: IntoIterator<Item = P>,
         P: AsRef<Path>,
     {
-        self.only_sources(
-            paths
-                .into_iter()
-                .map(|path| LoadedSourceFilter::path_prefix(path)),
-        )
+        self.source_path_prefix_filters = source_path_filters(paths);
+        self
     }
 
     /// Restricts loading to spectra whose tracked source path starts with any prefix.
@@ -422,6 +421,8 @@ impl SpectrumBundleLoader {
     pub fn all_sources(mut self) -> Self {
         self.source_formats.clear();
         self.source_path_filters.clear();
+        self.source_path_prefix_filters.clear();
+        self.source_data_kind_filters.clear();
         self.source_filters.clear();
         self
     }
@@ -430,6 +431,12 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn all_source_formats(mut self) -> Self {
         self.source_formats.clear();
+        self.source_filters.retain(|filter| {
+            !matches!(
+                filter,
+                LoadedSourceFilter::Format { .. } | LoadedSourceFilter::Vendor { .. }
+            )
+        });
         self
     }
 
@@ -437,6 +444,7 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn all_source_paths(mut self) -> Self {
         self.source_path_filters.clear();
+        self.source_path_prefix_filters.clear();
         self.source_filters.retain(|filter| {
             !matches!(
                 filter,
@@ -453,6 +461,7 @@ impl SpectrumBundleLoader {
     /// source-vendor, and source-path restrictions unchanged.
     #[must_use]
     pub fn all_source_data_kinds(mut self) -> Self {
+        self.source_data_kind_filters.clear();
         self.source_filters
             .retain(|filter| !matches!(filter, LoadedSourceFilter::DataKind { .. }));
         self
@@ -768,6 +777,8 @@ impl Default for SpectrumBundleLoader {
             source_paths: Toggle::Enabled,
             source_formats: Vec::new(),
             source_path_filters: Vec::new(),
+            source_path_prefix_filters: Vec::new(),
+            source_data_kind_filters: Vec::new(),
             source_filters: Vec::new(),
         }
     }
@@ -791,6 +802,19 @@ where
         let path = path.as_ref().to_path_buf();
         if !filters.iter().any(|existing| existing == &path) {
             filters.push(path);
+        }
+    }
+    filters
+}
+
+fn source_data_kind_filters<I>(data_kinds: I) -> Vec<LoadedSourceDataKind>
+where
+    I: IntoIterator<Item = LoadedSourceDataKind>,
+{
+    let mut filters = Vec::new();
+    for data_kind in data_kinds {
+        if !filters.iter().any(|existing| existing == &data_kind) {
+            filters.push(data_kind);
         }
     }
     filters

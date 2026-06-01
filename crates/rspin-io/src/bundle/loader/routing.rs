@@ -14,15 +14,15 @@ use crate::{
 
 use super::{FileCandidateKind, SpectrumBundleLoader};
 use crate::bundle::{
-    LoadWarning, LoadedSource, LoadedSpectrum, SpectrumBundle, clear_bundle_source_paths,
-    collect_tree, disabled_candidate_message, disabled_dimension_error, disabled_dimension_message,
-    fallback_message, file_candidate_kind, format_from_file, is_agilent_arrayed_1d_fid_path,
-    is_agilent_arrayed_2d_fid_path, is_agilent_fid_dir, is_agilent_format,
-    is_agilent_processed_dir, is_bruker_fid_dir, is_bruker_processed_1d_dir,
-    is_bruker_processed_2d_dir, is_bruker_ser_dir, is_json_file, is_nmredata_file,
-    is_standalone_spectrum_file, nmredata_record_molecule, prefix_bundle_source_paths,
-    relative_source_path, selected_path_candidate_kind, source_format_1d, source_format_2d,
-    source_format_candidate_kind, source_format_matches,
+    LoadWarning, LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSpectrum,
+    SpectrumBundle, clear_bundle_source_paths, collect_tree, disabled_candidate_message,
+    disabled_dimension_error, disabled_dimension_message, fallback_message, file_candidate_kind,
+    format_from_file, is_agilent_arrayed_1d_fid_path, is_agilent_arrayed_2d_fid_path,
+    is_agilent_fid_dir, is_agilent_format, is_agilent_processed_dir, is_bruker_fid_dir,
+    is_bruker_processed_1d_dir, is_bruker_processed_2d_dir, is_bruker_ser_dir, is_json_file,
+    is_nmredata_file, is_standalone_spectrum_file, nmredata_record_molecule,
+    prefix_bundle_source_paths, relative_source_path, selected_path_candidate_kind,
+    source_format_1d, source_format_2d, source_format_candidate_kind, source_format_matches,
 };
 
 impl SpectrumBundleLoader {
@@ -679,22 +679,38 @@ impl SpectrumBundleLoader {
     }
 
     fn filter_bundle_source_paths(&self, bundle: &mut SpectrumBundle) {
-        if self.source_path_filters.is_empty() {
+        if self.source_path_filters.is_empty() && self.source_path_prefix_filters.is_empty() {
             return;
         }
 
         bundle.spectra.retain(|entry| {
             entry.source().path().is_some_and(|path| {
-                self.source_path_filters
-                    .iter()
-                    .any(|allowed| allowed.as_path() == path)
+                self.source_path_filters.is_empty()
+                    || self
+                        .source_path_filters
+                        .iter()
+                        .any(|allowed| allowed.as_path() == path)
+            }) && entry.source().path().is_some_and(|path| {
+                self.source_path_prefix_filters.is_empty()
+                    || self
+                        .source_path_prefix_filters
+                        .iter()
+                        .any(|allowed| path.starts_with(allowed))
             })
         });
         bundle.warnings.retain(|warning| {
             warning.path().is_some_and(|path| {
-                self.source_path_filters
-                    .iter()
-                    .any(|allowed| allowed.as_path() == path)
+                self.source_path_filters.is_empty()
+                    || self
+                        .source_path_filters
+                        .iter()
+                        .any(|allowed| allowed.as_path() == path)
+            }) && warning.path().is_some_and(|path| {
+                self.source_path_prefix_filters.is_empty()
+                    || self
+                        .source_path_prefix_filters
+                        .iter()
+                        .any(|allowed| path.starts_with(allowed))
             })
         });
     }
@@ -791,6 +807,7 @@ impl SpectrumBundleLoader {
 
     fn allows_source(&self, root: &Path, path: &Path, format: &str) -> bool {
         self.allows_source_format(format)
+            && self.allows_source_candidate_kind(format)
             && self.allows_source_path(root, path)
             && self.allows_source_filter(root, path, format)
     }
@@ -810,15 +827,24 @@ impl SpectrumBundleLoader {
     }
 
     fn allows_source_candidate_kind(&self, format: &str) -> bool {
-        match source_format_candidate_kind(format) {
+        let allowed_by_toggle = match source_format_candidate_kind(format) {
             FileCandidateKind::Raw => self.raw.is_enabled(),
             FileCandidateKind::Processed => self.processed.is_enabled(),
             FileCandidateKind::Other => true,
-        }
+        };
+        let allowed_by_data_kind = self.source_data_kind_filters.is_empty()
+            || self
+                .source_data_kind_filters
+                .iter()
+                .any(|allowed| *allowed == source_data_kind_for_format(format));
+        allowed_by_toggle && allowed_by_data_kind
     }
 
     fn allows_source_path(&self, root: &Path, path: &Path) -> bool {
-        if self.source_path_filters.is_empty() && self.source_filters.is_empty() {
+        if self.source_path_filters.is_empty()
+            && self.source_path_prefix_filters.is_empty()
+            && self.source_filters.is_empty()
+        {
             return true;
         }
 
@@ -828,12 +854,17 @@ impl SpectrumBundleLoader {
                     .source_path_filters
                     .iter()
                     .any(|allowed| allowed == &source_path);
+            let allowed_by_path_prefixes = self.source_path_prefix_filters.is_empty()
+                || self
+                    .source_path_prefix_filters
+                    .iter()
+                    .any(|allowed| source_path.starts_with(allowed));
             let allowed_by_generic_filters = self.source_filters.is_empty()
                 || self
                     .source_filters
                     .iter()
                     .any(|filter| filter.may_match_path(&source_path));
-            allowed_by_named_paths && allowed_by_generic_filters
+            allowed_by_named_paths && allowed_by_path_prefixes && allowed_by_generic_filters
         })
     }
 
@@ -848,14 +879,21 @@ impl SpectrumBundleLoader {
     }
 
     fn allows_or_may_contain_source_path(&self, root: &Path, path: &Path) -> bool {
-        if self.source_path_filters.is_empty() || root == path {
+        if (self.source_path_filters.is_empty() && self.source_path_prefix_filters.is_empty())
+            || root == path
+        {
             return true;
         }
 
         relative_source_path(root, path).is_some_and(|container_path| {
-            self.source_path_filters.iter().any(|allowed| {
+            let may_contain_exact_path = self.source_path_filters.iter().any(|allowed| {
                 allowed == &container_path || allowed.starts_with(container_path.as_path())
-            })
+            });
+            let may_contain_path_prefix = self.source_path_prefix_filters.iter().any(|allowed| {
+                allowed.starts_with(container_path.as_path())
+                    || container_path.starts_with(allowed.as_path())
+            });
+            may_contain_exact_path || may_contain_path_prefix
         })
     }
 
@@ -885,4 +923,9 @@ impl SpectrumBundleLoader {
         }
         relative_source_path(root, path)
     }
+}
+
+fn source_data_kind_for_format(format: &str) -> LoadedSourceDataKind {
+    LoadedSourceFormat::parse(format)
+        .map_or(LoadedSourceDataKind::Other, LoadedSourceFormat::data_kind)
 }

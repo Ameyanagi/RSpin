@@ -378,6 +378,73 @@ fn reader_source_path_prefix_aliases_cover_directory_filters() -> anyhow::Result
 }
 
 #[test]
+fn reader_typed_source_filters_compose_in_chains() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let raw_bruker = RSpinReader::new()
+        .source_vendor("bruker")
+        .raw_sources()
+        .read(&base)?;
+    assert_eq!(raw_bruker.len(), 1);
+    assert_eq!(
+        raw_bruker.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert_eq!(
+        raw_bruker.source_format_count(LoadedSourceFormat::AgilentFid),
+        0
+    );
+    assert!(has_source_path(
+        &raw_bruker,
+        Path::new("bruker_without_expno")
+    ));
+
+    let raw_bruker_prefix = RSpinReader::new()
+        .source_path_prefix("bruker_without_expno")
+        .raw_sources()
+        .read(&base)?;
+    assert_eq!(raw_bruker_prefix.len(), 1);
+    assert!(has_source_path(
+        &raw_bruker_prefix,
+        Path::new("bruker_without_expno")
+    ));
+    assert_eq!(
+        raw_bruker_prefix.source_format_count(LoadedSourceFormat::AgilentFid),
+        0
+    );
+
+    let cleared_kind = RSpinReader::new()
+        .source_vendor("bruker")
+        .raw_sources()
+        .all_source_data_kinds()
+        .read(&base)?;
+    assert_eq!(cleared_kind.len(), 2);
+    assert_eq!(
+        cleared_kind.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        cleared_kind.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        0
+    );
+
+    let cleared_generic_format = RSpinReader::new()
+        .source(LoadedSourceFilter::vendor("bruker"))
+        .all_source_formats()
+        .read(&base)?;
+    assert_eq!(cleared_generic_format.len(), 3);
+    assert_eq!(
+        cleared_generic_format.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        cleared_generic_format.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 
