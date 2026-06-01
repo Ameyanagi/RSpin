@@ -1612,6 +1612,63 @@ fn bundle_generic_source_helpers_consume_many_filtered_entries() -> anyhow::Resu
 }
 
 #[test]
+fn bundle_source_subset_helpers_preserve_relevant_context() -> anyhow::Result<()> {
+    let bundle = RSpinReader::new().read_path(fixture_root())?;
+    assert_eq!(bundle.len(), 3);
+    assert_eq!(bundle.warning_count(), 1);
+
+    let varian_path = bundle.source_subset(LoadedSourceFilter::path("varian_1h"));
+    assert_eq!(varian_path.len(), 1);
+    assert_eq!(varian_path.warning_count(), 0);
+    assert_eq!(
+        varian_path.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let warning_only = bundle.source_subset(LoadedSourceFilter::path("empty_jcamp/empty.jdx"));
+    assert_eq!(warning_only.len(), 0);
+    assert_eq!(warning_only.warning_count(), 1);
+    let warning = warning_only
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing retained source warning"))?;
+    assert!(warning.message().contains("missing XYDATA values"));
+
+    let vendor_subset = bundle.source_subset(LoadedSourceFilter::vendor("varian"));
+    assert_eq!(vendor_subset.len(), 1);
+    assert_eq!(
+        vendor_subset.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(vendor_subset.warning_count(), 1);
+
+    let all_subset = bundle.source_subset_by_sources(Vec::<LoadedSourceFilter>::new());
+    assert_eq!(all_subset, bundle);
+
+    let mixed = load_spectra(nmrxiv_fixture_root())?;
+    let jcamp_and_bruker = mixed.clone().into_source_subset_by_sources([
+        LoadedSourceFilter::format("jdx"),
+        LoadedSourceFilter::vendor("bruker"),
+    ]);
+    assert_eq!(jcamp_and_bruker.len(), 4);
+    assert_eq!(
+        jcamp_and_bruker.source_count_by_sources([
+            LoadedSourceFilter::format("jdx"),
+            LoadedSourceFilter::vendor("bruker")
+        ]),
+        4
+    );
+    assert_eq!(mixed.len(), 7);
+
+    let molecule_subset =
+        load_spectra(nmredata_fixture_root())?.source_subset(LoadedSourceFilter::vendor("bruker"));
+    assert_eq!(molecule_subset.len(), 0);
+    assert_eq!(molecule_subset.molecule_count(), 1);
+    assert!(!molecule_subset.is_empty());
+    Ok(())
+}
+
+#[test]
 fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
     let jcamp = RSpinReader::new()
         .only_source_format(LoadedSourceFormat::JcampDx)

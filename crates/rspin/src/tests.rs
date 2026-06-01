@@ -565,6 +565,37 @@ fn prelude_exports_owned_source_filtered_bundle_extractors() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_subset_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let bundle =
+        load_spectra_many_relative_to(&fixture_root, ["varian_1h", "bruker_without_expno"])?;
+    let subset = bundle.source_subset_by_sources([
+        LoadedSourceFilter::vendor("varian"),
+        LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+    ]);
+
+    assert_eq!(subset.len(), 2);
+    assert_eq!(
+        subset.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        subset.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let consumed = subset.into_source_subset(LoadedSourceFilter::vendor("bruker"));
+    assert_eq!(consumed.len(), 1);
+    assert_eq!(
+        consumed.source_paths().collect::<Vec<_>>(),
+        vec![std::path::Path::new("bruker_without_expno/pdata/1")]
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

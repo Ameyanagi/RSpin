@@ -447,6 +447,32 @@ impl SpectrumBundle {
         &self.warnings
     }
 
+    /// Returns a cloned bundle containing spectra that match one generic source filter.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained when they
+    /// match a path filter; format and vendor filters keep warnings
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn source_subset(&self, filter: impl Into<LoadedSourceFilter>) -> Self {
+        self.source_subset_by_sources([filter.into()])
+    }
+
+    /// Returns a cloned bundle containing spectra that match any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator returns
+    /// a full clone. Molecule metadata is preserved. Loader warnings are
+    /// retained when they match path-only filters; format and vendor filters
+    /// keep warnings conservatively because warnings do not carry source-format
+    /// metadata.
+    #[must_use]
+    pub fn source_subset_by_sources<I, F>(&self, filters: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.clone().into_source_subset_by_sources(filters)
+    }
+
     /// Returns serializable summary counts for this bundle.
     #[must_use]
     pub fn summary(&self) -> SpectrumBundleSummary {
@@ -911,6 +937,41 @@ impl SpectrumBundle {
             .collect()
     }
 
+    /// Consumes the bundle and keeps spectra that match one generic source filter.
+    ///
+    /// Molecule metadata is preserved. Loader warnings are retained when they
+    /// match a path filter; format and vendor filters keep warnings
+    /// conservatively because warnings do not carry source-format metadata.
+    #[must_use]
+    pub fn into_source_subset(self, filter: impl Into<LoadedSourceFilter>) -> Self {
+        self.into_source_subset_by_sources([filter.into()])
+    }
+
+    /// Consumes the bundle and keeps spectra that match any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// the bundle unchanged. Molecule metadata is preserved. Loader warnings are
+    /// retained when they match path-only filters; format and vendor filters
+    /// keep warnings conservatively because warnings do not carry source-format
+    /// metadata.
+    #[must_use]
+    pub fn into_source_subset_by_sources<I, F>(mut self, filters: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        if filters.is_empty() {
+            return self;
+        }
+
+        self.spectra
+            .retain(|entry| source_matches_any(&filters, entry.source()));
+        self.warnings
+            .retain(|warning| warning_matches_any(&filters, warning));
+        self
+    }
+
     /// Consumes the bundle and returns loaded spectra matching any generic source filter.
     ///
     /// Filters are combined with logical OR. Passing an empty iterator leaves
@@ -1326,4 +1387,17 @@ impl SpectrumBundle {
 
 fn source_matches_any(filters: &[LoadedSourceFilter], source: &LoadedSource) -> bool {
     filters.is_empty() || filters.iter().any(|filter| filter.matches_source(source))
+}
+
+fn warning_matches_any(filters: &[LoadedSourceFilter], warning: &LoadWarning) -> bool {
+    if filters
+        .iter()
+        .any(|filter| !matches!(filter, LoadedSourceFilter::Path { .. }))
+    {
+        return true;
+    }
+
+    warning
+        .path()
+        .is_some_and(|path| filters.iter().any(|filter| filter.may_match_path(path)))
 }

@@ -159,6 +159,14 @@ fn load_owned_runtime_subset() -> Result<Vec<Spectrum1D>> {
     ]))
 }
 
+fn keep_runtime_subset_as_bundle() -> Result<SpectrumBundle> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle.source_subset_by_sources([
+        LoadedSourceFilter::vendor("bruker"),
+        LoadedSourceFilter::path("jcamp/carbon_13c.jdx"),
+    ]))
+}
+
 fn load_named_carbon_spectrum() -> Result<Spectrum1D> {
     let bundle = load_spectra("data/sample")?;
     let (spectrum, _) = bundle
