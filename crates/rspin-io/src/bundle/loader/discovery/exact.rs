@@ -7,6 +7,394 @@ use rspin_core::{Result, Spectrum1D, Spectrum2D};
 use super::{DiscoveredSpectrumSource, selection};
 use crate::bundle::{LoadedSource, LoadedSourceFilter, SpectrumBundleLoader};
 
+/// Loads selected discovered source candidates as exactly one one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_discovered_1d_relative_to(base, sources)
+}
+
+/// Loads selected discovered source candidates as exactly one one-dimensional spectrum.
+///
+/// This short alias mirrors [`load_discovered_spectrum_1d_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<Spectrum1D> {
+    load_discovered_spectrum_1d_relative_to(base, sources)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_by_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_discovered_1d_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one one-dimensional spectrum.
+///
+/// This short alias mirrors [`load_discovered_spectrum_1d_by_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_by_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Spectrum1D> {
+    load_discovered_spectrum_1d_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_by_sources_relative_to<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_discovered_1d_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one one-dimensional spectrum.
+///
+/// This short alias mirrors [`load_discovered_spectrum_1d_by_sources_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_by_sources<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    load_discovered_spectrum_1d_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads selected discovered source candidates as exactly one one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_with_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_discovered_1d_with_source_relative_to(base, sources)
+}
+
+/// Loads selected discovered source candidates as exactly one one-dimensional spectrum with source metadata.
+///
+/// This short alias mirrors [`load_discovered_spectrum_1d_with_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_with_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    load_discovered_spectrum_1d_with_source_relative_to(base, sources)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_with_source_by_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    SpectrumBundleLoader::new()
+        .read_discovered_1d_with_source_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one one-dimensional spectrum with source metadata.
+///
+/// This short alias mirrors [`load_discovered_spectrum_1d_with_source_by_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_with_source_by_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    load_discovered_spectrum_1d_with_source_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_with_source_by_sources_relative_to<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .read_discovered_1d_with_source_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one one-dimensional spectrum with source metadata.
+///
+/// This short alias mirrors [`load_discovered_spectrum_1d_with_source_by_sources_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one one-dimensional spectrum.
+pub fn load_discovered_spectrum_1d_with_source_by_sources<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    load_discovered_spectrum_1d_with_source_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads selected discovered source candidates as exactly one two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_discovered_2d_relative_to(base, sources)
+}
+
+/// Loads selected discovered source candidates as exactly one two-dimensional spectrum.
+///
+/// This short alias mirrors [`load_discovered_spectrum_2d_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<Spectrum2D> {
+    load_discovered_spectrum_2d_relative_to(base, sources)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_by_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_discovered_2d_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one two-dimensional spectrum.
+///
+/// This short alias mirrors [`load_discovered_spectrum_2d_by_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_by_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Spectrum2D> {
+    load_discovered_spectrum_2d_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_by_sources_relative_to<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_discovered_2d_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one two-dimensional spectrum.
+///
+/// This short alias mirrors [`load_discovered_spectrum_2d_by_sources_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_by_sources<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    load_discovered_spectrum_2d_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads selected discovered source candidates as exactly one two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_with_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_discovered_2d_with_source_relative_to(base, sources)
+}
+
+/// Loads selected discovered source candidates as exactly one two-dimensional spectrum with source metadata.
+///
+/// This short alias mirrors [`load_discovered_spectrum_2d_with_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the selected discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_with_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    load_discovered_spectrum_2d_with_source_relative_to(base, sources)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_with_source_by_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    SpectrumBundleLoader::new()
+        .read_discovered_2d_with_source_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching one generic source filter as exactly one two-dimensional spectrum with source metadata.
+///
+/// This short alias mirrors [`load_discovered_spectrum_2d_with_source_by_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_with_source_by_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    load_discovered_spectrum_2d_with_source_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_with_source_by_sources_relative_to<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .read_discovered_2d_with_source_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads discovered source candidates matching any generic source filter as exactly one two-dimensional spectrum with source metadata.
+///
+/// This short alias mirrors [`load_discovered_spectrum_2d_with_source_by_sources_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading fails or the matching discovered sources do
+/// not resolve to exactly one two-dimensional spectrum.
+pub fn load_discovered_spectrum_2d_with_source_by_sources<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    load_discovered_spectrum_2d_with_source_by_sources_relative_to(base, sources, filters)
+}
+
 impl SpectrumBundleLoader {
     /// Loads selected discovered source candidates as exactly one one-dimensional spectrum.
     ///

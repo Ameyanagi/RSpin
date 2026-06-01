@@ -19,6 +19,24 @@ use crate::bundle::{
     is_bruker_processed_2d_dir, is_bruker_ser_dir, is_nmredata_file, is_standalone_spectrum_file,
     no_data_error_in_inputs, selected_path_from_base,
 };
+pub use exact::{
+    load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,
+    load_discovered_spectrum_1d_by_source_relative_to, load_discovered_spectrum_1d_by_sources,
+    load_discovered_spectrum_1d_by_sources_relative_to, load_discovered_spectrum_1d_relative_to,
+    load_discovered_spectrum_1d_with_source, load_discovered_spectrum_1d_with_source_by_source,
+    load_discovered_spectrum_1d_with_source_by_source_relative_to,
+    load_discovered_spectrum_1d_with_source_by_sources,
+    load_discovered_spectrum_1d_with_source_by_sources_relative_to,
+    load_discovered_spectrum_1d_with_source_relative_to, load_discovered_spectrum_2d,
+    load_discovered_spectrum_2d_by_source, load_discovered_spectrum_2d_by_source_relative_to,
+    load_discovered_spectrum_2d_by_sources, load_discovered_spectrum_2d_by_sources_relative_to,
+    load_discovered_spectrum_2d_relative_to, load_discovered_spectrum_2d_with_source,
+    load_discovered_spectrum_2d_with_source_by_source,
+    load_discovered_spectrum_2d_with_source_by_source_relative_to,
+    load_discovered_spectrum_2d_with_source_by_sources,
+    load_discovered_spectrum_2d_with_source_by_sources_relative_to,
+    load_discovered_spectrum_2d_with_source_relative_to,
+};
 pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 pub use selection::{select_discovered_spectra_by_source, select_discovered_spectra_by_sources};
 pub use summary::{
