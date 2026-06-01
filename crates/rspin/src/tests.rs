@@ -493,6 +493,31 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
     assert_eq!(varian.data_kind(), LoadedSourceDataKind::Raw);
     assert!(varian.matches_source(LoadedSourceFilter::vendor("varian")));
 
+    let discovered_bruker =
+        discover_spectra_by_source(&fixture_root, LoadedSourceFilter::vendor("bruker"))?;
+    assert_eq!(discovered_bruker.len(), 2);
+    let discovered_selected = discover_spectra_by_sources_relative_to(
+        &fixture_root,
+        "empty_jcamp/empty.jdx",
+        [LoadedSourceFilter::format("jdx")],
+    )?;
+    assert_eq!(discovered_selected.len(), 2);
+    let discovered_many = discover_spectra_many_by_source_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+        LoadedSourceFilter::raw(),
+    )?;
+    assert_eq!(discovered_many.len(), 2);
+    let discovered_many_sources = discover_spectra_many_by_sources_relative_to(
+        &fixture_root,
+        ["empty_jcamp/empty.jdx", "bruker_without_expno"],
+        [
+            LoadedSourceFilter::format("jdx"),
+            LoadedSourceFilter::processed(),
+        ],
+    )?;
+    assert_eq!(discovered_many_sources.len(), 3);
+
     let processed = RSpinReader::new()
         .processed_sources()
         .discover_relative_to(&fixture_root, "bruker_without_expno")?;

@@ -208,6 +208,81 @@ pub fn discover_spectra_relative_to(
     SpectrumBundleLoader::new().discover_path_relative_to(base, path)
 }
 
+/// Discovers source candidates below a file or directory, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_by_source(
+    path: impl AsRef<Path>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .discover_path(path)
+}
+
+/// Discovers one selected path relative to a base directory, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the selected
+/// path is missing, or a directory cannot be read.
+pub fn discover_spectra_by_source_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .discover_path_relative_to(base, path)
+}
+
+/// Discovers source candidates below a file or directory, restricted by generic source filters.
+///
+/// Filters are combined with logical OR. Passing an empty iterator leaves
+/// discovery unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_by_sources<I, F>(
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .only_sources(filters)
+        .discover_path(path)
+}
+
+/// Discovers one selected path relative to a base directory, restricted by generic source filters.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Filters are combined with logical OR. Passing an empty
+/// iterator leaves discovery unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the selected
+/// path is missing, or a directory cannot be read.
+pub fn discover_spectra_by_sources_relative_to<I, F>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filters: I,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .only_sources(filters)
+        .discover_path_relative_to(base, path)
+}
+
 /// Loads supported spectra from a file or directory, restricted by one generic source filter.
 ///
 /// # Errors
@@ -630,6 +705,94 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().discover_paths_relative_to(base, paths)
+}
+
+/// Discovers source candidates below multiple paths, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_many_by_source<I, P>(
+    paths: I,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .discover_paths(paths)
+}
+
+/// Discovers selected paths relative to a base directory, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_many_by_source_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .discover_paths_relative_to(base, paths)
+}
+
+/// Discovers source candidates below multiple paths, restricted by generic source filters.
+///
+/// Filters are combined with logical OR. Passing an empty iterator leaves
+/// discovery unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_many_by_sources<I, P, J, F>(
+    paths: I,
+    filters: J,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .only_sources(filters)
+        .discover_paths(paths)
+}
+
+/// Discovers selected paths relative to a base directory, restricted by generic source filters.
+///
+/// Filters are combined with logical OR. Passing an empty iterator leaves
+/// discovery unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_many_by_sources_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filters: J,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new()
+        .only_sources(filters)
+        .discover_paths_relative_to(base, paths)
 }
 
 /// Loads supported spectra from multiple paths, restricted by one generic source filter.
