@@ -263,6 +263,11 @@ fn keep_one_source_directory_as_bundle() -> Result<SpectrumBundle> {
     Ok(bundle.source_path_prefix_subset("bruker/pdata"))
 }
 
+fn keep_selected_source_directories_as_bundle() -> Result<SpectrumBundle> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle.source_path_prefix_subset_by_prefixes(["jcamp", "jeol"]))
+}
+
 fn load_named_carbon_spectrum() -> Result<Spectrum1D> {
     let bundle = load_spectra("data/sample")?;
     let (spectrum, _) = bundle

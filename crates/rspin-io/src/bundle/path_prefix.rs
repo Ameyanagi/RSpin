@@ -1,6 +1,6 @@
 //! Source-path prefix helpers for loaded spectrum bundles.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
@@ -197,6 +197,20 @@ impl SpectrumBundle {
         self.source_subset(LoadedSourceFilter::path_prefix(path))
     }
 
+    /// Returns a cloned bundle containing spectra from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator returns
+    /// a full clone. Molecule metadata is preserved. Loader warnings are
+    /// retained when their tracked paths start with any prefix.
+    #[must_use]
+    pub fn source_path_prefix_subset_by_prefixes<I, P>(&self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.source_subset_by_sources(path_prefix_filters(paths))
+    }
+
     /// Returns loaded spectra from tracked source paths below a prefix.
     pub fn loaded_by_source_path_prefix(
         &self,
@@ -206,6 +220,21 @@ impl SpectrumBundle {
         self.spectra()
             .iter()
             .filter(move |entry| source_path_matches_prefix(entry.source(), &path))
+    }
+
+    /// Returns loaded spectra from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    pub fn loaded_by_source_path_prefixes<I, P>(
+        &self,
+        paths: I,
+    ) -> impl Iterator<Item = &LoadedSpectrum> + '_
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.loaded_by_sources(path_prefix_filters(paths))
     }
 
     /// Returns one-dimensional spectra and sources from tracked source paths below a prefix.
@@ -218,6 +247,21 @@ impl SpectrumBundle {
             .filter(move |(_, source)| source_path_matches_prefix(source, &path))
     }
 
+    /// Returns one-dimensional spectra and sources from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    pub fn loaded_1d_by_source_path_prefixes<I, P>(
+        &self,
+        paths: I,
+    ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.loaded_1d_by_sources(path_prefix_filters(paths))
+    }
+
     /// Returns two-dimensional spectra and sources from tracked source paths below a prefix.
     pub fn loaded_2d_by_source_path_prefix(
         &self,
@@ -226,6 +270,21 @@ impl SpectrumBundle {
         let path = path.as_ref().to_path_buf();
         self.loaded_2d()
             .filter(move |(_, source)| source_path_matches_prefix(source, &path))
+    }
+
+    /// Returns two-dimensional spectra and sources from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    pub fn loaded_2d_by_source_path_prefixes<I, P>(
+        &self,
+        paths: I,
+    ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.loaded_2d_by_sources(path_prefix_filters(paths))
     }
 
     /// Returns the only one-dimensional spectrum from tracked source paths below a prefix.
@@ -295,6 +354,18 @@ impl SpectrumBundle {
             .filter_map(LoadedSource::path)
     }
 
+    /// Returns tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator returns
+    /// all tracked source paths.
+    pub fn source_paths_for_path_prefixes<I, P>(&self, paths: I) -> impl Iterator<Item = &Path> + '_
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.source_paths_for_sources(path_prefix_filters(paths))
+    }
+
     /// Returns warnings associated with tracked source paths below a prefix.
     pub fn warnings_for_source_path_prefix(
         &self,
@@ -306,16 +377,59 @@ impl SpectrumBundle {
             .filter(move |warning| warning_path_matches_prefix(warning, &path))
     }
 
+    /// Returns warnings associated with tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator returns
+    /// all warnings.
+    pub fn warnings_for_source_path_prefixes<I, P>(
+        &self,
+        paths: I,
+    ) -> impl Iterator<Item = &LoadWarning> + '_
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let paths = path_prefixes(paths);
+        self.warnings()
+            .iter()
+            .filter(move |warning| warning_matches_any_prefix(warning, &paths))
+    }
+
     /// Returns the number of loaded spectra from tracked source paths below a prefix.
     #[must_use]
     pub fn source_path_prefix_count(&self, path: impl AsRef<Path>) -> usize {
         self.loaded_by_source_path_prefix(path).count()
     }
 
+    /// Returns the number of loaded spectra from tracked source paths below any prefix.
+    ///
+    /// Passing an empty iterator counts all loaded spectra.
+    #[must_use]
+    pub fn source_path_prefix_count_by_prefixes<I, P>(&self, paths: I) -> usize
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.loaded_by_source_path_prefixes(paths).count()
+    }
+
     /// Returns true when at least one loaded spectrum has a tracked source path below a prefix.
     #[must_use]
     pub fn has_source_path_prefix(&self, path: impl AsRef<Path>) -> bool {
         self.loaded_by_source_path_prefix(path).next().is_some()
+    }
+
+    /// Returns true when at least one loaded spectrum has a tracked source path below any prefix.
+    ///
+    /// Passing an empty iterator returns true when the bundle contains any
+    /// loaded spectrum.
+    #[must_use]
+    pub fn has_any_source_path_prefix<I, P>(&self, paths: I) -> bool
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.loaded_by_source_path_prefixes(paths).next().is_some()
     }
 
     /// Consumes the bundle and keeps spectra from tracked source paths below a prefix.
@@ -327,10 +441,37 @@ impl SpectrumBundle {
         self.into_source_subset(LoadedSourceFilter::path_prefix(path))
     }
 
+    /// Consumes the bundle and keeps spectra from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// the bundle unchanged. Molecule metadata is preserved. Loader warnings
+    /// are retained when their tracked paths start with any prefix.
+    #[must_use]
+    pub fn into_source_path_prefix_subset_by_prefixes<I, P>(self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.into_source_subset_by_sources(path_prefix_filters(paths))
+    }
+
     /// Consumes the bundle and returns loaded spectra from tracked source paths below a prefix.
     #[must_use]
     pub fn into_loaded_by_source_path_prefix(self, path: impl AsRef<Path>) -> Vec<LoadedSpectrum> {
         self.into_loaded_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Consumes the bundle and returns loaded spectra from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    #[must_use]
+    pub fn into_loaded_by_source_path_prefixes<I, P>(self, paths: I) -> Vec<LoadedSpectrum>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.into_loaded_by_sources(path_prefix_filters(paths))
     }
 
     /// Consumes the bundle and returns one-dimensional spectra and sources from tracked source paths below a prefix.
@@ -342,6 +483,22 @@ impl SpectrumBundle {
         self.into_loaded_1d_by_source(LoadedSourceFilter::path_prefix(path))
     }
 
+    /// Consumes the bundle and returns one-dimensional spectra and sources from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    #[must_use]
+    pub fn into_loaded_1d_by_source_path_prefixes<I, P>(
+        self,
+        paths: I,
+    ) -> Vec<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.into_loaded_1d_by_sources(path_prefix_filters(paths))
+    }
+
     /// Consumes the bundle and returns two-dimensional spectra and sources from tracked source paths below a prefix.
     #[must_use]
     pub fn into_loaded_2d_by_source_path_prefix(
@@ -349,6 +506,22 @@ impl SpectrumBundle {
         path: impl AsRef<Path>,
     ) -> Vec<(Spectrum2D, LoadedSource)> {
         self.into_loaded_2d_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra and sources from tracked source paths below any prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    #[must_use]
+    pub fn into_loaded_2d_by_source_path_prefixes<I, P>(
+        self,
+        paths: I,
+    ) -> Vec<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.into_loaded_2d_by_sources(path_prefix_filters(paths))
     }
 
     /// Consumes the bundle and returns the only one-dimensional spectrum from tracked source paths below a prefix.
@@ -413,10 +586,30 @@ impl SpectrumBundle {
         self.into_spectra_1d_by_source(LoadedSourceFilter::path_prefix(path))
     }
 
+    /// Consumes the bundle and returns one-dimensional spectra from tracked source paths below any prefix.
+    #[must_use]
+    pub fn into_spectra_1d_by_source_path_prefixes<I, P>(self, paths: I) -> Vec<Spectrum1D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.into_spectra_1d_by_sources(path_prefix_filters(paths))
+    }
+
     /// Consumes the bundle and returns two-dimensional spectra from tracked source paths below a prefix.
     #[must_use]
     pub fn into_spectra_2d_by_source_path_prefix(self, path: impl AsRef<Path>) -> Vec<Spectrum2D> {
         self.into_spectra_2d_by_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra from tracked source paths below any prefix.
+    #[must_use]
+    pub fn into_spectra_2d_by_source_path_prefixes<I, P>(self, paths: I) -> Vec<Spectrum2D>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.into_spectra_2d_by_sources(path_prefix_filters(paths))
     }
 }
 
@@ -430,4 +623,39 @@ fn warning_path_matches_prefix(warning: &LoadWarning, path: &Path) -> bool {
     warning
         .path()
         .is_some_and(|warning_path| warning_path.starts_with(path))
+}
+
+fn path_prefix_filters<I, P>(paths: I) -> Vec<LoadedSourceFilter>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    path_prefixes(paths)
+        .into_iter()
+        .map(LoadedSourceFilter::path_prefix)
+        .collect()
+}
+
+fn path_prefixes<I, P>(paths: I) -> Vec<PathBuf>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut unique = Vec::new();
+    for path in paths {
+        let path = path.as_ref().to_path_buf();
+        if !unique.iter().any(|existing| existing == &path) {
+            unique.push(path);
+        }
+    }
+    unique
+}
+
+fn warning_matches_any_prefix(warning: &LoadWarning, paths: &[PathBuf]) -> bool {
+    paths.is_empty()
+        || warning.path().is_some_and(|warning_path| {
+            paths
+                .iter()
+                .any(|path| warning_path.starts_with(path.as_path()))
+        })
 }
