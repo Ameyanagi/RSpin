@@ -1,5 +1,6 @@
 //! Source discovery for the spectrum bundle loader.
 
+mod dimension;
 mod exact;
 mod model;
 mod selection;
@@ -19,6 +20,24 @@ use crate::bundle::{
     is_agilent_fid_dir, is_agilent_processed_dir, is_bruker_fid_dir, is_bruker_processed_1d_dir,
     is_bruker_processed_2d_dir, is_bruker_ser_dir, is_nmredata_file, is_standalone_spectrum_file,
     no_data_error_in_inputs, selected_path_from_base,
+};
+pub use dimension::{
+    load_discovered_spectra_1d, load_discovered_spectra_1d_by_source,
+    load_discovered_spectra_1d_by_source_relative_to, load_discovered_spectra_1d_by_sources,
+    load_discovered_spectra_1d_by_sources_relative_to, load_discovered_spectra_1d_relative_to,
+    load_discovered_spectra_1d_strict, load_discovered_spectra_1d_strict_by_source,
+    load_discovered_spectra_1d_strict_by_source_relative_to,
+    load_discovered_spectra_1d_strict_by_sources,
+    load_discovered_spectra_1d_strict_by_sources_relative_to,
+    load_discovered_spectra_1d_strict_relative_to, load_discovered_spectra_2d,
+    load_discovered_spectra_2d_by_source, load_discovered_spectra_2d_by_source_relative_to,
+    load_discovered_spectra_2d_by_sources, load_discovered_spectra_2d_by_sources_relative_to,
+    load_discovered_spectra_2d_relative_to, load_discovered_spectra_2d_strict,
+    load_discovered_spectra_2d_strict_by_source,
+    load_discovered_spectra_2d_strict_by_source_relative_to,
+    load_discovered_spectra_2d_strict_by_sources,
+    load_discovered_spectra_2d_strict_by_sources_relative_to,
+    load_discovered_spectra_2d_strict_relative_to,
 };
 pub use exact::{
     load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,

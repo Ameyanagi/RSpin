@@ -14,10 +14,14 @@ use rspin_io::{
     discover_spectra_many_relative_to, discover_spectra_many_summary,
     discover_spectra_many_summary_relative_to, discover_spectra_summary,
     discover_spectra_summary_relative_to, load_discovered_spectra,
-    load_discovered_spectra_by_source, load_discovered_spectra_by_source_relative_to,
-    load_discovered_spectra_by_sources, load_discovered_spectra_by_sources_relative_to,
-    load_discovered_spectra_relative_to, select_discovered_spectra_by_source,
-    select_discovered_spectra_by_sources, summarize_discovered_spectra,
+    load_discovered_spectra_1d_by_source, load_discovered_spectra_1d_relative_to,
+    load_discovered_spectra_1d_strict_by_source_relative_to,
+    load_discovered_spectra_2d_by_sources_relative_to, load_discovered_spectra_2d_relative_to,
+    load_discovered_spectra_2d_strict_by_sources, load_discovered_spectra_by_source,
+    load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
+    load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
+    select_discovered_spectra_by_source, select_discovered_spectra_by_sources,
+    summarize_discovered_spectra,
 };
 
 #[test]
@@ -596,6 +600,70 @@ fn reader_loads_exact_discovered_sources_relative_to_base() -> Result<()> {
     let (_, source) =
         RSpinReader::new().read_discovered_2d_with_source(cc0_myrcene_fixture_root(), [hsqc])?;
     assert_eq!(source.format(), "jeol_jdf");
+    Ok(())
+}
+
+#[test]
+fn discovered_dimension_bundle_helpers_load_matching_candidates() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let one_d = RSpinReader::new().read_discovered_bundle_1d_relative_to(&root, &sources)?;
+    assert_eq!(one_d.len_1d(), 5);
+    assert_eq!(one_d.len_2d(), 0);
+    assert!(one_d.warnings().is_empty());
+
+    let one_d_alias = RSpinReader::new().read_discovered_bundle_1d(&root, &sources)?;
+    assert_eq!(one_d_alias.len_1d(), 5);
+
+    let two_d = load_discovered_spectra_2d_relative_to(&root, &sources)?;
+    assert_eq!(two_d.len_1d(), 0);
+    assert_eq!(two_d.len_2d(), 2);
+
+    let jeol_1d =
+        load_discovered_spectra_1d_by_source(&root, &sources, LoadedSourceFilter::vendor("jeol"))?;
+    assert_eq!(jeol_1d.len_1d(), 2);
+    assert_eq!(jeol_1d.len_2d(), 0);
+
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let hsqc = load_discovered_spectra_2d_by_sources_relative_to(
+        &root,
+        &sources,
+        [
+            LoadedSourceFilter::path("missing"),
+            LoadedSourceFilter::path(hsqc_path),
+        ],
+    )?;
+    assert_eq!(hsqc.len_2d(), 1);
+    assert!(hsqc.has_source_path(hsqc_path));
+
+    let strict_1d = load_discovered_spectra_1d_strict_by_source_relative_to(
+        &root,
+        &sources,
+        LoadedSourceFilter::vendor("jeol"),
+    )?;
+    assert_eq!(strict_1d.len_1d(), 2);
+
+    let strict_2d = load_discovered_spectra_2d_strict_by_sources(
+        &root,
+        &sources,
+        [LoadedSourceFilter::path(hsqc_path)],
+    )?;
+    assert_eq!(strict_2d.len_2d(), 1);
+
+    let selected_hsqc =
+        select_discovered_spectra_by_source(&sources, LoadedSourceFilter::path(hsqc_path));
+    let Err(error) = load_discovered_spectra_1d_relative_to(&root, selected_hsqc) else {
+        return Err(anyhow!(
+            "one-dimensional discovered bundle loading should reject two-dimensional selections"
+        ));
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("no one-dimensional discovered sources selected")
+    );
+
     Ok(())
 }
 

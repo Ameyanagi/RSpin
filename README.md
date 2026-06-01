@@ -521,6 +521,15 @@ fn load_selected_bundle_strict_with_free_helper() -> Result<SpectrumBundle> {
     )
 }
 
+fn load_selected_1d_bundle_after_preflight() -> Result<SpectrumBundle> {
+    let sources = discover_spectra("data/mixed-vendor")?;
+    load_discovered_spectra_1d_by_source_relative_to(
+        "data/mixed-vendor",
+        &sources,
+        LoadedSourceFilter::vendor("jeol"),
+    )
+}
+
 fn load_selected_after_preflight() -> Result<SpectrumBundle> {
     let sources = RSpinReader::new()
         .processed_sources()
