@@ -613,6 +613,16 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
     );
     assert_eq!(mixed.raw_source_subset().len(), 1);
     assert_eq!(mixed.into_processed_source_subset().len(), 1);
+
+    let raw = load_spectra_by_source_data_kind(
+        fixture_root.join("bruker_without_expno"),
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw.len(), 1);
+    let processed = RSpinReader::new()
+        .only_source(LoadedSourceDataKind::Processed)
+        .read_path_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(processed.len(), 1);
     Ok(())
 }
 

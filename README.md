@@ -110,6 +110,10 @@ fn load_bruker_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_vendor("data/mixed-vendor", LoadedSourceVendor::Bruker)
 }
 
+fn load_raw_vendor_bundle() -> Result<SpectrumBundle> {
+    load_spectra_by_source_data_kind("data/mixed-vendor", LoadedSourceDataKind::Raw)
+}
+
 fn load_one_tracked_source_as_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_path("data/mixed-vendor", "jcamp/carbon_13c.jdx")
 }
@@ -223,6 +227,12 @@ fn load_with_runtime_filter(filter: LoadedSourceFilter) -> Result<SpectrumBundle
         .read_path("data/mixed-vendor")
 }
 
+fn load_processed_vendor_data() -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .only_processed_sources()
+        .read_path("data/mixed-vendor")
+}
+
 fn load_one_tracked_path() -> Result<SpectrumBundle> {
     RSpinReader::new()
         .only_source_path("jcamp/carbon_13c.jdx")
@@ -230,7 +240,8 @@ fn load_one_tracked_path() -> Result<SpectrumBundle> {
 }
 ```
 
-Use the type-safe discovery helpers when building format or vendor selectors:
+Use the type-safe discovery helpers when building format, vendor, or data-kind
+selectors:
 
 ```rust,no_run
 use rspin::prelude::*;
@@ -246,6 +257,13 @@ fn supported_format_filters() -> Vec<&'static str> {
     LoadedSourceFormat::all()
         .iter()
         .map(|format| format.as_str())
+        .collect()
+}
+
+fn supported_data_kind_filters() -> Vec<&'static str> {
+    LoadedSourceDataKind::all()
+        .iter()
+        .map(|data_kind| data_kind.as_str())
         .collect()
 }
 

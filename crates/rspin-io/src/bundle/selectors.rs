@@ -208,8 +208,8 @@ impl SpectrumBundle {
 
     /// Returns the only one-dimensional spectrum matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -222,8 +222,8 @@ impl SpectrumBundle {
 
     /// Returns the only one-dimensional spectrum and source matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -240,8 +240,8 @@ impl SpectrumBundle {
 
     /// Returns the only two-dimensional spectrum matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -254,8 +254,8 @@ impl SpectrumBundle {
 
     /// Returns the only two-dimensional spectrum and source matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -468,8 +468,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns the only one-dimensional spectrum matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -485,8 +485,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns the only one-dimensional spectrum and source matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -505,8 +505,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns the only two-dimensional spectrum matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -522,8 +522,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns the only two-dimensional spectrum and source matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -706,6 +706,9 @@ fn source_filter_label(filter: &LoadedSourceFilter) -> String {
         }
         LoadedSourceFilter::Vendor { vendor } => {
             source_vendor_filter_label(vendor, LoadedSourceVendor::parse(vendor).ok())
+        }
+        LoadedSourceFilter::DataKind { data_kind } => {
+            format!("source data kind {data_kind}")
         }
         LoadedSourceFilter::Path { path } => source_path_filter_label(path),
     }

@@ -10,8 +10,9 @@ use crate::SpectrumPathReader;
 
 use super::source_filter::source_filters;
 use super::{
-    LoadedSourceFilter, SpectrumBundle, canonical_source_format_filter, no_data_error_at,
-    no_data_error_in_inputs, selected_path_from_base, source_format_filters, source_vendor_filters,
+    LoadedSourceDataKind, LoadedSourceFilter, SpectrumBundle, canonical_source_format_filter,
+    no_data_error_at, no_data_error_in_inputs, selected_path_from_base, source_format_filters,
+    source_vendor_filters,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.
@@ -147,6 +148,44 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Restricts loading to spectra with one raw/processed source data kind.
+    ///
+    /// Use this when callers want vendor raw acquisition data, vendor processed
+    /// data, or open/custom data without matching specific vendor formats.
+    #[must_use]
+    pub fn only_source_data_kind(self, data_kind: LoadedSourceDataKind) -> Self {
+        self.only_source(LoadedSourceFilter::data_kind(data_kind))
+    }
+
+    /// Restricts loading to spectra with any of the raw/processed source data kinds.
+    ///
+    /// Passing an empty iterator leaves source loading unrestricted.
+    #[must_use]
+    pub fn only_source_data_kinds<I>(self, data_kinds: I) -> Self
+    where
+        I: IntoIterator<Item = LoadedSourceDataKind>,
+    {
+        self.only_sources(data_kinds.into_iter().map(LoadedSourceFilter::data_kind))
+    }
+
+    /// Restricts loading to vendor raw acquisition data.
+    #[must_use]
+    pub fn only_raw_sources(self) -> Self {
+        self.only_source_data_kind(LoadedSourceDataKind::Raw)
+    }
+
+    /// Restricts loading to vendor processed data.
+    #[must_use]
+    pub fn only_processed_sources(self) -> Self {
+        self.only_source_data_kind(LoadedSourceDataKind::Processed)
+    }
+
+    /// Restricts loading to open exchange or custom data without raw/processed classification.
+    #[must_use]
+    pub fn only_other_sources(self) -> Self {
+        self.only_source_data_kind(LoadedSourceDataKind::Other)
+    }
+
     /// Restricts loading to spectra read from one tracked source path.
     ///
     /// Source paths are matched after anchoring to the selected loader root, so
@@ -181,6 +220,9 @@ impl SpectrumBundleLoader {
         match filter.into() {
             LoadedSourceFilter::Format { format } => self.only_source_format(format),
             LoadedSourceFilter::Vendor { vendor } => self.only_source_vendor(vendor),
+            LoadedSourceFilter::DataKind { data_kind } => {
+                self.only_sources([LoadedSourceFilter::data_kind(data_kind)])
+            }
             LoadedSourceFilter::Path { path } => self.only_source_path(path),
         }
     }
@@ -223,6 +265,18 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn all_source_paths(mut self) -> Self {
         self.source_path_filters.clear();
+        self
+    }
+
+    /// Clears any generic source-data-kind restriction.
+    ///
+    /// Source data kind filters are represented as generic source filters, so
+    /// this removes data-kind generic filters while leaving source-format,
+    /// source-vendor, and source-path restrictions unchanged.
+    #[must_use]
+    pub fn all_source_data_kinds(mut self) -> Self {
+        self.source_filters
+            .retain(|filter| !matches!(filter, LoadedSourceFilter::DataKind { .. }));
         self
     }
 

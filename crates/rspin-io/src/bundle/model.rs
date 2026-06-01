@@ -519,7 +519,7 @@ impl SpectrumBundle {
     /// conservatively because warnings do not carry source-format metadata.
     #[must_use]
     pub fn source_data_kind_subset(&self, data_kind: LoadedSourceDataKind) -> Self {
-        self.clone().into_source_data_kind_subset(data_kind)
+        self.source_subset(LoadedSourceFilter::data_kind(data_kind))
     }
 
     /// Returns a cloned bundle containing spectra from vendor raw acquisition data.
@@ -769,8 +769,8 @@ impl SpectrumBundle {
 
     /// Returns loaded spectra matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path.
     pub fn loaded_by_source(
         &self,
         filter: impl Into<LoadedSourceFilter>,
@@ -798,8 +798,8 @@ impl SpectrumBundle {
 
     /// Returns one-dimensional spectra and sources matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path.
     pub fn loaded_1d_by_source(
         &self,
         filter: impl Into<LoadedSourceFilter>,
@@ -828,8 +828,8 @@ impl SpectrumBundle {
 
     /// Returns two-dimensional spectra and sources matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path.
     pub fn loaded_2d_by_source(
         &self,
         filter: impl Into<LoadedSourceFilter>,
@@ -1074,8 +1074,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns loaded spectra matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path.
     #[must_use]
     pub fn into_loaded_by_source(
         self,
@@ -1123,10 +1123,8 @@ impl SpectrumBundle {
     /// Molecule metadata is preserved. Loader warnings are retained
     /// conservatively because warnings do not carry source-format metadata.
     #[must_use]
-    pub fn into_source_data_kind_subset(mut self, data_kind: LoadedSourceDataKind) -> Self {
-        self.spectra
-            .retain(|entry| entry.source().data_kind() == data_kind);
-        self
+    pub fn into_source_data_kind_subset(self, data_kind: LoadedSourceDataKind) -> Self {
+        self.into_source_subset(LoadedSourceFilter::data_kind(data_kind))
     }
 
     /// Consumes the bundle and keeps spectra from vendor raw acquisition data.
@@ -1200,8 +1198,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns one-dimensional spectra and sources matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path.
     #[must_use]
     pub fn into_loaded_1d_by_source(
         self,
@@ -1281,8 +1279,8 @@ impl SpectrumBundle {
 
     /// Consumes the bundle and returns two-dimensional spectra and sources matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path.
     #[must_use]
     pub fn into_loaded_2d_by_source(
         self,

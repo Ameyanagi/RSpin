@@ -9,8 +9,8 @@ use crate::bundle::{LoadedSource, LoadedSourceFilter, SpectrumBundleLoader};
 impl SpectrumBundleLoader {
     /// Loads exactly one one-dimensional spectrum matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -26,8 +26,8 @@ impl SpectrumBundleLoader {
 
     /// Loads exactly one one-dimensional spectrum and source matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -43,8 +43,8 @@ impl SpectrumBundleLoader {
 
     /// Loads exactly one two-dimensional spectrum matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///
@@ -60,8 +60,8 @@ impl SpectrumBundleLoader {
 
     /// Loads exactly one two-dimensional spectrum and source matching a generic source filter.
     ///
-    /// The filter may target a source format, vendor family, or tracked source
-    /// path. Other matching dimensions do not prevent success.
+    /// The filter may target a source format, vendor family, source data kind,
+    /// or tracked source path. Other matching dimensions do not prevent success.
     ///
     /// # Errors
     ///

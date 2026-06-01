@@ -10,12 +10,14 @@ use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
     LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
-    load_spectra, load_spectra_by_source, load_spectra_by_source_format,
+    load_spectra, load_spectra_by_source, load_spectra_by_source_data_kind,
+    load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_format,
     load_spectra_by_source_format_relative_to, load_spectra_by_source_path,
     load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
     load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
     load_spectra_by_sources, load_spectra_by_sources_relative_to, load_spectra_many,
-    load_spectra_many_by_source, load_spectra_many_by_source_format,
+    load_spectra_many_by_source, load_spectra_many_by_source_data_kind,
+    load_spectra_many_by_source_data_kind_relative_to, load_spectra_many_by_source_format,
     load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_path,
     load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
@@ -1761,6 +1763,84 @@ fn bundle_source_data_kind_helpers_cover_raw_and_processed_sources() -> anyhow::
             .collect::<Vec<_>>(),
         vec![Path::new("bruker_without_expno/pdata/1")]
     );
+    Ok(())
+}
+
+#[test]
+fn loader_can_restrict_source_data_kinds() -> anyhow::Result<()> {
+    let raw_loaded = load_spectra_by_source_data_kind_relative_to(
+        fixture_root(),
+        "bruker_without_expno",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_loaded.len(), 1);
+    assert_eq!(first_1d(&raw_loaded)?.x.unit, Unit::Seconds);
+    assert_eq!(
+        raw_loaded.source_paths().collect::<Vec<_>>(),
+        vec![Path::new("bruker_without_expno")]
+    );
+
+    let processed_loaded = load_spectra_many_by_source_data_kind_relative_to(
+        fixture_root(),
+        ["bruker_without_expno"],
+        LoadedSourceDataKind::Processed,
+    )?;
+    assert_eq!(processed_loaded.len(), 1);
+    assert_eq!(first_1d(&processed_loaded)?.x.unit, Unit::Ppm);
+
+    let raw_direct = load_spectra_by_source_data_kind(
+        fixture_root().join("bruker_without_expno"),
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_direct.len(), 1);
+
+    let raw_many = load_spectra_many_by_source_data_kind(
+        [fixture_root().join("bruker_without_expno")],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_many.len(), 1);
+
+    let other = RSpinReader::new()
+        .only_other_sources()
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(other.len(), 5);
+    assert_eq!(other.source_data_kind_count(LoadedSourceDataKind::Other), 5);
+    assert_eq!(other.source_data_kind_count(LoadedSourceDataKind::Raw), 0);
+
+    let raw_or_processed = RSpinReader::new()
+        .only_source_data_kinds([LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed])
+        .read_path_relative_to(fixture_root(), "bruker_without_expno")?;
+    assert_eq!(raw_or_processed.len(), 2);
+
+    let data_kind_filter_cleared = RSpinReader::new()
+        .only_raw_sources()
+        .all_source_data_kinds()
+        .read_path_relative_to(fixture_root(), "bruker_without_expno")?;
+    assert_eq!(data_kind_filter_cleared.len(), 2);
+
+    let raw_from_filter = load_spectra_by_source(
+        fixture_root().join("bruker_without_expno"),
+        LoadedSourceFilter::data_kind(LoadedSourceDataKind::Raw),
+    )?;
+    assert_eq!(raw_from_filter.len(), 1);
+
+    let processed_by_generic_filter = RSpinReader::new()
+        .only_source(LoadedSourceDataKind::Processed)
+        .read_path_relative_to(fixture_root(), "bruker_without_expno")?;
+    assert_eq!(processed_by_generic_filter.len(), 1);
+
+    let raw_by_convenience_filter = load_spectra_by_sources(
+        fixture_root().join("bruker_without_expno"),
+        [LoadedSourceFilter::raw()],
+    )?;
+    assert_eq!(raw_by_convenience_filter.len(), 1);
+
+    let raw_exact = RSpinReader::new().read_1d_by_source_relative_to(
+        fixture_root(),
+        "bruker_without_expno",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_exact.x.unit, Unit::Seconds);
     Ok(())
 }
 

@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use rspin_core::Nucleus;
 use rspin_io::{
-    LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader, load_spectra,
-    load_spectrum_1d_by_source, load_spectrum_1d_by_source_format,
+    LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader,
+    load_spectra, load_spectrum_1d_by_source, load_spectrum_1d_by_source_format,
     load_spectrum_1d_by_source_format_relative_to, load_spectrum_1d_by_source_path,
     load_spectrum_1d_by_source_path_relative_to, load_spectrum_1d_by_source_relative_to,
     load_spectrum_1d_by_source_vendor, load_spectrum_1d_by_source_vendor_relative_to,
@@ -139,6 +139,12 @@ fn generic_source_filter_exact_helpers_select_matching_dimension() -> anyhow::Re
 
     let bruker_1d = bundle.only_1d_by_source(LoadedSourceFilter::vendor("bruker"))?;
     assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let raw_1d = bundle.only_1d_by_source(LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let raw_2d = bundle.only_2d_by_source(LoadedSourceFilter::raw())?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
 
     let (hsqc, hsqc_source) =
         bundle.only_loaded_2d_by_source(LoadedSourceFilter::path(hsqc_path))?;
