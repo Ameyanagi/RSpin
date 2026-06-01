@@ -523,6 +523,40 @@ fn prelude_exports_bundle_summary_loader_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let raw = load_discovered_spectra_summary_by_source_relative_to(
+        &fixture_root,
+        &sources,
+        LoadedSourceFilter::raw(),
+    )?;
+    assert_eq!(raw.spectra(), 2);
+    assert_eq!(raw.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+
+    let selected = RSpinReader::new().read_discovered_summary_by_sources(
+        &fixture_root,
+        &sources,
+        [LoadedSourceFilter::path("bruker_without_expno/pdata/1")],
+    )?;
+    assert_eq!(selected.spectra(), 1);
+    assert_eq!(
+        selected.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let strict = load_discovered_spectra_summary_strict_by_source(
+        &fixture_root,
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    assert_eq!(strict.spectra(), 1);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_dimension_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

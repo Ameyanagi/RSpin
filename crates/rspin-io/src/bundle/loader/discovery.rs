@@ -2,6 +2,7 @@
 
 mod dimension;
 mod exact;
+mod loaded_summary;
 mod model;
 mod selection;
 mod strict;
@@ -56,6 +57,18 @@ pub use exact::{
     load_discovered_spectrum_2d_with_source_by_sources,
     load_discovered_spectrum_2d_with_source_by_sources_relative_to,
     load_discovered_spectrum_2d_with_source_relative_to,
+};
+pub use loaded_summary::{
+    load_discovered_spectra_summary, load_discovered_spectra_summary_by_source,
+    load_discovered_spectra_summary_by_source_relative_to,
+    load_discovered_spectra_summary_by_sources,
+    load_discovered_spectra_summary_by_sources_relative_to,
+    load_discovered_spectra_summary_relative_to, load_discovered_spectra_summary_strict,
+    load_discovered_spectra_summary_strict_by_source,
+    load_discovered_spectra_summary_strict_by_source_relative_to,
+    load_discovered_spectra_summary_strict_by_sources,
+    load_discovered_spectra_summary_strict_by_sources_relative_to,
+    load_discovered_spectra_summary_strict_relative_to,
 };
 pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 pub use selection::{select_discovered_spectra_by_source, select_discovered_spectra_by_sources};
