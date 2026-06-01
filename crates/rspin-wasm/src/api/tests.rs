@@ -489,22 +489,59 @@ fn extracts_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
         Some("wasm selected 2d")
     );
 
+    let wrong_dimension = spectrum_bundle_1d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf");
+    assert!(matches!(wrong_dimension, Err(RSpinError::Parse { .. })));
+    Ok(())
+}
+
+#[test]
+fn extracts_generic_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
+    let bundle_json = selected_bundle_json()?;
+
+    let one_d_filter = r#"{"kind":"vendor","vendor":"bruker"}"#;
+    let one_d = spectrum_bundle_1d_by_source_json(&bundle_json, one_d_filter)?;
+    assert_eq!(
+        spectrum1d_from_json(&one_d)?.metadata.name.as_deref(),
+        Some("wasm selected 1d")
+    );
+
+    let two_d_filter = r#"{"kind":"path","path":"vendor/hsqc.jdf"}"#;
+    let two_d = spectrum_bundle_2d_by_source_json(&bundle_json, two_d_filter)?;
+    assert_eq!(
+        spectrum2d_from_json(&two_d)?.metadata.name.as_deref(),
+        Some("wasm selected 2d")
+    );
+
+    assert!(matches!(
+        spectrum_bundle_1d_by_source_json(&bundle_json, two_d_filter),
+        Err(RSpinError::Parse { .. })
+    ));
+    assert!(matches!(
+        spectrum_bundle_1d_by_source_json(&bundle_json, r#"[{"kind":"vendor","vendor":"bruker"}]"#),
+        Err(RSpinError::Parse { .. })
+    ));
+    Ok(())
+}
+
+#[test]
+fn extracts_source_set_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
+    let bundle_json = selected_bundle_json()?;
     let one_d_filters = serde_json::to_string(&serde_json::json!([
         {"kind": "vendor", "vendor": "missing"},
         {"kind": "path", "path": "vendor/fid"}
     ]))?;
-    let by_sources = spectrum_bundle_1d_by_sources_json(&bundle_json, &one_d_filters)?;
+    let one_d = spectrum_bundle_1d_by_sources_json(&bundle_json, &one_d_filters)?;
     assert_eq!(
-        spectrum1d_from_json(&by_sources)?.metadata.name.as_deref(),
+        spectrum1d_from_json(&one_d)?.metadata.name.as_deref(),
         Some("wasm selected 1d")
     );
 
     let two_d_filters = serde_json::to_string(&serde_json::json!([
         {"kind": "path_prefix", "path": "vendor"}
     ]))?;
-    let by_sources = spectrum_bundle_2d_by_sources_json(&bundle_json, &two_d_filters)?;
+    let two_d = spectrum_bundle_2d_by_sources_json(&bundle_json, &two_d_filters)?;
     assert_eq!(
-        spectrum2d_from_json(&by_sources)?.metadata.name.as_deref(),
+        spectrum2d_from_json(&two_d)?.metadata.name.as_deref(),
         Some("wasm selected 2d")
     );
 
@@ -517,18 +554,17 @@ fn extracts_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
         Some("wasm selected 1d")
     );
 
-    let wrong_dimension = spectrum_bundle_1d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf");
-    assert!(matches!(wrong_dimension, Err(RSpinError::Parse { .. })));
-
     let two_d_only_filters = serde_json::to_string(&serde_json::json!([
         {"kind": "path", "path": "vendor/hsqc.jdf"}
     ]))?;
-    let wrong_dimension = spectrum_bundle_1d_by_sources_json(&bundle_json, &two_d_only_filters);
-    assert!(matches!(wrong_dimension, Err(RSpinError::Parse { .. })));
-
-    let invalid_filters =
-        spectrum_bundle_1d_by_sources_json(&bundle_json, r#"{"kind":"vendor","vendor":"bruker"}"#);
-    assert!(matches!(invalid_filters, Err(RSpinError::Parse { .. })));
+    assert!(matches!(
+        spectrum_bundle_1d_by_sources_json(&bundle_json, &two_d_only_filters),
+        Err(RSpinError::Parse { .. })
+    ));
+    assert!(matches!(
+        spectrum_bundle_1d_by_sources_json(&bundle_json, r#"{"kind":"vendor","vendor":"bruker"}"#),
+        Err(RSpinError::Parse { .. })
+    ));
     Ok(())
 }
 
@@ -550,6 +586,10 @@ fn extracts_loaded_source_filtered_spectra_from_bundle_json() -> anyhow::Result<
         spectrum_bundle_loaded_1d_by_source_vendor_json(&bundle_json, "bruker")?,
         spectrum_bundle_loaded_1d_by_source_data_kind_json(&bundle_json, "raw")?,
         spectrum_bundle_loaded_1d_by_source_path_json(&bundle_json, "vendor/fid")?,
+        spectrum_bundle_loaded_1d_by_source_json(
+            &bundle_json,
+            r#"{"kind":"path","path":"vendor/fid"}"#,
+        )?,
         spectrum_bundle_loaded_1d_by_sources_json(
             &bundle_json,
             &serde_json::to_string(&serde_json::json!([
@@ -567,6 +607,10 @@ fn extracts_loaded_source_filtered_spectra_from_bundle_json() -> anyhow::Result<
         spectrum_bundle_loaded_2d_by_source_vendor_json(&bundle_json, "jeol")?,
         spectrum_bundle_loaded_2d_by_source_data_kind_json(&bundle_json, "other")?,
         spectrum_bundle_loaded_2d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf")?,
+        spectrum_bundle_loaded_2d_by_source_json(
+            &bundle_json,
+            r#"{"kind":"format","format":"jdf"}"#,
+        )?,
         spectrum_bundle_loaded_2d_by_sources_json(
             &bundle_json,
             &serde_json::to_string(&serde_json::json!([

@@ -1044,6 +1044,66 @@ pub fn spectrum_bundle_loaded_2d_by_source_path_json(
     loaded_spectrum2d_to_json(spectrum, source)
 }
 
+/// Extracts exactly one one-dimensional spectrum matching a generic source filter from bundle JSON.
+///
+/// `filter_json` is a `LoadedSourceFilter` object, for example
+/// `{"kind":"vendor","vendor":"bruker"}`.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_1d_by_source_json(input: &str, filter_json: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filter = source_filter_from_json(filter_json)?;
+    write_spectrum1d_json(bundle.only_1d_by_source(filter)?)
+}
+
+/// Extracts exactly one one-dimensional loaded spectrum matching a generic source filter from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_loaded_1d_by_source_json(input: &str, filter_json: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filter = source_filter_from_json(filter_json)?;
+    let (spectrum, source) = bundle.only_loaded_1d_by_source(filter)?;
+    loaded_spectrum1d_to_json(spectrum, source)
+}
+
+/// Extracts exactly one two-dimensional spectrum matching a generic source filter from bundle JSON.
+///
+/// `filter_json` is a `LoadedSourceFilter` object, for example
+/// `{"kind":"path","path":"vendor/hsqc.jdf"}`.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_2d_by_source_json(input: &str, filter_json: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filter = source_filter_from_json(filter_json)?;
+    write_spectrum2d_json(bundle.only_2d_by_source(filter)?)
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum matching a generic source filter from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when deserialization or serialization fails.
+pub fn spectrum_bundle_loaded_2d_by_source_json(input: &str, filter_json: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let filter = source_filter_from_json(filter_json)?;
+    let (spectrum, source) = bundle.only_loaded_2d_by_source(filter)?;
+    loaded_spectrum2d_to_json(spectrum, source)
+}
+
 /// Extracts exactly one one-dimensional spectrum matching any source filter from bundle JSON.
 ///
 /// `filters_json` is an array of `LoadedSourceFilter` objects, for example:
@@ -1401,6 +1461,10 @@ fn loaded_spectrum1d_to_json(spectrum: &Spectrum1D, source: &LoadedSource) -> Re
 
 fn loaded_spectrum2d_to_json(spectrum: &Spectrum2D, source: &LoadedSource) -> Result<String> {
     to_json(&LoadedSpectrum2DJson::TwoD { spectrum, source })
+}
+
+fn source_filter_from_json(input: &str) -> Result<LoadedSourceFilter> {
+    from_json(input)
 }
 
 fn source_filters_from_json(input: &str) -> Result<Vec<LoadedSourceFilter>> {

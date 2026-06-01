@@ -19,24 +19,25 @@ use crate::{
     parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json,
     parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
     spectrum_bundle_1d_by_source_data_kind_json, spectrum_bundle_1d_by_source_format_json,
-    spectrum_bundle_1d_by_source_path_json, spectrum_bundle_1d_by_source_vendor_json,
-    spectrum_bundle_1d_by_sources_json, spectrum_bundle_2d_by_source_data_kind_json,
-    spectrum_bundle_2d_by_source_format_json, spectrum_bundle_2d_by_source_path_json,
+    spectrum_bundle_1d_by_source_json, spectrum_bundle_1d_by_source_path_json,
+    spectrum_bundle_1d_by_source_vendor_json, spectrum_bundle_1d_by_sources_json,
+    spectrum_bundle_2d_by_source_data_kind_json, spectrum_bundle_2d_by_source_format_json,
+    spectrum_bundle_2d_by_source_json, spectrum_bundle_2d_by_source_path_json,
     spectrum_bundle_2d_by_source_vendor_json, spectrum_bundle_2d_by_sources_json,
     spectrum_bundle_counts_json, spectrum_bundle_loaded_1d_by_source_data_kind_json,
-    spectrum_bundle_loaded_1d_by_source_format_json, spectrum_bundle_loaded_1d_by_source_path_json,
-    spectrum_bundle_loaded_1d_by_source_vendor_json, spectrum_bundle_loaded_1d_by_sources_json,
-    spectrum_bundle_loaded_2d_by_source_data_kind_json,
-    spectrum_bundle_loaded_2d_by_source_format_json, spectrum_bundle_loaded_2d_by_source_path_json,
-    spectrum_bundle_loaded_2d_by_source_vendor_json, spectrum_bundle_loaded_2d_by_sources_json,
-    spectrum_bundle_only_1d_json, spectrum_bundle_only_2d_json,
-    spectrum_bundle_only_loaded_1d_json, spectrum_bundle_only_loaded_2d_json,
-    spectrum_bundle_source_data_kinds_json, spectrum_bundle_source_formats_json,
-    spectrum_bundle_source_vendors_json, validate_spectrum_bundle_json, write_analysis_1d_csv_json,
-    write_analysis_2d_csv_json, write_jcamp_dx_2d_json, write_nmredata_json,
-    write_nmredata_records_json, write_nmrml_1d_json, write_nmrml_2d_json,
-    write_spectrum_1d_csv_json, write_spectrum_1d_text_json, write_spectrum_2d_csv_json,
-    write_spectrum_2d_text_json,
+    spectrum_bundle_loaded_1d_by_source_format_json, spectrum_bundle_loaded_1d_by_source_json,
+    spectrum_bundle_loaded_1d_by_source_path_json, spectrum_bundle_loaded_1d_by_source_vendor_json,
+    spectrum_bundle_loaded_1d_by_sources_json, spectrum_bundle_loaded_2d_by_source_data_kind_json,
+    spectrum_bundle_loaded_2d_by_source_format_json, spectrum_bundle_loaded_2d_by_source_json,
+    spectrum_bundle_loaded_2d_by_source_path_json, spectrum_bundle_loaded_2d_by_source_vendor_json,
+    spectrum_bundle_loaded_2d_by_sources_json, spectrum_bundle_only_1d_json,
+    spectrum_bundle_only_2d_json, spectrum_bundle_only_loaded_1d_json,
+    spectrum_bundle_only_loaded_2d_json, spectrum_bundle_source_data_kinds_json,
+    spectrum_bundle_source_formats_json, spectrum_bundle_source_vendors_json,
+    validate_spectrum_bundle_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
+    write_jcamp_dx_2d_json, write_nmredata_json, write_nmredata_records_json, write_nmrml_1d_json,
+    write_nmrml_2d_json, write_spectrum_1d_csv_json, write_spectrum_1d_text_json,
+    write_spectrum_2d_csv_json, write_spectrum_2d_text_json,
 };
 
 /// Parses one-dimensional CSV text into serialized spectrum JSON.
@@ -852,6 +853,76 @@ pub fn spectrum_bundle_loaded_2d_by_source_path(
 ) -> std::result::Result<String, JsValue> {
     spectrum_bundle_loaded_2d_by_source_path_json(input, source_path)
         .map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one one-dimensional spectrum matching a generic source filter from spectrum bundle JSON.
+///
+/// `filterJson` is a source filter object such as
+/// `{"kind":"vendor","vendor":"bruker"}`.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the filter JSON is invalid, the
+/// bundle does not contain exactly one matching one-dimensional spectrum, or
+/// serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle1dBySource)]
+pub fn spectrum_bundle_1d_by_source(
+    input: &str,
+    filter_json: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_1d_by_source_json(input, filter_json).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one one-dimensional loaded spectrum matching a generic source filter from spectrum bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the filter JSON is invalid, the
+/// bundle does not contain exactly one matching one-dimensional spectrum, or
+/// serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleLoaded1dBySource)]
+pub fn spectrum_bundle_loaded_1d_by_source(
+    input: &str,
+    filter_json: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_loaded_1d_by_source_json(input, filter_json).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one two-dimensional spectrum matching a generic source filter from spectrum bundle JSON.
+///
+/// `filterJson` is a source filter object such as
+/// `{"kind":"path","path":"vendor/hsqc.jdf"}`.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the filter JSON is invalid, the
+/// bundle does not contain exactly one matching two-dimensional spectrum, or
+/// serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle2dBySource)]
+pub fn spectrum_bundle_2d_by_source(
+    input: &str,
+    filter_json: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_2d_by_source_json(input, filter_json).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum matching a generic source filter from spectrum bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the filter JSON is invalid, the
+/// bundle does not contain exactly one matching two-dimensional spectrum, or
+/// serialization fails.
+#[wasm_bindgen(js_name = spectrumBundleLoaded2dBySource)]
+pub fn spectrum_bundle_loaded_2d_by_source(
+    input: &str,
+    filter_json: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_loaded_2d_by_source_json(input, filter_json).map_err(|error| js_error(&error))
 }
 
 /// Extracts exactly one one-dimensional spectrum matching any source filter from spectrum bundle JSON.
