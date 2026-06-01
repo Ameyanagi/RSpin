@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use anyhow::{Result, anyhow};
 use rspin_io::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
-    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFormat,
-    LoadedSourceVendor, RSpinReader, discover_spectra, discover_spectra_many,
+    DiscoveredSpectrumSource, DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFilter,
+    LoadedSourceFormat, LoadedSourceVendor, RSpinReader, discover_spectra, discover_spectra_many,
     discover_spectra_many_relative_to, load_discovered_spectra,
     load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
@@ -76,6 +76,43 @@ fn source_discovery_respects_chainable_loader_filters() -> Result<()> {
             .iter()
             .all(|source| source.vendor() == Some(LoadedSourceVendor::Bruker))
     );
+
+    Ok(())
+}
+
+#[test]
+fn discovered_sources_match_generic_source_filters() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+
+    let varian = discovered_source(&sources, "varian_1h", LoadedSourceFormat::AgilentFid)?;
+    assert!(varian.matches_source(LoadedSourceFilter::vendor("varian")));
+    assert!(varian.matches_source(LoadedSourceFilter::format("agilent_fid")));
+    assert!(varian.matches_source(LoadedSourceDataKind::Raw));
+    assert!(varian.matches_source(LoadedSourceFilter::path("varian_1h")));
+    assert!(!varian.matches_source(LoadedSourceFilter::path_prefix("bruker_without_expno")));
+    assert!(varian.is_1d());
+    assert!(!varian.is_2d());
+    assert!(!varian.is_unknown_dimension());
+
+    let bruker_processed = discovered_source(
+        &sources,
+        "bruker_without_expno/pdata/1",
+        LoadedSourceFormat::BrukerProcessed,
+    )?;
+    assert!(
+        bruker_processed.matches_source(LoadedSourceFilter::path_prefix("bruker_without_expno"))
+    );
+
+    let empty_jcamp = discovered_source(
+        &sources,
+        "empty_jcamp/empty.jdx",
+        LoadedSourceFormat::JcampDx,
+    )?;
+    assert!(empty_jcamp.matches_any_source([
+        LoadedSourceFilter::format("jdx"),
+        LoadedSourceFilter::vendor("bruker"),
+    ]));
+    assert!(!empty_jcamp.matches_any_source(Vec::<LoadedSourceFilter>::new()));
 
     Ok(())
 }

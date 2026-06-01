@@ -380,7 +380,11 @@ fn load_selected_after_preflight() -> Result<SpectrumBundle> {
     let sources = RSpinReader::new()
         .processed_sources()
         .discover("data/mixed-vendor")?;
-    load_discovered_spectra_relative_to("data/mixed-vendor", &sources)
+    let selected = sources
+        .iter()
+        .filter(|source| source.matches_source(LoadedSourceFilter::vendor("bruker")))
+        .collect::<Vec<_>>();
+    load_discovered_spectra_relative_to("data/mixed-vendor", selected)
 }
 ```
 

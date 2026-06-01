@@ -462,12 +462,19 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
             .contains(&DiscoveredSpectrumPathCount::new("varian_1h", 1))
     );
     assert!(summary.has_dimension(DiscoveredSpectrumDimension::OneD));
-    assert!(sources.iter().any(|source| {
-        source.path() == Some(std::path::Path::new("varian_1h"))
-            && source.is_format(LoadedSourceFormat::AgilentFid)
-            && source.dimension() == DiscoveredSpectrumDimension::OneD
-            && source.data_kind() == LoadedSourceDataKind::Raw
-    }));
+    let varian = sources
+        .iter()
+        .find(|source| {
+            source.path() == Some(std::path::Path::new("varian_1h"))
+                && source.is_format(LoadedSourceFormat::AgilentFid)
+        })
+        .ok_or_else(|| RSpinError::Parse {
+            format: "spectrum bundle source discovery",
+            message: "missing varian source candidate".to_owned(),
+        })?;
+    assert!(varian.is_1d());
+    assert_eq!(varian.data_kind(), LoadedSourceDataKind::Raw);
+    assert!(varian.matches_source(LoadedSourceFilter::vendor("varian")));
 
     let processed = RSpinReader::new()
         .processed_sources()

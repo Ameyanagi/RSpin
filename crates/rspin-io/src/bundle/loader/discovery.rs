@@ -11,8 +11,8 @@ use crate::{Spectrum1DPathFormat, Spectrum2DPathFormat};
 
 use super::SpectrumBundleLoader;
 use crate::bundle::{
-    LoadWarning, LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor,
-    SpectrumBundle, collect_tree, file_candidate_kind, format_from_file,
+    LoadWarning, LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat,
+    LoadedSourceVendor, SpectrumBundle, collect_tree, file_candidate_kind, format_from_file,
     is_agilent_arrayed_1d_fid_path, is_agilent_arrayed_2d_fid_path, is_agilent_fid_dir,
     is_agilent_processed_dir, is_bruker_fid_dir, is_bruker_processed_1d_dir,
     is_bruker_processed_2d_dir, is_bruker_ser_dir, is_nmredata_file, is_standalone_spectrum_file,
@@ -140,6 +140,28 @@ impl DiscoveredSpectrumSource {
         LoadedSource::new(self.path.clone(), self.format.clone())
     }
 
+    /// Returns true when this discovered source matches a generic source filter.
+    #[must_use]
+    pub fn matches_source(&self, filter: impl Into<LoadedSourceFilter>) -> bool {
+        filter.into().matches_source(&self.source())
+    }
+
+    /// Returns true when this discovered source matches any generic source filter.
+    ///
+    /// Empty filter iterators return false because this is a candidate predicate,
+    /// not a loader restriction.
+    #[must_use]
+    pub fn matches_any_source<I, F>(&self, filters: I) -> bool
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let source = self.source();
+        filters
+            .into_iter()
+            .any(|filter| filter.into().matches_source(&source))
+    }
+
     /// Returns true when this source would use the requested source format.
     #[must_use]
     pub fn is_format(&self, format: impl AsRef<str>) -> bool {
@@ -150,6 +172,24 @@ impl DiscoveredSpectrumSource {
     #[must_use]
     pub fn is_vendor(&self, vendor: impl AsRef<str>) -> bool {
         self.source().is_vendor(vendor)
+    }
+
+    /// Returns true when discovery inferred a one-dimensional source.
+    #[must_use]
+    pub const fn is_1d(&self) -> bool {
+        self.dimension.is_1d()
+    }
+
+    /// Returns true when discovery inferred a two-dimensional source.
+    #[must_use]
+    pub const fn is_2d(&self) -> bool {
+        self.dimension.is_2d()
+    }
+
+    /// Returns true when discovery could not infer the spectrum dimension.
+    #[must_use]
+    pub const fn is_unknown_dimension(&self) -> bool {
+        self.dimension.is_unknown()
     }
 
     /// Returns true when this source represents vendor raw acquisition data.
