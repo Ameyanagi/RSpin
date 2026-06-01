@@ -849,12 +849,45 @@ fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
 
     let selected_1d = select_discovered_spectra_1d(&myrcene_sources);
     assert_eq!(selected_1d.len(), 5);
+    let jeol_1d = select_discovered_spectra_1d_by_source(
+        &myrcene_sources,
+        LoadedSourceFilter::vendor("jeol"),
+    );
+    assert_eq!(jeol_1d.len(), 2);
+    let jeol_1d_many = select_discovered_spectra_1d_by_sources(
+        &myrcene_sources,
+        [LoadedSourceFilter::vendor("jeol")],
+    );
+    assert_eq!(jeol_1d_many, jeol_1d);
     let selected_2d =
         select_discovered_spectra_by_dimension(&myrcene_sources, DiscoveredSpectrumDimension::TwoD);
     assert_eq!(
         selected_2d.len(),
         select_discovered_spectra_2d(&myrcene_sources).len()
     );
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let hsqc_candidate = select_discovered_spectra_2d_by_source(
+        &myrcene_sources,
+        LoadedSourceFilter::path(hsqc_path),
+    );
+    assert_eq!(hsqc_candidate.len(), 1);
+    let hsqc_candidates = select_discovered_spectra_2d_by_sources(
+        &myrcene_sources,
+        [LoadedSourceFilter::path(hsqc_path)],
+    );
+    assert_eq!(hsqc_candidates, hsqc_candidate);
+    let hsqc_candidates_by_dimension = select_discovered_spectra_by_dimension_and_sources(
+        &myrcene_sources,
+        DiscoveredSpectrumDimension::TwoD,
+        [LoadedSourceFilter::path(hsqc_path)],
+    );
+    assert_eq!(hsqc_candidates_by_dimension, hsqc_candidate);
+    let selected_unknown = select_discovered_spectra_by_dimension_and_source(
+        &myrcene_sources,
+        DiscoveredSpectrumDimension::Unknown,
+        LoadedSourceFilter::vendor("jeol"),
+    );
+    assert!(selected_unknown.is_empty());
 
     let jeol_1d = load_discovered_spectra_1d_by_source_relative_to(
         &myrcene_root,
@@ -864,7 +897,6 @@ fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
     assert_eq!(jeol_1d.len_1d(), 2);
     assert_eq!(jeol_1d.len_2d(), 0);
 
-    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
     let hsqc = RSpinReader::new().read_discovered_bundle_2d_by_sources(
         &myrcene_root,
         &myrcene_sources,

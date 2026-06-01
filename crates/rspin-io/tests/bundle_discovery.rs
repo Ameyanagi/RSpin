@@ -20,8 +20,11 @@ use rspin_io::{
     load_discovered_spectra_2d_strict_by_sources, load_discovered_spectra_by_source,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
-    select_discovered_spectra_1d, select_discovered_spectra_2d,
-    select_discovered_spectra_by_dimension, select_discovered_spectra_by_source,
+    select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
+    select_discovered_spectra_1d_by_sources, select_discovered_spectra_2d,
+    select_discovered_spectra_2d_by_source, select_discovered_spectra_2d_by_sources,
+    select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
+    select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
     select_discovered_spectra_by_sources, summarize_discovered_spectra,
 };
 
@@ -140,6 +143,18 @@ fn discovered_dimension_selection_helpers_filter_candidates() -> Result<()> {
     assert_eq!(one_d.len(), summary.sources_1d());
     assert!(one_d.iter().all(|source| source.is_1d()));
 
+    let jeol_1d =
+        select_discovered_spectra_1d_by_source(&sources, LoadedSourceFilter::vendor("jeol"));
+    assert_eq!(jeol_1d.len(), 2);
+    assert!(
+        jeol_1d
+            .iter()
+            .all(|source| { source.is_1d() && source.vendor() == Some(LoadedSourceVendor::Jeol) })
+    );
+    let all_1d =
+        select_discovered_spectra_1d_by_sources(&sources, Vec::<LoadedSourceFilter>::new());
+    assert_eq!(all_1d, one_d);
+
     let two_d = select_discovered_spectra_2d(&sources);
     assert_eq!(two_d.len(), summary.sources_2d());
     assert!(two_d.iter().all(|source| source.is_2d()));
@@ -149,9 +164,37 @@ fn discovered_dimension_selection_helpers_filter_candidates() -> Result<()> {
             .any(|source| source.path() == Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf")))
     );
 
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let hsqc_2d =
+        select_discovered_spectra_2d_by_source(&sources, LoadedSourceFilter::path(hsqc_path));
+    assert_eq!(hsqc_2d.len(), 1);
+    let selected_2d = select_discovered_spectra_2d_by_sources(
+        &sources,
+        [
+            LoadedSourceFilter::path(hsqc_path),
+            LoadedSourceFilter::path_prefix("bruker_cosy_raw"),
+        ],
+    );
+    assert_eq!(selected_2d.len(), 2);
+
     let unknown =
         select_discovered_spectra_by_dimension(&sources, DiscoveredSpectrumDimension::Unknown);
     assert!(unknown.is_empty());
+    let unknown_by_source = select_discovered_spectra_by_dimension_and_source(
+        &sources,
+        DiscoveredSpectrumDimension::Unknown,
+        LoadedSourceFilter::vendor("jeol"),
+    );
+    assert!(unknown_by_source.is_empty());
+    let selected_1d = select_discovered_spectra_by_dimension_and_sources(
+        &sources,
+        DiscoveredSpectrumDimension::OneD,
+        [
+            LoadedSourceFilter::path("jeol/myrcene_1h_400mhz.jdf"),
+            LoadedSourceFilter::path("missing"),
+        ],
+    );
+    assert_eq!(selected_1d.len(), 1);
     Ok(())
 }
 

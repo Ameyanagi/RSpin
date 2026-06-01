@@ -280,10 +280,14 @@ pub use bundle::{
     load_spectrum_2d_with_source_by_sources, load_spectrum_2d_with_source_by_sources_relative_to,
     load_spectrum_2d_with_source_relative_to, parse_loaded_source_data_kind,
     parse_loaded_source_format, parse_loaded_source_vendor, select_discovered_spectra_1d,
-    select_discovered_spectra_2d, select_discovered_spectra_by_dimension,
-    select_discovered_spectra_by_source, select_discovered_spectra_by_sources,
-    summarize_discovered_spectra, supported_bundle_source_data_kinds,
-    supported_bundle_source_formats, supported_bundle_source_vendors,
+    select_discovered_spectra_1d_by_source, select_discovered_spectra_1d_by_sources,
+    select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
+    select_discovered_spectra_2d_by_sources, select_discovered_spectra_by_dimension,
+    select_discovered_spectra_by_dimension_and_source,
+    select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_sources, summarize_discovered_spectra,
+    supported_bundle_source_data_kinds, supported_bundle_source_formats,
+    supported_bundle_source_vendors,
 };
 pub use bundle_json::{
     JsonSpectrumBundle, SPECTRUM_BUNDLE_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_VERSION,

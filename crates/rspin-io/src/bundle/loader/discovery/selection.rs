@@ -11,12 +11,72 @@ pub fn select_discovered_spectra_1d(
     select_discovered_spectra_by_dimension(sources, DiscoveredSpectrumDimension::OneD)
 }
 
+/// Selects discovered one-dimensional source candidates matching one generic source filter.
+#[must_use]
+pub fn select_discovered_spectra_1d_by_source(
+    sources: &[DiscoveredSpectrumSource],
+    filter: impl Into<LoadedSourceFilter>,
+) -> Vec<&DiscoveredSpectrumSource> {
+    let filter = filter.into();
+    select_discovered_spectra_1d_by_sources(sources, [filter])
+}
+
+/// Selects discovered one-dimensional source candidates matching any generic source filter.
+///
+/// Filters are combined with logical OR. Passing an empty iterator returns all
+/// discovered one-dimensional source candidates.
+#[must_use]
+pub fn select_discovered_spectra_1d_by_sources<I, F>(
+    sources: &[DiscoveredSpectrumSource],
+    filters: I,
+) -> Vec<&DiscoveredSpectrumSource>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    select_discovered_spectra_by_dimension_and_sources(
+        sources,
+        DiscoveredSpectrumDimension::OneD,
+        filters,
+    )
+}
+
 /// Selects discovered two-dimensional source candidates.
 #[must_use]
 pub fn select_discovered_spectra_2d(
     sources: &[DiscoveredSpectrumSource],
 ) -> Vec<&DiscoveredSpectrumSource> {
     select_discovered_spectra_by_dimension(sources, DiscoveredSpectrumDimension::TwoD)
+}
+
+/// Selects discovered two-dimensional source candidates matching one generic source filter.
+#[must_use]
+pub fn select_discovered_spectra_2d_by_source(
+    sources: &[DiscoveredSpectrumSource],
+    filter: impl Into<LoadedSourceFilter>,
+) -> Vec<&DiscoveredSpectrumSource> {
+    let filter = filter.into();
+    select_discovered_spectra_2d_by_sources(sources, [filter])
+}
+
+/// Selects discovered two-dimensional source candidates matching any generic source filter.
+///
+/// Filters are combined with logical OR. Passing an empty iterator returns all
+/// discovered two-dimensional source candidates.
+#[must_use]
+pub fn select_discovered_spectra_2d_by_sources<I, F>(
+    sources: &[DiscoveredSpectrumSource],
+    filters: I,
+) -> Vec<&DiscoveredSpectrumSource>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    select_discovered_spectra_by_dimension_and_sources(
+        sources,
+        DiscoveredSpectrumDimension::TwoD,
+        filters,
+    )
 }
 
 /// Selects discovered source candidates with one inferred dimension.
@@ -26,6 +86,34 @@ pub fn select_discovered_spectra_by_dimension(
     dimension: DiscoveredSpectrumDimension,
 ) -> Vec<&DiscoveredSpectrumSource> {
     select_discovered_source_refs_by_dimension(sources.iter(), dimension)
+}
+
+/// Selects discovered source candidates with one inferred dimension and one generic source filter.
+#[must_use]
+pub fn select_discovered_spectra_by_dimension_and_source(
+    sources: &[DiscoveredSpectrumSource],
+    dimension: DiscoveredSpectrumDimension,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Vec<&DiscoveredSpectrumSource> {
+    let filter = filter.into();
+    select_discovered_spectra_by_dimension_and_sources(sources, dimension, [filter])
+}
+
+/// Selects discovered source candidates with one inferred dimension and any generic source filter.
+///
+/// Filters are combined with logical OR. Passing an empty iterator returns all
+/// discovered source candidates with the requested inferred dimension.
+#[must_use]
+pub fn select_discovered_spectra_by_dimension_and_sources<I, F>(
+    sources: &[DiscoveredSpectrumSource],
+    dimension: DiscoveredSpectrumDimension,
+    filters: I,
+) -> Vec<&DiscoveredSpectrumSource>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    select_discovered_source_refs_by_dimension_and_sources(sources.iter(), dimension, filters)
 }
 
 /// Selects discovered source candidates matching one generic source filter.
@@ -68,6 +156,26 @@ where
     sources
         .into_iter()
         .filter(|source| source.dimension() == dimension)
+        .collect()
+}
+
+pub(super) fn select_discovered_source_refs_by_dimension_and_sources<'a, S, I, F>(
+    sources: S,
+    dimension: DiscoveredSpectrumDimension,
+    filters: I,
+) -> Vec<&'a DiscoveredSpectrumSource>
+where
+    S: IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    let filters = discovered_source_filters(filters);
+    sources
+        .into_iter()
+        .filter(|source| {
+            source.dimension() == dimension
+                && (filters.is_empty() || source.matches_any_source(filters.iter()))
+        })
         .collect()
 }
 
