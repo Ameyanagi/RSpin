@@ -5,8 +5,8 @@ use std::path::Path;
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use super::{
-    LoadedSource, LoadedSourceFilter, LoadedSourceVendor, LoadedSpectrum, SpectrumBundle,
-    source_format_count_name, source_format_matches,
+    LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceVendor, LoadedSpectrum,
+    SpectrumBundle, source_format_count_name, source_format_matches,
 };
 
 impl SpectrumBundle {
@@ -148,6 +148,68 @@ impl SpectrumBundle {
             Some(vendor) => source.vendor() == Some(vendor),
             None => false,
         })
+    }
+
+    /// Returns the only one-dimensional spectrum read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_1d_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<&Spectrum1D> {
+        self.only_loaded_1d_by_source_data_kind(data_kind)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only one-dimensional spectrum and source read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_1d_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<(&Spectrum1D, &LoadedSource)> {
+        self.only_loaded_1d_by_source(LoadedSourceFilter::data_kind(data_kind))
+    }
+
+    /// Returns the only two-dimensional spectrum read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_2d_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<&Spectrum2D> {
+        self.only_loaded_2d_by_source_data_kind(data_kind)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Returns the only two-dimensional spectrum and source read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn only_loaded_2d_by_source_data_kind(
+        &self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<(&Spectrum2D, &LoadedSource)> {
+        self.only_loaded_2d_by_source(LoadedSourceFilter::data_kind(data_kind))
     }
 
     /// Returns the only one-dimensional spectrum read from a tracked source path.
@@ -408,6 +470,68 @@ impl SpectrumBundle {
             Some(vendor) => source.vendor() == Some(vendor),
             None => false,
         })
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_1d_by_source_data_kind(
+        self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<Spectrum1D> {
+        self.into_only_loaded_1d_by_source_data_kind(data_kind)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only one-dimensional spectrum and source read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching one-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_1d_by_source_data_kind(
+        self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.into_only_loaded_1d_by_source(LoadedSourceFilter::data_kind(data_kind))
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_2d_by_source_data_kind(
+        self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<Spectrum2D> {
+        self.into_only_loaded_2d_by_source_data_kind(data_kind)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the only two-dimensional spectrum and source read from a source data kind.
+    ///
+    /// Other matching dimensions do not prevent success.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error unless exactly one matching two-dimensional spectrum
+    /// exists.
+    pub fn into_only_loaded_2d_by_source_data_kind(
+        self,
+        data_kind: LoadedSourceDataKind,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.into_only_loaded_2d_by_source(LoadedSourceFilter::data_kind(data_kind))
     }
 
     /// Consumes the bundle and returns the only one-dimensional spectrum read from a tracked source path.

@@ -749,6 +749,43 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_data_kind_exact_bundle_loaders() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let mixed_vendor_base =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../rspin-io/testdata/nmrxiv/cc0");
+
+    let raw_1d =
+        load_spectrum_1d_by_source_data_kind(&mixed_vendor_root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (raw_1d, source) = load_spectrum_1d_with_source_by_source_data_kind(
+        &mixed_vendor_root,
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.data_kind(), LoadedSourceDataKind::Raw);
+
+    let raw_2d = RSpinReader::new()
+        .read_2d_by_source_data_kind(&mixed_vendor_root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    let (raw_2d, source) = load_spectrum_2d_with_source_by_source_data_kind_relative_to(
+        &mixed_vendor_base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    assert_eq!(
+        source.path(),
+        Some(std::path::Path::new("myrcene/bruker_cosy_raw"))
+    );
+
+    let raw_1d = load_spectra(&mixed_vendor_root)?
+        .into_only_1d_by_source_data_kind(LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_generic_source_filtered_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

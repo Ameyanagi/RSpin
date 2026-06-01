@@ -1,5 +1,6 @@
 //! Exact single-spectrum convenience readers.
 
+mod data_kind_filtered;
 mod generic_source_filtered;
 mod many_source_filtered;
 mod source_filtered;
@@ -9,6 +10,14 @@ use std::path::Path;
 use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
 use super::{LoadedSource, SpectrumBundleLoader};
+pub use data_kind_filtered::{
+    load_spectrum_1d_by_source_data_kind, load_spectrum_1d_by_source_data_kind_relative_to,
+    load_spectrum_1d_with_source_by_source_data_kind,
+    load_spectrum_1d_with_source_by_source_data_kind_relative_to,
+    load_spectrum_2d_by_source_data_kind, load_spectrum_2d_by_source_data_kind_relative_to,
+    load_spectrum_2d_with_source_by_source_data_kind,
+    load_spectrum_2d_with_source_by_source_data_kind_relative_to,
+};
 pub use generic_source_filtered::{
     load_spectrum_1d_by_source, load_spectrum_1d_by_source_relative_to,
     load_spectrum_1d_many_by_source, load_spectrum_1d_many_by_source_relative_to,

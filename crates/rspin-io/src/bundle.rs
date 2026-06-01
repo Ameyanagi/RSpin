@@ -20,7 +20,8 @@ mod selectors;
 mod source_filter;
 mod source_format;
 pub use exact::{
-    load_spectrum_1d, load_spectrum_1d_by_source, load_spectrum_1d_by_source_format,
+    load_spectrum_1d, load_spectrum_1d_by_source, load_spectrum_1d_by_source_data_kind,
+    load_spectrum_1d_by_source_data_kind_relative_to, load_spectrum_1d_by_source_format,
     load_spectrum_1d_by_source_format_relative_to, load_spectrum_1d_by_source_path,
     load_spectrum_1d_by_source_path_relative_to, load_spectrum_1d_by_source_relative_to,
     load_spectrum_1d_by_source_vendor, load_spectrum_1d_by_source_vendor_relative_to,
@@ -41,6 +42,8 @@ pub use exact::{
     load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
     load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
     load_spectrum_1d_with_source, load_spectrum_1d_with_source_by_source,
+    load_spectrum_1d_with_source_by_source_data_kind,
+    load_spectrum_1d_with_source_by_source_data_kind_relative_to,
     load_spectrum_1d_with_source_by_source_format,
     load_spectrum_1d_with_source_by_source_format_relative_to,
     load_spectrum_1d_with_source_by_source_path,
@@ -49,6 +52,7 @@ pub use exact::{
     load_spectrum_1d_with_source_by_source_vendor,
     load_spectrum_1d_with_source_by_source_vendor_relative_to,
     load_spectrum_1d_with_source_relative_to, load_spectrum_2d, load_spectrum_2d_by_source,
+    load_spectrum_2d_by_source_data_kind, load_spectrum_2d_by_source_data_kind_relative_to,
     load_spectrum_2d_by_source_format, load_spectrum_2d_by_source_format_relative_to,
     load_spectrum_2d_by_source_path, load_spectrum_2d_by_source_path_relative_to,
     load_spectrum_2d_by_source_relative_to, load_spectrum_2d_by_source_vendor,
@@ -70,6 +74,8 @@ pub use exact::{
     load_spectrum_2d_paths_relative_to, load_spectrum_2d_paths_with_source,
     load_spectrum_2d_paths_with_source_relative_to, load_spectrum_2d_relative_to,
     load_spectrum_2d_with_source, load_spectrum_2d_with_source_by_source,
+    load_spectrum_2d_with_source_by_source_data_kind,
+    load_spectrum_2d_with_source_by_source_data_kind_relative_to,
     load_spectrum_2d_with_source_by_source_format,
     load_spectrum_2d_with_source_by_source_format_relative_to,
     load_spectrum_2d_with_source_by_source_path,

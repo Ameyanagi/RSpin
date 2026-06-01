@@ -94,6 +94,10 @@ fn load_exactly_one_bruker_spectrum() -> Result<Spectrum1D> {
     )
 }
 
+fn load_exactly_one_raw_spectrum() -> Result<Spectrum1D> {
+    load_spectrum_1d_by_source_data_kind("data/mixed-vendor", LoadedSourceDataKind::Raw)
+}
+
 fn load_exactly_one_tracked_source() -> Result<Spectrum2D> {
     load_spectrum_2d_by_source_path_relative_to(
         "data",

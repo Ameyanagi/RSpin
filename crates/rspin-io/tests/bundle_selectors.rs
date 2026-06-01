@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 use rspin_core::Nucleus;
 use rspin_io::{
     LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader,
-    load_spectra, load_spectrum_1d_by_source, load_spectrum_1d_by_source_format,
+    load_spectra, load_spectrum_1d_by_source, load_spectrum_1d_by_source_data_kind,
+    load_spectrum_1d_by_source_data_kind_relative_to, load_spectrum_1d_by_source_format,
     load_spectrum_1d_by_source_format_relative_to, load_spectrum_1d_by_source_path,
     load_spectrum_1d_by_source_path_relative_to, load_spectrum_1d_by_source_relative_to,
     load_spectrum_1d_by_source_vendor, load_spectrum_1d_by_source_vendor_relative_to,
@@ -13,6 +14,8 @@ use rspin_io::{
     load_spectrum_1d_many_by_source_path_relative_to, load_spectrum_1d_many_with_source_by_source,
     load_spectrum_1d_many_with_source_by_source_relative_to,
     load_spectrum_1d_many_with_source_by_source_vendor, load_spectrum_1d_with_source_by_source,
+    load_spectrum_1d_with_source_by_source_data_kind,
+    load_spectrum_1d_with_source_by_source_data_kind_relative_to,
     load_spectrum_1d_with_source_by_source_format,
     load_spectrum_1d_with_source_by_source_format_relative_to,
     load_spectrum_1d_with_source_by_source_path,
@@ -20,6 +23,7 @@ use rspin_io::{
     load_spectrum_1d_with_source_by_source_relative_to,
     load_spectrum_1d_with_source_by_source_vendor,
     load_spectrum_1d_with_source_by_source_vendor_relative_to, load_spectrum_2d_by_source,
+    load_spectrum_2d_by_source_data_kind, load_spectrum_2d_by_source_data_kind_relative_to,
     load_spectrum_2d_by_source_format, load_spectrum_2d_by_source_format_relative_to,
     load_spectrum_2d_by_source_path, load_spectrum_2d_by_source_path_relative_to,
     load_spectrum_2d_by_source_relative_to, load_spectrum_2d_by_source_vendor,
@@ -27,6 +31,8 @@ use rspin_io::{
     load_spectrum_2d_many_by_source_format_relative_to,
     load_spectrum_2d_many_by_source_relative_to, load_spectrum_2d_many_with_source_by_source,
     load_spectrum_2d_many_with_source_by_source_path, load_spectrum_2d_with_source_by_source,
+    load_spectrum_2d_with_source_by_source_data_kind,
+    load_spectrum_2d_with_source_by_source_data_kind_relative_to,
     load_spectrum_2d_with_source_by_source_format,
     load_spectrum_2d_with_source_by_source_format_relative_to,
     load_spectrum_2d_with_source_by_source_path,
@@ -165,6 +171,35 @@ fn generic_source_filter_exact_helpers_select_matching_dimension() -> anyhow::Re
         .into_only_loaded_2d_by_source(LoadedSourceFilter::from(LoadedSourceVendor::Bruker))?;
     assert_eq!(bruker_2d.shape(), (2048, 512));
     assert_eq!(bruker_source.format(), "bruker_ser");
+    Ok(())
+}
+
+#[test]
+fn source_data_kind_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    let raw_1d = bundle.only_1d_by_source_data_kind(LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (raw_2d, raw_source) =
+        bundle.only_loaded_2d_by_source_data_kind(LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
+
+    assert_single_error(
+        bundle.only_loaded_1d_by_source_data_kind(LoadedSourceDataKind::Other),
+        "expected exactly one one-dimensional spectrum for source data kind other",
+        "found 4 one-dimensional and 1 two-dimensional spectra",
+    )?;
+
+    let raw_1d = load_spectra(nmrxiv_fixture_root())?
+        .into_only_1d_by_source_data_kind(LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (raw_2d, raw_source) = load_spectra(nmrxiv_fixture_root())?
+        .into_only_loaded_2d_by_source_data_kind(LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
     Ok(())
 }
 
@@ -385,6 +420,43 @@ fn reader_generic_source_filter_exact_helpers_select_matching_dimension() -> any
 }
 
 #[test]
+fn reader_source_data_kind_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let root = nmrxiv_fixture_root();
+
+    let raw_1d = reader.read_1d_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (raw_2d, raw_source) =
+        reader.read_2d_with_source_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
+
+    assert_single_error(
+        reader.read_1d_by_source_data_kind(&root, LoadedSourceDataKind::Other),
+        "expected exactly one one-dimensional spectrum for source data kind other",
+        "found 4 one-dimensional and 1 two-dimensional spectra",
+    )?;
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let (raw_1d, raw_source) = reader.read_1d_with_source_by_source_data_kind_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(raw_source.path(), Some(Path::new("myrcene/bruker_1h_raw")));
+
+    let raw_2d = reader.read_2d_by_source_data_kind_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
 fn relative_source_filtered_helpers_anchor_source_paths() -> anyhow::Result<()> {
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
     let reader = RSpinReader::new();
@@ -522,6 +594,60 @@ fn free_source_vendor_exact_helpers_select_matching_dimension() -> anyhow::Resul
         "expected exactly one one-dimensional spectrum for source vendor jeol",
         "found 2 one-dimensional and 1 two-dimensional spectra",
     )?;
+    Ok(())
+}
+
+#[test]
+fn free_source_data_kind_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+
+    let raw_1d = load_spectrum_1d_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (raw_1d, raw_source) =
+        load_spectrum_1d_with_source_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
+
+    let raw_2d = load_spectrum_2d_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+
+    let (raw_2d, raw_source) =
+        load_spectrum_2d_with_source_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let raw_1d = load_spectrum_1d_by_source_data_kind_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (_, raw_source) = load_spectrum_1d_with_source_by_source_data_kind_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_source.path(), Some(Path::new("myrcene/bruker_1h_raw")));
+
+    let raw_2d = load_spectrum_2d_by_source_data_kind_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+
+    let (_, raw_source) = load_spectrum_2d_with_source_by_source_data_kind_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(
+        raw_source.path(),
+        Some(Path::new("myrcene/bruker_cosy_raw"))
+    );
     Ok(())
 }
 
