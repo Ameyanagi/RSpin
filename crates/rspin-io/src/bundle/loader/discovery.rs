@@ -273,6 +273,32 @@ impl SpectrumBundleLoader {
         self.discover_path(path)
     }
 
+    /// Discovers and summarizes source candidates below a file or directory.
+    ///
+    /// Discovery respects the same filters as [`Self::discover_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_summary_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        let sources = self.discover_path(path)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes source candidates below a file or directory.
+    ///
+    /// This is a short alias for [`Self::discover_summary_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_summary(&self, path: impl AsRef<Path>) -> Result<DiscoveredSpectrumSummary> {
+        self.discover_summary_path(path)
+    }
+
     /// Discovers one selected path while anchoring source paths to a base directory.
     ///
     /// # Errors
@@ -299,6 +325,35 @@ impl SpectrumBundleLoader {
         path: impl AsRef<Path>,
     ) -> Result<Vec<DiscoveredSpectrumSource>> {
         self.discover_path_relative_to(base, path)
+    }
+
+    /// Discovers and summarizes one selected path while anchoring source paths to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory or selected path is missing.
+    pub fn discover_summary_path_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        let sources = self.discover_path_relative_to(base, path)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes one selected path while anchoring source paths to a base directory.
+    ///
+    /// This is a short alias for [`Self::discover_summary_path_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory or selected path is missing.
+    pub fn discover_summary_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        self.discover_summary_path_relative_to(base, path)
     }
 
     /// Discovers source candidates below multiple file or directory paths.
@@ -346,6 +401,35 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.discover_paths(paths)
+    }
+
+    /// Discovers and summarizes source candidates below multiple file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no paths are provided or an input path is missing.
+    pub fn discover_summary_paths<I, P>(&self, paths: I) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_paths(paths)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes source candidates below multiple file or directory paths.
+    ///
+    /// This is a short alias for [`Self::discover_summary_paths`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no paths are provided or an input path is missing.
+    pub fn discover_summary_many<I, P>(&self, paths: I) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.discover_summary_paths(paths)
     }
 
     /// Discovers selected paths while anchoring source paths to a base directory.
@@ -416,6 +500,45 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.discover_paths_relative_to(base, paths)
+    }
+
+    /// Discovers and summarizes selected paths while anchoring source paths to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory is missing, no selected paths
+    /// are provided, or a selected path is missing.
+    pub fn discover_summary_paths_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_paths_relative_to(base, paths)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes selected paths while anchoring source paths to a base directory.
+    ///
+    /// This is a short alias for [`Self::discover_summary_paths_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory is missing, no selected paths
+    /// are provided, or a selected path is missing.
+    pub fn discover_summary_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.discover_summary_paths_relative_to(base, paths)
     }
 
     /// Loads selected discovered source candidates relative to a common base directory.

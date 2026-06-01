@@ -495,6 +495,8 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
 
     let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
     let summary: DiscoveredSpectrumSummary = summarize_discovered_spectra(&sources);
+    let direct_summary = discover_spectra_summary(&fixture_root)?;
+    assert_eq!(direct_summary, summary);
     assert_eq!(summary.source_format_count("jdx"), 2);
     assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
     assert_eq!(summary.source_path_count("varian_1h"), 1);
@@ -546,12 +548,23 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
         ],
     )?;
     assert_eq!(discovered_many_sources.len(), 3);
+    let discovered_summary =
+        discover_spectra_many_summary_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(discovered_summary.sources(), 1);
+    assert_eq!(
+        discovered_summary.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
 
     let processed = RSpinReader::new()
         .processed_sources()
         .discover_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(processed.len(), 1);
     assert!(processed.iter().all(DiscoveredSpectrumSource::is_processed));
+    let processed_summary = RSpinReader::new()
+        .processed_sources()
+        .discover_summary_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(processed_summary.sources(), processed.len());
 
     let loaded = load_discovered_spectra_relative_to(&fixture_root, &processed)?;
     assert_eq!(loaded.len(), 1);

@@ -11,7 +11,9 @@ use rspin_io::{
     discover_spectra_by_sources, discover_spectra_by_sources_relative_to, discover_spectra_many,
     discover_spectra_many_by_source, discover_spectra_many_by_source_relative_to,
     discover_spectra_many_by_sources, discover_spectra_many_by_sources_relative_to,
-    discover_spectra_many_relative_to, load_discovered_spectra,
+    discover_spectra_many_relative_to, discover_spectra_many_summary,
+    discover_spectra_many_summary_relative_to, discover_spectra_summary,
+    discover_spectra_summary_relative_to, load_discovered_spectra,
     load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
 
@@ -125,6 +127,8 @@ fn discovered_sources_match_generic_source_filters() -> Result<()> {
 fn source_discovery_summary_counts_candidates() -> Result<()> {
     let sources = discover_spectra(fixture_root())?;
     let summary: DiscoveredSpectrumSummary = summarize_discovered_spectra(&sources);
+    let direct_summary = discover_spectra_summary(fixture_root())?;
+    assert_eq!(direct_summary, summary);
 
     assert_eq!(summary.sources(), sources.len());
     assert_eq!(
@@ -194,6 +198,49 @@ fn source_discovery_summary_counts_candidates() -> Result<()> {
             ))
     );
 
+    Ok(())
+}
+
+#[test]
+fn source_discovery_summary_helpers_preflight_paths() -> Result<()> {
+    let root_summary = RSpinReader::new().discover_summary_path(fixture_root())?;
+    assert_eq!(root_summary.sources(), 5);
+    assert_eq!(
+        root_summary.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+
+    let relative_summary =
+        discover_spectra_summary_relative_to(fixture_root(), "bruker_without_expno")?;
+    assert_eq!(relative_summary.sources(), 2);
+    assert_eq!(
+        relative_summary.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let many_summary = discover_spectra_many_summary([
+        fixture_root().join("varian_1h"),
+        fixture_root().join("bruker_without_expno/pdata/1"),
+    ])?;
+    assert_eq!(many_summary.sources(), 2);
+    assert_eq!(
+        many_summary.source_data_kind_count(LoadedSourceDataKind::Raw),
+        1
+    );
+
+    let many_relative_summary =
+        discover_spectra_many_summary_relative_to(fixture_root(), ["varian_1h"])?;
+    assert_eq!(many_relative_summary.sources(), 1);
+    assert!(many_relative_summary.has_source_path("varian_1h"));
+
+    let filtered_summary = RSpinReader::new()
+        .processed_sources()
+        .discover_summary_relative_to(fixture_root(), "bruker_without_expno")?;
+    assert_eq!(filtered_summary.sources(), 1);
+    assert_eq!(
+        filtered_summary.source_data_kind_count(LoadedSourceDataKind::Processed),
+        1
+    );
     Ok(())
 }
 

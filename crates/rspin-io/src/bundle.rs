@@ -227,6 +227,18 @@ pub fn discover_spectra(path: impl AsRef<Path>) -> Result<Vec<DiscoveredSpectrum
     SpectrumBundleLoader::new().discover_path(path)
 }
 
+/// Discovers and summarizes source candidates below a file or directory without loading full spectra.
+///
+/// Empty summaries are allowed so callers can preflight picker selections before
+/// calling [`load_spectra`].
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_summary(path: impl AsRef<Path>) -> Result<DiscoveredSpectrumSummary> {
+    SpectrumBundleLoader::new().discover_summary_path(path)
+}
+
 /// Discovers one selected path while anchoring source paths to a common base directory.
 ///
 /// # Errors
@@ -238,6 +250,19 @@ pub fn discover_spectra_relative_to(
     path: impl AsRef<Path>,
 ) -> Result<Vec<DiscoveredSpectrumSource>> {
     SpectrumBundleLoader::new().discover_path_relative_to(base, path)
+}
+
+/// Discovers and summarizes one selected path while anchoring source paths to a common base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, or the
+/// selected path is missing.
+pub fn discover_spectra_summary_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<DiscoveredSpectrumSummary> {
+    SpectrumBundleLoader::new().discover_summary_path_relative_to(base, path)
 }
 
 /// Discovers source candidates below a file or directory, restricted by one generic source filter.
@@ -763,6 +788,20 @@ where
     SpectrumBundleLoader::new().discover_paths(paths)
 }
 
+/// Discovers and summarizes source candidates below multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_many_summary<I, P>(paths: I) -> Result<DiscoveredSpectrumSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_summary_paths(paths)
+}
+
 /// Discovers selected paths while anchoring source paths to a common base directory.
 ///
 /// # Errors
@@ -778,6 +817,23 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().discover_paths_relative_to(base, paths)
+}
+
+/// Discovers and summarizes selected paths while anchoring source paths to a common base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_many_summary_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<DiscoveredSpectrumSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_summary_paths_relative_to(base, paths)
 }
 
 /// Discovers source candidates below multiple paths, restricted by one generic source filter.
