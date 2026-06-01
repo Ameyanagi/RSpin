@@ -9,11 +9,12 @@ use crate::{Spectrum1DPathFormat, Spectrum2DPathFormat};
 
 use super::SpectrumBundleLoader;
 use crate::bundle::{
-    LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor,
-    SourceDataKindCount, SourceFormatCount, SourceVendorCount, collect_tree, file_candidate_kind,
-    format_from_file, is_agilent_arrayed_1d_fid_path, is_agilent_arrayed_2d_fid_path,
-    is_agilent_fid_dir, is_agilent_processed_dir, is_bruker_fid_dir, is_bruker_processed_1d_dir,
-    is_bruker_processed_2d_dir, is_bruker_ser_dir, is_nmredata_file, is_standalone_spectrum_file,
+    LoadWarning, LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor,
+    SourceDataKindCount, SourceFormatCount, SourceVendorCount, SpectrumBundle, collect_tree,
+    file_candidate_kind, format_from_file, is_agilent_arrayed_1d_fid_path,
+    is_agilent_arrayed_2d_fid_path, is_agilent_fid_dir, is_agilent_processed_dir,
+    is_bruker_fid_dir, is_bruker_processed_1d_dir, is_bruker_processed_2d_dir, is_bruker_ser_dir,
+    is_nmredata_file, is_standalone_spectrum_file, no_data_error_in_inputs,
     selected_path_from_base, source_format_matches,
 };
 
@@ -333,6 +334,39 @@ pub fn summarize_discovered_spectra(
     DiscoveredSpectrumSummary::new(sources)
 }
 
+/// Loads selected discovered source candidates relative to a common base directory.
+///
+/// This is a convenience wrapper for the common preflight workflow: discover
+/// candidates, let the caller select some of them, then load only those exact
+/// source path and format pairs.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or not a directory, no discovered
+/// sources are provided, a selected source does not include a tracked source
+/// path, strict loading rejects a selected source, or no selected source can be
+/// read.
+pub fn load_discovered_spectra_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new().read_discovered_relative_to(base, sources)
+}
+
+/// Loads selected discovered source candidates relative to a common base directory.
+///
+/// This short alias mirrors [`load_discovered_spectra_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the selected discovered sources fails.
+pub fn load_discovered_spectra<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+) -> Result<SpectrumBundle> {
+    load_discovered_spectra_relative_to(base, sources)
+}
+
 impl SpectrumBundleLoader {
     /// Discovers source candidates below a file or directory without loading full spectra.
     ///
@@ -511,6 +545,72 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.discover_paths_relative_to(base, paths)
+    }
+
+    /// Loads selected discovered source candidates relative to a common base directory.
+    ///
+    /// Each discovered source must have source-path tracking enabled. The
+    /// loader reads each selected source with both its discovered path and
+    /// discovered source format as filters, preserving any other options already
+    /// configured on this reader.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `base` is missing or not a directory, no discovered
+    /// sources are provided, a selected source does not include a tracked source
+    /// path, strict loading rejects a selected source, or no selected source can
+    /// be read.
+    pub fn read_discovered_relative_to<'a>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    ) -> Result<SpectrumBundle> {
+        let base = base.as_ref();
+        validate_discovered_base(base)?;
+
+        let mut bundle = SpectrumBundle::new();
+        let mut saw_source = false;
+
+        for source in sources {
+            saw_source = true;
+            let source_path = source.path().ok_or_else(discovered_source_path_error)?;
+            let selected_path = selected_path_from_base(base, source_path);
+            let loader = self.loader_for_discovered_source(source_path, source);
+
+            match loader.read_path_relative_to(base, source_path) {
+                Ok(selected_bundle) => bundle.extend_bundle(selected_bundle),
+                Err(error) if self.strict.is_enabled() => return Err(error),
+                Err(error) => bundle.push_warning(LoadWarning::new(
+                    self.source_path_for_metadata(base, &selected_path),
+                    error.to_string(),
+                )),
+            }
+        }
+
+        if !saw_source {
+            return Err(no_discovered_sources_error());
+        }
+
+        if bundle.has_data() {
+            Ok(bundle)
+        } else {
+            Err(no_data_error_in_inputs(&bundle))
+        }
+    }
+
+    /// Loads selected discovered source candidates relative to a common base directory.
+    ///
+    /// This short alias mirrors [`Self::read_discovered_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the selected discovered sources fails.
+    pub fn read_discovered<'a>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    ) -> Result<SpectrumBundle> {
+        self.read_discovered_relative_to(base, sources)
     }
 
     fn discover_existing_path_into(
@@ -715,6 +815,54 @@ impl SpectrumBundleLoader {
                 self.one_d.is_enabled() || self.two_d.is_enabled()
             }
         }
+    }
+
+    fn loader_for_discovered_source(
+        &self,
+        source_path: &Path,
+        source: &DiscoveredSpectrumSource,
+    ) -> Self {
+        let loader = self
+            .clone()
+            .source_path(source_path)
+            .source_format(source.format());
+        match source.dimension() {
+            DiscoveredSpectrumDimension::OneD => loader.with_2d(false),
+            DiscoveredSpectrumDimension::TwoD => loader.with_1d(false),
+            DiscoveredSpectrumDimension::Unknown => loader,
+        }
+    }
+}
+
+fn validate_discovered_base(base: &Path) -> Result<()> {
+    if !base.exists() {
+        return Err(RSpinError::Parse {
+            format: "spectrum bundle",
+            message: format!("{} does not exist", base.display()),
+        });
+    }
+    if !base.is_dir() {
+        return Err(RSpinError::Parse {
+            format: "spectrum bundle",
+            message: format!("{} is not a directory", base.display()),
+        });
+    }
+    Ok(())
+}
+
+fn discovered_source_path_error() -> RSpinError {
+    RSpinError::Parse {
+        format: "spectrum bundle",
+        message:
+            "discovered source is missing a tracked source path; discover with source paths enabled"
+                .to_owned(),
+    }
+}
+
+fn no_discovered_sources_error() -> RSpinError {
+    RSpinError::Parse {
+        format: "spectrum bundle",
+        message: "no discovered sources provided".to_owned(),
     }
 }
 

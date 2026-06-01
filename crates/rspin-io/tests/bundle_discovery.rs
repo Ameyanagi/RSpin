@@ -7,7 +7,7 @@ use rspin_io::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
     DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor,
     RSpinReader, discover_spectra, discover_spectra_many, discover_spectra_many_relative_to,
-    summarize_discovered_spectra,
+    load_discovered_spectra, load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
 
 #[test]
@@ -162,6 +162,103 @@ fn source_discovery_supports_relative_and_many_inputs() -> Result<()> {
     };
     assert!(error.to_string().contains("no input paths provided"));
 
+    Ok(())
+}
+
+#[test]
+fn loads_selected_discovered_sources_relative_to_base() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+    let selected = sources
+        .iter()
+        .filter(|source| source.is_format(LoadedSourceFormat::AgilentFid) || source.is_processed())
+        .collect::<Vec<_>>();
+
+    let bundle = RSpinReader::new().read_discovered_relative_to(fixture_root(), selected)?;
+
+    assert_eq!(bundle.len(), 2);
+    assert_eq!(
+        bundle.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        bundle.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+    assert!(bundle.has_source_path(Path::new("varian_1h")));
+    assert!(bundle.has_source_path(Path::new("bruker_without_expno/pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn discovered_source_free_helpers_load_selected_sources() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+    let selected = sources
+        .iter()
+        .filter(|source| source.is_format(LoadedSourceFormat::BrukerProcessed))
+        .collect::<Vec<_>>();
+
+    let bundle = load_discovered_spectra_relative_to(fixture_root(), selected)?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(
+        bundle.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let selected = sources
+        .iter()
+        .filter(|source| source.is_format(LoadedSourceFormat::AgilentFid))
+        .collect::<Vec<_>>();
+    let bundle = load_discovered_spectra(fixture_root(), selected)?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(
+        bundle.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn discovered_source_loading_records_bad_candidates_in_non_strict_mode() -> Result<()> {
+    let good = discovered_source(
+        &discover_spectra(fixture_root())?,
+        "varian_1h",
+        LoadedSourceFormat::AgilentFid,
+    )?
+    .clone();
+    let bad = DiscoveredSpectrumSource::new(
+        Some(PathBuf::from("empty_jcamp/empty.jdx")),
+        "jcamp_dx",
+        DiscoveredSpectrumDimension::OneD,
+    );
+    let selected = vec![bad, good];
+
+    let bundle = RSpinReader::new().read_discovered_relative_to(fixture_root(), &selected)?;
+
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(bundle.warning_count(), 1);
+    let warning = bundle
+        .warnings()
+        .first()
+        .ok_or_else(|| anyhow!("missing warning for bad discovered source"))?;
+    assert_eq!(warning.path(), Some(Path::new("empty_jcamp/empty.jdx")));
+    assert!(warning.message().contains("missing XYDATA values"));
+    assert!(bundle.has_source_path(Path::new("varian_1h")));
+    Ok(())
+}
+
+#[test]
+fn discovered_source_loading_rejects_missing_source_paths() -> Result<()> {
+    let sources = RSpinReader::new()
+        .without_source_paths()
+        .discover(fixture_root())?;
+    let Err(error) = RSpinReader::new().read_discovered_relative_to(fixture_root(), &sources)
+    else {
+        return Err(anyhow!(
+            "loading discovered sources without tracked paths should fail"
+        ));
+    };
+
+    assert!(error.to_string().contains("tracked source path"));
     Ok(())
 }
 

@@ -467,6 +467,16 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
         .discover_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(processed.len(), 1);
     assert!(processed.iter().all(DiscoveredSpectrumSource::is_processed));
+
+    let loaded = load_discovered_spectra_relative_to(&fixture_root, &processed)?;
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(
+        loaded.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let loaded = RSpinReader::new().read_discovered(&fixture_root, &processed)?;
+    assert_eq!(loaded.len(), 1);
     Ok(())
 }
 

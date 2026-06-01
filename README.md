@@ -373,6 +373,13 @@ fn summarize_preflight() -> Result<DiscoveredSpectrumSummary> {
     let sources = discover_spectra("data/mixed-vendor")?;
     Ok(summarize_discovered_spectra(&sources))
 }
+
+fn load_selected_after_preflight() -> Result<SpectrumBundle> {
+    let sources = RSpinReader::new()
+        .processed_sources()
+        .discover("data/mixed-vendor")?;
+    load_discovered_spectra_relative_to("data/mixed-vendor", &sources)
+}
 ```
 
 The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,

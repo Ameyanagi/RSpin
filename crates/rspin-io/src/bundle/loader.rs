@@ -19,7 +19,8 @@ use super::{
 };
 pub use discovery::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
-    DiscoveredSpectrumSummary, summarize_discovered_spectra,
+    DiscoveredSpectrumSummary, load_discovered_spectra, load_discovered_spectra_relative_to,
+    summarize_discovered_spectra,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.
