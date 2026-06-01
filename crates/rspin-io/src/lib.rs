@@ -75,11 +75,12 @@ pub use bruker::{
     read_bruker_ser_2d_dir,
 };
 pub use bundle::{
-    DiscoveredSpectrumDimension, DiscoveredSpectrumSource, LoadWarning, LoadedSource,
-    LoadedSourceDataKind, LoadedSourceDataKindInfo, LoadedSourceFilter, LoadedSourceFormat,
-    LoadedSourceFormatInfo, LoadedSourceVendor, LoadedSourceVendorInfo, LoadedSpectrum,
-    RSpinReader, SourceDataKindCount, SourceFormatCount, SourceVendorCount, SpectrumBundle,
-    SpectrumBundleLoader, SpectrumBundleSummary, discover_spectra, discover_spectra_many,
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
+    DiscoveredSpectrumSummary, LoadWarning, LoadedSource, LoadedSourceDataKind,
+    LoadedSourceDataKindInfo, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceFormatInfo,
+    LoadedSourceVendor, LoadedSourceVendorInfo, LoadedSpectrum, RSpinReader, SourceDataKindCount,
+    SourceFormatCount, SourceVendorCount, SpectrumBundle, SpectrumBundleLoader,
+    SpectrumBundleSummary, discover_spectra, discover_spectra_many,
     discover_spectra_many_relative_to, discover_spectra_relative_to, load_spectra,
     load_spectra_by_source, load_spectra_by_source_data_kind,
     load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_data_kinds,
@@ -213,8 +214,9 @@ pub use bundle::{
     load_spectrum_2d_with_source_by_source_vendor_relative_to,
     load_spectrum_2d_with_source_by_sources, load_spectrum_2d_with_source_by_sources_relative_to,
     load_spectrum_2d_with_source_relative_to, parse_loaded_source_data_kind,
-    parse_loaded_source_format, parse_loaded_source_vendor, supported_bundle_source_data_kinds,
-    supported_bundle_source_formats, supported_bundle_source_vendors,
+    parse_loaded_source_format, parse_loaded_source_vendor, summarize_discovered_spectra,
+    supported_bundle_source_data_kinds, supported_bundle_source_formats,
+    supported_bundle_source_vendors,
 };
 pub use bundle_json::{
     JsonSpectrumBundle, SPECTRUM_BUNDLE_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_VERSION,

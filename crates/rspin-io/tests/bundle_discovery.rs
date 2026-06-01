@@ -4,9 +4,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use rspin_io::{
-    DiscoveredSpectrumDimension, DiscoveredSpectrumSource, LoadedSourceDataKind,
-    LoadedSourceFormat, LoadedSourceVendor, RSpinReader, discover_spectra, discover_spectra_many,
-    discover_spectra_many_relative_to,
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
+    DiscoveredSpectrumSummary, LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor,
+    RSpinReader, discover_spectra, discover_spectra_many, discover_spectra_many_relative_to,
+    summarize_discovered_spectra,
 };
 
 #[test]
@@ -73,6 +74,51 @@ fn source_discovery_respects_chainable_loader_filters() -> Result<()> {
         hidden_paths
             .iter()
             .all(|source| source.vendor() == Some(LoadedSourceVendor::Bruker))
+    );
+
+    Ok(())
+}
+
+#[test]
+fn source_discovery_summary_counts_candidates() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+    let summary: DiscoveredSpectrumSummary = summarize_discovered_spectra(&sources);
+
+    assert_eq!(summary.sources(), sources.len());
+    assert_eq!(
+        summary.sources(),
+        summary.sources_1d() + summary.sources_2d() + summary.sources_unknown()
+    );
+    assert_eq!(
+        summary.dimension_count(DiscoveredSpectrumDimension::OneD),
+        summary.sources_1d()
+    );
+    assert!(summary.has_dimension(DiscoveredSpectrumDimension::OneD));
+    assert_eq!(
+        summary.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(summary.source_format_count("jdx"), 2);
+    assert!(summary.has_source_format(LoadedSourceFormat::BrukerProcessed));
+    assert_eq!(summary.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert!(summary.has_source_vendor("varian"));
+    assert_eq!(summary.source_vendor_count("missing"), 0);
+    assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+    assert_eq!(
+        summary.source_data_kind_count(LoadedSourceDataKind::Processed),
+        1
+    );
+    assert_eq!(
+        summary.source_data_kind_count(LoadedSourceDataKind::Other),
+        2
+    );
+    assert!(summary.has_source_data_kind(LoadedSourceDataKind::Other));
+    assert_eq!(
+        summary.dimensions,
+        vec![
+            DiscoveredSpectrumDimensionCount::new(DiscoveredSpectrumDimension::OneD, 4),
+            DiscoveredSpectrumDimensionCount::new(DiscoveredSpectrumDimension::TwoD, 1),
+        ]
     );
 
     Ok(())

@@ -17,7 +17,10 @@ use super::{
     supported_bundle_source_data_kinds, supported_bundle_source_formats,
     supported_bundle_source_vendors,
 };
-pub use discovery::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
+pub use discovery::{
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
+    DiscoveredSpectrumSummary, summarize_discovered_spectra,
+};
 
 /// Chainable options for loading all recognizable spectra from a path.
 #[derive(Clone, Debug, PartialEq, Eq)]

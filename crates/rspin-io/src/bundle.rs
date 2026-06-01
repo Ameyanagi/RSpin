@@ -131,7 +131,10 @@ pub use exact::{
     load_spectrum_2d_with_source_relative_to,
 };
 use loader::FileCandidateKind;
-pub use loader::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource, SpectrumBundleLoader};
+pub use loader::{
+    DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumSource,
+    DiscoveredSpectrumSummary, SpectrumBundleLoader, summarize_discovered_spectra,
+};
 pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,
     SourceVendorCount, SpectrumBundle, SpectrumBundleSummary,

@@ -451,6 +451,10 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
         .join("../rspin-io/testdata/zenodo_7100132");
 
     let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+    let summary: DiscoveredSpectrumSummary = summarize_discovered_spectra(&sources);
+    assert_eq!(summary.source_format_count("jdx"), 2);
+    assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+    assert!(summary.has_dimension(DiscoveredSpectrumDimension::OneD));
     assert!(sources.iter().any(|source| {
         source.path() == Some(std::path::Path::new("varian_1h"))
             && source.is_format(LoadedSourceFormat::AgilentFid)

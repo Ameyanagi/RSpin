@@ -368,6 +368,11 @@ fn preflight_sources() -> Result<Vec<DiscoveredSpectrumSource>> {
         .processed_sources()
         .discover("data/mixed-vendor")
 }
+
+fn summarize_preflight() -> Result<DiscoveredSpectrumSummary> {
+    let sources = discover_spectra("data/mixed-vendor")?;
+    Ok(summarize_discovered_spectra(&sources))
+}
 ```
 
 The unified loader currently routes supported Bruker, Agilent/Varian, JEOL,
