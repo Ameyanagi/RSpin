@@ -661,6 +661,17 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
         LoadedSourceDataKind::Raw,
     )?;
     assert_eq!(raw.len(), 1);
+    let raw_or_processed = load_spectra_by_source_data_kinds(
+        fixture_root.join("bruker_without_expno"),
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )?;
+    assert_eq!(raw_or_processed.len(), 2);
+    let raw_or_processed = load_spectra_many_by_source_data_kinds_relative_to(
+        &fixture_root,
+        ["bruker_without_expno"],
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )?;
+    assert_eq!(raw_or_processed.len(), 2);
     let processed = RSpinReader::new()
         .only_source(LoadedSourceDataKind::Processed)
         .read_path_relative_to(&fixture_root, "bruker_without_expno")?;

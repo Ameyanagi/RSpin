@@ -146,6 +146,13 @@ fn load_raw_vendor_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_data_kind("data/mixed-vendor", LoadedSourceDataKind::Raw)
 }
 
+fn load_vendor_bundle() -> Result<SpectrumBundle> {
+    load_spectra_by_source_data_kinds(
+        "data/mixed-vendor",
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )
+}
+
 fn load_one_tracked_source_as_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_path("data/mixed-vendor", "jcamp/carbon_13c.jdx")
 }

@@ -12,6 +12,7 @@ use rspin_io::{
     LoadedSpectrum, RSpinReader, SourceDataKindCount, SpectrumBundle, SpectrumBundleLoader,
     SpectrumBundleSummary, SpectrumPathReader, load_spectra, load_spectra_by_source,
     load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
+    load_spectra_by_source_data_kinds, load_spectra_by_source_data_kinds_relative_to,
     load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
     load_spectra_by_source_path, load_spectra_by_source_path_prefix,
     load_spectra_by_source_path_prefix_relative_to, load_spectra_by_source_path_relative_to,
@@ -19,6 +20,7 @@ use rspin_io::{
     load_spectra_by_source_vendor_relative_to, load_spectra_by_sources,
     load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
     load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
+    load_spectra_many_by_source_data_kinds, load_spectra_many_by_source_data_kinds_relative_to,
     load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
     load_spectra_many_by_source_path, load_spectra_many_by_source_path_prefix,
     load_spectra_many_by_source_path_prefix_relative_to,
@@ -2119,6 +2121,38 @@ fn loader_can_restrict_source_data_kinds() -> anyhow::Result<()> {
         LoadedSourceDataKind::Raw,
     )?;
     assert_eq!(raw_many.len(), 1);
+
+    let raw_and_processed_direct = load_spectra_by_source_data_kinds(
+        fixture_root().join("bruker_without_expno"),
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )?;
+    assert_eq!(raw_and_processed_direct.len(), 2);
+
+    let raw_and_processed_relative = load_spectra_by_source_data_kinds_relative_to(
+        fixture_root(),
+        "bruker_without_expno",
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )?;
+    assert_eq!(raw_and_processed_relative.len(), 2);
+
+    let raw_and_processed_many = load_spectra_many_by_source_data_kinds(
+        [fixture_root().join("bruker_without_expno")],
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )?;
+    assert_eq!(raw_and_processed_many.len(), 2);
+
+    let raw_and_processed_many_relative = load_spectra_many_by_source_data_kinds_relative_to(
+        fixture_root(),
+        ["bruker_without_expno"],
+        [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+    )?;
+    assert_eq!(raw_and_processed_many_relative.len(), 2);
+
+    let unrestricted_data_kinds = load_spectra_by_source_data_kinds(
+        fixture_root().join("bruker_without_expno"),
+        std::iter::empty::<LoadedSourceDataKind>(),
+    )?;
+    assert_eq!(unrestricted_data_kinds.len(), 2);
 
     let other = RSpinReader::new()
         .only_other_sources()

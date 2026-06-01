@@ -317,6 +317,27 @@ pub fn load_spectra_by_source_data_kind(
         .read_path(path)
 }
 
+/// Loads supported spectra from a file or directory, restricted to raw/processed source data kinds.
+///
+/// Data kinds are combined with logical OR. Passing an empty iterator leaves
+/// source loading unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_data_kinds<I>(
+    path: impl AsRef<Path>,
+    data_kinds: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = LoadedSourceDataKind>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_data_kinds(data_kinds)
+        .read_path(path)
+}
+
 /// Loads one selected path relative to a base directory, restricted to one raw/processed source data kind.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -333,6 +354,28 @@ pub fn load_spectra_by_source_data_kind_relative_to(
 ) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new()
         .only_source_data_kind(data_kind)
+        .read_path_relative_to(base, path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to raw/processed source data kinds.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Data kinds are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_data_kinds_relative_to<I>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    data_kinds: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = LoadedSourceDataKind>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_data_kinds(data_kinds)
         .read_path_relative_to(base, path)
 }
 
@@ -603,6 +646,29 @@ where
         .read_paths(paths)
 }
 
+/// Loads supported spectra from multiple paths, restricted to raw/processed source data kinds.
+///
+/// Data kinds are combined with logical OR. Passing an empty iterator leaves
+/// source loading unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_data_kinds<I, P, J>(
+    paths: I,
+    data_kinds: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = LoadedSourceDataKind>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_data_kinds(data_kinds)
+        .read_paths(paths)
+}
+
 /// Loads selected paths relative to a base directory, restricted to one raw/processed source data kind.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -623,6 +689,30 @@ where
 {
     SpectrumBundleLoader::new()
         .only_source_data_kind(data_kind)
+        .read_paths_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to raw/processed source data kinds.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Data kinds are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_data_kinds_relative_to<I, P, J>(
+    base: impl AsRef<Path>,
+    paths: I,
+    data_kinds: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = LoadedSourceDataKind>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_data_kinds(data_kinds)
         .read_paths_relative_to(base, paths)
 }
 
