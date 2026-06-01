@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::super::SpectrumBundleLoader;
 use crate::bundle::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
-    SpectrumBundle,
+    SpectrumBundle, SpectrumBundleSummary,
 };
 
 /// Dimension identified for a discovered source candidate.
@@ -174,6 +174,54 @@ impl DiscoveredSpectrumSource {
     /// Returns an error when strict loading this discovered source fails.
     pub fn load_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
         self.load_strict_relative_to(base)
+    }
+
+    /// Loads this discovered source and returns only bundle summary counts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails.
+    pub fn load_summary_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary> {
+        SpectrumBundleLoader::new().read_discovered_summary_relative_to(base, [self])
+    }
+
+    /// Loads this discovered source and returns only bundle summary counts.
+    ///
+    /// This short alias mirrors [`Self::load_summary_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading this discovered source fails.
+    pub fn load_summary(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.load_summary_relative_to(base)
+    }
+
+    /// Strictly loads this discovered source and returns only bundle summary counts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails.
+    pub fn load_summary_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary> {
+        SpectrumBundleLoader::new()
+            .strict()
+            .read_discovered_summary_relative_to(base, [self])
+    }
+
+    /// Strictly loads this discovered source and returns only bundle summary counts.
+    ///
+    /// This short alias mirrors [`Self::load_summary_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict loading this discovered source fails.
+    pub fn load_summary_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.load_summary_strict_relative_to(base)
     }
 
     /// Loads this discovered source as exactly one one-dimensional spectrum.

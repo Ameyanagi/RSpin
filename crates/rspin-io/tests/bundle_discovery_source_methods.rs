@@ -18,6 +18,18 @@ fn discovered_source_strict_methods_load_exact_spectra() -> Result<()> {
     let bundle = varian.load_strict(fixture_root())?;
     assert_eq!(bundle.len(), 1);
 
+    let summary = varian.load_summary_relative_to(fixture_root())?;
+    assert_eq!(summary.spectra(), 1);
+    assert_eq!(summary.spectra_1d(), 1);
+    assert_eq!(summary.source_path_count("varian_1h"), 1);
+    let summary_alias = varian.load_summary(fixture_root())?;
+    assert_eq!(summary_alias, summary);
+
+    let strict_summary = varian.load_summary_strict_relative_to(fixture_root())?;
+    assert_eq!(strict_summary, summary);
+    let strict_summary_alias = varian.load_summary_strict(fixture_root())?;
+    assert_eq!(strict_summary_alias, summary);
+
     let spectrum = varian.load_1d_strict_relative_to(fixture_root())?;
     assert_eq!(spectrum.len(), 16_384);
     let spectrum = varian.load_1d_strict(fixture_root())?;
@@ -35,6 +47,10 @@ fn discovered_source_strict_methods_load_exact_spectra() -> Result<()> {
     assert_eq!(spectrum.shape(), (1024, 32));
     let spectrum = hsqc.load_2d_strict(cc0_myrcene_fixture_root())?;
     assert_eq!(spectrum.shape(), (1024, 32));
+    let hsqc_summary = hsqc.load_summary_strict_relative_to(cc0_myrcene_fixture_root())?;
+    assert_eq!(hsqc_summary.spectra(), 1);
+    assert_eq!(hsqc_summary.spectra_2d(), 1);
+    assert_eq!(hsqc_summary.source_path_count(hsqc_path), 1);
     let (spectrum, source) =
         hsqc.load_2d_with_source_strict_relative_to(cc0_myrcene_fixture_root())?;
     assert_eq!(spectrum.shape(), (1024, 32));
@@ -55,6 +71,13 @@ fn discovered_source_strict_methods_return_parser_errors() -> Result<()> {
     let Err(error) = empty_jcamp.load_1d_strict_relative_to(fixture_root()) else {
         return Err(anyhow!(
             "strict selected-source loading should reject malformed JCAMP-DX"
+        ));
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+
+    let Err(error) = empty_jcamp.load_summary_strict_relative_to(fixture_root()) else {
+        return Err(anyhow!(
+            "strict selected-source summary loading should reject malformed JCAMP-DX"
         ));
     };
     assert!(error.to_string().contains("missing XYDATA values"));
