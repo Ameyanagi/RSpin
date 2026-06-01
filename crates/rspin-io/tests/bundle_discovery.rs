@@ -14,6 +14,8 @@ use rspin_io::{
     discover_spectra_many_relative_to, discover_spectra_many_summary,
     discover_spectra_many_summary_relative_to, discover_spectra_summary,
     discover_spectra_summary_relative_to, load_discovered_spectra,
+    load_discovered_spectra_by_source, load_discovered_spectra_by_source_relative_to,
+    load_discovered_spectra_by_sources, load_discovered_spectra_by_sources_relative_to,
     load_discovered_spectra_relative_to, summarize_discovered_spectra,
 };
 
@@ -455,6 +457,90 @@ fn discovered_source_free_helpers_load_selected_sources() -> Result<()> {
         bundle.source_format_count(LoadedSourceFormat::AgilentFid),
         1
     );
+    Ok(())
+}
+
+#[test]
+fn discovered_source_filter_helpers_load_matching_candidates() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+
+    let processed = RSpinReader::new().read_discovered_by_source_relative_to(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::processed(),
+    )?;
+    assert_eq!(processed.len(), 1);
+    assert_eq!(
+        processed.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let varian_or_processed = RSpinReader::new().read_discovered_by_sources(
+        fixture_root(),
+        &sources,
+        [
+            LoadedSourceFilter::vendor("varian"),
+            LoadedSourceFilter::processed(),
+        ],
+    )?;
+    assert_eq!(varian_or_processed.len(), 2);
+    assert_eq!(
+        varian_or_processed.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        varian_or_processed.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let raw = load_discovered_spectra_by_source_relative_to(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::raw(),
+    )?;
+    assert_eq!(raw.len(), 2);
+    assert_eq!(raw.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+
+    let varian = load_discovered_spectra_by_source(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    assert_eq!(varian.len(), 1);
+    assert_eq!(
+        varian.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let selected_paths = load_discovered_spectra_by_sources_relative_to(
+        fixture_root(),
+        &sources,
+        [
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ],
+    )?;
+    assert_eq!(selected_paths.len(), 2);
+    assert!(selected_paths.has_source_path("varian_1h"));
+    assert!(selected_paths.has_source_path("bruker_without_expno/pdata/1"));
+
+    let selected_paths = load_discovered_spectra_by_sources(
+        fixture_root(),
+        &sources,
+        [
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ],
+    )?;
+    assert_eq!(selected_paths.len(), 2);
+
+    let unrestricted = RSpinReader::new().read_discovered_by_sources_relative_to(
+        fixture_root(),
+        &sources,
+        Vec::<LoadedSourceFilter>::new(),
+    )?;
+    assert_eq!(unrestricted.len(), 3);
+    assert_eq!(unrestricted.warning_count(), 2);
     Ok(())
 }
 

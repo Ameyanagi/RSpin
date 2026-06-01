@@ -238,6 +238,76 @@ pub fn load_discovered_spectra<'a>(
     load_discovered_spectra_relative_to(base, sources)
 }
 
+/// Loads selected discovered source candidates matching one generic source filter.
+///
+/// This is a convenience wrapper for filtering discovered candidates before
+/// loading them with [`load_discovered_spectra_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the matching discovered sources fails.
+pub fn load_discovered_spectra_by_source_relative_to<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new().read_discovered_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads selected discovered source candidates matching one generic source filter.
+///
+/// This short alias mirrors [`load_discovered_spectra_by_source_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the matching discovered sources fails.
+pub fn load_discovered_spectra_by_source<'a>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<SpectrumBundle> {
+    load_discovered_spectra_by_source_relative_to(base, sources, filter)
+}
+
+/// Loads selected discovered source candidates matching any generic source filter.
+///
+/// Filters are combined with logical OR. Passing an empty iterator loads all
+/// provided discovered sources.
+///
+/// # Errors
+///
+/// Returns an error when loading the matching discovered sources fails.
+pub fn load_discovered_spectra_by_sources_relative_to<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    SpectrumBundleLoader::new().read_discovered_by_sources_relative_to(base, sources, filters)
+}
+
+/// Loads selected discovered source candidates matching any generic source filter.
+///
+/// This short alias mirrors [`load_discovered_spectra_by_sources_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the matching discovered sources fails.
+pub fn load_discovered_spectra_by_sources<'a, I, F>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    filters: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    load_discovered_spectra_by_sources_relative_to(base, sources, filters)
+}
+
 impl SpectrumBundleLoader {
     /// Discovers source candidates below a file or directory without loading full spectra.
     ///
@@ -607,6 +677,86 @@ impl SpectrumBundleLoader {
         self.read_discovered_relative_to(base, sources)
     }
 
+    /// Loads discovered source candidates matching one generic source filter.
+    ///
+    /// This is useful after a preflight discovery step when caller state stores
+    /// a runtime source filter rather than explicit selected candidate indices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching discovered sources fails.
+    pub fn read_discovered_by_source_relative_to<'a>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<SpectrumBundle> {
+        let filter = filter.into();
+        self.read_discovered_by_sources_relative_to(base, sources, [filter])
+    }
+
+    /// Loads discovered source candidates matching one generic source filter.
+    ///
+    /// This short alias mirrors [`Self::read_discovered_by_source_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching discovered sources fails.
+    pub fn read_discovered_by_source<'a>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<SpectrumBundle> {
+        self.read_discovered_by_source_relative_to(base, sources, filter)
+    }
+
+    /// Loads discovered source candidates matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator loads all
+    /// provided discovered sources.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching discovered sources fails.
+    pub fn read_discovered_by_sources_relative_to<'a, I, F>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        filters: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = discovered_source_filters(filters);
+        let selected = sources
+            .into_iter()
+            .filter(|source| filters.is_empty() || source.matches_any_source(filters.iter()))
+            .collect::<Vec<_>>();
+        self.read_discovered_relative_to(base, selected)
+    }
+
+    /// Loads discovered source candidates matching any generic source filter.
+    ///
+    /// This short alias mirrors [`Self::read_discovered_by_sources_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching discovered sources fails.
+    pub fn read_discovered_by_sources<'a, I, F>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        filters: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.read_discovered_by_sources_relative_to(base, sources, filters)
+    }
+
     fn discover_existing_path_into(
         &self,
         source_root: &Path,
@@ -858,6 +1008,21 @@ fn no_discovered_sources_error() -> RSpinError {
         format: "spectrum bundle",
         message: "no discovered sources provided".to_owned(),
     }
+}
+
+fn discovered_source_filters<I, F>(filters: I) -> Vec<LoadedSourceFilter>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    let mut unique = Vec::new();
+    for filter in filters {
+        let filter = filter.into();
+        if !unique.iter().any(|existing| existing == &filter) {
+            unique.push(filter);
+        }
+    }
+    unique
 }
 
 fn path_format_1d(

@@ -579,6 +579,68 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_source_filter_loaders() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let loaded = load_discovered_spectra_by_source_relative_to(
+        &fixture_root,
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(
+        loaded.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let loaded = load_discovered_spectra_by_source(
+        &fixture_root,
+        &sources,
+        LoadedSourceFilter::processed(),
+    )?;
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(
+        loaded.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let loaded = load_discovered_spectra_by_sources(
+        &fixture_root,
+        &sources,
+        [
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ],
+    )?;
+    assert_eq!(loaded.len(), 2);
+    assert!(loaded.has_source_path(std::path::Path::new("varian_1h")));
+
+    let loaded = load_discovered_spectra_by_sources_relative_to(
+        &fixture_root,
+        &sources,
+        [LoadedSourceFilter::path("bruker_without_expno/pdata/1")],
+    )?;
+    assert_eq!(loaded.len(), 1);
+
+    let loaded = RSpinReader::new().read_discovered_by_source(
+        &fixture_root,
+        &sources,
+        LoadedSourceFilter::processed(),
+    )?;
+    assert_eq!(loaded.len(), 1);
+
+    let loaded = RSpinReader::new().read_discovered_by_sources(
+        &fixture_root,
+        &sources,
+        [LoadedSourceFilter::path("varian_1h")],
+    )?;
+    assert_eq!(loaded.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");
