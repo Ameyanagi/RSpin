@@ -523,6 +523,83 @@ fn discovered_source_can_load_itself_relative_to_base() -> Result<()> {
 }
 
 #[test]
+fn reader_loads_exact_discovered_sources_relative_to_base() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+    let varian = discovered_source(&sources, "varian_1h", LoadedSourceFormat::AgilentFid)?;
+
+    let spectrum = RSpinReader::new().read_discovered_1d_relative_to(fixture_root(), [varian])?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let spectrum = RSpinReader::new().read_discovered_1d(fixture_root(), [varian])?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (spectrum, source) =
+        RSpinReader::new().read_discovered_1d_with_source_relative_to(fixture_root(), [varian])?;
+    assert_eq!(spectrum.len(), 16_384);
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+    assert_eq!(source.format(), "agilent_fid");
+
+    let (_, source) =
+        RSpinReader::new().read_discovered_1d_with_source(fixture_root(), [varian])?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let Err(error) = RSpinReader::new().read_discovered_2d_relative_to(fixture_root(), [varian])
+    else {
+        return Err(anyhow!(
+            "one-dimensional discovered source should reject exact two-dimensional reader loading"
+        ));
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("expected exactly one two-dimensional spectrum")
+    );
+
+    let empty_jcamp = discovered_source(
+        &sources,
+        "empty_jcamp/empty.jdx",
+        LoadedSourceFormat::JcampDx,
+    )?;
+    let Err(error) = RSpinReader::new()
+        .strict()
+        .read_discovered_1d_relative_to(fixture_root(), [empty_jcamp])
+    else {
+        return Err(anyhow!(
+            "strict exact discovered loading should reject malformed JCAMP"
+        ));
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+
+    let myrcene_sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let hsqc = discovered_source(
+        &myrcene_sources,
+        "jeol/myrcene_hsqc_400mhz.jdf",
+        LoadedSourceFormat::JeolJdf,
+    )?;
+
+    let hsqc_spectrum =
+        RSpinReader::new().read_discovered_2d_relative_to(cc0_myrcene_fixture_root(), [hsqc])?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+
+    let hsqc_spectrum =
+        RSpinReader::new().read_discovered_2d(cc0_myrcene_fixture_root(), [hsqc])?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+
+    let (hsqc_spectrum, source) = RSpinReader::new()
+        .read_discovered_2d_with_source_relative_to(cc0_myrcene_fixture_root(), [hsqc])?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+
+    let (_, source) =
+        RSpinReader::new().read_discovered_2d_with_source(cc0_myrcene_fixture_root(), [hsqc])?;
+    assert_eq!(source.format(), "jeol_jdf");
+    Ok(())
+}
+
+#[test]
 fn discovered_source_free_helpers_load_selected_sources() -> Result<()> {
     let sources = discover_spectra(fixture_root())?;
     let selected = sources

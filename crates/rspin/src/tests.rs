@@ -601,6 +601,12 @@ fn prelude_exports_discovered_source_filter_loaders() -> Result<()> {
     assert_eq!(spectrum.len(), 16_384);
     let (_, source) = selected[0].load_1d_with_source_relative_to(&fixture_root)?;
     assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
+    let spectrum =
+        RSpinReader::new().read_discovered_1d_relative_to(&fixture_root, [selected[0]])?;
+    assert_eq!(spectrum.len(), 16_384);
+    let (_, source) =
+        RSpinReader::new().read_discovered_1d_with_source(&fixture_root, [selected[0]])?;
+    assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
 
     let selected = select_discovered_spectra_by_sources(
         &sources,
