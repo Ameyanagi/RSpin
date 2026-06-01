@@ -8,6 +8,8 @@ use rspin_io::{
     load_spectrum_1d_by_source_format, load_spectrum_1d_by_source_format_relative_to,
     load_spectrum_1d_by_source_path, load_spectrum_1d_by_source_path_relative_to,
     load_spectrum_1d_by_source_vendor, load_spectrum_1d_by_source_vendor_relative_to,
+    load_spectrum_1d_many_by_source_format, load_spectrum_1d_many_by_source_path_relative_to,
+    load_spectrum_1d_many_with_source_by_source_vendor,
     load_spectrum_1d_with_source_by_source_format,
     load_spectrum_1d_with_source_by_source_format_relative_to,
     load_spectrum_1d_with_source_by_source_path,
@@ -16,7 +18,10 @@ use rspin_io::{
     load_spectrum_1d_with_source_by_source_vendor_relative_to, load_spectrum_2d_by_source_format,
     load_spectrum_2d_by_source_format_relative_to, load_spectrum_2d_by_source_path,
     load_spectrum_2d_by_source_path_relative_to, load_spectrum_2d_by_source_vendor,
-    load_spectrum_2d_by_source_vendor_relative_to, load_spectrum_2d_with_source_by_source_format,
+    load_spectrum_2d_by_source_vendor_relative_to,
+    load_spectrum_2d_many_by_source_format_relative_to,
+    load_spectrum_2d_many_with_source_by_source_path,
+    load_spectrum_2d_with_source_by_source_format,
     load_spectrum_2d_with_source_by_source_format_relative_to,
     load_spectrum_2d_with_source_by_source_path,
     load_spectrum_2d_with_source_by_source_path_relative_to,
@@ -486,6 +491,68 @@ fn free_source_path_exact_helpers_select_matching_dimension() -> anyhow::Result<
         anchored_hsqc_path,
     )?;
     assert_eq!(hsqc_source.path(), Some(anchored_hsqc_path));
+    Ok(())
+}
+
+#[test]
+fn free_many_source_filtered_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let proton_jcamp = root.join("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let carbon_jcamp = root.join("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let bruker_2d = root.join("bruker_cosy_raw");
+    let jeol_1d = root.join("jeol/myrcene_1h_400mhz.jdf");
+    let jeol_2d = root.join("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let proton = load_spectrum_1d_many_by_source_format(
+        [&proton_jcamp, &bruker_2d],
+        LoadedSourceFormat::JcampDx,
+    )?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (jeol, jeol_source) =
+        load_spectrum_1d_many_with_source_by_source_vendor([&jeol_1d, &bruker_2d], "jeol")?;
+    assert_eq!(jeol.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(jeol_source.format(), "jeol_jdf");
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let hsqc = load_spectrum_2d_many_by_source_format_relative_to(
+        &base,
+        [
+            "myrcene/jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
+            "myrcene",
+        ],
+        "jdf",
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (hsqc, hsqc_source) = load_spectrum_2d_many_with_source_by_source_path(
+        [&jeol_1d, &jeol_2d],
+        "myrcene_hsqc_400mhz.jdf",
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(hsqc_source.format(), "jeol_jdf");
+
+    let carbon_path = Path::new("myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let carbon = load_spectrum_1d_many_by_source_path_relative_to(
+        &base,
+        ["myrcene", "myrcene/bruker_cosy_raw"],
+        carbon_path,
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let (_, bruker_source) = RSpinReader::new()
+        .read_2d_many_with_source_by_source_vendor_relative_to(
+            &base,
+            ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+            LoadedSourceVendor::Bruker,
+        )?;
+    assert_eq!(bruker_source.format(), "bruker_ser");
+
+    assert_single_error(
+        load_spectrum_1d_many_by_source_format([&proton_jcamp, &carbon_jcamp], "jdx"),
+        "expected exactly one one-dimensional spectrum for source format jcamp_dx",
+        "found 2 one-dimensional and 0 two-dimensional spectra",
+    )?;
     Ok(())
 }
 

@@ -56,6 +56,13 @@ fn load_selected_bruker_inputs() -> Result<SpectrumBundle> {
     )
 }
 
+fn load_one_bruker_spectrum_from_selected_inputs() -> Result<Spectrum1D> {
+    load_spectrum_1d_many_by_source_vendor(
+        ["data/proton.fid", "data/bruker/pdata/1"],
+        LoadedSourceVendor::Bruker,
+    )
+}
+
 fn load_exactly_one_selected_spectrum() -> Result<Spectrum1D> {
     load_spectrum_1d_relative_to("data", "proton.fid")
 }

@@ -519,10 +519,26 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
         LoadedSourceVendor::Bruker,
     )?;
     assert_eq!(bruker_2d.shape(), (2048, 512));
+    let (bruker_2d, source) = load_spectrum_2d_many_with_source_by_source_vendor_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceVendor::Bruker,
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    assert_eq!(
+        source.path(),
+        Some(std::path::Path::new("myrcene/bruker_cosy_raw"))
+    );
 
     let carbon = load_spectrum_1d_by_source_path_relative_to(
         &mixed_vendor_base,
         "myrcene",
+        std::path::Path::new("myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    let carbon = load_spectrum_1d_many_by_source_path_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_cosy_raw", "myrcene"],
         std::path::Path::new("myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
     )?;
     assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
