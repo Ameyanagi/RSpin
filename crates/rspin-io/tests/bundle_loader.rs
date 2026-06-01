@@ -1475,6 +1475,57 @@ fn loader_can_restrict_source_vendors() -> anyhow::Result<()> {
 }
 
 #[test]
+fn loader_can_restrict_source_paths() -> anyhow::Result<()> {
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let carbon = RSpinReader::new()
+        .only_source_path(carbon_path)
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(carbon.len(), 1);
+    assert_eq!(carbon.len_1d(), 1);
+    assert_eq!(first_1d(&carbon)?.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert!(carbon.has_source_path(carbon_path));
+
+    let selected = RSpinReader::new()
+        .only_source_paths([Path::new("bruker_1h_raw"), hsqc_path])
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(selected.len(), 2);
+    assert_eq!(selected.len_1d(), 1);
+    assert_eq!(selected.len_2d(), 1);
+    assert_eq!(selected.source_vendor_count(LoadedSourceVendor::Bruker), 1);
+    assert_eq!(selected.source_vendor_count(LoadedSourceVendor::Jeol), 1);
+    assert!(selected.has_source_path(Path::new("bruker_1h_raw")));
+    assert!(selected.has_source_path(hsqc_path));
+
+    let hidden_sources = RSpinReader::new()
+        .only_source_path(carbon_path)
+        .without_source_paths()
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(hidden_sources.len(), 1);
+    assert_eq!(
+        first_1d(&hidden_sources)?.metadata.nucleus,
+        Some(Nucleus::Carbon13)
+    );
+    assert_eq!(hidden_sources.source_paths().count(), 0);
+
+    let cleared = RSpinReader::new()
+        .only_source_path(carbon_path)
+        .all_source_paths()
+        .read_path(nmrxiv_fixture_root())?;
+    assert_eq!(cleared.len(), 7);
+
+    let filtered_out = RSpinReader::new()
+        .only_source_path("missing.jdx")
+        .read_path(nmrxiv_fixture_root());
+    let Err(error) = filtered_out else {
+        anyhow::bail!("missing source-path filter should leave no readable spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
+    Ok(())
+}
+
+#[test]
 fn loader_source_format_filter_applies_to_nested_bundle_json() -> anyhow::Result<()> {
     let source_bundle = load_spectra(nmrxiv_fixture_root())?;
     let root = temp_dir("source-format-bundle")?;
@@ -1514,6 +1565,46 @@ fn loader_source_format_filter_applies_to_nested_bundle_json() -> anyhow::Result
     assert_eq!(bundle.source_format_count("jcamp_dx"), 1);
     assert_eq!(bundle.source_format_count("jdx"), 1);
     assert_eq!(bundle.source_format_counts()[0].format(), "jcamp_dx");
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
+fn loader_source_path_filter_applies_to_nested_bundle_json() -> anyhow::Result<()> {
+    let source_bundle = load_spectra(nmrxiv_fixture_root())?;
+    let root = temp_dir("source-path-bundle")?;
+    fs::write(
+        root.join("bundle.json"),
+        write_spectrum_bundle_json(&source_bundle)?,
+    )?;
+
+    let selected_path = Path::new("bundle.json/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let bundle = RSpinReader::new()
+        .only_source_path(selected_path)
+        .read_path(&root)?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(first_1d(&bundle)?.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert!(bundle.has_source_path(selected_path));
+
+    let hidden_sources = RSpinReader::new()
+        .only_source_path(selected_path)
+        .without_source_paths()
+        .read_path(&root)?;
+    assert_eq!(hidden_sources.len(), 1);
+    assert_eq!(
+        first_1d(&hidden_sources)?.metadata.nucleus,
+        Some(Nucleus::Carbon13)
+    );
+    assert_eq!(hidden_sources.source_paths().count(), 0);
+
+    let filtered_out = RSpinReader::new()
+        .only_source_path("bundle.json/missing.jdx")
+        .read_path(&root);
+    let Err(error) = filtered_out else {
+        anyhow::bail!("missing nested source-path filter should leave no readable spectra");
+    };
+    assert!(error.to_string().contains("no readable bundle data found"));
 
     remove_dir(root)?;
     Ok(())

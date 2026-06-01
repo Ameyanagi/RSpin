@@ -2,7 +2,7 @@
 
 mod routing;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use rspin_core::{RSpinError, Result};
 
@@ -23,6 +23,7 @@ pub struct SpectrumBundleLoader {
     strict: Toggle,
     source_paths: Toggle,
     source_formats: Vec<String>,
+    source_path_filters: Vec<PathBuf>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,10 +145,42 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Restricts loading to spectra read from one tracked source path.
+    ///
+    /// Source paths are matched after anchoring to the selected loader root, so
+    /// pass the same relative path that appears in `LoadedSource`.
+    #[must_use]
+    pub fn only_source_path(mut self, path: impl AsRef<Path>) -> Self {
+        self.source_path_filters = vec![path.as_ref().to_path_buf()];
+        self
+    }
+
+    /// Restricts loading to spectra read from any of the tracked source paths.
+    ///
+    /// Passing an empty iterator clears the source-path filter. Filters are
+    /// evaluated before source paths are optionally hidden with
+    /// [`Self::without_source_paths`].
+    #[must_use]
+    pub fn only_source_paths<I, P>(mut self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.source_path_filters = source_path_filters(paths);
+        self
+    }
+
     /// Clears any source-format restriction.
     #[must_use]
     pub fn all_source_formats(mut self) -> Self {
         self.source_formats.clear();
+        self
+    }
+
+    /// Clears any source-path restriction.
+    #[must_use]
+    pub fn all_source_paths(mut self) -> Self {
+        self.source_path_filters.clear();
         self
     }
 
@@ -460,6 +493,7 @@ impl Default for SpectrumBundleLoader {
             strict: Toggle::Disabled,
             source_paths: Toggle::Enabled,
             source_formats: Vec::new(),
+            source_path_filters: Vec::new(),
         }
     }
 }
@@ -470,4 +504,19 @@ impl SpectrumPathReader for SpectrumBundleLoader {
     fn read_path(&self, path: &Path) -> Result<Self::Output> {
         SpectrumBundleLoader::read_path(self, path)
     }
+}
+
+fn source_path_filters<I, P>(paths: I) -> Vec<PathBuf>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut filters = Vec::new();
+    for path in paths {
+        let path = path.as_ref().to_path_buf();
+        if !filters.iter().any(|existing| existing == &path) {
+            filters.push(path);
+        }
+    }
+    filters
 }

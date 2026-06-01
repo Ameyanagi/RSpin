@@ -367,6 +367,14 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
         .only_source_vendor(LoadedSourceVendor::AgilentVarian)
         .read_path(fixture_root.join("varian_1h"))?;
     assert_eq!(vendor_filtered.len(), 1);
+    let path_filtered = RSpinReader::new()
+        .only_source_path("varian_1h")
+        .read_path(&fixture_root)?;
+    assert_eq!(path_filtered.len(), 1);
+    assert_eq!(
+        path_filtered.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
 
     let exact = load_spectrum_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(exact.metadata.nucleus, Some(Nucleus::Hydrogen1));

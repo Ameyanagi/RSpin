@@ -65,6 +65,10 @@ impl SpectrumBundleLoader {
         directory: &Path,
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
+        if !self.allows_source_path(root, directory) {
+            return Ok(());
+        }
+
         self.read_bruker_directory_candidate(root, directory, bundle)?;
         self.read_agilent_directory_candidate(root, directory, bundle)?;
         Ok(())
@@ -223,6 +227,9 @@ impl SpectrumBundleLoader {
         }
 
         if is_nmredata_file(file) {
+            if !self.allows_source_path(root, file) {
+                return Ok(());
+            }
             return self.read_nmredata_candidate(root, file, bundle);
         }
         if self.raw.is_enabled()
@@ -266,14 +273,7 @@ impl SpectrumBundleLoader {
             );
         }
         if is_json_file(file) {
-            return self.add_1d_or_2d_or_bundle_result(
-                bundle,
-                root,
-                file,
-                || read_spectrum1d_path(file),
-                || read_spectrum2d_path(file),
-                || read_spectrum_bundle_json_file(file),
-            );
+            return self.read_json_file_candidate(root, file, bundle);
         }
         if let Some(message) = self.disabled_dimension_file_message(file) {
             return self.handle_error_message(bundle, root, file, message);
@@ -281,6 +281,9 @@ impl SpectrumBundleLoader {
 
         let format = format_from_file(file);
         if format != "auto" && !self.allows_source_format(format) {
+            return Ok(());
+        }
+        if !self.allows_source_path(root, file) {
             return Ok(());
         }
 
@@ -291,6 +294,25 @@ impl SpectrumBundleLoader {
             format,
             || read_spectrum1d_path(file),
             || read_spectrum2d_path(file),
+        )
+    }
+
+    fn read_json_file_candidate(
+        &self,
+        root: &Path,
+        file: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<()> {
+        if !self.allows_or_may_contain_source_path(root, file) {
+            return Ok(());
+        }
+        self.add_1d_or_2d_or_bundle_result(
+            bundle,
+            root,
+            file,
+            || read_spectrum1d_path(file),
+            || read_spectrum2d_path(file),
+            || read_spectrum_bundle_json_file(file),
         )
     }
 
@@ -656,6 +678,27 @@ impl SpectrumBundleLoader {
         });
     }
 
+    fn filter_bundle_source_paths(&self, bundle: &mut SpectrumBundle) {
+        if self.source_path_filters.is_empty() {
+            return;
+        }
+
+        bundle.spectra.retain(|entry| {
+            entry.source().path().is_some_and(|path| {
+                self.source_path_filters
+                    .iter()
+                    .any(|allowed| allowed.as_path() == path)
+            })
+        });
+        bundle.warnings.retain(|warning| {
+            warning.path().is_some_and(|path| {
+                self.source_path_filters
+                    .iter()
+                    .any(|allowed| allowed.as_path() == path)
+            })
+        });
+    }
+
     pub(super) fn handle_error(
         &self,
         bundle: &mut SpectrumBundle,
@@ -700,7 +743,7 @@ impl SpectrumBundleLoader {
         format: &'static str,
         spectrum: Spectrum1D,
     ) {
-        if self.allows_source_format(format) {
+        if self.allows_source_format(format) && self.allows_source_path(root, path) {
             bundle.push_1d(spectrum, self.loaded_source(root, path, format));
         }
     }
@@ -713,7 +756,7 @@ impl SpectrumBundleLoader {
         format: &'static str,
         spectrum: Spectrum2D,
     ) {
-        if self.allows_source_format(format) {
+        if self.allows_source_format(format) && self.allows_source_path(root, path) {
             bundle.push_2d(spectrum, self.loaded_source(root, path, format));
         }
     }
@@ -734,6 +777,27 @@ impl SpectrumBundleLoader {
         }
     }
 
+    fn allows_source_path(&self, root: &Path, path: &Path) -> bool {
+        self.source_path_filters.is_empty()
+            || relative_source_path(root, path).is_some_and(|source_path| {
+                self.source_path_filters
+                    .iter()
+                    .any(|allowed| allowed == &source_path)
+            })
+    }
+
+    fn allows_or_may_contain_source_path(&self, root: &Path, path: &Path) -> bool {
+        if self.source_path_filters.is_empty() || root == path {
+            return true;
+        }
+
+        relative_source_path(root, path).is_some_and(|container_path| {
+            self.source_path_filters.iter().any(|allowed| {
+                allowed == &container_path || allowed.starts_with(container_path.as_path())
+            })
+        })
+    }
+
     fn bundle_with_source_context(
         &self,
         root: &Path,
@@ -741,19 +805,15 @@ impl SpectrumBundleLoader {
         mut bundle: SpectrumBundle,
     ) -> SpectrumBundle {
         self.filter_bundle_dimensions(&mut bundle);
+        if root != path
+            && let Some(container_path) = relative_source_path(root, path)
+        {
+            prefix_bundle_source_paths(&mut bundle, &container_path);
+        }
+        self.filter_bundle_source_paths(&mut bundle);
         if !self.source_paths.is_enabled() {
             clear_bundle_source_paths(&mut bundle);
-            return bundle;
         }
-
-        if root == path {
-            return bundle;
-        }
-
-        let Some(container_path) = self.source_path(root, path) else {
-            return bundle;
-        };
-        prefix_bundle_source_paths(&mut bundle, &container_path);
         bundle
     }
 

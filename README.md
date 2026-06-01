@@ -133,6 +133,12 @@ fn load_bruker_only() -> Result<SpectrumBundle> {
         .only_source_vendor(LoadedSourceVendor::Bruker)
         .read_path("data/mixed-vendor")
 }
+
+fn load_one_tracked_path() -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .only_source_path("jcamp/carbon_13c.jdx")
+        .read_path("data/mixed-vendor")
+}
 ```
 
 Use the type-safe discovery helpers when building format or vendor selectors:
