@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use super::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 use crate::bundle::{
-    LoadedSourceDataKind, LoadedSourceVendor, SourceDataKindCount, SourceFormatCount,
-    SourceVendorCount, source_format_matches,
+    LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceVendor, SourceDataKindCount,
+    SourceFormatCount, SourceVendorCount, source_format_matches,
 };
 
 const DISCOVERY_DIMENSIONS: &[DiscoveredSpectrumDimension] = &[
@@ -148,6 +148,24 @@ impl DiscoveredSpectrumSummary {
     #[must_use]
     pub const fn sources_unknown(&self) -> usize {
         self.sources_unknown
+    }
+
+    /// Returns the number of discovered sources matching one generic source filter.
+    #[must_use]
+    pub fn source_count(&self, filter: impl Into<LoadedSourceFilter>) -> usize {
+        match filter.into() {
+            LoadedSourceFilter::Format { format } => self.source_format_count(format),
+            LoadedSourceFilter::Vendor { vendor } => self.source_vendor_count(vendor),
+            LoadedSourceFilter::DataKind { data_kind } => self.source_data_kind_count(data_kind),
+            LoadedSourceFilter::Path { path } => self.source_path_count(path),
+            LoadedSourceFilter::PathPrefix { path } => self.source_path_prefix_count(path),
+        }
+    }
+
+    /// Returns true when a discovered source matches one generic source filter.
+    #[must_use]
+    pub fn has_source(&self, filter: impl Into<LoadedSourceFilter>) -> bool {
+        self.source_count(filter) > 0
     }
 
     /// Returns the number of discovered sources read with a source format.

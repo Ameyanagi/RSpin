@@ -383,6 +383,24 @@ impl SpectrumBundleSummary {
         self.warnings
     }
 
+    /// Returns the number of loaded spectra matching one generic source filter.
+    #[must_use]
+    pub fn source_count(&self, filter: impl Into<LoadedSourceFilter>) -> usize {
+        match filter.into() {
+            LoadedSourceFilter::Format { format } => self.source_format_count(format),
+            LoadedSourceFilter::Vendor { vendor } => self.source_vendor_count(vendor),
+            LoadedSourceFilter::DataKind { data_kind } => self.source_data_kind_count(data_kind),
+            LoadedSourceFilter::Path { path } => self.source_path_count(path),
+            LoadedSourceFilter::PathPrefix { path } => self.source_path_prefix_count(path),
+        }
+    }
+
+    /// Returns true when a loaded spectrum matches one generic source filter.
+    #[must_use]
+    pub fn has_source(&self, filter: impl Into<LoadedSourceFilter>) -> bool {
+        self.source_count(filter) > 0
+    }
+
     /// Returns the number of loaded spectra read with a source format.
     #[must_use]
     pub fn source_format_count(&self, format: impl AsRef<str>) -> usize {

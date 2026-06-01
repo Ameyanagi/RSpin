@@ -1615,6 +1615,12 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert!(summary.has_source_path(hsqc_path));
     assert!(summary.has_source_path_prefix("jeol"));
     assert!(!summary.has_source_path("missing"));
+    assert_eq!(
+        summary.source_count(LoadedSourceFilter::path_prefix("jcamp")),
+        2
+    );
+    assert!(summary.has_source(LoadedSourceFilter::path(hsqc_path)));
+    assert!(!summary.has_source(LoadedSourceFilter::path("missing")));
 
     let loaded_sources = bundle.loaded_sources().collect::<Vec<_>>();
     assert_eq!(loaded_sources.len(), bundle.len());
@@ -1653,6 +1659,16 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert!(!bundle.has_source_path("missing"));
     assert!(bundle.loaded_2d_by_source_path(jcamp_path).is_none());
 
+    let no_sources = RSpinReader::new()
+        .without_source_paths()
+        .read_path(nmrxiv_fixture_root())?;
+    assert!(no_sources.loaded_by_source_path(jcamp_path).is_none());
+    assert!(no_sources.source_paths().next().is_none());
+    Ok(())
+}
+
+#[test]
+fn bundle_warning_path_lookup_helpers_find_entries() -> anyhow::Result<()> {
     let bundle_with_warning = RSpinReader::new().read_path(fixture_root())?;
     let warnings = bundle_with_warning
         .warnings_for_source_path(Path::new("empty_jcamp/empty.jdx"))
@@ -1693,12 +1709,6 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     let warning_messages = bundle_with_warning.warning_messages().collect::<Vec<_>>();
     assert_eq!(warning_messages.len(), 1);
     assert!(warning_messages[0].contains("missing XYDATA values"));
-
-    let no_sources = RSpinReader::new()
-        .without_source_paths()
-        .read_path(nmrxiv_fixture_root())?;
-    assert!(no_sources.loaded_by_source_path(jcamp_path).is_none());
-    assert!(no_sources.source_paths().next().is_none());
     Ok(())
 }
 
@@ -1732,6 +1742,13 @@ fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
     assert!(summary.has_source_format(LoadedSourceFormat::JeolJdf));
     assert!(summary.has_source_format("jdf"));
     assert!(!summary.has_source_format("missing"));
+    assert_eq!(summary.source_count(LoadedSourceFilter::format("jdx")), 2);
+    assert_eq!(
+        summary.source_count(LoadedSourceFilter::vendor("bruker")),
+        2
+    );
+    assert!(summary.has_source(LoadedSourceFilter::data_kind(LoadedSourceDataKind::Raw)));
+    assert!(!summary.has_source(LoadedSourceFilter::vendor("missing")));
     assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
     assert_eq!(
         summary.source_data_kind_count(LoadedSourceDataKind::Processed),

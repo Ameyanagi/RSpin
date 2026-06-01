@@ -473,6 +473,9 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
     assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
     assert_eq!(summary.source_path_count("varian_1h"), 1);
     assert!(summary.has_source_path_prefix("bruker_without_expno"));
+    assert_eq!(summary.source_count(LoadedSourceFilter::format("jdx")), 2);
+    assert_eq!(summary.source_count(LoadedSourceFilter::raw()), 2);
+    assert!(summary.has_source(LoadedSourceFilter::path_prefix("bruker_without_expno")));
     assert!(
         summary
             .source_paths

@@ -145,6 +145,11 @@ fn source_discovery_summary_counts_candidates() -> Result<()> {
     assert_eq!(summary.source_vendor_count(LoadedSourceVendor::Bruker), 2);
     assert!(summary.has_source_vendor("varian"));
     assert_eq!(summary.source_vendor_count("missing"), 0);
+    assert_eq!(summary.source_count(LoadedSourceFilter::format("jdx")), 2);
+    assert_eq!(
+        summary.source_count(LoadedSourceFilter::vendor("bruker")),
+        2
+    );
     assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
     assert_eq!(
         summary.source_data_kind_count(LoadedSourceDataKind::Processed),
@@ -168,6 +173,12 @@ fn source_discovery_summary_counts_candidates() -> Result<()> {
     assert!(summary.has_source_path("bruker_without_expno/pdata/1"));
     assert!(summary.has_source_path_prefix("empty_jcamp"));
     assert!(!summary.has_source_path("missing"));
+    assert_eq!(
+        summary.source_count(LoadedSourceFilter::path_prefix("empty_jcamp")),
+        2
+    );
+    assert!(summary.has_source(LoadedSourceFilter::data_kind(LoadedSourceDataKind::Raw)));
+    assert!(!summary.has_source(LoadedSourceFilter::path("missing")));
     assert_eq!(summary.source_paths.len(), 4);
     assert!(
         summary
