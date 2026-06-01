@@ -1,6 +1,7 @@
 //! Source discovery for the spectrum bundle loader.
 
 mod dimension;
+mod dimension_path;
 mod exact;
 mod loaded_summary;
 mod model;
@@ -42,6 +43,22 @@ pub use dimension::{
     load_discovered_spectra_2d_strict_by_sources,
     load_discovered_spectra_2d_strict_by_sources_relative_to,
     load_discovered_spectra_2d_strict_relative_to,
+};
+pub use dimension_path::{
+    load_discovered_spectra_1d_by_source_path, load_discovered_spectra_1d_by_source_path_prefix,
+    load_discovered_spectra_1d_by_source_path_prefix_relative_to,
+    load_discovered_spectra_1d_by_source_path_relative_to,
+    load_discovered_spectra_1d_strict_by_source_path,
+    load_discovered_spectra_1d_strict_by_source_path_prefix,
+    load_discovered_spectra_1d_strict_by_source_path_prefix_relative_to,
+    load_discovered_spectra_1d_strict_by_source_path_relative_to,
+    load_discovered_spectra_2d_by_source_path, load_discovered_spectra_2d_by_source_path_prefix,
+    load_discovered_spectra_2d_by_source_path_prefix_relative_to,
+    load_discovered_spectra_2d_by_source_path_relative_to,
+    load_discovered_spectra_2d_strict_by_source_path,
+    load_discovered_spectra_2d_strict_by_source_path_prefix,
+    load_discovered_spectra_2d_strict_by_source_path_prefix_relative_to,
+    load_discovered_spectra_2d_strict_by_source_path_relative_to,
 };
 pub use exact::{
     load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,

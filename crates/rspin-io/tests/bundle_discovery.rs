@@ -22,11 +22,16 @@ use rspin_io::{
     discover_spectra_many_relative_to, discover_spectra_many_summary,
     discover_spectra_many_summary_relative_to, discover_spectra_summary,
     discover_spectra_summary_relative_to, load_discovered_spectra,
-    load_discovered_spectra_1d_by_source, load_discovered_spectra_1d_relative_to,
+    load_discovered_spectra_1d_by_source, load_discovered_spectra_1d_by_source_path,
+    load_discovered_spectra_1d_by_source_path_prefix_relative_to,
+    load_discovered_spectra_1d_relative_to,
+    load_discovered_spectra_1d_strict_by_source_path_prefix,
     load_discovered_spectra_1d_strict_by_source_relative_to,
+    load_discovered_spectra_2d_by_source_path_relative_to,
     load_discovered_spectra_2d_by_sources_relative_to, load_discovered_spectra_2d_relative_to,
-    load_discovered_spectra_2d_strict_by_sources, load_discovered_spectra_by_source,
-    load_discovered_spectra_by_source_path, load_discovered_spectra_by_source_path_prefix,
+    load_discovered_spectra_2d_strict_by_source_path, load_discovered_spectra_2d_strict_by_sources,
+    load_discovered_spectra_by_source, load_discovered_spectra_by_source_path,
+    load_discovered_spectra_by_source_path_prefix,
     load_discovered_spectra_by_source_path_prefix_relative_to,
     load_discovered_spectra_by_source_path_relative_to,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
@@ -977,6 +982,49 @@ fn discovered_dimension_bundle_helpers_load_matching_candidates() -> Result<()> 
             .to_string()
             .contains("no one-dimensional discovered sources selected")
     );
+
+    Ok(())
+}
+
+#[test]
+fn discovered_dimension_source_path_helpers_load_matching_candidates() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    let one_d = load_discovered_spectra_1d_by_source_path(&root, &sources, proton_path)?;
+    assert_eq!(one_d.len_1d(), 1);
+    assert_eq!(one_d.len_2d(), 0);
+    assert!(one_d.has_source_path(proton_path));
+
+    let one_d_prefix =
+        load_discovered_spectra_1d_by_source_path_prefix_relative_to(&root, &sources, "jeol")?;
+    assert_eq!(one_d_prefix.len_1d(), 2);
+    assert_eq!(one_d_prefix.len_2d(), 0);
+
+    let one_d_prefix = RSpinReader::new()
+        .read_discovered_bundle_1d_by_source_path_prefix(&root, &sources, "jeol")?;
+    assert_eq!(one_d_prefix.len_1d(), 2);
+
+    let strict_one_d =
+        load_discovered_spectra_1d_strict_by_source_path_prefix(&root, &sources, "jeol")?;
+    assert_eq!(strict_one_d.len_1d(), 2);
+    assert!(strict_one_d.warnings().is_empty());
+
+    let two_d = load_discovered_spectra_2d_by_source_path_relative_to(&root, &sources, hsqc_path)?;
+    assert_eq!(two_d.len_1d(), 0);
+    assert_eq!(two_d.len_2d(), 1);
+    assert!(two_d.has_source_path(hsqc_path));
+
+    let two_d =
+        RSpinReader::new().read_discovered_bundle_2d_by_source_path(&root, &sources, hsqc_path)?;
+    assert_eq!(two_d.len_2d(), 1);
+
+    let strict_two_d =
+        load_discovered_spectra_2d_strict_by_source_path(&root, &sources, hsqc_path)?;
+    assert_eq!(strict_two_d.len_2d(), 1);
+    assert!(strict_two_d.warnings().is_empty());
 
     Ok(())
 }
