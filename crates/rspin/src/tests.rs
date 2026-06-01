@@ -429,6 +429,19 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
         source_vendor.source_vendor_count(LoadedSourceVendor::AgilentVarian),
         1
     );
+
+    let multi_vendor =
+        load_spectra_many_by_source_vendor([fixture_root.join("varian_1h")], "varian")?;
+    assert_eq!(multi_vendor.len(), 1);
+    assert_eq!(
+        multi_vendor.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let multi_path =
+        load_spectra_many_by_source_path_relative_to(&fixture_root, ["varian_1h"], "varian_1h")?;
+    assert_eq!(multi_path.len(), 1);
+    assert!(multi_path.has_source_path(std::path::Path::new("varian_1h")));
     Ok(())
 }
 

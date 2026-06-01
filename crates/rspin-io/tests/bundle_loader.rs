@@ -13,6 +13,9 @@ use rspin_io::{
     load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
     load_spectra_by_source_path, load_spectra_by_source_path_relative_to,
     load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to, load_spectra_many,
+    load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
+    load_spectra_many_by_source_path, load_spectra_many_by_source_path_relative_to,
+    load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
     load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
@@ -1568,6 +1571,57 @@ fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
         Some(Nucleus::Carbon13)
     );
     assert!(relative_carbon.has_source_path(carbon_path));
+    Ok(())
+}
+
+#[test]
+fn free_multi_path_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let paths = [base.join("varian_1h"), base.join("bruker_without_expno")];
+
+    let processed =
+        load_spectra_many_by_source_format(&paths, LoadedSourceFormat::BrukerProcessed)?;
+    assert_eq!(processed.len(), 1);
+    assert_eq!(
+        processed.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+    assert_eq!(first_1d(&processed)?.x.unit, Unit::Ppm);
+
+    let relative_varian = load_spectra_many_by_source_format_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        "varian fid",
+    )?;
+    assert_eq!(relative_varian.len(), 1);
+    assert!(relative_varian.has_source_path(Path::new("varian_1h")));
+
+    let bruker = load_spectra_many_by_source_vendor(&paths, "bruker")?;
+    assert_eq!(bruker.len(), 2);
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let relative_vendor =
+        load_spectra_many_by_source_vendor_relative_to(&base, ["varian_1h"], "varian")?;
+    assert_eq!(relative_vendor.len(), 1);
+    assert_eq!(
+        relative_vendor.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let varian = load_spectra_many_by_source_path(&paths, "varian_1h")?;
+    assert_eq!(varian.len(), 1);
+    assert_eq!(
+        first_1d(&varian)?.metadata.nucleus,
+        Some(Nucleus::Hydrogen1)
+    );
+
+    let relative_processed = load_spectra_many_by_source_path_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        "bruker_without_expno/pdata/1",
+    )?;
+    assert_eq!(relative_processed.len(), 1);
+    assert_eq!(first_1d(&relative_processed)?.x.unit, Unit::Ppm);
     Ok(())
 }
 

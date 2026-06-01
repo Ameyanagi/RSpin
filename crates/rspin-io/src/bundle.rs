@@ -231,6 +231,140 @@ where
     SpectrumBundleLoader::new().read_paths_relative_to(base, paths)
 }
 
+/// Loads supported spectra from multiple paths, restricted to one source format.
+///
+/// Source format aliases such as `jdx`, `jdf`, and `varian fid` are accepted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_format<I, P>(
+    paths: I,
+    format: impl AsRef<str>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_format(format)
+        .read_paths(paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to one source format.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_format_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+    format: impl AsRef<str>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_format(format)
+        .read_paths_relative_to(base, paths)
+}
+
+/// Loads supported spectra from multiple paths, restricted to one vendor family.
+///
+/// Vendor aliases such as `agilent` and `varian` are accepted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_vendor<I, P>(
+    paths: I,
+    vendor: impl AsRef<str>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_vendor(vendor)
+        .read_paths(paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to one vendor family.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_vendor_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+    vendor: impl AsRef<str>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_vendor(vendor)
+        .read_paths_relative_to(base, paths)
+}
+
+/// Loads supported spectra from multiple paths, restricted to one tracked source path.
+///
+/// The source path is matched against relative paths recorded in the loaded
+/// bundle, such as `jcamp/carbon_13c.jdx`.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_path<I, P>(
+    paths: I,
+    source_path: impl AsRef<Path>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path(source_path)
+        .read_paths(paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to one tracked source path.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. The source path is matched after anchoring source
+/// metadata to `base`.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_path_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+    source_path: impl AsRef<Path>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path(source_path)
+        .read_paths_relative_to(base, paths)
+}
+
 fn spectrum_dimension_counts<'a>(
     spectra: impl IntoIterator<Item = &'a LoadedSpectrum>,
 ) -> (usize, usize) {
