@@ -75,11 +75,14 @@ pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 pub use selected::SelectedDiscoveredSpectrumSourcesExt;
 pub use selection::{
     DiscoveredSpectrumSourcesExt, select_discovered_spectra_1d,
-    select_discovered_spectra_1d_by_source, select_discovered_spectra_1d_by_sources,
+    select_discovered_spectra_1d_by_source, select_discovered_spectra_1d_by_source_path,
+    select_discovered_spectra_1d_by_source_path_prefix, select_discovered_spectra_1d_by_sources,
     select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
-    select_discovered_spectra_2d_by_sources, select_discovered_spectra_by_dimension,
-    select_discovered_spectra_by_dimension_and_source,
+    select_discovered_spectra_2d_by_source_path,
+    select_discovered_spectra_2d_by_source_path_prefix, select_discovered_spectra_2d_by_sources,
+    select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
     select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
     select_discovered_spectra_by_sources,
 };
 pub use strict::{

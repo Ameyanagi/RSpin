@@ -925,6 +925,10 @@ fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
         LoadedSourceFilter::path(hsqc_path),
     );
     assert_eq!(hsqc_candidate.len(), 1);
+    assert_eq!(
+        select_discovered_spectra_2d_by_source_path(&myrcene_sources, hsqc_path),
+        hsqc_candidate
+    );
     let hsqc_candidates = select_discovered_spectra_2d_by_sources(
         &myrcene_sources,
         [LoadedSourceFilter::path(hsqc_path)],
@@ -936,6 +940,23 @@ fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
         [LoadedSourceFilter::path(hsqc_path)],
     );
     assert_eq!(hsqc_candidates_by_dimension, hsqc_candidate);
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+    assert_eq!(
+        select_discovered_spectra_1d_by_source_path(&myrcene_sources, proton_path).len(),
+        1
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_source_path_prefix(&myrcene_sources, "jeol").len(),
+        2
+    );
+    assert_eq!(
+        select_discovered_spectra_by_source_path(&myrcene_sources, proton_path).len(),
+        1
+    );
+    assert_eq!(
+        select_discovered_spectra_by_source_path_prefix(&myrcene_sources, "jeol").len(),
+        3
+    );
     let selected_unknown = select_discovered_spectra_by_dimension_and_source(
         &myrcene_sources,
         DiscoveredSpectrumDimension::Unknown,
@@ -987,8 +1008,24 @@ fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
         select_discovered_spectra_1d_by_sources(&sources, [LoadedSourceFilter::vendor("jeol")])
     );
     assert_eq!(
+        sources.select_1d_by_source_path(proton_path),
+        select_discovered_spectra_1d_by_source_path(&sources, proton_path)
+    );
+    assert_eq!(
+        sources.select_1d_by_source_path_prefix("jeol"),
+        select_discovered_spectra_1d_by_source_path_prefix(&sources, "jeol")
+    );
+    assert_eq!(
         sources.select_2d_by_source(LoadedSourceFilter::path(hsqc_path)),
         select_discovered_spectra_2d_by_source(&sources, LoadedSourceFilter::path(hsqc_path))
+    );
+    assert_eq!(
+        sources.select_2d_by_source_path(hsqc_path),
+        select_discovered_spectra_2d_by_source_path(&sources, hsqc_path)
+    );
+    assert_eq!(
+        sources.select_2d_by_source_path_prefix("bruker_cosy_raw"),
+        select_discovered_spectra_2d_by_source_path_prefix(&sources, "bruker_cosy_raw")
     );
     assert_eq!(
         sources.select_2d_by_sources([LoadedSourceFilter::path(hsqc_path)]),
@@ -1023,6 +1060,14 @@ fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
     assert_eq!(
         sources.select_by_source(LoadedSourceFilter::path(proton_path)),
         select_discovered_spectra_by_source(&sources, LoadedSourceFilter::path(proton_path))
+    );
+    assert_eq!(
+        sources.select_by_source_path(proton_path),
+        select_discovered_spectra_by_source_path(&sources, proton_path)
+    );
+    assert_eq!(
+        sources.select_by_source_path_prefix("jeol"),
+        select_discovered_spectra_by_source_path_prefix(&sources, "jeol")
     );
     assert_eq!(
         sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
