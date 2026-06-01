@@ -1442,6 +1442,79 @@ fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_generic_source_helpers_filter_many_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    assert_eq!(
+        bundle.source_count_by_sources([
+            LoadedSourceFilter::format("jdx"),
+            LoadedSourceFilter::vendor("bruker"),
+            LoadedSourceFilter::vendor("bruker")
+        ]),
+        4
+    );
+    assert!(bundle.has_any_source([
+        LoadedSourceFilter::vendor("missing"),
+        LoadedSourceFilter::path(hsqc_path)
+    ]));
+    assert_eq!(
+        bundle.source_count_by_sources(Vec::<LoadedSourceFilter>::new()),
+        bundle.len()
+    );
+    assert!(bundle.has_any_source(Vec::<LoadedSourceFilter>::new()));
+
+    let selected = bundle
+        .loaded_by_sources([
+            LoadedSourceFilter::format(LoadedSourceFormat::JcampDx),
+            LoadedSourceFilter::from(LoadedSourceVendor::Bruker),
+        ])
+        .collect::<Vec<_>>();
+    assert_eq!(selected.len(), 4);
+    assert!(selected.iter().all(|entry| {
+        entry.source().is_format(LoadedSourceFormat::JcampDx)
+            || entry.source().is_vendor(LoadedSourceVendor::Bruker)
+    }));
+
+    let selected_1d = bundle
+        .loaded_1d_by_sources([
+            LoadedSourceFilter::vendor("jeol"),
+            LoadedSourceFilter::path(carbon_path),
+        ])
+        .collect::<Vec<_>>();
+    assert_eq!(selected_1d.len(), 3);
+    assert!(
+        selected_1d
+            .iter()
+            .any(|(spectrum, _)| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+    );
+
+    let selected_2d = bundle
+        .loaded_2d_by_sources([
+            LoadedSourceFilter::vendor("bruker"),
+            LoadedSourceFilter::path(hsqc_path),
+        ])
+        .collect::<Vec<_>>();
+    assert_eq!(selected_2d.len(), 2);
+
+    assert_eq!(
+        bundle
+            .source_paths_for_sources([
+                LoadedSourceFilter::format("jdx"),
+                LoadedSourceFilter::path(hsqc_path)
+            ])
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+            Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx"),
+            Path::new("jeol/myrcene_hsqc_400mhz.jdf")
+        ]
+    );
+    Ok(())
+}
+
+#[test]
 fn bundle_generic_source_helpers_consume_filtered_entries() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
     let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
@@ -1494,6 +1567,47 @@ fn bundle_generic_source_helpers_consume_filtered_entries() -> anyhow::Result<()
     let bruker_2d = bundle.into_spectra_2d_by_source(LoadedSourceFilter::vendor("bruker"));
     assert_eq!(bruker_2d.len(), 1);
     assert_eq!(bruker_2d[0].shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
+fn bundle_generic_source_helpers_consume_many_filtered_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let selected = bundle.clone().into_loaded_by_sources([
+        LoadedSourceFilter::format("jdx"),
+        LoadedSourceFilter::vendor("bruker"),
+    ]);
+    assert_eq!(selected.len(), 4);
+
+    let selected_1d = bundle.clone().into_loaded_1d_by_sources([
+        LoadedSourceFilter::format("jdx"),
+        LoadedSourceFilter::vendor("bruker"),
+    ]);
+    assert_eq!(selected_1d.len(), 3);
+    assert!(
+        selected_1d
+            .iter()
+            .any(|(_, source)| source.is_format(LoadedSourceFormat::BrukerFid))
+    );
+
+    let selected_2d = bundle.clone().into_loaded_2d_by_sources([
+        LoadedSourceFilter::vendor("bruker"),
+        LoadedSourceFilter::path(hsqc_path),
+    ]);
+    assert_eq!(selected_2d.len(), 2);
+
+    let spectra_1d = bundle
+        .clone()
+        .into_spectra_1d_by_sources(Vec::<LoadedSourceFilter>::new());
+    assert_eq!(spectra_1d.len(), bundle.len_1d());
+
+    let spectra_2d = bundle.into_spectra_2d_by_sources([
+        LoadedSourceFilter::vendor("bruker"),
+        LoadedSourceFilter::path(hsqc_path),
+    ]);
+    assert_eq!(spectra_2d.len(), 2);
     Ok(())
 }
 

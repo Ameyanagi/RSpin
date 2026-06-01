@@ -528,6 +528,33 @@ fn prelude_exports_owned_source_filtered_bundle_extractors() -> Result<()> {
     assert_eq!(processed.len(), 1);
     assert_eq!(processed[0].metadata.nucleus, Some(Nucleus::Hydrogen1));
 
+    assert_eq!(
+        bundle.source_count_by_sources([
+            LoadedSourceFilter::vendor("varian"),
+            LoadedSourceFilter::vendor("bruker")
+        ]),
+        2
+    );
+    assert_eq!(
+        bundle
+            .loaded_1d_by_sources([
+                LoadedSourceFilter::path("varian_1h"),
+                LoadedSourceFilter::vendor("bruker")
+            ])
+            .count(),
+        2
+    );
+    assert_eq!(
+        bundle
+            .clone()
+            .into_loaded_1d_by_sources([
+                LoadedSourceFilter::path("varian_1h"),
+                LoadedSourceFilter::vendor("bruker")
+            ])
+            .len(),
+        2
+    );
+
     let loaded_varian = bundle.into_loaded_by_source(LoadedSourceFilter::vendor("varian"));
     assert_eq!(loaded_varian.len(), 1);
     assert_eq!(

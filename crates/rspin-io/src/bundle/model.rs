@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use rspin_core::{Molecule, RSpinError, Result, Spectrum1D, Spectrum2D};
 use serde::{Deserialize, Serialize};
 
+use super::source_filter::source_filters;
 use super::{
     LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, only_error_from_counts,
     push_source_vendor_count, source_format_count_name, source_format_matches,
@@ -617,6 +618,21 @@ impl SpectrumBundle {
             .filter(move |entry| filter.matches_source(entry.source()))
     }
 
+    /// Returns loaded spectra matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    pub fn loaded_by_sources<I, F>(&self, filters: I) -> impl Iterator<Item = &LoadedSpectrum> + '_
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.spectra
+            .iter()
+            .filter(move |entry| source_matches_any(&filters, entry.source()))
+    }
+
     /// Returns one-dimensional spectra and sources matching a generic source filter.
     ///
     /// The filter may target a source format, vendor family, or tracked source
@@ -628,6 +644,23 @@ impl SpectrumBundle {
         let filter = filter.into();
         self.loaded_1d()
             .filter(move |(_, source)| filter.matches_source(source))
+    }
+
+    /// Returns one-dimensional spectra and sources matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    pub fn loaded_1d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> impl Iterator<Item = (&Spectrum1D, &LoadedSource)> + '_
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.loaded_1d()
+            .filter(move |(_, source)| source_matches_any(&filters, source))
     }
 
     /// Returns two-dimensional spectra and sources matching a generic source filter.
@@ -643,6 +676,23 @@ impl SpectrumBundle {
             .filter(move |(_, source)| filter.matches_source(source))
     }
 
+    /// Returns two-dimensional spectra and sources matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    pub fn loaded_2d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> impl Iterator<Item = (&Spectrum2D, &LoadedSource)> + '_
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.loaded_2d()
+            .filter(move |(_, source)| source_matches_any(&filters, source))
+    }
+
     /// Returns tracked source paths for spectra matching a generic source filter.
     ///
     /// Spectra loaded while source path tracking is disabled are skipped.
@@ -656,16 +706,57 @@ impl SpectrumBundle {
             .filter_map(LoadedSource::path)
     }
 
+    /// Returns tracked source paths for spectra matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    /// Spectra loaded while source path tracking is disabled are skipped.
+    pub fn source_paths_for_sources<I, F>(&self, filters: I) -> impl Iterator<Item = &Path> + '_
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.loaded_sources()
+            .filter(move |source| source_matches_any(&filters, source))
+            .filter_map(LoadedSource::path)
+    }
+
     /// Returns the number of loaded spectra matching a generic source filter.
     #[must_use]
     pub fn source_count(&self, filter: impl Into<LoadedSourceFilter>) -> usize {
         self.loaded_by_source(filter).count()
     }
 
+    /// Returns the number of loaded spectra matching any generic source filter.
+    ///
+    /// Passing an empty iterator counts all loaded spectra.
+    #[must_use]
+    pub fn source_count_by_sources<I, F>(&self, filters: I) -> usize
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.loaded_by_sources(filters).count()
+    }
+
     /// Returns true when a loaded spectrum matches a generic source filter.
     #[must_use]
     pub fn has_source(&self, filter: impl Into<LoadedSourceFilter>) -> bool {
         self.loaded_by_source(filter).next().is_some()
+    }
+
+    /// Returns true when a loaded spectrum matches any generic source filter.
+    ///
+    /// Passing an empty iterator returns true when the bundle contains any
+    /// loaded spectrum.
+    #[must_use]
+    pub fn has_any_source<I, F>(&self, filters: I) -> bool
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.loaded_by_sources(filters).next().is_some()
     }
 
     /// Returns a loaded spectrum by its source path, if present.
@@ -820,6 +911,23 @@ impl SpectrumBundle {
             .collect()
     }
 
+    /// Consumes the bundle and returns loaded spectra matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    #[must_use]
+    pub fn into_loaded_by_sources<I, F>(self, filters: I) -> Vec<LoadedSpectrum>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.spectra
+            .into_iter()
+            .filter(move |entry| source_matches_any(&filters, entry.source()))
+            .collect()
+    }
+
     /// Consumes the bundle and returns one-dimensional spectra and sources matching a generic source filter.
     ///
     /// The filter may target a source format, vendor family, or tracked source
@@ -841,6 +949,30 @@ impl SpectrumBundle {
             .collect()
     }
 
+    /// Consumes the bundle and returns one-dimensional spectra and sources matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    #[must_use]
+    pub fn into_loaded_1d_by_sources<I, F>(self, filters: I) -> Vec<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.spectra
+            .into_iter()
+            .filter_map(move |entry| match entry {
+                LoadedSpectrum::OneD { spectrum, source }
+                    if source_matches_any(&filters, &source) =>
+                {
+                    Some((spectrum, source))
+                }
+                LoadedSpectrum::OneD { .. } | LoadedSpectrum::TwoD { .. } => None,
+            })
+            .collect()
+    }
+
     /// Consumes the bundle and returns loaded two-dimensional spectra with sources.
     #[must_use]
     pub fn into_loaded_2d(self) -> Vec<(Spectrum2D, LoadedSource)> {
@@ -849,6 +981,30 @@ impl SpectrumBundle {
             .filter_map(|entry| match entry {
                 LoadedSpectrum::TwoD { spectrum, source } => Some((spectrum, source)),
                 LoadedSpectrum::OneD { .. } => None,
+            })
+            .collect()
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra and sources matching any generic source filter.
+    ///
+    /// Filters are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted, mirroring `SpectrumBundleLoader::only_sources`.
+    #[must_use]
+    pub fn into_loaded_2d_by_sources<I, F>(self, filters: I) -> Vec<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let filters = source_filters(filters);
+        self.spectra
+            .into_iter()
+            .filter_map(move |entry| match entry {
+                LoadedSpectrum::TwoD { spectrum, source }
+                    if source_matches_any(&filters, &source) =>
+                {
+                    Some((spectrum, source))
+                }
+                LoadedSpectrum::OneD { .. } | LoadedSpectrum::TwoD { .. } => None,
             })
             .collect()
     }
@@ -897,10 +1053,42 @@ impl SpectrumBundle {
             .collect()
     }
 
+    /// Consumes the bundle and returns one-dimensional spectra matching any generic source filter.
+    ///
+    /// Source metadata is discarded after filtering. Passing an empty iterator
+    /// leaves source matching unrestricted.
+    #[must_use]
+    pub fn into_spectra_1d_by_sources<I, F>(self, filters: I) -> Vec<Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.into_loaded_1d_by_sources(filters)
+            .into_iter()
+            .map(|(spectrum, _)| spectrum)
+            .collect()
+    }
+
     /// Consumes the bundle and returns two-dimensional spectra without source metadata.
     #[must_use]
     pub fn into_spectra_2d(self) -> Vec<Spectrum2D> {
         self.into_loaded_2d()
+            .into_iter()
+            .map(|(spectrum, _)| spectrum)
+            .collect()
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra matching any generic source filter.
+    ///
+    /// Source metadata is discarded after filtering. Passing an empty iterator
+    /// leaves source matching unrestricted.
+    #[must_use]
+    pub fn into_spectra_2d_by_sources<I, F>(self, filters: I) -> Vec<Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.into_loaded_2d_by_sources(filters)
             .into_iter()
             .map(|(spectrum, _)| spectrum)
             .collect()
@@ -1134,4 +1322,8 @@ impl SpectrumBundle {
         let (one_d, two_d) = spectrum_dimension_counts(self.spectra.iter());
         only_error_from_counts(expected, one_d, two_d)
     }
+}
+
+fn source_matches_any(filters: &[LoadedSourceFilter], source: &LoadedSource) -> bool {
+    filters.is_empty() || filters.iter().any(|filter| filter.matches_source(source))
 }
