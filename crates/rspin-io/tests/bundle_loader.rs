@@ -339,6 +339,37 @@ fn reader_short_source_filter_aliases_cover_common_workflows() -> anyhow::Result
 }
 
 #[test]
+fn reader_source_path_prefix_aliases_cover_directory_filters() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let path_prefix = RSpinReader::new()
+        .source_path_prefix("bruker_without_expno/pdata")
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(path_prefix.len(), 1);
+    assert_eq!(first_1d(&path_prefix)?.x.unit, Unit::Ppm);
+    assert!(has_source_path(
+        &path_prefix,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+
+    let path_prefix_many = RSpinReader::new()
+        .source_path_prefixes(["jcamp", "jeol"])
+        .read(nmrxiv_fixture_root())?;
+    assert_eq!(path_prefix_many.len(), 5);
+    assert_eq!(
+        path_prefix_many.source_format_count(LoadedSourceFormat::BrukerFid),
+        0
+    );
+    assert_eq!(
+        path_prefix_many.source_format_count(LoadedSourceFormat::BrukerSer),
+        0
+    );
+    assert!(path_prefix_many.has_source(LoadedSourceFilter::path_prefix("jcamp")));
+    assert!(path_prefix_many.has_source(LoadedSourceFilter::path_prefix("jeol")));
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 
@@ -1516,7 +1547,16 @@ fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
     assert_eq!(bundle.source_count(LoadedSourceFilter::format("jdx")), 2);
     assert_eq!(bundle.source_count(LoadedSourceFilter::vendor("bruker")), 2);
     assert_eq!(bundle.source_count(LoadedSourceFilter::path(hsqc_path)), 1);
+    assert_eq!(
+        bundle.source_count(LoadedSourceFilter::path_prefix("jcamp")),
+        2
+    );
+    assert_eq!(
+        bundle.source_count(LoadedSourceFilter::path_prefix("jeol")),
+        3
+    );
     assert!(bundle.has_source(LoadedSourceFilter::path(carbon_path)));
+    assert!(bundle.has_source(LoadedSourceFilter::path_prefix("jeol")));
     assert!(!bundle.has_source(LoadedSourceFilter::path("missing.jdx")));
 
     let jcamp = bundle
@@ -1539,6 +1579,16 @@ fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
     assert_eq!(hsqc[0].0.shape(), (1024, 32));
     assert_eq!(hsqc[0].1.path(), Some(hsqc_path));
 
+    let jcamp_1d = bundle
+        .loaded_1d_by_source(LoadedSourceFilter::path_prefix("jcamp"))
+        .collect::<Vec<_>>();
+    assert_eq!(jcamp_1d.len(), 2);
+    assert!(jcamp_1d.iter().all(|(_, source)| {
+        source
+            .path()
+            .is_some_and(|path| path.starts_with(Path::new("jcamp")))
+    }));
+
     assert_eq!(
         bundle
             .source_paths_for_source(LoadedSourceFilter::vendor("jeol"))
@@ -1547,6 +1597,15 @@ fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
             Path::new("jeol/myrcene_13c_400mhz.jdf"),
             Path::new("jeol/myrcene_1h_400mhz.jdf"),
             Path::new("jeol/myrcene_hsqc_400mhz.jdf")
+        ]
+    );
+    assert_eq!(
+        bundle
+            .source_paths_for_source(LoadedSourceFilter::path_prefix("jcamp"))
+            .collect::<Vec<_>>(),
+        vec![
+            Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+            Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")
         ]
     );
     assert!(

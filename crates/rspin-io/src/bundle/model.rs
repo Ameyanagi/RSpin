@@ -1692,10 +1692,7 @@ fn source_matches_any(filters: &[LoadedSourceFilter], source: &LoadedSource) -> 
 }
 
 fn warning_matches_any(filters: &[LoadedSourceFilter], warning: &LoadWarning) -> bool {
-    if filters
-        .iter()
-        .any(|filter| !matches!(filter, LoadedSourceFilter::Path { .. }))
-    {
+    if filters.iter().any(|filter| !filter.is_path_filter()) {
         return true;
     }
 

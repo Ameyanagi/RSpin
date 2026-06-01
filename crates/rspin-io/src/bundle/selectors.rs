@@ -835,5 +835,8 @@ fn source_filter_label(filter: &LoadedSourceFilter) -> String {
             format!("source data kind {data_kind}")
         }
         LoadedSourceFilter::Path { path } => source_path_filter_label(path),
+        LoadedSourceFilter::PathPrefix { path } => {
+            format!("source path prefix {}", path.display())
+        }
     }
 }

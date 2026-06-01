@@ -14,11 +14,11 @@ use crate::{
 
 use super::{FileCandidateKind, SpectrumBundleLoader};
 use crate::bundle::{
-    LoadWarning, LoadedSource, LoadedSourceFilter, LoadedSpectrum, SpectrumBundle,
-    clear_bundle_source_paths, collect_tree, disabled_candidate_message, disabled_dimension_error,
-    disabled_dimension_message, fallback_message, file_candidate_kind, format_from_file,
-    is_agilent_arrayed_1d_fid_path, is_agilent_arrayed_2d_fid_path, is_agilent_fid_dir,
-    is_agilent_format, is_agilent_processed_dir, is_bruker_fid_dir, is_bruker_processed_1d_dir,
+    LoadWarning, LoadedSource, LoadedSpectrum, SpectrumBundle, clear_bundle_source_paths,
+    collect_tree, disabled_candidate_message, disabled_dimension_error, disabled_dimension_message,
+    fallback_message, file_candidate_kind, format_from_file, is_agilent_arrayed_1d_fid_path,
+    is_agilent_arrayed_2d_fid_path, is_agilent_fid_dir, is_agilent_format,
+    is_agilent_processed_dir, is_bruker_fid_dir, is_bruker_processed_1d_dir,
     is_bruker_processed_2d_dir, is_bruker_ser_dir, is_json_file, is_nmredata_file,
     is_standalone_spectrum_file, nmredata_record_molecule, prefix_bundle_source_paths,
     relative_source_path, selected_path_candidate_kind, source_format_1d, source_format_2d,
@@ -713,7 +713,7 @@ impl SpectrumBundleLoader {
         let keeps_format_or_vendor_warnings = self
             .source_filters
             .iter()
-            .any(|filter| !matches!(filter, LoadedSourceFilter::Path { .. }));
+            .any(|filter| !filter.is_path_filter());
         bundle.warnings.retain(|warning| {
             keeps_format_or_vendor_warnings
                 || warning.path().is_some_and(|path| {

@@ -327,6 +327,9 @@ impl SpectrumBundleLoader {
                 self.only_sources([LoadedSourceFilter::data_kind(data_kind)])
             }
             LoadedSourceFilter::Path { path } => self.only_source_path(path),
+            LoadedSourceFilter::PathPrefix { path } => {
+                self.only_sources([LoadedSourceFilter::path_prefix(path)])
+            }
         }
     }
 
@@ -366,6 +369,52 @@ impl SpectrumBundleLoader {
         F: Into<LoadedSourceFilter>,
     {
         self.only_sources(filters)
+    }
+
+    /// Restricts loading to spectra whose tracked source path starts with a prefix.
+    ///
+    /// Use this for directory-shaped source paths after loading relative to a
+    /// base directory. Exact path matching remains available with
+    /// [`Self::only_source_path`].
+    #[must_use]
+    pub fn only_source_path_prefix(self, path: impl AsRef<Path>) -> Self {
+        self.only_source(LoadedSourceFilter::path_prefix(path))
+    }
+
+    /// Restricts loading to spectra whose tracked source path starts with a prefix.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_path_prefix`].
+    #[must_use]
+    pub fn source_path_prefix(self, path: impl AsRef<Path>) -> Self {
+        self.only_source_path_prefix(path)
+    }
+
+    /// Restricts loading to spectra whose tracked source path starts with any prefix.
+    ///
+    /// Passing an empty iterator leaves source loading unrestricted.
+    #[must_use]
+    pub fn only_source_path_prefixes<I, P>(self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.only_sources(
+            paths
+                .into_iter()
+                .map(|path| LoadedSourceFilter::path_prefix(path)),
+        )
+    }
+
+    /// Restricts loading to spectra whose tracked source path starts with any prefix.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_path_prefixes`].
+    #[must_use]
+    pub fn source_path_prefixes<I, P>(self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.only_source_path_prefixes(paths)
     }
 
     /// Clears all source-format, source-path, and generic source filters.

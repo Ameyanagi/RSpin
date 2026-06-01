@@ -12,9 +12,10 @@ use super::{
 /// Source restriction for the unified bundle loader.
 ///
 /// Use this when caller UI or application state can select a format, a vendor,
-/// a raw/processed data kind, or a tracked source path through one API surface.
-/// Specific helpers such as `only_source_format` and `only_source_vendor`
-/// remain available when the filter kind is known statically.
+/// a raw/processed data kind, a tracked source path, or a tracked source-path
+/// prefix through one API surface. Specific helpers such as
+/// `only_source_format` and `only_source_vendor` remain available when the
+/// filter kind is known statically.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LoadedSourceFilter {
@@ -36,6 +37,11 @@ pub enum LoadedSourceFilter {
     /// Restricts loading to a tracked source path.
     Path {
         /// Source path relative to the loader root.
+        path: PathBuf,
+    },
+    /// Restricts loading to tracked source paths below a prefix.
+    PathPrefix {
+        /// Source path prefix relative to the loader root.
         path: PathBuf,
     },
 }
@@ -89,6 +95,14 @@ impl LoadedSourceFilter {
         }
     }
 
+    /// Creates a tracked source-path prefix filter.
+    #[must_use]
+    pub fn path_prefix(path: impl AsRef<Path>) -> Self {
+        Self::PathPrefix {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+
     /// Returns true when the source matches this filter.
     #[must_use]
     pub fn matches_source(&self, source: &LoadedSource) -> bool {
@@ -97,6 +111,9 @@ impl LoadedSourceFilter {
             Self::Vendor { vendor } => source.is_vendor(vendor),
             Self::DataKind { data_kind } => source.data_kind() == *data_kind,
             Self::Path { path } => source.path() == Some(path.as_path()),
+            Self::PathPrefix { path } => source
+                .path()
+                .is_some_and(|source_path| source_path.starts_with(path)),
         }
     }
 
@@ -118,7 +135,7 @@ impl LoadedSourceFilter {
                     .any(|allowed| source_format_matches(format.as_ref(), allowed.as_str()))
             }
             Self::DataKind { data_kind } => source_format_data_kind(format.as_ref()) == *data_kind,
-            Self::Path { .. } => true,
+            Self::Path { .. } | Self::PathPrefix { .. } => true,
         }
     }
 
@@ -130,8 +147,17 @@ impl LoadedSourceFilter {
     pub fn may_match_path(&self, path: impl AsRef<Path>) -> bool {
         match self {
             Self::Path { path: allowed } => allowed == path.as_ref(),
+            Self::PathPrefix { path: allowed } => {
+                path.as_ref().starts_with(allowed) || allowed.starts_with(path.as_ref())
+            }
             Self::Format { .. } | Self::Vendor { .. } | Self::DataKind { .. } => true,
         }
+    }
+
+    /// Returns true for exact or prefix source-path filters.
+    #[must_use]
+    pub const fn is_path_filter(&self) -> bool {
+        matches!(self, Self::Path { .. } | Self::PathPrefix { .. })
     }
 }
 

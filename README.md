@@ -128,6 +128,12 @@ fn load_with_reader_chain() -> Result<SpectrumBundle> {
         .read_relative_to("data", "mixed-vendor")
 }
 
+fn load_one_source_directory() -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .source_path_prefix("mixed-vendor/bruker/pdata")
+        .read_relative_to("data", "mixed-vendor")
+}
+
 fn load_raw_vendor_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_data_kind("data/mixed-vendor", LoadedSourceDataKind::Raw)
 }
