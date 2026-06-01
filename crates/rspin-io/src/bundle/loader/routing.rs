@@ -965,9 +965,14 @@ impl SpectrumBundleLoader {
     }
 
     fn allows_or_may_contain_source_path(&self, root: &Path, path: &Path) -> bool {
-        if (self.source_path_filters.is_empty() && self.source_path_prefix_filters.is_empty())
-            || root == path
-        {
+        let has_named_path_filters =
+            !self.source_path_filters.is_empty() || !self.source_path_prefix_filters.is_empty();
+        let generic_filters_only_paths = !self.source_filters.is_empty()
+            && self
+                .source_filters
+                .iter()
+                .all(LoadedSourceFilter::is_path_filter);
+        if (!has_named_path_filters && !generic_filters_only_paths) || root == path {
             return true;
         }
 
@@ -979,7 +984,14 @@ impl SpectrumBundleLoader {
                 allowed.starts_with(container_path.as_path())
                     || container_path.starts_with(allowed.as_path())
             });
-            may_contain_exact_path || may_contain_path_prefix
+            let may_match_generic_filter = !generic_filters_only_paths
+                || self
+                    .source_filters
+                    .iter()
+                    .any(|filter| filter_may_match_container_path(filter, &container_path));
+            (self.source_path_filters.is_empty() || may_contain_exact_path)
+                && (self.source_path_prefix_filters.is_empty() || may_contain_path_prefix)
+                && may_match_generic_filter
         })
     }
 
@@ -1033,5 +1045,19 @@ fn filter_may_match_candidate_kind(filter: &LoadedSourceFilter, kind: FileCandid
         | LoadedSourceFilter::Vendor { .. }
         | LoadedSourceFilter::Path { .. }
         | LoadedSourceFilter::PathPrefix { .. } => true,
+    }
+}
+
+fn filter_may_match_container_path(filter: &LoadedSourceFilter, container_path: &Path) -> bool {
+    match filter {
+        LoadedSourceFilter::Path { path } => {
+            path == container_path || path.starts_with(container_path)
+        }
+        LoadedSourceFilter::PathPrefix { path } => {
+            path.starts_with(container_path) || container_path.starts_with(path)
+        }
+        LoadedSourceFilter::Format { .. }
+        | LoadedSourceFilter::Vendor { .. }
+        | LoadedSourceFilter::DataKind { .. } => true,
     }
 }

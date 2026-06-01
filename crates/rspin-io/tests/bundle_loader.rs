@@ -445,6 +445,35 @@ fn reader_typed_source_filters_compose_in_chains() -> anyhow::Result<()> {
 }
 
 #[test]
+fn generic_source_path_filters_skip_excluded_selected_paths_in_strict_mode() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let bundle = RSpinReader::new()
+        .sources([LoadedSourceFilter::path("bruker_without_expno/pdata/1")])
+        .strict()
+        .read_paths_relative_to(&base, ["empty_jcamp/empty.jdx", "bruker_without_expno"])?;
+    assert_eq!(bundle.len(), 1);
+    assert!(bundle.warnings().is_empty());
+    assert!(bundle.has_source_path(Path::new("bruker_without_expno/pdata/1")));
+    assert_eq!(
+        bundle.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let prefix_filtered = RSpinReader::new()
+        .sources([LoadedSourceFilter::path_prefix(
+            "bruker_without_expno/pdata",
+        )])
+        .strict()
+        .read_paths_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+    assert_eq!(prefix_filtered.len(), 1);
+    assert!(prefix_filtered.warnings().is_empty());
+    assert!(prefix_filtered.has_source_path(Path::new("bruker_without_expno/pdata/1")));
+
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 
@@ -2986,6 +3015,16 @@ fn loader_source_path_filter_applies_to_nested_bundle_json() -> anyhow::Result<(
     assert_eq!(bundle.len(), 1);
     assert_eq!(first_1d(&bundle)?.metadata.nucleus, Some(Nucleus::Carbon13));
     assert!(bundle.has_source_path(selected_path));
+
+    let generic_path = RSpinReader::new()
+        .sources([LoadedSourceFilter::path(selected_path)])
+        .read_path(&root)?;
+    assert_eq!(generic_path.len(), 1);
+    assert_eq!(
+        first_1d(&generic_path)?.metadata.nucleus,
+        Some(Nucleus::Carbon13)
+    );
+    assert!(generic_path.has_source_path(selected_path));
 
     let hidden_sources = RSpinReader::new()
         .only_source_path(selected_path)
