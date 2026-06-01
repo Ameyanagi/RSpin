@@ -782,6 +782,30 @@ fn prelude_exports_source_data_kind_exact_bundle_loaders() -> Result<()> {
     let raw_1d = load_spectra(&mixed_vendor_root)?
         .into_only_1d_by_source_data_kind(LoadedSourceDataKind::Raw)?;
     assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let raw_1d = load_spectrum_1d_many_by_source_data_kind_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (_, source) = load_spectrum_2d_many_with_source_by_source_data_kind_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(
+        source.path(),
+        Some(std::path::Path::new("myrcene/bruker_cosy_raw"))
+    );
+
+    let raw_2d = RSpinReader::new().read_2d_many_by_source_data_kind_relative_to(
+        &mixed_vendor_base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
     Ok(())
 }
 

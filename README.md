@@ -98,6 +98,13 @@ fn load_exactly_one_raw_spectrum() -> Result<Spectrum1D> {
     load_spectrum_1d_by_source_data_kind("data/mixed-vendor", LoadedSourceDataKind::Raw)
 }
 
+fn load_exactly_one_raw_spectrum_from_selected_inputs() -> Result<Spectrum1D> {
+    load_spectrum_1d_many_by_source_data_kind(
+        ["data/proton.fid", "data/bruker/pdata/1"],
+        LoadedSourceDataKind::Raw,
+    )
+}
+
 fn load_exactly_one_tracked_source() -> Result<Spectrum2D> {
     load_spectrum_2d_by_source_path_relative_to(
         "data",

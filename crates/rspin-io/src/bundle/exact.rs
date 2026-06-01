@@ -12,9 +12,17 @@ use rspin_core::{Result, Spectrum1D, Spectrum2D};
 use super::{LoadedSource, SpectrumBundleLoader};
 pub use data_kind_filtered::{
     load_spectrum_1d_by_source_data_kind, load_spectrum_1d_by_source_data_kind_relative_to,
+    load_spectrum_1d_many_by_source_data_kind,
+    load_spectrum_1d_many_by_source_data_kind_relative_to,
+    load_spectrum_1d_many_with_source_by_source_data_kind,
+    load_spectrum_1d_many_with_source_by_source_data_kind_relative_to,
     load_spectrum_1d_with_source_by_source_data_kind,
     load_spectrum_1d_with_source_by_source_data_kind_relative_to,
     load_spectrum_2d_by_source_data_kind, load_spectrum_2d_by_source_data_kind_relative_to,
+    load_spectrum_2d_many_by_source_data_kind,
+    load_spectrum_2d_many_by_source_data_kind_relative_to,
+    load_spectrum_2d_many_with_source_by_source_data_kind,
+    load_spectrum_2d_many_with_source_by_source_data_kind_relative_to,
     load_spectrum_2d_with_source_by_source_data_kind,
     load_spectrum_2d_with_source_by_source_data_kind_relative_to,
 };

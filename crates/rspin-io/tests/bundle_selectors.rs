@@ -10,8 +10,11 @@ use rspin_io::{
     load_spectrum_1d_by_source_format_relative_to, load_spectrum_1d_by_source_path,
     load_spectrum_1d_by_source_path_relative_to, load_spectrum_1d_by_source_relative_to,
     load_spectrum_1d_by_source_vendor, load_spectrum_1d_by_source_vendor_relative_to,
-    load_spectrum_1d_many_by_source, load_spectrum_1d_many_by_source_format,
+    load_spectrum_1d_many_by_source, load_spectrum_1d_many_by_source_data_kind,
+    load_spectrum_1d_many_by_source_data_kind_relative_to, load_spectrum_1d_many_by_source_format,
     load_spectrum_1d_many_by_source_path_relative_to, load_spectrum_1d_many_with_source_by_source,
+    load_spectrum_1d_many_with_source_by_source_data_kind,
+    load_spectrum_1d_many_with_source_by_source_data_kind_relative_to,
     load_spectrum_1d_many_with_source_by_source_relative_to,
     load_spectrum_1d_many_with_source_by_source_vendor, load_spectrum_1d_with_source_by_source,
     load_spectrum_1d_with_source_by_source_data_kind,
@@ -27,9 +30,12 @@ use rspin_io::{
     load_spectrum_2d_by_source_format, load_spectrum_2d_by_source_format_relative_to,
     load_spectrum_2d_by_source_path, load_spectrum_2d_by_source_path_relative_to,
     load_spectrum_2d_by_source_relative_to, load_spectrum_2d_by_source_vendor,
-    load_spectrum_2d_by_source_vendor_relative_to,
+    load_spectrum_2d_by_source_vendor_relative_to, load_spectrum_2d_many_by_source_data_kind,
+    load_spectrum_2d_many_by_source_data_kind_relative_to,
     load_spectrum_2d_many_by_source_format_relative_to,
     load_spectrum_2d_many_by_source_relative_to, load_spectrum_2d_many_with_source_by_source,
+    load_spectrum_2d_many_with_source_by_source_data_kind,
+    load_spectrum_2d_many_with_source_by_source_data_kind_relative_to,
     load_spectrum_2d_many_with_source_by_source_path, load_spectrum_2d_with_source_by_source,
     load_spectrum_2d_with_source_by_source_data_kind,
     load_spectrum_2d_with_source_by_source_data_kind_relative_to,
@@ -769,6 +775,32 @@ fn free_many_source_filtered_exact_helpers_select_matching_dimension() -> anyhow
     assert_eq!(jeol.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(jeol_source.format(), "jeol_jdf");
 
+    let raw_1d = load_spectrum_1d_many_by_source_data_kind(
+        [root.join("bruker_1h_raw"), bruker_2d.clone()],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (raw_1d, raw_source) = load_spectrum_1d_many_with_source_by_source_data_kind(
+        [root.join("bruker_1h_raw"), bruker_2d.clone()],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
+
+    let raw_2d = load_spectrum_2d_many_by_source_data_kind(
+        [root.join("bruker_1h_raw"), bruker_2d.clone()],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+
+    let (raw_2d, raw_source) = load_spectrum_2d_many_with_source_by_source_data_kind(
+        [root.join("bruker_1h_raw"), bruker_2d.clone()],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+    assert_eq!(raw_source.data_kind(), LoadedSourceDataKind::Raw);
+
     let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
     let hsqc = load_spectrum_2d_many_by_source_format_relative_to(
         &base,
@@ -802,6 +834,37 @@ fn free_many_source_filtered_exact_helpers_select_matching_dimension() -> anyhow
             LoadedSourceVendor::Bruker,
         )?;
     assert_eq!(bruker_source.format(), "bruker_ser");
+
+    let raw_1d = load_spectrum_1d_many_by_source_data_kind_relative_to(
+        &base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (_, raw_source) = load_spectrum_1d_many_with_source_by_source_data_kind_relative_to(
+        &base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_source.path(), Some(Path::new("myrcene/bruker_1h_raw")));
+
+    let raw_2d = load_spectrum_2d_many_by_source_data_kind_relative_to(
+        &base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.shape(), (2048, 512));
+
+    let (_, raw_source) = load_spectrum_2d_many_with_source_by_source_data_kind_relative_to(
+        &base,
+        ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(
+        raw_source.path(),
+        Some(Path::new("myrcene/bruker_cosy_raw"))
+    );
 
     assert_single_error(
         load_spectrum_1d_many_by_source_format([&proton_jcamp, &carbon_jcamp], "jdx"),
