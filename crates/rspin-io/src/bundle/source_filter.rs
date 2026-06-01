@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use super::{LoadedSource, LoadedSourceFormat, LoadedSourceVendor, canonical_source_format_filter};
+use super::{
+    LoadedSource, LoadedSourceFormat, LoadedSourceVendor, canonical_source_format_filter,
+    source_format_matches,
+};
 
 /// Source restriction for the unified bundle loader.
 ///
@@ -66,6 +69,39 @@ impl LoadedSourceFilter {
             Self::Path { path } => source.path() == Some(path.as_path()),
         }
     }
+
+    /// Returns true when this filter can match a source with the given format.
+    ///
+    /// Path filters return true because the path must be evaluated with the
+    /// full source context.
+    #[must_use]
+    pub fn may_match_format(&self, format: impl AsRef<str>) -> bool {
+        match self {
+            Self::Format { format: allowed } => source_format_matches(format.as_ref(), allowed),
+            Self::Vendor { vendor } => {
+                let Ok(vendor) = LoadedSourceVendor::parse(vendor) else {
+                    return false;
+                };
+                vendor
+                    .source_formats()
+                    .iter()
+                    .any(|allowed| source_format_matches(format.as_ref(), allowed.as_str()))
+            }
+            Self::Path { .. } => true,
+        }
+    }
+
+    /// Returns true when this filter can match a source with the given tracked path.
+    ///
+    /// Format and vendor filters return true because the source format must be
+    /// evaluated with the full source context.
+    #[must_use]
+    pub fn may_match_path(&self, path: impl AsRef<Path>) -> bool {
+        match self {
+            Self::Path { path: allowed } => allowed == path.as_ref(),
+            Self::Format { .. } | Self::Vendor { .. } => true,
+        }
+    }
 }
 
 impl From<LoadedSourceFormat> for LoadedSourceFilter {
@@ -84,4 +120,19 @@ impl From<&LoadedSourceFilter> for LoadedSourceFilter {
     fn from(filter: &LoadedSourceFilter) -> Self {
         filter.clone()
     }
+}
+
+pub(super) fn source_filters<I, F>(filters: I) -> Vec<LoadedSourceFilter>
+where
+    I: IntoIterator<Item = F>,
+    F: Into<LoadedSourceFilter>,
+{
+    let mut unique = Vec::new();
+    for filter in filters {
+        let filter = filter.into();
+        if !unique.iter().any(|existing| existing == &filter) {
+            unique.push(filter);
+        }
+    }
+    unique
 }

@@ -61,6 +61,16 @@ fn load_selected_with_runtime_filter() -> Result<SpectrumBundle> {
     load_spectra_many_by_source(["data/proton.fid", "data/bruker/pdata/1"], filter)
 }
 
+fn load_selected_with_runtime_filters() -> Result<SpectrumBundle> {
+    load_spectra_by_sources(
+        "data/mixed-vendor",
+        [
+            LoadedSourceFilter::vendor("bruker"),
+            LoadedSourceFilter::path("jcamp/carbon_13c.jdx"),
+        ],
+    )
+}
+
 fn load_one_bruker_spectrum_from_selected_inputs() -> Result<Spectrum1D> {
     load_spectrum_1d_many_by_source_vendor(
         ["data/proton.fid", "data/bruker/pdata/1"],

@@ -13,11 +13,13 @@ use rspin_io::{
     load_spectra_by_source, load_spectra_by_source_format,
     load_spectra_by_source_format_relative_to, load_spectra_by_source_path,
     load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
-    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to, load_spectra_many,
+    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
+    load_spectra_by_sources, load_spectra_by_sources_relative_to, load_spectra_many,
     load_spectra_many_by_source, load_spectra_many_by_source_format,
     load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_path,
     load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
+    load_spectra_many_by_sources, load_spectra_many_by_sources_relative_to,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
     load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
@@ -1573,6 +1575,31 @@ fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
         Some(Nucleus::Carbon13)
     );
     assert!(relative_carbon.has_source_path(carbon_path));
+
+    let combined = load_spectra_by_sources(
+        &root,
+        [
+            LoadedSourceFilter::format("jdx"),
+            LoadedSourceFilter::vendor("bruker"),
+        ],
+    )?;
+    assert_eq!(combined.len(), 4);
+    assert_eq!(combined.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(combined.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let relative_combined = load_spectra_by_sources_relative_to(
+        &root,
+        "jcamp",
+        [
+            LoadedSourceFilter::from(LoadedSourceFormat::JcampDx),
+            LoadedSourceFilter::vendor("bruker"),
+        ],
+    )?;
+    assert_eq!(relative_combined.len(), 2);
+    assert_eq!(
+        relative_combined.source_format_count(LoadedSourceFormat::JcampDx),
+        2
+    );
     Ok(())
 }
 
@@ -1629,6 +1656,29 @@ fn generic_source_filter_helpers_can_restrict_sources() -> anyhow::Result<()> {
     )?;
     assert_eq!(processed.len(), 1);
     assert_eq!(first_1d(&processed)?.x.unit, Unit::Ppm);
+
+    let combined = RSpinReader::new()
+        .only_sources([jcamp_filter, vendor_filter])
+        .read_path(&root)?;
+    assert_eq!(combined.len(), 4);
+    assert_eq!(combined.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(combined.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+    let path_selected = RSpinReader::new()
+        .only_sources([path_filter, LoadedSourceFilter::path(hsqc_path)])
+        .read_path(&root)?;
+    assert_eq!(path_selected.len(), 2);
+    assert_eq!(path_selected.len_1d(), 1);
+    assert_eq!(path_selected.len_2d(), 1);
+    assert!(path_selected.has_source_path(carbon_path));
+    assert!(path_selected.has_source_path(hsqc_path));
+
+    let cleared = RSpinReader::new()
+        .only_sources([LoadedSourceFilter::vendor("bruker")])
+        .all_sources()
+        .read_path(&root)?;
+    assert_eq!(cleared.len(), 7);
     Ok(())
 }
 
@@ -1680,6 +1730,35 @@ fn free_multi_path_bundle_loader_helpers_can_restrict_sources() -> anyhow::Resul
     )?;
     assert_eq!(relative_processed.len(), 1);
     assert_eq!(first_1d(&relative_processed)?.x.unit, Unit::Ppm);
+
+    let combined = load_spectra_many_by_sources(
+        &paths,
+        [
+            LoadedSourceFilter::vendor("varian"),
+            LoadedSourceFilter::path("pdata/1"),
+        ],
+    )?;
+    assert_eq!(combined.len(), 2);
+    assert_eq!(
+        combined.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        combined.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let relative_combined = load_spectra_many_by_sources_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        [
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ],
+    )?;
+    assert_eq!(relative_combined.len(), 2);
+    assert!(relative_combined.has_source_path(Path::new("varian_1h")));
+    assert!(relative_combined.has_source_path(Path::new("bruker_without_expno/pdata/1")));
     Ok(())
 }
 

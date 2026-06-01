@@ -8,6 +8,7 @@ use rspin_core::{RSpinError, Result};
 
 use crate::SpectrumPathReader;
 
+use super::source_filter::source_filters;
 use super::{
     LoadedSourceFilter, SpectrumBundle, canonical_source_format_filter, no_data_error_at,
     no_data_error_in_inputs, selected_path_from_base, source_format_filters, source_vendor_filters,
@@ -24,6 +25,7 @@ pub struct SpectrumBundleLoader {
     source_paths: Toggle,
     source_formats: Vec<String>,
     source_path_filters: Vec<PathBuf>,
+    source_filters: Vec<LoadedSourceFilter>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -181,6 +183,33 @@ impl SpectrumBundleLoader {
             LoadedSourceFilter::Vendor { vendor } => self.only_source_vendor(vendor),
             LoadedSourceFilter::Path { path } => self.only_source_path(path),
         }
+    }
+
+    /// Restricts loading to spectra matching any generic source filter.
+    ///
+    /// This is useful when a caller accepts runtime filter choices from
+    /// configuration. Filters are combined with logical OR. This replaces
+    /// source-format and source-path restrictions; passing an empty iterator
+    /// leaves source loading unrestricted.
+    #[must_use]
+    pub fn only_sources<I, F>(mut self, filters: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.source_filters = source_filters(filters);
+        self.source_formats.clear();
+        self.source_path_filters.clear();
+        self
+    }
+
+    /// Clears all source-format, source-path, and generic source filters.
+    #[must_use]
+    pub fn all_sources(mut self) -> Self {
+        self.source_formats.clear();
+        self.source_path_filters.clear();
+        self.source_filters.clear();
+        self
     }
 
     /// Clears any source-format restriction.
@@ -507,6 +536,7 @@ impl Default for SpectrumBundleLoader {
             source_paths: Toggle::Enabled,
             source_formats: Vec::new(),
             source_path_filters: Vec::new(),
+            source_filters: Vec::new(),
         }
     }
 }
