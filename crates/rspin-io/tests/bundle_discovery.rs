@@ -600,6 +600,155 @@ fn reader_loads_exact_discovered_sources_relative_to_base() -> Result<()> {
 }
 
 #[test]
+fn reader_loads_exact_discovered_1d_sources_by_filter() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+
+    let spectrum = RSpinReader::new().read_discovered_1d_by_source_relative_to(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let spectrum = RSpinReader::new().read_discovered_1d_by_source(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::path("varian_1h"),
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let spectrum = RSpinReader::new().read_discovered_1d_by_sources_relative_to(
+        fixture_root(),
+        &sources,
+        [
+            LoadedSourceFilter::path("missing"),
+            LoadedSourceFilter::format("agilent_fid"),
+        ],
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let spectrum = RSpinReader::new().read_discovered_1d_by_sources(
+        fixture_root(),
+        &sources,
+        [LoadedSourceFilter::path("varian_1h")],
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (spectrum, source) = RSpinReader::new()
+        .read_discovered_1d_with_source_by_source_relative_to(
+            fixture_root(),
+            &sources,
+            LoadedSourceFilter::format("agilent_fid"),
+        )?;
+    assert_eq!(spectrum.len(), 16_384);
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let (_, source) = RSpinReader::new().read_discovered_1d_with_source_by_source(
+        fixture_root(),
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let (_, source) = RSpinReader::new().read_discovered_1d_with_source_by_sources_relative_to(
+        fixture_root(),
+        &sources,
+        [LoadedSourceFilter::path("varian_1h")],
+    )?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let (_, source) = RSpinReader::new().read_discovered_1d_with_source_by_sources(
+        fixture_root(),
+        &sources,
+        [LoadedSourceFilter::vendor("varian")],
+    )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let Err(error) = RSpinReader::new()
+        .strict()
+        .read_discovered_1d_by_source_relative_to(
+            fixture_root(),
+            &sources,
+            LoadedSourceFilter::path("empty_jcamp/empty.jdx"),
+        )
+    else {
+        return Err(anyhow!(
+            "strict exact discovered source-filter loading should reject malformed JCAMP"
+        ));
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+
+    Ok(())
+}
+
+#[test]
+fn reader_loads_exact_discovered_2d_sources_by_filter() -> Result<()> {
+    let myrcene_sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    let hsqc = RSpinReader::new().read_discovered_2d_by_source_relative_to(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        LoadedSourceFilter::path(hsqc_path),
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let hsqc = RSpinReader::new().read_discovered_2d_by_source(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        LoadedSourceFilter::path(hsqc_path),
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let hsqc = RSpinReader::new().read_discovered_2d_by_sources_relative_to(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        [
+            LoadedSourceFilter::path("missing"),
+            LoadedSourceFilter::path(hsqc_path),
+        ],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let hsqc = RSpinReader::new().read_discovered_2d_by_sources(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        [LoadedSourceFilter::path(hsqc_path)],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (hsqc, source) = RSpinReader::new().read_discovered_2d_with_source_by_source_relative_to(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        LoadedSourceFilter::path(hsqc_path),
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(source.path(), Some(Path::new(hsqc_path)));
+
+    let (_, source) = RSpinReader::new().read_discovered_2d_with_source_by_source(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        LoadedSourceFilter::path(hsqc_path),
+    )?;
+    assert_eq!(source.format(), "jeol_jdf");
+
+    let (_, source) = RSpinReader::new().read_discovered_2d_with_source_by_sources_relative_to(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        [LoadedSourceFilter::path(hsqc_path)],
+    )?;
+    assert_eq!(source.path(), Some(Path::new(hsqc_path)));
+
+    let (_, source) = RSpinReader::new().read_discovered_2d_with_source_by_sources(
+        cc0_myrcene_fixture_root(),
+        &myrcene_sources,
+        [LoadedSourceFilter::path(hsqc_path)],
+    )?;
+    assert_eq!(source.format(), "jeol_jdf");
+    Ok(())
+}
+
+#[test]
 fn discovered_source_free_helpers_load_selected_sources() -> Result<()> {
     let sources = discover_spectra(fixture_root())?;
     let selected = sources
