@@ -287,6 +287,33 @@ fn exposes_supported_bundle_source_metadata_json() -> anyhow::Result<()> {
             .iter()
             .any(|value| value.as_str() == Some("bruker_ser"))
     );
+
+    let data_kinds_json = spectrum_bundle_source_data_kinds_json()?;
+    let data_kinds: serde_json::Value = serde_json::from_str(&data_kinds_json)?;
+    let data_kinds = data_kinds
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("source data kinds JSON should be an array"))?;
+    let raw = data_kinds
+        .iter()
+        .find(|entry| entry.get("name").and_then(serde_json::Value::as_str) == Some("raw"))
+        .ok_or_else(|| anyhow::anyhow!("missing raw source data kind"))?;
+    assert!(json_array_contains(raw, "source_formats", "bruker_fid"));
+    assert!(json_array_contains(raw, "source_formats", "agilent_fid"));
+    let processed = data_kinds
+        .iter()
+        .find(|entry| entry.get("name").and_then(serde_json::Value::as_str) == Some("processed"))
+        .ok_or_else(|| anyhow::anyhow!("missing processed source data kind"))?;
+    assert!(json_array_contains(
+        processed,
+        "source_formats",
+        "bruker_processed"
+    ));
+    let other = data_kinds
+        .iter()
+        .find(|entry| entry.get("name").and_then(serde_json::Value::as_str) == Some("other"))
+        .ok_or_else(|| anyhow::anyhow!("missing other source data kind"))?;
+    assert!(json_array_contains(other, "source_formats", "jcamp_dx"));
+    assert!(json_array_contains(other, "source_formats", "jeol_jdf"));
     Ok(())
 }
 

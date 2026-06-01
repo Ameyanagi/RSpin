@@ -284,9 +284,10 @@ JCAMP-DX, nmrML, NMReDATA, JSON, and CSV inputs without replacing the
 format-specific readers. Browser callers should parse uploaded bytes with the
 format-specific WASM helpers, then use `createSpectrumBundle` to assemble the
 same versioned bundle JSON used by native code. Use
-`spectrumBundleSourceFormats` and `spectrumBundleSourceVendors` to populate
-browser format, extension, vendor, and directory-marker selectors from the same
-source list as native Rust.
+`spectrumBundleSourceFormats`, `spectrumBundleSourceVendors`, and
+`spectrumBundleSourceDataKinds` to populate browser format, extension, vendor,
+data-kind, and directory-marker selectors from the same source list as native
+Rust.
 
 The small committed loader fixtures under
 `crates/rspin-io/testdata/zenodo_7100132` come from the MIT-licensed Zenodo

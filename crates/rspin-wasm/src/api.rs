@@ -694,6 +694,29 @@ pub fn spectrum_bundle_source_vendors_json() -> Result<String> {
     to_json(&vendors)
 }
 
+/// Returns supported unified-loader source data kinds as JSON.
+///
+/// Each entry includes the canonical data-kind name and the source formats that
+/// are classified with that data kind.
+///
+/// # Errors
+///
+/// Returns an error only if serialization fails.
+pub fn spectrum_bundle_source_data_kinds_json() -> Result<String> {
+    let data_kinds = LoadedSourceDataKind::all()
+        .iter()
+        .map(|data_kind| SpectrumBundleSourceDataKindInfo {
+            name: data_kind.as_str(),
+            source_formats: LoadedSourceFormat::all()
+                .iter()
+                .filter(|format| format.data_kind() == *data_kind)
+                .map(|format| format.as_str())
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    to_json(&data_kinds)
+}
+
 /// Builds versioned spectrum bundle JSON from serialized one- and
 /// two-dimensional spectrum entries.
 ///
@@ -1113,6 +1136,12 @@ struct SpectrumBundleSourceFormatInfo {
 
 #[derive(Debug, Serialize)]
 struct SpectrumBundleSourceVendorInfo {
+    name: &'static str,
+    source_formats: Vec<&'static str>,
+}
+
+#[derive(Debug, Serialize)]
+struct SpectrumBundleSourceDataKindInfo {
     name: &'static str,
     source_formats: Vec<&'static str>,
 }
