@@ -625,6 +625,9 @@ impl SpectrumBundleLoader {
             let data_after = bundle.spectra.len() + bundle.molecules.len();
             let warnings_after = bundle.warnings.len();
             if data_after == data_before && warnings_after == warnings_before {
+                if self.selected_path_is_filtered_out(path, path) {
+                    continue;
+                }
                 let message = match self.disabled_selected_path_message(path) {
                     Some(message) => message,
                     None => format!("no readable bundle data found at {}", path.display()),
@@ -722,6 +725,9 @@ impl SpectrumBundleLoader {
             let data_after = bundle.spectra.len() + bundle.molecules.len();
             let warnings_after = bundle.warnings.len();
             if data_after == data_before && warnings_after == warnings_before {
+                if self.selected_path_is_filtered_out(base, &path) {
+                    continue;
+                }
                 let message = match self.disabled_selected_path_message(&path) {
                     Some(message) => message,
                     None => format!("no readable bundle data found at {}", path.display()),

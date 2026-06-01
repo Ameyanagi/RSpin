@@ -1,5 +1,7 @@
 //! Private filesystem routing for the spectrum bundle loader.
 
+mod source_hints;
+
 use std::path::{Path, PathBuf};
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
@@ -25,6 +27,7 @@ use crate::bundle::{
     prefix_bundle_source_paths, relative_source_path, selected_path_candidate_kind,
     source_format_1d, source_format_2d, source_format_candidate_kind, source_format_matches,
 };
+use source_hints::{auto_file_source_formats, selected_path_source_formats};
 
 impl SpectrumBundleLoader {
     pub(super) fn read_existing_path_into(
@@ -202,30 +205,8 @@ impl SpectrumBundleLoader {
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
         let candidate_kind = file_candidate_kind(file);
-        match candidate_kind {
-            FileCandidateKind::Raw if !self.raw.is_enabled() => {
-                return self.handle_error_message(
-                    bundle,
-                    root,
-                    file,
-                    format!(
-                        "raw spectrum candidates are disabled for {}",
-                        file.display()
-                    ),
-                );
-            }
-            FileCandidateKind::Processed if !self.processed.is_enabled() => {
-                return self.handle_error_message(
-                    bundle,
-                    root,
-                    file,
-                    format!(
-                        "processed spectrum candidates are disabled for {}",
-                        file.display()
-                    ),
-                );
-            }
-            FileCandidateKind::Raw | FileCandidateKind::Processed | FileCandidateKind::Other => {}
+        if self.handle_disabled_file_candidate(root, file, bundle, candidate_kind)? {
+            return Ok(());
         }
         if !self.allows_file_candidate_kind(candidate_kind) {
             return Ok(());
@@ -237,45 +218,8 @@ impl SpectrumBundleLoader {
             }
             return self.read_nmredata_candidate(root, file, bundle);
         }
-        if self.raw.is_enabled()
-            && self.allows_routed_source_format("agilent_fid")
-            && is_agilent_arrayed_1d_fid_path(file)
-        {
-            if !self.one_d.is_enabled() {
-                return self.handle_error_message(
-                    bundle,
-                    root,
-                    file,
-                    disabled_dimension_message(file, "one-dimensional"),
-                );
-            }
-            return self.add_1d_results(
-                bundle,
-                root,
-                file,
-                "agilent_fid",
-                read_agilent_arrayed_fid_1d_dir(file),
-            );
-        }
-        if self.raw.is_enabled()
-            && self.allows_routed_source_format("agilent_fid")
-            && is_agilent_arrayed_2d_fid_path(file)
-        {
-            if !self.two_d.is_enabled() {
-                return self.handle_error_message(
-                    bundle,
-                    root,
-                    file,
-                    disabled_dimension_message(file, "two-dimensional"),
-                );
-            }
-            return self.add_2d_results(
-                bundle,
-                root,
-                file,
-                "agilent_fid",
-                read_agilent_arrayed_fid_2d_dir(file),
-            );
+        if self.read_arrayed_agilent_file_candidate(root, file, bundle)? {
+            return Ok(());
         }
         if is_json_file(file) {
             return self.read_json_file_candidate(root, file, bundle);
@@ -291,6 +235,9 @@ impl SpectrumBundleLoader {
         if format != "auto" && !self.allows_source_candidate_kind(format) {
             return Ok(());
         }
+        if format == "auto" && !self.allows_any_auto_file_source_format(file) {
+            return Ok(());
+        }
         if !self.allows_source_path(root, file) {
             return Ok(());
         }
@@ -303,6 +250,94 @@ impl SpectrumBundleLoader {
             || read_spectrum1d_path(file),
             || read_spectrum2d_path(file),
         )
+    }
+
+    fn handle_disabled_file_candidate(
+        &self,
+        root: &Path,
+        file: &Path,
+        bundle: &mut SpectrumBundle,
+        candidate_kind: FileCandidateKind,
+    ) -> Result<bool> {
+        match candidate_kind {
+            FileCandidateKind::Raw if !self.raw.is_enabled() => {
+                self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    format!(
+                        "raw spectrum candidates are disabled for {}",
+                        file.display()
+                    ),
+                )?;
+                Ok(true)
+            }
+            FileCandidateKind::Processed if !self.processed.is_enabled() => {
+                self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    format!(
+                        "processed spectrum candidates are disabled for {}",
+                        file.display()
+                    ),
+                )?;
+                Ok(true)
+            }
+            FileCandidateKind::Raw | FileCandidateKind::Processed | FileCandidateKind::Other => {
+                Ok(false)
+            }
+        }
+    }
+
+    fn read_arrayed_agilent_file_candidate(
+        &self,
+        root: &Path,
+        file: &Path,
+        bundle: &mut SpectrumBundle,
+    ) -> Result<bool> {
+        if !(self.raw.is_enabled() && self.allows_routed_source_format("agilent_fid")) {
+            return Ok(false);
+        }
+        if is_agilent_arrayed_1d_fid_path(file) {
+            if !self.one_d.is_enabled() {
+                self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    disabled_dimension_message(file, "one-dimensional"),
+                )?;
+                return Ok(true);
+            }
+            self.add_1d_results(
+                bundle,
+                root,
+                file,
+                "agilent_fid",
+                read_agilent_arrayed_fid_1d_dir(file),
+            )?;
+            return Ok(true);
+        }
+        if is_agilent_arrayed_2d_fid_path(file) {
+            if !self.two_d.is_enabled() {
+                self.handle_error_message(
+                    bundle,
+                    root,
+                    file,
+                    disabled_dimension_message(file, "two-dimensional"),
+                )?;
+                return Ok(true);
+            }
+            self.add_2d_results(
+                bundle,
+                root,
+                file,
+                "agilent_fid",
+                read_agilent_arrayed_fid_2d_dir(file),
+            )?;
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     fn read_json_file_candidate(
@@ -669,6 +704,18 @@ impl SpectrumBundleLoader {
         self.disabled_dimension_file_message(path)
     }
 
+    pub(super) fn selected_path_is_filtered_out(&self, root: &Path, path: &Path) -> bool {
+        if !self.allows_or_may_contain_source_path(root, path) {
+            return true;
+        }
+
+        let source_formats = selected_path_source_formats(path);
+        !source_formats.is_empty()
+            && !source_formats
+                .iter()
+                .any(|format| self.allows_routed_source_format(format))
+    }
+
     fn filter_bundle_dimensions(&self, bundle: &mut SpectrumBundle) {
         let include_1d = self.one_d.is_enabled();
         let include_2d = self.two_d.is_enabled();
@@ -836,6 +883,14 @@ impl SpectrumBundleLoader {
 
     fn allows_routed_source_format(&self, format: &str) -> bool {
         self.allows_source_format(format) && self.allows_source_candidate_kind(format)
+    }
+
+    fn allows_any_auto_file_source_format(&self, file: &Path) -> bool {
+        let source_formats = auto_file_source_formats(file);
+        source_formats.is_empty()
+            || source_formats
+                .iter()
+                .any(|format| self.allows_routed_source_format(format))
     }
 
     fn allows_file_candidate_kind(&self, kind: FileCandidateKind) -> bool {

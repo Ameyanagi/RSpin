@@ -700,6 +700,61 @@ fn source_data_kind_filters_skip_excluded_vendor_candidates_before_reading() -> 
 }
 
 #[test]
+fn source_format_filters_skip_excluded_direct_vendor_files_before_reading() -> anyhow::Result<()> {
+    let root = temp_dir("source-format-routing")?;
+    let bruker = fixture_root().join("bruker_without_expno");
+
+    let good_bruker = root.join("good_bruker");
+    fs::create_dir_all(&good_bruker)?;
+    fs::copy(bruker.join("fid"), good_bruker.join("fid"))?;
+    fs::copy(bruker.join("acqus"), good_bruker.join("acqus"))?;
+
+    let bad_varian = root.join("bad_varian");
+    fs::create_dir_all(&bad_varian)?;
+    fs::write(bad_varian.join("fid"), [1_u8, 2, 3])?;
+    fs::write(bad_varian.join("procpar"), "not a valid procpar file")?;
+
+    let bruker_only = RSpinReader::new()
+        .source_vendor("bruker")
+        .strict()
+        .read_paths([bad_varian.join("fid"), good_bruker.join("fid")])?;
+    assert_eq!(bruker_only.len(), 1);
+    assert_eq!(
+        bruker_only.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert_eq!(
+        bruker_only.source_format_count(LoadedSourceFormat::AgilentFid),
+        0
+    );
+    assert!(bruker_only.warnings().is_empty());
+
+    let runtime_filter = RSpinReader::new()
+        .sources([LoadedSourceFilter::vendor("bruker")])
+        .strict()
+        .read_paths([bad_varian.join("fid"), good_bruker.join("fid")])?;
+    assert_eq!(runtime_filter.len(), 1);
+    assert_eq!(
+        runtime_filter.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert!(runtime_filter.warnings().is_empty());
+
+    let agilent_result = RSpinReader::new()
+        .source_vendor("agilent")
+        .strict()
+        .read_path(bad_varian.join("fid"));
+    let Err(error) = agilent_result else {
+        remove_dir(root)?;
+        anyhow::bail!("malformed Agilent candidate should fail when Agilent sources are loaded");
+    };
+    assert!(error.to_string().contains("Agilent"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra_many([
         fixture_root().join("varian_1h"),
