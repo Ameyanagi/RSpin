@@ -42,6 +42,10 @@ fn load_all_1d_spectra() -> Result<SpectrumBundle> {
     load_spectra_1d("data/experiment")
 }
 
+fn load_all_1d_spectra_strict() -> Result<SpectrumBundle> {
+    load_spectra_1d_strict("data/experiment")
+}
+
 fn summarize_dataset() -> Result<SpectrumBundleSummary> {
     load_spectra_summary("data/experiment")
 }

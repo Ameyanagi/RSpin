@@ -540,6 +540,12 @@ fn prelude_exports_dimension_bundle_loader_helpers() -> Result<()> {
     let many = load_spectra_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
     assert_eq!(many.len_1d(), 1);
 
+    let strict = load_spectra_1d_many_strict_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(strict.len_1d(), 1);
+
+    let strict_2d = load_spectra_2d_strict_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(strict_2d.len_2d(), 1);
+
     let reader = RSpinReader::new()
         .source_vendor("bruker")
         .read_bundle_2d_many_relative_to(&mixed, ["bruker_cosy_raw", "jeol"])?;

@@ -12,24 +12,27 @@ use rspin_io::{
     LoadedSpectrum, RSpinReader, SourceDataKindCount, SourcePathCount, SpectrumBundle,
     SpectrumBundleLoader, SpectrumBundleSummary, SpectrumPathReader, WarningPathCount,
     load_spectra, load_spectra_1d, load_spectra_1d_many, load_spectra_1d_many_relative_to,
-    load_spectra_1d_relative_to, load_spectra_2d, load_spectra_2d_many,
-    load_spectra_2d_many_relative_to, load_spectra_2d_relative_to, load_spectra_by_source,
-    load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
-    load_spectra_by_source_data_kinds, load_spectra_by_source_data_kinds_relative_to,
-    load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
-    load_spectra_by_source_formats, load_spectra_by_source_formats_relative_to,
-    load_spectra_by_source_path, load_spectra_by_source_path_prefix,
-    load_spectra_by_source_path_prefix_relative_to, load_spectra_by_source_path_relative_to,
-    load_spectra_by_source_relative_to, load_spectra_by_source_vendor,
-    load_spectra_by_source_vendor_relative_to, load_spectra_by_source_vendors,
-    load_spectra_by_source_vendors_relative_to, load_spectra_by_sources,
-    load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
-    load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
-    load_spectra_many_by_source_data_kinds, load_spectra_many_by_source_data_kinds_relative_to,
-    load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
-    load_spectra_many_by_source_formats, load_spectra_many_by_source_formats_relative_to,
-    load_spectra_many_by_source_path, load_spectra_many_by_source_path_prefix,
-    load_spectra_many_by_source_path_prefix_relative_to,
+    load_spectra_1d_many_strict, load_spectra_1d_many_strict_relative_to,
+    load_spectra_1d_relative_to, load_spectra_1d_strict, load_spectra_1d_strict_relative_to,
+    load_spectra_2d, load_spectra_2d_many, load_spectra_2d_many_relative_to,
+    load_spectra_2d_many_strict, load_spectra_2d_many_strict_relative_to,
+    load_spectra_2d_relative_to, load_spectra_2d_strict, load_spectra_2d_strict_relative_to,
+    load_spectra_by_source, load_spectra_by_source_data_kind,
+    load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_data_kinds,
+    load_spectra_by_source_data_kinds_relative_to, load_spectra_by_source_format,
+    load_spectra_by_source_format_relative_to, load_spectra_by_source_formats,
+    load_spectra_by_source_formats_relative_to, load_spectra_by_source_path,
+    load_spectra_by_source_path_prefix, load_spectra_by_source_path_prefix_relative_to,
+    load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
+    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
+    load_spectra_by_source_vendors, load_spectra_by_source_vendors_relative_to,
+    load_spectra_by_sources, load_spectra_by_sources_relative_to, load_spectra_many,
+    load_spectra_many_by_source, load_spectra_many_by_source_data_kind,
+    load_spectra_many_by_source_data_kind_relative_to, load_spectra_many_by_source_data_kinds,
+    load_spectra_many_by_source_data_kinds_relative_to, load_spectra_many_by_source_format,
+    load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_formats,
+    load_spectra_many_by_source_formats_relative_to, load_spectra_many_by_source_path,
+    load_spectra_many_by_source_path_prefix, load_spectra_many_by_source_path_prefix_relative_to,
     load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
     load_spectra_many_by_source_vendors, load_spectra_many_by_source_vendors_relative_to,
@@ -250,6 +253,45 @@ fn dimension_specific_bundle_helpers_load_matching_spectra() -> anyhow::Result<(
 
     let relative_many_2d = load_spectra_2d_many_relative_to(&mixed, ["bruker_cosy_raw"])?;
     assert_eq!(relative_many_2d.len_2d(), 1);
+    Ok(())
+}
+
+#[test]
+fn strict_dimension_bundle_helpers_abort_on_bad_candidates() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let mixed = nmrxiv_fixture_root();
+
+    let one_d = load_spectra_1d_strict(base.join("varian_1h"))?;
+    assert_eq!(one_d.len_1d(), 1);
+    assert!(one_d.warnings().is_empty());
+
+    let one_d_relative = load_spectra_1d_strict_relative_to(&base, "varian_1h")?;
+    assert_eq!(one_d_relative.len_1d(), 1);
+    assert!(one_d_relative.has_source_path("varian_1h"));
+
+    let one_d_many = load_spectra_1d_many_strict([base.join("varian_1h")])?;
+    assert_eq!(one_d_many.len_1d(), 1);
+
+    let one_d_many_relative = load_spectra_1d_many_strict_relative_to(&base, ["varian_1h"])?;
+    assert_eq!(one_d_many_relative.len_1d(), 1);
+
+    let two_d = load_spectra_2d_strict(mixed.join("bruker_cosy_raw"))?;
+    assert_eq!(two_d.len_2d(), 1);
+
+    let two_d_relative = load_spectra_2d_strict_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(two_d_relative.len_2d(), 1);
+
+    let two_d_many = load_spectra_2d_many_strict([mixed.join("bruker_cosy_raw")])?;
+    assert_eq!(two_d_many.len_2d(), 1);
+
+    let two_d_many_relative = load_spectra_2d_many_strict_relative_to(&mixed, ["bruker_cosy_raw"])?;
+    assert_eq!(two_d_many_relative.len_2d(), 1);
+
+    let malformed = load_spectra_1d_strict(base.join("empty_jcamp/empty.jdx"));
+    let Err(error) = malformed else {
+        anyhow::bail!("strict dimension loading should reject malformed candidates");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
     Ok(())
 }
 
