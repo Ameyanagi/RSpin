@@ -7,6 +7,11 @@ use rspin_io::{
     LoadedSourceFormat, SpectrumBundle, load_spectra_by_source_path_prefixes,
     load_spectra_by_source_path_prefixes_relative_to, load_spectra_many_by_source_path_prefixes,
     load_spectra_many_by_source_path_prefixes_relative_to,
+    load_spectrum_1d_by_source_path_prefixes, load_spectrum_1d_by_source_path_prefixes_relative_to,
+    load_spectrum_1d_many_by_source_path_prefixes,
+    load_spectrum_1d_with_source_by_source_path_prefixes, load_spectrum_2d_by_source_path_prefixes,
+    load_spectrum_2d_many_with_source_by_source_path_prefixes_relative_to,
+    load_spectrum_2d_with_source_by_source_path_prefixes,
 };
 
 #[test]
@@ -201,6 +206,79 @@ fn bundle_source_path_prefix_set_selectors_filter_warnings() -> anyhow::Result<(
     let subset = bundle.source_path_prefix_subset_by_prefixes(["empty_jcamp"]);
     assert_eq!(subset.len(), 0);
     assert_eq!(subset.warning_count(), 1);
+    Ok(())
+}
+
+#[test]
+fn exact_source_path_prefixes_select_single_spectra() -> anyhow::Result<()> {
+    let carbon = load_spectrum_1d_by_source_path_prefixes(
+        nmrxiv_fixture_root(),
+        ["jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx", "missing"],
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let (carbon, carbon_source) = load_spectrum_1d_with_source_by_source_path_prefixes(
+        nmrxiv_fixture_root(),
+        ["jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx", "missing"],
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(
+        carbon_source.path(),
+        Some(Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"))
+    );
+
+    let hsqc =
+        load_spectrum_2d_by_source_path_prefixes(nmrxiv_fixture_root(), ["jeol", "missing"])?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (_, hsqc_source) = load_spectrum_2d_with_source_by_source_path_prefixes(
+        nmrxiv_fixture_root(),
+        ["jeol", "missing"],
+    )?;
+    assert_eq!(
+        hsqc_source.path(),
+        Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+    Ok(())
+}
+
+#[test]
+fn exact_source_path_prefixes_work_after_base_anchoring() -> anyhow::Result<()> {
+    let base = nmrxiv_cc0_root();
+    let carbon = load_spectrum_1d_by_source_path_prefixes_relative_to(
+        &base,
+        "myrcene",
+        [
+            "myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+            "missing",
+        ],
+    )?;
+
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    Ok(())
+}
+
+#[test]
+fn exact_many_source_path_prefixes_work_for_selected_inputs() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let carbon = load_spectrum_1d_many_by_source_path_prefixes(
+        [root.join("jcamp"), root.join("jeol")],
+        ["myrcene_13c_400mhz_jcamp_dx_6_link.jdx", "missing"],
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let base = nmrxiv_cc0_root();
+    let (hsqc, hsqc_source) =
+        load_spectrum_2d_many_with_source_by_source_path_prefixes_relative_to(
+            &base,
+            ["myrcene/jeol/myrcene_1h_400mhz.jdf", "myrcene"],
+            ["myrcene/jeol", "missing"],
+        )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(
+        hsqc_source.path(),
+        Some(Path::new("myrcene/jeol/myrcene_hsqc_400mhz.jdf"))
+    );
     Ok(())
 }
 

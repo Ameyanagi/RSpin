@@ -637,6 +637,10 @@ fn prelude_exports_source_path_prefix_loader_helpers() -> Result<()> {
         ["varian_1h", "bruker_without_expno/pdata"],
     )?;
     assert_eq!(multi_prefix_paths.len(), 2);
+
+    let exact_prefix =
+        load_spectrum_1d_by_source_path_prefixes(&fixture_root, ["varian_1h", "missing"])?;
+    assert_eq!(exact_prefix.metadata.nucleus, Some(Nucleus::Hydrogen1));
     Ok(())
 }
 

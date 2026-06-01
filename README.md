@@ -131,6 +131,10 @@ fn load_selected_source_directories() -> Result<SpectrumBundle> {
     load_spectra_by_source_path_prefixes("data/mixed-vendor", ["jcamp", "jeol"])
 }
 
+fn load_exactly_one_from_selected_source_directories() -> Result<Spectrum2D> {
+    load_spectrum_2d_by_source_path_prefixes("data/mixed-vendor", ["jeol", "bruker/cosy"])
+}
+
 fn load_jcamp_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_format("data/mixed-vendor", LoadedSourceFormat::JcampDx)
 }
