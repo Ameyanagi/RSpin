@@ -246,6 +246,46 @@ fn reader_short_read_aliases_cover_common_workflows() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()> {
+    let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
+    let first_1d = one_d_bundle
+        .first_1d()
+        .ok_or_else(|| anyhow::anyhow!("missing first one-dimensional spectrum"))?;
+    assert_eq!(first_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (loaded_1d, source) = one_d_bundle
+        .first_loaded_1d()
+        .ok_or_else(|| anyhow::anyhow!("missing first loaded one-dimensional spectrum"))?;
+    assert_eq!(loaded_1d.len(), first_1d.len());
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+    assert!(source.is_vendor("varian"));
+    assert!(one_d_bundle.first_2d().is_none());
+    assert!(one_d_bundle.first_loaded_2d().is_none());
+
+    let two_d_bundle = load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?;
+    let first_2d = two_d_bundle
+        .first_2d()
+        .ok_or_else(|| anyhow::anyhow!("missing first two-dimensional spectrum"))?;
+    assert_eq!(first_2d.shape(), (2048, 512));
+
+    let (loaded_2d, source) = two_d_bundle
+        .first_loaded_2d()
+        .ok_or_else(|| anyhow::anyhow!("missing first loaded two-dimensional spectrum"))?;
+    assert_eq!(loaded_2d.shape(), first_2d.shape());
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+    assert!(source.is_vendor("bruker"));
+    assert!(two_d_bundle.first_1d().is_none());
+    assert!(two_d_bundle.first_loaded_1d().is_none());
+
+    let empty = SpectrumBundle::new();
+    assert!(empty.first_1d().is_none());
+    assert!(empty.first_loaded_1d().is_none());
+    assert!(empty.first_2d().is_none());
+    assert!(empty.first_loaded_2d().is_none());
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

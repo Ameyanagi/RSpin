@@ -33,6 +33,11 @@ fn load_one_dataset() -> Result<SpectrumBundle> {
     load_spectra("data/experiment")
 }
 
+fn load_first_1d_point_count() -> Result<Option<usize>> {
+    let bundle = load_spectra("data/experiment")?;
+    Ok(bundle.first_1d().map(|spectrum| spectrum.len()))
+}
+
 fn load_one_dataset_with_stable_sources() -> Result<SpectrumBundle> {
     load_spectra_relative_to("data", "experiment")
 }

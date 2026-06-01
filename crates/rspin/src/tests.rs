@@ -407,6 +407,32 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_first_bundle_accessors() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let bundle = load_spectra_many([
+        fixture_root.join("varian_1h"),
+        fixture_root.join("bruker_without_expno"),
+    ])?;
+
+    let first = bundle.first_1d().ok_or_else(|| RSpinError::Parse {
+        format: "facade bundle accessor",
+        message: "missing first one-dimensional spectrum".to_owned(),
+    })?;
+    assert_eq!(first.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (first_loaded, source) = bundle.first_loaded_1d().ok_or_else(|| RSpinError::Parse {
+        format: "facade bundle accessor",
+        message: "missing first loaded one-dimensional spectrum".to_owned(),
+    })?;
+    assert_eq!(first_loaded.len(), first.len());
+    assert!(source.path().is_some());
+    assert!(bundle.first_2d().is_none());
+    assert!(bundle.first_loaded_2d().is_none());
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_strict_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

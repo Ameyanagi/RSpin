@@ -859,6 +859,30 @@ impl SpectrumBundle {
         })
     }
 
+    /// Returns the first loaded one-dimensional spectrum, if present.
+    #[must_use]
+    pub fn first_1d(&self) -> Option<&Spectrum1D> {
+        self.spectra_1d().next()
+    }
+
+    /// Returns the first loaded one-dimensional spectrum and its source metadata, if present.
+    #[must_use]
+    pub fn first_loaded_1d(&self) -> Option<(&Spectrum1D, &LoadedSource)> {
+        self.loaded_1d().next()
+    }
+
+    /// Returns the first loaded two-dimensional spectrum, if present.
+    #[must_use]
+    pub fn first_2d(&self) -> Option<&Spectrum2D> {
+        self.spectra_2d().next()
+    }
+
+    /// Returns the first loaded two-dimensional spectrum and its source metadata, if present.
+    #[must_use]
+    pub fn first_loaded_2d(&self) -> Option<(&Spectrum2D, &LoadedSource)> {
+        self.loaded_2d().next()
+    }
+
     /// Returns an iterator over loaded spectrum sources.
     pub fn loaded_sources(&self) -> impl Iterator<Item = &LoadedSource> {
         self.spectra.iter().map(LoadedSpectrum::source)
