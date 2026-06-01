@@ -13,6 +13,7 @@ use crate::{
 };
 
 use super::{FileCandidateKind, SpectrumBundleLoader};
+use crate::bundle::LoadedSourceFilter;
 use crate::bundle::{
     LoadWarning, LoadedSource, LoadedSourceDataKind, LoadedSourceFormat, LoadedSpectrum,
     SpectrumBundle, clear_bundle_source_paths, collect_tree, disabled_candidate_message,
@@ -82,7 +83,7 @@ impl SpectrumBundleLoader {
     ) -> Result<()> {
         if self.raw.is_enabled()
             && self.two_d.is_enabled()
-            && self.allows_source_format("bruker_ser")
+            && self.allows_routed_source_format("bruker_ser")
             && is_bruker_ser_dir(directory)
         {
             self.add_2d_result(
@@ -95,7 +96,7 @@ impl SpectrumBundleLoader {
         }
         if self.raw.is_enabled()
             && self.one_d.is_enabled()
-            && self.allows_source_format("bruker_fid")
+            && self.allows_routed_source_format("bruker_fid")
             && is_bruker_fid_dir(directory)
         {
             self.add_1d_result(
@@ -108,7 +109,7 @@ impl SpectrumBundleLoader {
         }
         if self.processed.is_enabled()
             && self.two_d.is_enabled()
-            && self.allows_source_format("bruker_processed")
+            && self.allows_routed_source_format("bruker_processed")
             && is_bruker_processed_2d_dir(directory)
         {
             self.add_2d_result(
@@ -121,7 +122,7 @@ impl SpectrumBundleLoader {
         }
         if self.processed.is_enabled()
             && self.one_d.is_enabled()
-            && self.allows_source_format("bruker_processed")
+            && self.allows_routed_source_format("bruker_processed")
             && is_bruker_processed_1d_dir(directory)
         {
             self.add_1d_result(
@@ -142,7 +143,7 @@ impl SpectrumBundleLoader {
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
         if self.raw.is_enabled()
-            && self.allows_source_format("agilent_fid")
+            && self.allows_routed_source_format("agilent_fid")
             && is_agilent_fid_dir(directory)
         {
             if is_agilent_arrayed_2d_fid_path(directory) {
@@ -179,7 +180,7 @@ impl SpectrumBundleLoader {
             )?;
         }
         if self.processed.is_enabled()
-            && self.allows_source_format("agilent_processed")
+            && self.allows_routed_source_format("agilent_processed")
             && is_agilent_processed_dir(directory)
         {
             self.add_1d_or_2d_result(
@@ -200,7 +201,8 @@ impl SpectrumBundleLoader {
         file: &Path,
         bundle: &mut SpectrumBundle,
     ) -> Result<()> {
-        match file_candidate_kind(file) {
+        let candidate_kind = file_candidate_kind(file);
+        match candidate_kind {
             FileCandidateKind::Raw if !self.raw.is_enabled() => {
                 return self.handle_error_message(
                     bundle,
@@ -225,6 +227,9 @@ impl SpectrumBundleLoader {
             }
             FileCandidateKind::Raw | FileCandidateKind::Processed | FileCandidateKind::Other => {}
         }
+        if !self.allows_file_candidate_kind(candidate_kind) {
+            return Ok(());
+        }
 
         if is_nmredata_file(file) {
             if !self.allows_source_path(root, file) {
@@ -233,7 +238,7 @@ impl SpectrumBundleLoader {
             return self.read_nmredata_candidate(root, file, bundle);
         }
         if self.raw.is_enabled()
-            && self.allows_source_format("agilent_fid")
+            && self.allows_routed_source_format("agilent_fid")
             && is_agilent_arrayed_1d_fid_path(file)
         {
             if !self.one_d.is_enabled() {
@@ -253,7 +258,7 @@ impl SpectrumBundleLoader {
             );
         }
         if self.raw.is_enabled()
-            && self.allows_source_format("agilent_fid")
+            && self.allows_routed_source_format("agilent_fid")
             && is_agilent_arrayed_2d_fid_path(file)
         {
             if !self.two_d.is_enabled() {
@@ -281,6 +286,9 @@ impl SpectrumBundleLoader {
 
         let format = format_from_file(file);
         if format != "auto" && !self.allows_source_format(format) {
+            return Ok(());
+        }
+        if format != "auto" && !self.allows_source_candidate_kind(format) {
             return Ok(());
         }
         if !self.allows_source_path(root, file) {
@@ -826,6 +834,29 @@ impl SpectrumBundleLoader {
         allowed_by_named_formats && allowed_by_generic_filters
     }
 
+    fn allows_routed_source_format(&self, format: &str) -> bool {
+        self.allows_source_format(format) && self.allows_source_candidate_kind(format)
+    }
+
+    fn allows_file_candidate_kind(&self, kind: FileCandidateKind) -> bool {
+        let allowed_by_toggle = match kind {
+            FileCandidateKind::Raw => self.raw.is_enabled(),
+            FileCandidateKind::Processed => self.processed.is_enabled(),
+            FileCandidateKind::Other => true,
+        };
+        let allowed_by_data_kind = self.source_data_kind_filters.is_empty()
+            || self
+                .source_data_kind_filters
+                .iter()
+                .any(|allowed| *allowed == source_data_kind_for_candidate(kind));
+        let allowed_by_generic_filters = self.source_filters.is_empty()
+            || self
+                .source_filters
+                .iter()
+                .any(|filter| filter_may_match_candidate_kind(filter, kind));
+        allowed_by_toggle && allowed_by_data_kind && allowed_by_generic_filters
+    }
+
     fn allows_source_candidate_kind(&self, format: &str) -> bool {
         let allowed_by_toggle = match source_format_candidate_kind(format) {
             FileCandidateKind::Raw => self.raw.is_enabled(),
@@ -928,4 +959,24 @@ impl SpectrumBundleLoader {
 fn source_data_kind_for_format(format: &str) -> LoadedSourceDataKind {
     LoadedSourceFormat::parse(format)
         .map_or(LoadedSourceDataKind::Other, LoadedSourceFormat::data_kind)
+}
+
+fn source_data_kind_for_candidate(kind: FileCandidateKind) -> LoadedSourceDataKind {
+    match kind {
+        FileCandidateKind::Raw => LoadedSourceDataKind::Raw,
+        FileCandidateKind::Processed => LoadedSourceDataKind::Processed,
+        FileCandidateKind::Other => LoadedSourceDataKind::Other,
+    }
+}
+
+fn filter_may_match_candidate_kind(filter: &LoadedSourceFilter, kind: FileCandidateKind) -> bool {
+    match filter {
+        LoadedSourceFilter::DataKind { data_kind } => {
+            *data_kind == source_data_kind_for_candidate(kind)
+        }
+        LoadedSourceFilter::Format { .. }
+        | LoadedSourceFilter::Vendor { .. }
+        | LoadedSourceFilter::Path { .. }
+        | LoadedSourceFilter::PathPrefix { .. } => true,
+    }
 }

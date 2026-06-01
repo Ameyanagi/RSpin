@@ -651,6 +651,55 @@ fn selected_vendor_directories_report_disabled_raw_or_processed() {
 }
 
 #[test]
+fn source_data_kind_filters_skip_excluded_vendor_candidates_before_reading() -> anyhow::Result<()> {
+    let root = temp_dir("data-kind-routing")?;
+    let bruker = fixture_root().join("bruker_without_expno");
+    fs::copy(bruker.join("fid"), root.join("fid"))?;
+    fs::copy(bruker.join("acqus"), root.join("acqus"))?;
+
+    let processed = root.join("pdata/1");
+    fs::create_dir_all(&processed)?;
+    fs::write(processed.join("procs"), "not a valid Bruker parameter file")?;
+    fs::write(processed.join("1r"), [1_u8, 2, 3])?;
+
+    let raw = RSpinReader::new().raw_sources().strict().read_path(&root)?;
+    assert_eq!(raw.len(), 1);
+    assert_eq!(first_1d(&raw)?.x.unit, Unit::Seconds);
+    assert_eq!(raw.source_format_count(LoadedSourceFormat::BrukerFid), 1);
+    assert_eq!(
+        raw.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        0
+    );
+    assert!(raw.warnings().is_empty());
+
+    let raw_runtime = RSpinReader::new()
+        .sources([LoadedSourceFilter::raw()])
+        .strict()
+        .read_path(&root)?;
+    assert_eq!(raw_runtime.len(), 1);
+    assert_eq!(
+        raw_runtime.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert!(raw_runtime.warnings().is_empty());
+
+    let processed_result = RSpinReader::new()
+        .processed_sources()
+        .strict()
+        .read_path(&root);
+    let Err(error) = processed_result else {
+        remove_dir(root)?;
+        anyhow::bail!(
+            "malformed processed candidate should fail when processed sources are loaded"
+        );
+    };
+    assert!(error.to_string().contains("Bruker"));
+
+    remove_dir(root)?;
+    Ok(())
+}
+
+#[test]
 fn loads_multiple_selected_paths_as_one_bundle() -> anyhow::Result<()> {
     let bundle = load_spectra_many([
         fixture_root().join("varian_1h"),
