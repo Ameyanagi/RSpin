@@ -464,6 +464,15 @@ fn load_selected_spectrum_with_free_helper() -> Result<Spectrum1D> {
     )
 }
 
+fn load_selected_bundle_strict_with_free_helper() -> Result<SpectrumBundle> {
+    let sources = discover_spectra("data/mixed-vendor")?;
+    load_discovered_spectra_strict_by_source_relative_to(
+        "data/mixed-vendor",
+        &sources,
+        LoadedSourceFilter::path_prefix("bruker/pdata"),
+    )
+}
+
 fn load_selected_after_preflight() -> Result<SpectrumBundle> {
     let sources = RSpinReader::new()
         .processed_sources()

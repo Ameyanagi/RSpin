@@ -707,6 +707,27 @@ fn prelude_exports_exact_discovered_free_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_strict_discovered_free_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let bundle = load_discovered_spectra_strict_by_source_relative_to(
+        &fixture_root,
+        &sources,
+        LoadedSourceFilter::vendor("varian"),
+    )?;
+    assert_eq!(bundle.len(), 1);
+    let bundle = load_discovered_spectra_strict_by_sources(
+        &fixture_root,
+        &sources,
+        [LoadedSourceFilter::path("varian_1h")],
+    )?;
+    assert_eq!(bundle.len(), 1);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

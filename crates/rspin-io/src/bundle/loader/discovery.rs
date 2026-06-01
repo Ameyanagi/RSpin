@@ -3,6 +3,7 @@
 mod exact;
 mod model;
 mod selection;
+mod strict;
 mod summary;
 
 use std::path::Path;
@@ -39,6 +40,13 @@ pub use exact::{
 };
 pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
 pub use selection::{select_discovered_spectra_by_source, select_discovered_spectra_by_sources};
+pub use strict::{
+    load_discovered_spectra_strict, load_discovered_spectra_strict_by_source,
+    load_discovered_spectra_strict_by_source_relative_to,
+    load_discovered_spectra_strict_by_sources,
+    load_discovered_spectra_strict_by_sources_relative_to,
+    load_discovered_spectra_strict_relative_to,
+};
 pub use summary::{
     DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount, DiscoveredSpectrumSummary,
     summarize_discovered_spectra,
