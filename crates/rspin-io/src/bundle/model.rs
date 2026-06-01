@@ -219,6 +219,38 @@ impl SourceVendorCount {
     }
 }
 
+/// Deterministic count of loaded spectra for one tracked source path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourcePathCount {
+    /// Source path relative to the loader root.
+    pub path: PathBuf,
+    /// Number of loaded spectra with this source path.
+    pub count: usize,
+}
+
+impl SourcePathCount {
+    /// Creates a source path count.
+    #[must_use]
+    pub fn new(path: impl AsRef<Path>, count: usize) -> Self {
+        Self {
+            path: path.as_ref().to_path_buf(),
+            count,
+        }
+    }
+
+    /// Returns the source path.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Returns the number of loaded spectra with this source path.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+}
+
 /// Summary counts for a loaded spectrum bundle.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SpectrumBundleSummary {
@@ -240,6 +272,9 @@ pub struct SpectrumBundleSummary {
     /// Counts of loaded spectra by coarse source data kind.
     #[serde(default)]
     pub source_data_kinds: Vec<SourceDataKindCount>,
+    /// Counts of loaded spectra by tracked source path.
+    #[serde(default)]
+    pub source_paths: Vec<SourcePathCount>,
 }
 
 impl SpectrumBundleSummary {
@@ -264,7 +299,15 @@ impl SpectrumBundleSummary {
             source_formats,
             source_vendors,
             source_data_kinds,
+            source_paths: Vec::new(),
         }
+    }
+
+    /// Adds tracked source path counts to this summary.
+    #[must_use]
+    pub fn with_source_path_counts(mut self, source_paths: Vec<SourcePathCount>) -> Self {
+        self.source_paths = source_paths;
+        self
     }
 
     /// Returns the number of loaded spectra.
@@ -347,6 +390,40 @@ impl SpectrumBundleSummary {
         self.source_data_kind_count(data_kind) > 0
     }
 
+    /// Returns the number of loaded spectra with a tracked source path.
+    #[must_use]
+    pub fn source_path_count(&self, path: impl AsRef<Path>) -> usize {
+        let path = path.as_ref();
+        self.source_paths
+            .iter()
+            .filter(|count| count.path() == path)
+            .map(SourcePathCount::count)
+            .sum()
+    }
+
+    /// Returns true when a loaded spectrum has a tracked source path.
+    #[must_use]
+    pub fn has_source_path(&self, path: impl AsRef<Path>) -> bool {
+        self.source_path_count(path) > 0
+    }
+
+    /// Returns the number of loaded spectra with tracked source paths below a prefix.
+    #[must_use]
+    pub fn source_path_prefix_count(&self, path: impl AsRef<Path>) -> usize {
+        let path = path.as_ref();
+        self.source_paths
+            .iter()
+            .filter(|count| count.path().starts_with(path))
+            .map(SourcePathCount::count)
+            .sum()
+    }
+
+    /// Returns true when a loaded spectrum has a tracked source path below a prefix.
+    #[must_use]
+    pub fn has_source_path_prefix(&self, path: impl AsRef<Path>) -> bool {
+        self.source_path_prefix_count(path) > 0
+    }
+
     /// Returns deterministic source vendor counts in first-seen order.
     ///
     /// For summaries deserialized from older JSON that does not contain the
@@ -369,6 +446,16 @@ impl SpectrumBundleSummary {
             return source_data_kind_counts_from_format_counts(&self.source_formats);
         }
         self.source_data_kinds.clone()
+    }
+
+    /// Returns deterministic source path counts in first-seen order.
+    ///
+    /// For summaries deserialized from older JSON that does not contain the
+    /// `source_paths` field, this returns an empty vector because source paths
+    /// cannot be reconstructed from format counts alone.
+    #[must_use]
+    pub fn source_path_counts(&self) -> Vec<SourcePathCount> {
+        self.source_paths.clone()
     }
 }
 
@@ -637,6 +724,7 @@ impl SpectrumBundle {
             self.warning_count(),
             self.source_format_counts(),
         )
+        .with_source_path_counts(self.source_path_counts())
     }
 
     /// Returns an iterator over one-dimensional spectra.
@@ -998,6 +1086,15 @@ impl SpectrumBundle {
         self.loaded_by_source_path(path).is_some()
     }
 
+    /// Returns the number of loaded spectra with the given tracked source path.
+    #[must_use]
+    pub fn source_path_count(&self, path: impl AsRef<Path>) -> usize {
+        let path = path.as_ref();
+        self.loaded_sources()
+            .filter(|source| source.path() == Some(path))
+            .count()
+    }
+
     /// Returns the number of loaded spectra read with a source format.
     #[must_use]
     pub fn source_format_count(&self, format: impl AsRef<str>) -> usize {
@@ -1082,6 +1179,19 @@ impl SpectrumBundle {
         let mut counts: Vec<SourceDataKindCount> = Vec::new();
         for source in self.loaded_sources() {
             push_source_data_kind_count(&mut counts, source.data_kind(), 1);
+        }
+        counts
+    }
+
+    /// Returns deterministic source path counts in first-seen order.
+    #[must_use]
+    pub fn source_path_counts(&self) -> Vec<SourcePathCount> {
+        let mut counts: Vec<SourcePathCount> = Vec::new();
+        for path in self.source_paths() {
+            match counts.iter_mut().find(|count| count.path() == path) {
+                Some(count) => count.count += 1,
+                None => counts.push(SourcePathCount::new(path, 1)),
+            }
         }
         counts
     }

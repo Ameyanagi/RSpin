@@ -354,8 +354,7 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
             .iter()
             .any(|count| { count.format() == "bruker_processed" && count.count() == 1 })
     );
-    assert_eq!(bundle.source_paths().count(), 3);
-    assert!(bundle.has_source_path(std::path::Path::new("varian_1h")));
+    assert_multi_path_source_counts(&bundle, &summary);
 
     let anchored = load_spectra_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(anchored.len(), 2);
@@ -405,6 +404,22 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
     assert_eq!(agilent.metadata.nucleus, Some(Nucleus::Hydrogen1));
     assert_eq!(agilent.x.unit, Unit::Seconds);
     Ok(())
+}
+
+fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
+    assert_eq!(bundle.source_paths().count(), 3);
+    assert_eq!(
+        bundle.source_path_count(std::path::Path::new("varian_1h")),
+        1
+    );
+    assert!(
+        bundle
+            .source_path_counts()
+            .contains(&SourcePathCount::new("varian_1h", 1))
+    );
+    assert_eq!(summary.source_path_count("varian_1h"), 1);
+    assert!(summary.has_source_path_prefix("bruker_without_expno"));
+    assert!(bundle.has_source_path(std::path::Path::new("varian_1h")));
 }
 
 #[test]

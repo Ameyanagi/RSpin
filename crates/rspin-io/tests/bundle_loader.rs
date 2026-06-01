@@ -9,24 +9,24 @@ use std::{
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
-    LoadedSpectrum, RSpinReader, SourceDataKindCount, SpectrumBundle, SpectrumBundleLoader,
-    SpectrumBundleSummary, SpectrumPathReader, load_spectra, load_spectra_by_source,
-    load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
-    load_spectra_by_source_data_kinds, load_spectra_by_source_data_kinds_relative_to,
-    load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
-    load_spectra_by_source_formats, load_spectra_by_source_formats_relative_to,
-    load_spectra_by_source_path, load_spectra_by_source_path_prefix,
-    load_spectra_by_source_path_prefix_relative_to, load_spectra_by_source_path_relative_to,
-    load_spectra_by_source_relative_to, load_spectra_by_source_vendor,
-    load_spectra_by_source_vendor_relative_to, load_spectra_by_source_vendors,
-    load_spectra_by_source_vendors_relative_to, load_spectra_by_sources,
-    load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
-    load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
-    load_spectra_many_by_source_data_kinds, load_spectra_many_by_source_data_kinds_relative_to,
-    load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
-    load_spectra_many_by_source_formats, load_spectra_many_by_source_formats_relative_to,
-    load_spectra_many_by_source_path, load_spectra_many_by_source_path_prefix,
-    load_spectra_many_by_source_path_prefix_relative_to,
+    LoadedSpectrum, RSpinReader, SourceDataKindCount, SourcePathCount, SpectrumBundle,
+    SpectrumBundleLoader, SpectrumBundleSummary, SpectrumPathReader, load_spectra,
+    load_spectra_by_source, load_spectra_by_source_data_kind,
+    load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_data_kinds,
+    load_spectra_by_source_data_kinds_relative_to, load_spectra_by_source_format,
+    load_spectra_by_source_format_relative_to, load_spectra_by_source_formats,
+    load_spectra_by_source_formats_relative_to, load_spectra_by_source_path,
+    load_spectra_by_source_path_prefix, load_spectra_by_source_path_prefix_relative_to,
+    load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
+    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
+    load_spectra_by_source_vendors, load_spectra_by_source_vendors_relative_to,
+    load_spectra_by_sources, load_spectra_by_sources_relative_to, load_spectra_many,
+    load_spectra_many_by_source, load_spectra_many_by_source_data_kind,
+    load_spectra_many_by_source_data_kind_relative_to, load_spectra_many_by_source_data_kinds,
+    load_spectra_many_by_source_data_kinds_relative_to, load_spectra_many_by_source_format,
+    load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_formats,
+    load_spectra_many_by_source_formats_relative_to, load_spectra_many_by_source_path,
+    load_spectra_many_by_source_path_prefix, load_spectra_many_by_source_path_prefix_relative_to,
     load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
     load_spectra_many_by_source_vendors, load_spectra_many_by_source_vendors_relative_to,
@@ -1602,6 +1602,19 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
     assert!(source_paths.contains(&jcamp_path));
     assert!(source_paths.contains(&hsqc_path));
     assert!(bundle.has_source_path(jcamp_path));
+    assert_eq!(bundle.source_path_count(jcamp_path), 1);
+    assert_eq!(bundle.source_path_count("missing"), 0);
+    let source_path_counts = bundle.source_path_counts();
+    assert_eq!(source_path_counts.len(), bundle.len());
+    assert!(source_path_counts.contains(&SourcePathCount::new(jcamp_path, 1)));
+    assert!(source_path_counts.contains(&SourcePathCount::new(hsqc_path, 1)));
+    let summary = bundle.summary();
+    assert_eq!(summary.source_paths, source_path_counts);
+    assert_eq!(summary.source_path_count(jcamp_path), 1);
+    assert_eq!(summary.source_path_prefix_count("jcamp"), 2);
+    assert!(summary.has_source_path(hsqc_path));
+    assert!(summary.has_source_path_prefix("jeol"));
+    assert!(!summary.has_source_path("missing"));
 
     let loaded_sources = bundle.loaded_sources().collect::<Vec<_>>();
     assert_eq!(loaded_sources.len(), bundle.len());
@@ -2406,6 +2419,10 @@ fn bundle_summary_reconstructs_source_data_kind_counts_from_legacy_json() -> any
     let summary: SpectrumBundleSummary = serde_json::from_str(&summary_json)?;
 
     assert!(summary.source_data_kinds.is_empty());
+    assert!(summary.source_paths.is_empty());
+    assert!(summary.source_path_counts().is_empty());
+    assert_eq!(summary.source_path_count("missing"), 0);
+    assert!(!summary.has_source_path_prefix("missing"));
     assert_eq!(
         summary.source_data_kind_counts(),
         vec![

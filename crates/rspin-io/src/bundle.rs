@@ -138,7 +138,7 @@ pub use loader::{
 };
 pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,
-    SourceVendorCount, SpectrumBundle, SpectrumBundleSummary,
+    SourcePathCount, SourceVendorCount, SpectrumBundle, SpectrumBundleSummary,
 };
 pub use path_prefix::{
     load_spectra_by_source_path_prefix, load_spectra_by_source_path_prefix_relative_to,

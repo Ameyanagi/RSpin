@@ -212,6 +212,9 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     for count in &summary.source_data_kinds {
         println!("{} data spectra: {}", count.data_kind(), count.count());
     }
+    for count in &summary.source_paths {
+        println!("{} source spectra: {}", count.path().display(), count.count());
+    }
     println!(
         "loaded {} raw vendor spectra",
         summary.source_data_kind_count(LoadedSourceDataKind::Raw)
