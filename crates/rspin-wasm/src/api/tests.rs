@@ -299,6 +299,71 @@ fn extracts_exact_spectrum_from_bundle_json() -> anyhow::Result<()> {
 }
 
 #[test]
+fn extracts_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
+    let one_d = Spectrum1D::new(
+        Axis::linear("time", Unit::Seconds, 0.0, 0.001, 2)?,
+        vec![1.0, 2.0],
+        Metadata::named("wasm selected 1d"),
+    )?;
+    let two_d = Spectrum2D::new(
+        Axis::linear("direct", Unit::Seconds, 0.0, 0.001, 2)?,
+        Axis::linear("indirect", Unit::Seconds, 0.0, 0.002, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("wasm selected 2d"),
+    )?;
+    let input = serde_json::to_string(&serde_json::json!({
+        "spectra_1d": [{
+            "spectrum": one_d,
+            "path": "vendor/fid",
+            "format": "bruker_fid"
+        }],
+        "spectra_2d": [{
+            "spectrum": two_d,
+            "path": "vendor/hsqc.jdf",
+            "format": "jeol_jdf"
+        }]
+    }))?;
+    let bundle_json = create_spectrum_bundle_json(&input)?;
+
+    let by_format = spectrum_bundle_1d_by_source_format_json(&bundle_json, "bruker fid")?;
+    assert_eq!(
+        spectrum1d_from_json(&by_format)?.metadata.name.as_deref(),
+        Some("wasm selected 1d")
+    );
+    let by_format = spectrum_bundle_2d_by_source_format_json(&bundle_json, "jdf")?;
+    assert_eq!(
+        spectrum2d_from_json(&by_format)?.metadata.name.as_deref(),
+        Some("wasm selected 2d")
+    );
+
+    let by_vendor = spectrum_bundle_1d_by_source_vendor_json(&bundle_json, "bruker")?;
+    assert_eq!(
+        spectrum1d_from_json(&by_vendor)?.metadata.name.as_deref(),
+        Some("wasm selected 1d")
+    );
+    let by_vendor = spectrum_bundle_2d_by_source_vendor_json(&bundle_json, "jeol")?;
+    assert_eq!(
+        spectrum2d_from_json(&by_vendor)?.metadata.name.as_deref(),
+        Some("wasm selected 2d")
+    );
+
+    let by_path = spectrum_bundle_1d_by_source_path_json(&bundle_json, "vendor/fid")?;
+    assert_eq!(
+        spectrum1d_from_json(&by_path)?.metadata.name.as_deref(),
+        Some("wasm selected 1d")
+    );
+    let by_path = spectrum_bundle_2d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf")?;
+    assert_eq!(
+        spectrum2d_from_json(&by_path)?.metadata.name.as_deref(),
+        Some("wasm selected 2d")
+    );
+
+    let wrong_dimension = spectrum_bundle_1d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf");
+    assert!(matches!(wrong_dimension, Err(RSpinError::Parse { .. })));
+    Ok(())
+}
+
+#[test]
 fn parses_nmrml_to_json() -> anyhow::Result<()> {
     let json = parse_nmrml_1d_json(
         r#"

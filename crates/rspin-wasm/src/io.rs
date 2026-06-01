@@ -18,6 +18,9 @@ use crate::{
     parse_nmrml_version_json, parse_spectrum_1d_bytes_as_json, parse_spectrum_1d_csv_json,
     parse_spectrum_1d_text_as_json, parse_spectrum_1d_text_json, parse_spectrum_2d_bytes_as_json,
     parse_spectrum_2d_csv_json, parse_spectrum_2d_text_as_json, parse_spectrum_2d_text_json,
+    spectrum_bundle_1d_by_source_format_json, spectrum_bundle_1d_by_source_path_json,
+    spectrum_bundle_1d_by_source_vendor_json, spectrum_bundle_2d_by_source_format_json,
+    spectrum_bundle_2d_by_source_path_json, spectrum_bundle_2d_by_source_vendor_json,
     spectrum_bundle_counts_json, spectrum_bundle_only_1d_json, spectrum_bundle_only_2d_json,
     spectrum_bundle_source_formats_json, spectrum_bundle_source_vendors_json,
     validate_spectrum_bundle_json, write_analysis_1d_csv_json, write_analysis_2d_csv_json,
@@ -555,6 +558,90 @@ pub fn spectrum_bundle_only_1d(input: &str) -> std::result::Result<String, JsVal
 #[wasm_bindgen(js_name = spectrumBundleOnly2d)]
 pub fn spectrum_bundle_only_2d(input: &str) -> std::result::Result<String, JsValue> {
     spectrum_bundle_only_2d_json(input).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one one-dimensional spectrum with a source format from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one matching one-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle1dBySourceFormat)]
+pub fn spectrum_bundle_1d_by_source_format(
+    input: &str,
+    format: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_1d_by_source_format_json(input, format).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one two-dimensional spectrum with a source format from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one matching two-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle2dBySourceFormat)]
+pub fn spectrum_bundle_2d_by_source_format(
+    input: &str,
+    format: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_2d_by_source_format_json(input, format).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one one-dimensional spectrum with a source vendor from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one matching one-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle1dBySourceVendor)]
+pub fn spectrum_bundle_1d_by_source_vendor(
+    input: &str,
+    vendor: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_1d_by_source_vendor_json(input, vendor).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one two-dimensional spectrum with a source vendor from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one matching two-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle2dBySourceVendor)]
+pub fn spectrum_bundle_2d_by_source_vendor(
+    input: &str,
+    vendor: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_2d_by_source_vendor_json(input, vendor).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one one-dimensional spectrum with a tracked source path from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one matching one-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle1dBySourcePath)]
+pub fn spectrum_bundle_1d_by_source_path(
+    input: &str,
+    source_path: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_1d_by_source_path_json(input, source_path).map_err(|error| js_error(&error))
+}
+
+/// Extracts exactly one two-dimensional spectrum with a tracked source path from spectrum bundle JSON.
+///
+/// # Errors
+///
+/// Returns a JavaScript error string when the bundle does not contain exactly
+/// one matching two-dimensional spectrum, or serialization fails.
+#[wasm_bindgen(js_name = spectrumBundle2dBySourcePath)]
+pub fn spectrum_bundle_2d_by_source_path(
+    input: &str,
+    source_path: &str,
+) -> std::result::Result<String, JsValue> {
+    spectrum_bundle_2d_by_source_path_json(input, source_path).map_err(|error| js_error(&error))
 }
 
 /// Serializes one-dimensional spectrum JSON into nmrML text.
