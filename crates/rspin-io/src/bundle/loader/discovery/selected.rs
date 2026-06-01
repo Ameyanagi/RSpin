@@ -107,6 +107,22 @@ pub trait SelectedDiscoveredSpectrumSourcesExt {
     /// Returns an error when one-dimensional bundle loading fails.
     fn load_1d(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle>;
 
+    /// Loads these selected discovered sources as a one-dimensional bundle summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when one-dimensional bundle loading fails.
+    fn load_1d_summary_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary>;
+
+    /// Loads these selected discovered sources as a one-dimensional bundle summary.
+    ///
+    /// This short alias mirrors [`Self::load_1d_summary_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when one-dimensional bundle loading fails.
+    fn load_1d_summary(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary>;
+
     /// Strictly loads these selected discovered sources as a one-dimensional spectrum bundle.
     ///
     /// # Errors
@@ -122,6 +138,25 @@ pub trait SelectedDiscoveredSpectrumSourcesExt {
     ///
     /// Returns an error when strict one-dimensional bundle loading fails.
     fn load_1d_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle>;
+
+    /// Strictly loads these selected discovered sources as a one-dimensional bundle summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict one-dimensional bundle loading fails.
+    fn load_1d_summary_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary>;
+
+    /// Strictly loads these selected discovered sources as a one-dimensional bundle summary.
+    ///
+    /// This short alias mirrors [`Self::load_1d_summary_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict one-dimensional bundle loading fails.
+    fn load_1d_summary_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary>;
 
     /// Loads these selected discovered sources as a two-dimensional spectrum bundle.
     ///
@@ -141,6 +176,22 @@ pub trait SelectedDiscoveredSpectrumSourcesExt {
     /// Returns an error when two-dimensional bundle loading fails.
     fn load_2d(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle>;
 
+    /// Loads these selected discovered sources as a two-dimensional bundle summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when two-dimensional bundle loading fails.
+    fn load_2d_summary_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary>;
+
+    /// Loads these selected discovered sources as a two-dimensional bundle summary.
+    ///
+    /// This short alias mirrors [`Self::load_2d_summary_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when two-dimensional bundle loading fails.
+    fn load_2d_summary(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary>;
+
     /// Strictly loads these selected discovered sources as a two-dimensional spectrum bundle.
     ///
     /// # Errors
@@ -156,6 +207,25 @@ pub trait SelectedDiscoveredSpectrumSourcesExt {
     ///
     /// Returns an error when strict two-dimensional bundle loading fails.
     fn load_2d_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle>;
+
+    /// Strictly loads these selected discovered sources as a two-dimensional bundle summary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict two-dimensional bundle loading fails.
+    fn load_2d_summary_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary>;
+
+    /// Strictly loads these selected discovered sources as a two-dimensional bundle summary.
+    ///
+    /// This short alias mirrors [`Self::load_2d_summary_strict_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when strict two-dimensional bundle loading fails.
+    fn load_2d_summary_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary>;
 }
 
 impl SelectedDiscoveredSpectrumSourcesExt for [&DiscoveredSpectrumSource] {
@@ -207,6 +277,16 @@ impl SelectedDiscoveredSpectrumSourcesExt for [&DiscoveredSpectrumSource] {
         self.load_1d_relative_to(base)
     }
 
+    fn load_1d_summary_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        SpectrumBundleLoader::new()
+            .read_discovered_bundle_1d_relative_to(base, self.iter().copied())
+            .map(|bundle| bundle.summary())
+    }
+
+    fn load_1d_summary(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.load_1d_summary_relative_to(base)
+    }
+
     fn load_1d_strict_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
         SpectrumBundleLoader::new()
             .strict()
@@ -215,6 +295,20 @@ impl SelectedDiscoveredSpectrumSourcesExt for [&DiscoveredSpectrumSource] {
 
     fn load_1d_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
         self.load_1d_strict_relative_to(base)
+    }
+
+    fn load_1d_summary_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary> {
+        SpectrumBundleLoader::new()
+            .strict()
+            .read_discovered_bundle_1d_relative_to(base, self.iter().copied())
+            .map(|bundle| bundle.summary())
+    }
+
+    fn load_1d_summary_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.load_1d_summary_strict_relative_to(base)
     }
 
     fn load_2d_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
@@ -226,6 +320,16 @@ impl SelectedDiscoveredSpectrumSourcesExt for [&DiscoveredSpectrumSource] {
         self.load_2d_relative_to(base)
     }
 
+    fn load_2d_summary_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        SpectrumBundleLoader::new()
+            .read_discovered_bundle_2d_relative_to(base, self.iter().copied())
+            .map(|bundle| bundle.summary())
+    }
+
+    fn load_2d_summary(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.load_2d_summary_relative_to(base)
+    }
+
     fn load_2d_strict_relative_to(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
         SpectrumBundleLoader::new()
             .strict()
@@ -234,5 +338,19 @@ impl SelectedDiscoveredSpectrumSourcesExt for [&DiscoveredSpectrumSource] {
 
     fn load_2d_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundle> {
         self.load_2d_strict_relative_to(base)
+    }
+
+    fn load_2d_summary_strict_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+    ) -> Result<SpectrumBundleSummary> {
+        SpectrumBundleLoader::new()
+            .strict()
+            .read_discovered_bundle_2d_relative_to(base, self.iter().copied())
+            .map(|bundle| bundle.summary())
+    }
+
+    fn load_2d_summary_strict(&self, base: impl AsRef<Path>) -> Result<SpectrumBundleSummary> {
+        self.load_2d_summary_strict_relative_to(base)
     }
 }

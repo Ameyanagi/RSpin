@@ -926,8 +926,14 @@ fn selected_discovered_source_slices_load_chainably() -> Result<()> {
     assert!(bundle.warnings().is_empty());
     assert_eq!(jeol_1d.load(&root)?.len_1d(), 2);
     assert_eq!(jeol_1d.load_1d(&root)?.len_1d(), 2);
+    let one_d_summary = jeol_1d.load_1d_summary_relative_to(&root)?;
+    assert_eq!(one_d_summary, bundle.summary());
+    assert_eq!(jeol_1d.load_1d_summary(&root)?, one_d_summary);
     assert_eq!(jeol_1d.load_1d_strict_relative_to(&root)?.len_1d(), 2);
     assert_eq!(jeol_1d.load_1d_strict(&root)?.len_1d(), 2);
+    let strict_one_d_summary = jeol_1d.load_1d_summary_strict_relative_to(&root)?;
+    assert_eq!(strict_one_d_summary, bundle.summary());
+    assert_eq!(jeol_1d.load_1d_summary_strict(&root)?, strict_one_d_summary);
 
     let summary = jeol_1d.load_summary(&root)?;
     assert_eq!(summary.spectra_1d(), 2);
@@ -945,6 +951,9 @@ fn selected_discovered_source_slices_load_chainably() -> Result<()> {
     assert_eq!(hsqc_bundle.len_2d(), 1);
     assert!(hsqc_bundle.has_source_path(hsqc_path));
     assert_eq!(hsqc.load_2d_relative_to(&root)?.len_2d(), 1);
+    let hsqc_summary = hsqc.load_2d_summary(&root)?;
+    assert_eq!(hsqc_summary, hsqc_bundle.summary());
+    assert_eq!(hsqc.load_2d_summary_relative_to(&root)?, hsqc_summary);
 
     let strict_hsqc = hsqc.load_strict_relative_to(&root)?;
     assert_eq!(strict_hsqc.len(), 1);
@@ -953,6 +962,23 @@ fn selected_discovered_source_slices_load_chainably() -> Result<()> {
     let strict_hsqc_2d = hsqc.load_2d_strict(&root)?;
     assert_eq!(strict_hsqc_2d.len_2d(), 1);
     assert_eq!(hsqc.load_2d_strict_relative_to(&root)?.len_2d(), 1);
+    let strict_hsqc_summary = hsqc.load_2d_summary_strict(&root)?;
+    assert_eq!(strict_hsqc_summary, strict_hsqc_2d.summary());
+    assert_eq!(
+        hsqc.load_2d_summary_strict_relative_to(&root)?,
+        strict_hsqc_summary
+    );
+
+    let Err(error) = hsqc.load_1d_summary(&root) else {
+        return Err(anyhow!(
+            "selected 1D summary loading should reject two-dimensional selections"
+        ));
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("no one-dimensional discovered sources selected")
+    );
 
     Ok(())
 }

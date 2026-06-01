@@ -1042,12 +1042,25 @@ fn prelude_exports_selected_discovered_source_load_methods() -> Result<()> {
     assert_eq!(loaded_1d.len_1d(), 2);
     assert_eq!(loaded_1d.len_2d(), 0);
     assert_eq!(jeol_1d.load_summary(&myrcene_root)?.spectra_1d(), 2);
+    assert_eq!(jeol_1d.load_1d_summary(&myrcene_root)?, loaded_1d.summary());
+    assert_eq!(
+        jeol_1d.load_1d_summary_strict_relative_to(&myrcene_root)?,
+        loaded_1d.summary()
+    );
 
     let hsqc =
         sources.select_2d_by_source(LoadedSourceFilter::path("jeol/myrcene_hsqc_400mhz.jdf"));
     let loaded_2d = hsqc.load_2d(&myrcene_root)?;
     assert_eq!(loaded_2d.len_1d(), 0);
     assert_eq!(loaded_2d.len_2d(), 1);
+    assert_eq!(
+        hsqc.load_2d_summary_relative_to(&myrcene_root)?,
+        loaded_2d.summary()
+    );
+    assert_eq!(
+        hsqc.load_2d_summary_strict(&myrcene_root)?,
+        loaded_2d.summary()
+    );
     Ok(())
 }
 
