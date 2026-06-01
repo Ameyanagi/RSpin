@@ -258,6 +258,112 @@ impl SpectrumBundleLoader {
         self.discover_summary_path(path)
     }
 
+    /// Discovers one-dimensional source candidates below a file or directory.
+    ///
+    /// This preserves the loader's other source filters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_1d_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<Vec<DiscoveredSpectrumSource>> {
+        let sources = self.discover_path(path)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::OneD,
+        ))
+    }
+
+    /// Discovers one-dimensional source candidates below a file or directory.
+    ///
+    /// This is a short alias for [`Self::discover_1d_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_1d(&self, path: impl AsRef<Path>) -> Result<Vec<DiscoveredSpectrumSource>> {
+        self.discover_1d_path(path)
+    }
+
+    /// Discovers two-dimensional source candidates below a file or directory.
+    ///
+    /// This preserves the loader's other source filters.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_2d_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<Vec<DiscoveredSpectrumSource>> {
+        let sources = self.discover_path(path)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::TwoD,
+        ))
+    }
+
+    /// Discovers two-dimensional source candidates below a file or directory.
+    ///
+    /// This is a short alias for [`Self::discover_2d_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_2d(&self, path: impl AsRef<Path>) -> Result<Vec<DiscoveredSpectrumSource>> {
+        self.discover_2d_path(path)
+    }
+
+    /// Discovers and summarizes one-dimensional source candidates below a file or directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_1d_summary_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        let sources = self.discover_1d_path(path)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes one-dimensional source candidates below a file or directory.
+    ///
+    /// This is a short alias for [`Self::discover_1d_summary_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_1d_summary(&self, path: impl AsRef<Path>) -> Result<DiscoveredSpectrumSummary> {
+        self.discover_1d_summary_path(path)
+    }
+
+    /// Discovers and summarizes two-dimensional source candidates below a file or directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_2d_summary_path(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        let sources = self.discover_2d_path(path)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes two-dimensional source candidates below a file or directory.
+    ///
+    /// This is a short alias for [`Self::discover_2d_summary_path`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input path is missing or a directory cannot be read.
+    pub fn discover_2d_summary(&self, path: impl AsRef<Path>) -> Result<DiscoveredSpectrumSummary> {
+        self.discover_2d_summary_path(path)
+    }
+
     /// Discovers one selected path while anchoring source paths to a base directory.
     ///
     /// # Errors
@@ -313,6 +419,68 @@ impl SpectrumBundleLoader {
         path: impl AsRef<Path>,
     ) -> Result<DiscoveredSpectrumSummary> {
         self.discover_summary_path_relative_to(base, path)
+    }
+
+    /// Discovers one-dimensional source candidates from one selected path relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory or selected path is missing.
+    pub fn discover_1d_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<Vec<DiscoveredSpectrumSource>> {
+        let sources = self.discover_path_relative_to(base, path)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::OneD,
+        ))
+    }
+
+    /// Discovers two-dimensional source candidates from one selected path relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory or selected path is missing.
+    pub fn discover_2d_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<Vec<DiscoveredSpectrumSource>> {
+        let sources = self.discover_path_relative_to(base, path)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::TwoD,
+        ))
+    }
+
+    /// Discovers and summarizes one-dimensional source candidates from one selected path relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory or selected path is missing.
+    pub fn discover_1d_summary_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        let sources = self.discover_1d_relative_to(base, path)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes two-dimensional source candidates from one selected path relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory or selected path is missing.
+    pub fn discover_2d_summary_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<DiscoveredSpectrumSummary> {
+        let sources = self.discover_2d_relative_to(base, path)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
     }
 
     /// Discovers source candidates below multiple file or directory paths.
@@ -389,6 +557,68 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.discover_summary_paths(paths)
+    }
+
+    /// Discovers one-dimensional source candidates below multiple file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no paths are provided or an input path is missing.
+    pub fn discover_1d_many<I, P>(&self, paths: I) -> Result<Vec<DiscoveredSpectrumSource>>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_paths(paths)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::OneD,
+        ))
+    }
+
+    /// Discovers two-dimensional source candidates below multiple file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no paths are provided or an input path is missing.
+    pub fn discover_2d_many<I, P>(&self, paths: I) -> Result<Vec<DiscoveredSpectrumSource>>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_paths(paths)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::TwoD,
+        ))
+    }
+
+    /// Discovers and summarizes one-dimensional source candidates below multiple file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no paths are provided or an input path is missing.
+    pub fn discover_1d_summary_many<I, P>(&self, paths: I) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_1d_many(paths)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes two-dimensional source candidates below multiple file or directory paths.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no paths are provided or an input path is missing.
+    pub fn discover_2d_summary_many<I, P>(&self, paths: I) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_2d_many(paths)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
     }
 
     /// Discovers selected paths while anchoring source paths to a base directory.
@@ -498,6 +728,88 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.discover_summary_paths_relative_to(base, paths)
+    }
+
+    /// Discovers one-dimensional source candidates from selected paths relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory is missing, no selected paths
+    /// are provided, or a selected path is missing.
+    pub fn discover_1d_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<Vec<DiscoveredSpectrumSource>>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_paths_relative_to(base, paths)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::OneD,
+        ))
+    }
+
+    /// Discovers two-dimensional source candidates from selected paths relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory is missing, no selected paths
+    /// are provided, or a selected path is missing.
+    pub fn discover_2d_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<Vec<DiscoveredSpectrumSource>>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_paths_relative_to(base, paths)?;
+        Ok(discovered_dimension_subset(
+            sources,
+            DiscoveredSpectrumDimension::TwoD,
+        ))
+    }
+
+    /// Discovers and summarizes one-dimensional source candidates from selected paths relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory is missing, no selected paths
+    /// are provided, or a selected path is missing.
+    pub fn discover_1d_summary_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_1d_many_relative_to(base, paths)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
+    }
+
+    /// Discovers and summarizes two-dimensional source candidates from selected paths relative to a base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the base directory is missing, no selected paths
+    /// are provided, or a selected path is missing.
+    pub fn discover_2d_summary_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<DiscoveredSpectrumSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let sources = self.discover_2d_many_relative_to(base, paths)?;
+        Ok(DiscoveredSpectrumSummary::new(&sources))
     }
 
     /// Loads selected discovered source candidates relative to a common base directory.
@@ -893,6 +1205,16 @@ fn no_discovered_sources_error() -> RSpinError {
         format: "spectrum bundle",
         message: "no discovered sources provided".to_owned(),
     }
+}
+
+fn discovered_dimension_subset(
+    sources: Vec<DiscoveredSpectrumSource>,
+    dimension: DiscoveredSpectrumDimension,
+) -> Vec<DiscoveredSpectrumSource> {
+    sources
+        .into_iter()
+        .filter(|source| source.dimension() == dimension)
+        .collect()
 }
 
 fn path_format_1d(

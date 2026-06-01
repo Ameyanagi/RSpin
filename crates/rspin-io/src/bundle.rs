@@ -365,6 +365,42 @@ pub fn discover_spectra_summary(path: impl AsRef<Path>) -> Result<DiscoveredSpec
     SpectrumBundleLoader::new().discover_summary_path(path)
 }
 
+/// Discovers one-dimensional source candidates below a file or directory without loading full spectra.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_1d(path: impl AsRef<Path>) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new().discover_1d_path(path)
+}
+
+/// Discovers two-dimensional source candidates below a file or directory without loading full spectra.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_2d(path: impl AsRef<Path>) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new().discover_2d_path(path)
+}
+
+/// Discovers and summarizes one-dimensional source candidates below a file or directory.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_1d_summary(path: impl AsRef<Path>) -> Result<DiscoveredSpectrumSummary> {
+    SpectrumBundleLoader::new().discover_1d_summary_path(path)
+}
+
+/// Discovers and summarizes two-dimensional source candidates below a file or directory.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or a directory cannot be read.
+pub fn discover_spectra_2d_summary(path: impl AsRef<Path>) -> Result<DiscoveredSpectrumSummary> {
+    SpectrumBundleLoader::new().discover_2d_summary_path(path)
+}
+
 /// Discovers one selected path while anchoring source paths to a common base directory.
 ///
 /// # Errors
@@ -389,6 +425,58 @@ pub fn discover_spectra_summary_relative_to(
     path: impl AsRef<Path>,
 ) -> Result<DiscoveredSpectrumSummary> {
     SpectrumBundleLoader::new().discover_summary_path_relative_to(base, path)
+}
+
+/// Discovers one-dimensional source candidates from one selected path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, or the
+/// selected path is missing.
+pub fn discover_spectra_1d_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new().discover_1d_relative_to(base, path)
+}
+
+/// Discovers two-dimensional source candidates from one selected path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, or the
+/// selected path is missing.
+pub fn discover_spectra_2d_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Vec<DiscoveredSpectrumSource>> {
+    SpectrumBundleLoader::new().discover_2d_relative_to(base, path)
+}
+
+/// Discovers and summarizes one-dimensional source candidates from one selected path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, or the
+/// selected path is missing.
+pub fn discover_spectra_1d_summary_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<DiscoveredSpectrumSummary> {
+    SpectrumBundleLoader::new().discover_1d_summary_relative_to(base, path)
+}
+
+/// Discovers and summarizes two-dimensional source candidates from one selected path relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, or the
+/// selected path is missing.
+pub fn discover_spectra_2d_summary_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<DiscoveredSpectrumSummary> {
+    SpectrumBundleLoader::new().discover_2d_summary_relative_to(base, path)
 }
 
 /// Discovers source candidates below a file or directory, restricted by one generic source filter.
@@ -1001,6 +1089,62 @@ where
     SpectrumBundleLoader::new().discover_summary_paths(paths)
 }
 
+/// Discovers one-dimensional source candidates below multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_1d_many<I, P>(paths: I) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_1d_many(paths)
+}
+
+/// Discovers two-dimensional source candidates below multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_2d_many<I, P>(paths: I) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_2d_many(paths)
+}
+
+/// Discovers and summarizes one-dimensional source candidates below multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_1d_many_summary<I, P>(paths: I) -> Result<DiscoveredSpectrumSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_1d_summary_many(paths)
+}
+
+/// Discovers and summarizes two-dimensional source candidates below multiple file or directory paths.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided, an input path is missing,
+/// or a directory cannot be read.
+pub fn discover_spectra_2d_many_summary<I, P>(paths: I) -> Result<DiscoveredSpectrumSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_2d_summary_many(paths)
+}
+
 /// Discovers selected paths while anchoring source paths to a common base directory.
 ///
 /// # Errors
@@ -1033,6 +1177,74 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().discover_summary_paths_relative_to(base, paths)
+}
+
+/// Discovers one-dimensional source candidates from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_1d_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_1d_many_relative_to(base, paths)
+}
+
+/// Discovers two-dimensional source candidates from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_2d_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Vec<DiscoveredSpectrumSource>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_2d_many_relative_to(base, paths)
+}
+
+/// Discovers and summarizes one-dimensional source candidates from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_1d_many_summary_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<DiscoveredSpectrumSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_1d_summary_many_relative_to(base, paths)
+}
+
+/// Discovers and summarizes two-dimensional source candidates from selected paths relative to a base directory.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, a selected path is missing, or a directory cannot be read.
+pub fn discover_spectra_2d_many_summary_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<DiscoveredSpectrumSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().discover_2d_summary_many_relative_to(base, paths)
 }
 
 /// Discovers source candidates below multiple paths, restricted by one generic source filter.

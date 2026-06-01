@@ -733,6 +733,23 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
         discovered_summary.source_vendor_count(LoadedSourceVendor::AgilentVarian),
         1
     );
+    let discovered_1d = discover_spectra_1d_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(discovered_1d.len(), 1);
+    assert!(discovered_1d.iter().all(DiscoveredSpectrumSource::is_1d));
+    assert_eq!(
+        discover_spectra_1d_many_summary_relative_to(&fixture_root, ["varian_1h"])?.sources_1d(),
+        1
+    );
+
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let discovered_2d =
+        discover_spectra_2d_relative_to(&myrcene_root, "jeol/myrcene_hsqc_400mhz.jdf")?;
+    assert_eq!(discovered_2d.len(), 1);
+    assert!(discovered_2d.iter().all(DiscoveredSpectrumSource::is_2d));
+    let discovered_2d_summary = discover_spectra_2d_summary(&myrcene_root)?;
+    assert_eq!(discovered_2d_summary.sources_1d(), 0);
+    assert!(discovered_2d_summary.sources_2d() >= discovered_2d.len());
 
     let processed = RSpinReader::new()
         .processed_sources()

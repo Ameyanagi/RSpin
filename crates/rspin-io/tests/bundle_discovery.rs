@@ -7,9 +7,16 @@ use rspin_io::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
     DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary,
     LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader,
-    SelectedDiscoveredSpectrumSourcesExt, discover_spectra, discover_spectra_by_source,
-    discover_spectra_by_source_relative_to, discover_spectra_by_sources,
-    discover_spectra_by_sources_relative_to, discover_spectra_many,
+    SelectedDiscoveredSpectrumSourcesExt, discover_spectra, discover_spectra_1d,
+    discover_spectra_1d_many, discover_spectra_1d_many_relative_to,
+    discover_spectra_1d_many_summary, discover_spectra_1d_many_summary_relative_to,
+    discover_spectra_1d_relative_to, discover_spectra_1d_summary,
+    discover_spectra_1d_summary_relative_to, discover_spectra_2d, discover_spectra_2d_many,
+    discover_spectra_2d_many_relative_to, discover_spectra_2d_many_summary,
+    discover_spectra_2d_many_summary_relative_to, discover_spectra_2d_relative_to,
+    discover_spectra_2d_summary, discover_spectra_2d_summary_relative_to,
+    discover_spectra_by_source, discover_spectra_by_source_relative_to,
+    discover_spectra_by_sources, discover_spectra_by_sources_relative_to, discover_spectra_many,
     discover_spectra_many_by_source, discover_spectra_many_by_source_relative_to,
     discover_spectra_many_by_sources, discover_spectra_many_by_sources_relative_to,
     discover_spectra_many_relative_to, discover_spectra_many_summary,
@@ -93,6 +100,100 @@ fn source_discovery_respects_chainable_loader_filters() -> Result<()> {
         hidden_paths
             .iter()
             .all(|source| source.vendor() == Some(LoadedSourceVendor::Bruker))
+    );
+
+    Ok(())
+}
+
+#[test]
+fn dimension_specific_discovery_helpers_match_loader_filters() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let all_sources = discover_spectra(&root)?;
+
+    let one_d = discover_spectra_1d(&root)?;
+    assert!(!one_d.is_empty());
+    assert!(one_d.iter().all(DiscoveredSpectrumSource::is_1d));
+    assert_eq!(
+        one_d,
+        owned_selected(select_discovered_spectra_1d(&all_sources))
+    );
+    assert_eq!(one_d, RSpinReader::new().discover_1d(&root)?);
+
+    let two_d = discover_spectra_2d(&root)?;
+    assert!(!two_d.is_empty());
+    assert!(two_d.iter().all(DiscoveredSpectrumSource::is_2d));
+    assert_eq!(
+        two_d,
+        owned_selected(select_discovered_spectra_2d(&all_sources))
+    );
+    assert_eq!(two_d, RSpinReader::new().discover_2d(&root)?);
+
+    let one_d_summary = discover_spectra_1d_summary(&root)?;
+    assert_eq!(one_d_summary.sources(), one_d.len());
+    assert_eq!(one_d_summary.sources_1d(), one_d.len());
+    assert_eq!(one_d_summary.sources_2d(), 0);
+    assert_eq!(
+        one_d_summary,
+        RSpinReader::new().discover_1d_summary(&root)?
+    );
+
+    let two_d_summary = discover_spectra_2d_summary(&root)?;
+    assert_eq!(two_d_summary.sources(), two_d.len());
+    assert_eq!(two_d_summary.sources_1d(), 0);
+    assert_eq!(two_d_summary.sources_2d(), two_d.len());
+    assert_eq!(
+        two_d_summary,
+        RSpinReader::new().discover_2d_summary(&root)?
+    );
+
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let relative_1d = discover_spectra_1d_relative_to(&root, proton_path)?;
+    assert_eq!(relative_1d.len(), 1);
+    assert_eq!(relative_1d[0].path(), Some(Path::new(proton_path)));
+    assert!(relative_1d[0].is_1d());
+    assert_eq!(
+        discover_spectra_1d_summary_relative_to(&root, proton_path)?.sources(),
+        relative_1d.len()
+    );
+
+    let relative_2d = discover_spectra_2d_relative_to(&root, hsqc_path)?;
+    assert_eq!(relative_2d.len(), 1);
+    assert_eq!(relative_2d[0].path(), Some(Path::new(hsqc_path)));
+    assert!(relative_2d[0].is_2d());
+    assert_eq!(
+        discover_spectra_2d_summary_relative_to(&root, hsqc_path)?.sources(),
+        relative_2d.len()
+    );
+
+    let many_1d = discover_spectra_1d_many([root.join(proton_path), root.join(hsqc_path)])?;
+    assert_eq!(many_1d.len(), 1);
+    assert!(many_1d.iter().all(DiscoveredSpectrumSource::is_1d));
+    assert_eq!(
+        discover_spectra_1d_many_summary([root.join(proton_path), root.join(hsqc_path)])?.sources(),
+        many_1d.len()
+    );
+
+    let many_2d = discover_spectra_2d_many([root.join(proton_path), root.join(hsqc_path)])?;
+    assert_eq!(many_2d.len(), 1);
+    assert!(many_2d.iter().all(DiscoveredSpectrumSource::is_2d));
+    assert_eq!(
+        discover_spectra_2d_many_summary([root.join(proton_path), root.join(hsqc_path)])?.sources(),
+        many_2d.len()
+    );
+
+    let relative_many_1d = discover_spectra_1d_many_relative_to(&root, [proton_path, hsqc_path])?;
+    assert_eq!(relative_many_1d, relative_1d);
+    assert_eq!(
+        discover_spectra_1d_many_summary_relative_to(&root, [proton_path, hsqc_path])?.sources(),
+        relative_many_1d.len()
+    );
+
+    let relative_many_2d = discover_spectra_2d_many_relative_to(&root, [proton_path, hsqc_path])?;
+    assert_eq!(relative_many_2d, relative_2d);
+    assert_eq!(
+        discover_spectra_2d_many_summary_relative_to(&root, [proton_path, hsqc_path])?.sources(),
+        relative_many_2d.len()
     );
 
     Ok(())
@@ -1217,6 +1318,10 @@ fn only_discovered_source(
             sources.len()
         )),
     }
+}
+
+fn owned_selected(sources: Vec<&DiscoveredSpectrumSource>) -> Vec<DiscoveredSpectrumSource> {
+    sources.into_iter().cloned().collect()
 }
 
 fn has_discovered_source(
