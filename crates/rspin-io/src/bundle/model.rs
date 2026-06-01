@@ -804,6 +804,43 @@ impl SpectrumBundle {
             .collect()
     }
 
+    /// Consumes the bundle and returns loaded spectra matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path.
+    #[must_use]
+    pub fn into_loaded_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<LoadedSpectrum> {
+        let filter = filter.into();
+        self.spectra
+            .into_iter()
+            .filter(move |entry| filter.matches_source(entry.source()))
+            .collect()
+    }
+
+    /// Consumes the bundle and returns one-dimensional spectra and sources matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path.
+    #[must_use]
+    pub fn into_loaded_1d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<(Spectrum1D, LoadedSource)> {
+        let filter = filter.into();
+        self.spectra
+            .into_iter()
+            .filter_map(move |entry| match entry {
+                LoadedSpectrum::OneD { spectrum, source } if filter.matches_source(&source) => {
+                    Some((spectrum, source))
+                }
+                LoadedSpectrum::OneD { .. } | LoadedSpectrum::TwoD { .. } => None,
+            })
+            .collect()
+    }
+
     /// Consumes the bundle and returns loaded two-dimensional spectra with sources.
     #[must_use]
     pub fn into_loaded_2d(self) -> Vec<(Spectrum2D, LoadedSource)> {
@@ -812,6 +849,27 @@ impl SpectrumBundle {
             .filter_map(|entry| match entry {
                 LoadedSpectrum::TwoD { spectrum, source } => Some((spectrum, source)),
                 LoadedSpectrum::OneD { .. } => None,
+            })
+            .collect()
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra and sources matching a generic source filter.
+    ///
+    /// The filter may target a source format, vendor family, or tracked source
+    /// path.
+    #[must_use]
+    pub fn into_loaded_2d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<(Spectrum2D, LoadedSource)> {
+        let filter = filter.into();
+        self.spectra
+            .into_iter()
+            .filter_map(move |entry| match entry {
+                LoadedSpectrum::TwoD { spectrum, source } if filter.matches_source(&source) => {
+                    Some((spectrum, source))
+                }
+                LoadedSpectrum::OneD { .. } | LoadedSpectrum::TwoD { .. } => None,
             })
             .collect()
     }
@@ -825,10 +883,38 @@ impl SpectrumBundle {
             .collect()
     }
 
+    /// Consumes the bundle and returns one-dimensional spectra matching a generic source filter.
+    ///
+    /// Source metadata is discarded after filtering.
+    #[must_use]
+    pub fn into_spectra_1d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<Spectrum1D> {
+        self.into_loaded_1d_by_source(filter)
+            .into_iter()
+            .map(|(spectrum, _)| spectrum)
+            .collect()
+    }
+
     /// Consumes the bundle and returns two-dimensional spectra without source metadata.
     #[must_use]
     pub fn into_spectra_2d(self) -> Vec<Spectrum2D> {
         self.into_loaded_2d()
+            .into_iter()
+            .map(|(spectrum, _)| spectrum)
+            .collect()
+    }
+
+    /// Consumes the bundle and returns two-dimensional spectra matching a generic source filter.
+    ///
+    /// Source metadata is discarded after filtering.
+    #[must_use]
+    pub fn into_spectra_2d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Vec<Spectrum2D> {
+        self.into_loaded_2d_by_source(filter)
             .into_iter()
             .map(|(spectrum, _)| spectrum)
             .collect()

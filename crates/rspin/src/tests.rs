@@ -509,6 +509,35 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_owned_source_filtered_bundle_extractors() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let bundle = load_spectra_many_by_sources_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+        [
+            LoadedSourceFilter::path("varian_1h"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ],
+    )?;
+
+    let processed = bundle
+        .clone()
+        .into_spectra_1d_by_source(LoadedSourceFilter::vendor("bruker"));
+    assert_eq!(processed.len(), 1);
+    assert_eq!(processed[0].metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let loaded_varian = bundle.into_loaded_by_source(LoadedSourceFilter::vendor("varian"));
+    assert_eq!(loaded_varian.len(), 1);
+    assert_eq!(
+        loaded_varian[0].source().vendor(),
+        Some(LoadedSourceVendor::AgilentVarian)
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

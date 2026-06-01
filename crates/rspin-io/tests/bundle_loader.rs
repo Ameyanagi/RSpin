@@ -1442,6 +1442,62 @@ fn bundle_generic_source_helpers_filter_entries() -> anyhow::Result<()> {
 }
 
 #[test]
+fn bundle_generic_source_helpers_consume_filtered_entries() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let bruker_entries = bundle
+        .clone()
+        .into_loaded_by_source(LoadedSourceFilter::vendor("bruker"));
+    assert_eq!(bruker_entries.len(), 2);
+    assert!(
+        bruker_entries
+            .iter()
+            .all(|entry| entry.source().is_vendor(LoadedSourceVendor::Bruker))
+    );
+
+    let jeol_1d = bundle
+        .clone()
+        .into_loaded_1d_by_source(LoadedSourceFilter::from(LoadedSourceVendor::Jeol));
+    assert_eq!(jeol_1d.len(), 2);
+    assert!(
+        jeol_1d
+            .iter()
+            .all(|(_, source)| source.is_format(LoadedSourceFormat::JeolJdf))
+    );
+    assert!(
+        jeol_1d
+            .iter()
+            .any(|(spectrum, _)| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+    );
+
+    let hsqc = bundle
+        .clone()
+        .into_loaded_2d_by_source(LoadedSourceFilter::path(hsqc_path));
+    assert_eq!(hsqc.len(), 1);
+    let (hsqc_spectrum, hsqc_source) = hsqc
+        .first()
+        .ok_or_else(|| anyhow::anyhow!("missing consumed HSQC spectrum"))?;
+    assert_eq!(hsqc_spectrum.shape(), (1024, 32));
+    assert_eq!(hsqc_source.path(), Some(hsqc_path));
+
+    let jcamp_1d = bundle
+        .clone()
+        .into_spectra_1d_by_source(LoadedSourceFilter::format("jdx"));
+    assert_eq!(jcamp_1d.len(), 2);
+    assert!(
+        jcamp_1d
+            .iter()
+            .any(|spectrum| spectrum.metadata.nucleus == Some(Nucleus::Carbon13))
+    );
+
+    let bruker_2d = bundle.into_spectra_2d_by_source(LoadedSourceFilter::vendor("bruker"));
+    assert_eq!(bruker_2d.len(), 1);
+    assert_eq!(bruker_2d[0].shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
 fn loader_can_restrict_source_formats() -> anyhow::Result<()> {
     let jcamp = RSpinReader::new()
         .only_source_format(LoadedSourceFormat::JcampDx)

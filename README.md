@@ -146,6 +146,11 @@ fn inspect_bundle() -> Result<Vec<Spectrum1D>> {
     Ok(bundle.into_spectra_1d())
 }
 
+fn load_owned_vendor_subset() -> Result<Vec<Spectrum1D>> {
+    let bundle = load_spectra("data/mixed-vendor")?;
+    Ok(bundle.into_spectra_1d_by_source(LoadedSourceFilter::vendor("bruker")))
+}
+
 fn load_named_carbon_spectrum() -> Result<Spectrum1D> {
     let bundle = load_spectra("data/sample")?;
     let (spectrum, _) = bundle
