@@ -394,6 +394,19 @@ fn count_runtime_selection() -> Result<usize> {
     Ok(selected.len())
 }
 
+fn load_first_selected_source() -> Result<SpectrumBundle> {
+    let sources = discover_spectra("data/mixed-vendor")?;
+    let selected = select_discovered_spectra_by_source(
+        &sources,
+        LoadedSourceFilter::path_prefix("bruker/pdata"),
+    );
+    let source = selected.first().ok_or_else(|| RSpinError::Parse {
+        format: "spectrum source discovery",
+        message: "no matching source found".to_owned(),
+    })?;
+    source.load_relative_to("data/mixed-vendor")
+}
+
 fn load_selected_after_preflight() -> Result<SpectrumBundle> {
     let sources = RSpinReader::new()
         .processed_sources()

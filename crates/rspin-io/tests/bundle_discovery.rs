@@ -434,6 +434,47 @@ fn loads_selected_discovered_sources_relative_to_base() -> Result<()> {
 }
 
 #[test]
+fn discovered_source_can_load_itself_relative_to_base() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+    let varian = discovered_source(&sources, "varian_1h", LoadedSourceFormat::AgilentFid)?;
+
+    let bundle = varian.load_relative_to(fixture_root())?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(
+        bundle.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let bundle = varian.load(fixture_root())?;
+    assert_eq!(
+        bundle.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+
+    let empty_jcamp = discovered_source(
+        &sources,
+        "empty_jcamp/empty.jdx",
+        LoadedSourceFormat::JcampDx,
+    )?;
+    let Err(error) = empty_jcamp.load_strict_relative_to(fixture_root()) else {
+        return Err(anyhow!(
+            "strict discovered source loading should reject malformed JCAMP"
+        ));
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+
+    let mut missing_path = varian.clone();
+    missing_path.path = None;
+    let Err(error) = missing_path.load_relative_to(fixture_root()) else {
+        return Err(anyhow!(
+            "discovered source loading should reject missing tracked paths"
+        ));
+    };
+    assert!(error.to_string().contains("tracked source path"));
+    Ok(())
+}
+
+#[test]
 fn discovered_source_free_helpers_load_selected_sources() -> Result<()> {
     let sources = discover_spectra(fixture_root())?;
     let selected = sources

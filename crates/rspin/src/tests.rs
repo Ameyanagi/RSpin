@@ -591,6 +591,12 @@ fn prelude_exports_discovered_source_filter_loaders() -> Result<()> {
         selected[0].vendor(),
         Some(LoadedSourceVendor::AgilentVarian)
     );
+    let loaded = selected[0].load_relative_to(&fixture_root)?;
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(
+        loaded.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
 
     let selected = select_discovered_spectra_by_sources(
         &sources,
