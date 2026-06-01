@@ -2,8 +2,9 @@ use std::path::PathBuf;
 
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
 use rspin_io::{
-    ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, NMREDATA_RECORD_JSON_FORMAT,
-    NMREDATA_RECORDS_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_FORMAT, SpectrumBundleSummary,
+    ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, LoadedSourceDataKind,
+    NMREDATA_RECORD_JSON_FORMAT, NMREDATA_RECORDS_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_FORMAT,
+    SpectrumBundleSummary,
 };
 
 use super::*;
@@ -172,6 +173,7 @@ fn validates_and_summarizes_spectrum_bundle_json() -> anyhow::Result<()> {
     assert_eq!(counts.warnings(), 0);
     assert!(counts.source_formats.is_empty());
     assert!(counts.source_vendors.is_empty());
+    assert!(counts.source_data_kinds.is_empty());
     Ok(())
 }
 
@@ -218,6 +220,17 @@ fn creates_spectrum_bundle_json_from_spectrum_entries() -> anyhow::Result<()> {
     assert_eq!(counts.source_vendors.len(), 1);
     assert_eq!(counts.source_vendors[0].vendor(), "jeol");
     assert_eq!(counts.source_vendors[0].count(), 1);
+    assert_eq!(
+        counts.source_data_kind_count(LoadedSourceDataKind::Other),
+        2
+    );
+    assert_eq!(counts.source_data_kind_count(LoadedSourceDataKind::Raw), 0);
+    assert_eq!(counts.source_data_kinds.len(), 1);
+    assert_eq!(
+        counts.source_data_kinds[0].data_kind(),
+        LoadedSourceDataKind::Other
+    );
+    assert_eq!(counts.source_data_kinds[0].count(), 2);
 
     let bundle = rspin_io::read_spectrum_bundle_json(&bundle_json)?;
     let sources = bundle

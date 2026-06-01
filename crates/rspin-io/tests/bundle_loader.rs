@@ -9,21 +9,22 @@ use std::{
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
-    LoadedSpectrum, RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader,
-    load_spectra, load_spectra_by_source, load_spectra_by_source_data_kind,
-    load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_format,
-    load_spectra_by_source_format_relative_to, load_spectra_by_source_path,
-    load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
-    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
-    load_spectra_by_sources, load_spectra_by_sources_relative_to, load_spectra_many,
-    load_spectra_many_by_source, load_spectra_many_by_source_data_kind,
-    load_spectra_many_by_source_data_kind_relative_to, load_spectra_many_by_source_format,
-    load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_path,
-    load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
-    load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
-    load_spectra_many_by_sources, load_spectra_many_by_sources_relative_to,
-    load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
-    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
+    LoadedSpectrum, RSpinReader, SourceDataKindCount, SpectrumBundle, SpectrumBundleLoader,
+    SpectrumBundleSummary, SpectrumPathReader, load_spectra, load_spectra_by_source,
+    load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
+    load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
+    load_spectra_by_source_path, load_spectra_by_source_path_relative_to,
+    load_spectra_by_source_relative_to, load_spectra_by_source_vendor,
+    load_spectra_by_source_vendor_relative_to, load_spectra_by_sources,
+    load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
+    load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
+    load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
+    load_spectra_many_by_source_path, load_spectra_many_by_source_path_relative_to,
+    load_spectra_many_by_source_relative_to, load_spectra_many_by_source_vendor,
+    load_spectra_many_by_source_vendor_relative_to, load_spectra_many_by_sources,
+    load_spectra_many_by_sources_relative_to, load_spectra_many_relative_to,
+    load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_many,
+    load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
     load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
     load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
     load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
@@ -1223,6 +1224,17 @@ fn bundle_source_format_helpers_count_entries() -> anyhow::Result<()> {
     assert!(summary.has_source_format(LoadedSourceFormat::JeolJdf));
     assert!(summary.has_source_format("jdf"));
     assert!(!summary.has_source_format("missing"));
+    assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+    assert_eq!(
+        summary.source_data_kind_count(LoadedSourceDataKind::Processed),
+        0
+    );
+    assert_eq!(
+        summary.source_data_kind_count(LoadedSourceDataKind::Other),
+        5
+    );
+    assert!(summary.has_source_data_kind(LoadedSourceDataKind::Raw));
+    assert!(!summary.has_source_data_kind(LoadedSourceDataKind::Processed));
 
     assert_eq!(
         bundle
@@ -1729,6 +1741,19 @@ fn bundle_source_data_kind_helpers_cover_raw_and_processed_sources() -> anyhow::
         bundle.source_data_kinds().collect::<Vec<_>>(),
         vec![LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed]
     );
+    assert_eq!(
+        bundle.source_data_kind_counts(),
+        vec![
+            SourceDataKindCount::new(LoadedSourceDataKind::Raw, 1),
+            SourceDataKindCount::new(LoadedSourceDataKind::Processed, 1)
+        ]
+    );
+    let summary = bundle.summary();
+    assert_eq!(summary.source_data_kinds, bundle.source_data_kind_counts());
+    assert_eq!(
+        summary.source_data_kind_counts(),
+        bundle.source_data_kind_counts()
+    );
 
     let raw = bundle.raw_source_subset();
     assert_eq!(raw.len(), 1);
@@ -1763,6 +1788,39 @@ fn bundle_source_data_kind_helpers_cover_raw_and_processed_sources() -> anyhow::
             .collect::<Vec<_>>(),
         vec![Path::new("bruker_without_expno/pdata/1")]
     );
+    Ok(())
+}
+
+#[test]
+fn bundle_summary_reconstructs_source_data_kind_counts_from_legacy_json() -> anyhow::Result<()> {
+    let summary_json = serde_json::json!({
+        "spectra": 3,
+        "spectra_1d": 3,
+        "spectra_2d": 0,
+        "molecules": 0,
+        "warnings": 0,
+        "source_formats": [
+            { "format": "bruker_fid", "count": 1 },
+            { "format": "jcamp_dx", "count": 2 }
+        ]
+    })
+    .to_string();
+    let summary: SpectrumBundleSummary = serde_json::from_str(&summary_json)?;
+
+    assert!(summary.source_data_kinds.is_empty());
+    assert_eq!(
+        summary.source_data_kind_counts(),
+        vec![
+            SourceDataKindCount::new(LoadedSourceDataKind::Raw, 1),
+            SourceDataKindCount::new(LoadedSourceDataKind::Other, 2)
+        ]
+    );
+    assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
+    assert_eq!(
+        summary.source_data_kind_count(LoadedSourceDataKind::Other),
+        2
+    );
+    assert!(!summary.has_source_data_kind(LoadedSourceDataKind::Processed));
     Ok(())
 }
 

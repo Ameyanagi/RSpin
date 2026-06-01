@@ -152,6 +152,35 @@ impl SourceFormatCount {
     }
 }
 
+/// Deterministic count of loaded spectra for one source data kind.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SourceDataKindCount {
+    /// Source data kind.
+    pub data_kind: LoadedSourceDataKind,
+    /// Number of loaded spectra with this source data kind.
+    pub count: usize,
+}
+
+impl SourceDataKindCount {
+    /// Creates a source data-kind count.
+    #[must_use]
+    pub fn new(data_kind: LoadedSourceDataKind, count: usize) -> Self {
+        Self { data_kind, count }
+    }
+
+    /// Returns the source data kind.
+    #[must_use]
+    pub fn data_kind(&self) -> LoadedSourceDataKind {
+        self.data_kind
+    }
+
+    /// Returns the number of loaded spectra with this source data kind.
+    #[must_use]
+    pub fn count(&self) -> usize {
+        self.count
+    }
+}
+
 /// Deterministic count of loaded spectra for one source vendor family.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SourceVendorCount {
@@ -208,6 +237,9 @@ pub struct SpectrumBundleSummary {
     /// Counts of loaded spectra by source vendor family.
     #[serde(default)]
     pub source_vendors: Vec<SourceVendorCount>,
+    /// Counts of loaded spectra by coarse source data kind.
+    #[serde(default)]
+    pub source_data_kinds: Vec<SourceDataKindCount>,
 }
 
 impl SpectrumBundleSummary {
@@ -222,6 +254,7 @@ impl SpectrumBundleSummary {
         source_formats: Vec<SourceFormatCount>,
     ) -> Self {
         let source_vendors = source_vendor_counts_from_format_counts(&source_formats);
+        let source_data_kinds = source_data_kind_counts_from_format_counts(&source_formats);
         Self {
             spectra,
             spectra_1d,
@@ -230,6 +263,7 @@ impl SpectrumBundleSummary {
             warnings,
             source_formats,
             source_vendors,
+            source_data_kinds,
         }
     }
 
@@ -298,6 +332,21 @@ impl SpectrumBundleSummary {
         self.source_vendor_count(vendor) > 0
     }
 
+    /// Returns the number of loaded spectra with one raw/processed source data kind.
+    #[must_use]
+    pub fn source_data_kind_count(&self, data_kind: LoadedSourceDataKind) -> usize {
+        self.source_data_kind_counts()
+            .iter()
+            .find(|count| count.data_kind() == data_kind)
+            .map_or(0, SourceDataKindCount::count)
+    }
+
+    /// Returns true when a loaded spectrum has one raw/processed source data kind.
+    #[must_use]
+    pub fn has_source_data_kind(&self, data_kind: LoadedSourceDataKind) -> bool {
+        self.source_data_kind_count(data_kind) > 0
+    }
+
     /// Returns deterministic source vendor counts in first-seen order.
     ///
     /// For summaries deserialized from older JSON that does not contain the
@@ -308,6 +357,18 @@ impl SpectrumBundleSummary {
             return source_vendor_counts_from_format_counts(&self.source_formats);
         }
         self.source_vendors.clone()
+    }
+
+    /// Returns deterministic source data-kind counts in first-seen order.
+    ///
+    /// For summaries deserialized from older JSON that does not contain the
+    /// `source_data_kinds` field, counts are reconstructed from `source_formats`.
+    #[must_use]
+    pub fn source_data_kind_counts(&self) -> Vec<SourceDataKindCount> {
+        if self.source_data_kinds.is_empty() {
+            return source_data_kind_counts_from_format_counts(&self.source_formats);
+        }
+        self.source_data_kinds.clone()
     }
 }
 
@@ -1015,6 +1076,16 @@ impl SpectrumBundle {
         counts
     }
 
+    /// Returns deterministic source data-kind counts in first-seen order.
+    #[must_use]
+    pub fn source_data_kind_counts(&self) -> Vec<SourceDataKindCount> {
+        let mut counts: Vec<SourceDataKindCount> = Vec::new();
+        for source in self.loaded_sources() {
+            push_source_data_kind_count(&mut counts, source.data_kind(), 1);
+        }
+        counts
+    }
+
     /// Returns a one-dimensional spectrum and source by source path, if present.
     #[must_use]
     pub fn loaded_1d_by_source_path(
@@ -1589,6 +1660,30 @@ impl SpectrumBundle {
     pub(super) fn only_error(&self, expected: &'static str) -> RSpinError {
         let (one_d, two_d) = spectrum_dimension_counts(self.spectra.iter());
         only_error_from_counts(expected, one_d, two_d)
+    }
+}
+
+fn source_data_kind_counts_from_format_counts(
+    format_counts: &[SourceFormatCount],
+) -> Vec<SourceDataKindCount> {
+    let mut counts = Vec::new();
+    for format_count in format_counts {
+        push_source_data_kind_count(&mut counts, format_count.data_kind(), format_count.count());
+    }
+    counts
+}
+
+fn push_source_data_kind_count(
+    counts: &mut Vec<SourceDataKindCount>,
+    data_kind: LoadedSourceDataKind,
+    increment: usize,
+) {
+    match counts
+        .iter_mut()
+        .find(|count| count.data_kind() == data_kind)
+    {
+        Some(count) => count.count += increment,
+        None => counts.push(SourceDataKindCount::new(data_kind, increment)),
     }
 }
 

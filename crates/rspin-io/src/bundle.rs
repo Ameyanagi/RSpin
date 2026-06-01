@@ -82,8 +82,8 @@ pub use exact::{
 use loader::FileCandidateKind;
 pub use loader::SpectrumBundleLoader;
 pub use model::{
-    LoadWarning, LoadedSource, LoadedSpectrum, SourceFormatCount, SourceVendorCount,
-    SpectrumBundle, SpectrumBundleSummary,
+    LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,
+    SourceVendorCount, SpectrumBundle, SpectrumBundleSummary,
 };
 pub use source_filter::LoadedSourceFilter;
 pub use source_format::{

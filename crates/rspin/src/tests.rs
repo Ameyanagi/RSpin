@@ -611,6 +611,13 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
         mixed.source_data_kind_count(LoadedSourceDataKind::Processed),
         1
     );
+    assert_eq!(
+        mixed.summary().source_data_kind_counts(),
+        vec![
+            SourceDataKindCount::new(LoadedSourceDataKind::Raw, 1),
+            SourceDataKindCount::new(LoadedSourceDataKind::Processed, 1)
+        ]
+    );
     assert_eq!(mixed.raw_source_subset().len(), 1);
     assert_eq!(mixed.into_processed_source_subset().len(), 1);
 
