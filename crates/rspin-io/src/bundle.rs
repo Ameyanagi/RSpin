@@ -242,6 +242,29 @@ pub fn load_spectra_by_source_format(
         .read_path(path)
 }
 
+/// Loads supported spectra from a file or directory, restricted to source formats.
+///
+/// Source format aliases such as `jdx`, `jdf`, and `varian fid` are accepted.
+/// Formats are combined with logical OR. Passing an empty iterator leaves
+/// source loading unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_formats<I, F>(
+    path: impl AsRef<Path>,
+    formats: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = F>,
+    F: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_formats(formats)
+        .read_path(path)
+}
+
 /// Loads one selected path relative to a base directory, restricted to one source format.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -258,6 +281,30 @@ pub fn load_spectra_by_source_format_relative_to(
 ) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new()
         .only_source_format(format)
+        .read_path_relative_to(base, path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to source formats.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Source format aliases such as `jdx`, `jdf`, and
+/// `varian fid` are accepted. Formats are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_formats_relative_to<I, F>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    formats: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = F>,
+    F: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_formats(formats)
         .read_path_relative_to(base, path)
 }
 
@@ -278,6 +325,29 @@ pub fn load_spectra_by_source_vendor(
         .read_path(path)
 }
 
+/// Loads supported spectra from a file or directory, restricted to vendor families.
+///
+/// Vendor aliases such as `agilent` and `varian` are accepted. Vendors are
+/// combined with logical OR. Passing an empty iterator leaves source loading
+/// unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_vendors<I, V>(
+    path: impl AsRef<Path>,
+    vendors: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = V>,
+    V: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_vendors(vendors)
+        .read_path(path)
+}
+
 /// Loads one selected path relative to a base directory, restricted to one vendor family.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -294,6 +364,30 @@ pub fn load_spectra_by_source_vendor_relative_to(
 ) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new()
         .only_source_vendor(vendor)
+        .read_path_relative_to(base, path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to vendor families.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Vendor aliases such as `agilent` and `varian` are
+/// accepted. Vendors are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_vendors_relative_to<I, V>(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    vendors: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = V>,
+    V: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_vendors(vendors)
         .read_path_relative_to(base, path)
 }
 
@@ -560,6 +654,31 @@ where
         .read_paths(paths)
 }
 
+/// Loads supported spectra from multiple paths, restricted to source formats.
+///
+/// Source format aliases such as `jdx`, `jdf`, and `varian fid` are accepted.
+/// Formats are combined with logical OR. Passing an empty iterator leaves
+/// source loading unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_formats<I, P, J, F>(
+    paths: I,
+    formats: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_formats(formats)
+        .read_paths(paths)
+}
+
 /// Loads selected paths relative to a base directory, restricted to one source format.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -580,6 +699,32 @@ where
 {
     SpectrumBundleLoader::new()
         .only_source_format(format)
+        .read_paths_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to source formats.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Source format aliases such as `jdx`, `jdf`, and
+/// `varian fid` are accepted. Formats are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_formats_relative_to<I, P, J, F>(
+    base: impl AsRef<Path>,
+    paths: I,
+    formats: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = F>,
+    F: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_formats(formats)
         .read_paths_relative_to(base, paths)
 }
 
@@ -604,6 +749,31 @@ where
         .read_paths(paths)
 }
 
+/// Loads supported spectra from multiple paths, restricted to vendor families.
+///
+/// Vendor aliases such as `agilent` and `varian` are accepted. Vendors are
+/// combined with logical OR. Passing an empty iterator leaves source loading
+/// unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_vendors<I, P, J, V>(
+    paths: I,
+    vendors: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = V>,
+    V: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_vendors(vendors)
+        .read_paths(paths)
+}
+
 /// Loads selected paths relative to a base directory, restricted to one vendor family.
 ///
 /// Relative input paths are resolved below `base`; absolute input paths are
@@ -624,6 +794,32 @@ where
 {
     SpectrumBundleLoader::new()
         .only_source_vendor(vendor)
+        .read_paths_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to vendor families.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. Vendor aliases such as `agilent` and `varian` are
+/// accepted. Vendors are combined with logical OR.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_vendors_relative_to<I, P, J, V>(
+    base: impl AsRef<Path>,
+    paths: I,
+    vendors: J,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+    J: IntoIterator<Item = V>,
+    V: AsRef<str>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_vendors(vendors)
         .read_paths_relative_to(base, paths)
 }
 

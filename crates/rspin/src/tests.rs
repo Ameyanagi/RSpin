@@ -513,6 +513,82 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_set_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let source_formats = load_spectra_by_source_formats(
+        &fixture_root,
+        [
+            LoadedSourceFormat::AgilentFid,
+            LoadedSourceFormat::BrukerProcessed,
+        ],
+    )?;
+    assert_eq!(source_formats.len(), 2);
+    assert_eq!(
+        source_formats.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        source_formats.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let source_vendors = load_spectra_by_source_vendors(
+        &fixture_root,
+        [
+            LoadedSourceVendor::AgilentVarian,
+            LoadedSourceVendor::Bruker,
+        ],
+    )?;
+    assert_eq!(source_vendors.len(), 3);
+    assert_eq!(
+        source_vendors.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        source_vendors.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+
+    let multi_formats = load_spectra_many_by_source_formats(
+        [
+            fixture_root.join("varian_1h"),
+            fixture_root.join("bruker_without_expno"),
+        ],
+        [
+            LoadedSourceFormat::AgilentFid,
+            LoadedSourceFormat::BrukerFid,
+        ],
+    )?;
+    assert_eq!(multi_formats.len(), 2);
+    assert_eq!(
+        multi_formats.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        multi_formats.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+
+    let multi_vendors = load_spectra_many_by_source_vendors_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+        ["varian", "bruker"],
+    )?;
+    assert_eq!(multi_vendors.len(), 3);
+    assert_eq!(
+        multi_vendors.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        multi_vendors.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_source_path_prefix_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

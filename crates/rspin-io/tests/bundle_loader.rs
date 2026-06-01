@@ -14,18 +14,22 @@ use rspin_io::{
     load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
     load_spectra_by_source_data_kinds, load_spectra_by_source_data_kinds_relative_to,
     load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
+    load_spectra_by_source_formats, load_spectra_by_source_formats_relative_to,
     load_spectra_by_source_path, load_spectra_by_source_path_prefix,
     load_spectra_by_source_path_prefix_relative_to, load_spectra_by_source_path_relative_to,
     load_spectra_by_source_relative_to, load_spectra_by_source_vendor,
-    load_spectra_by_source_vendor_relative_to, load_spectra_by_sources,
+    load_spectra_by_source_vendor_relative_to, load_spectra_by_source_vendors,
+    load_spectra_by_source_vendors_relative_to, load_spectra_by_sources,
     load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
     load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
     load_spectra_many_by_source_data_kinds, load_spectra_many_by_source_data_kinds_relative_to,
     load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
+    load_spectra_many_by_source_formats, load_spectra_many_by_source_formats_relative_to,
     load_spectra_many_by_source_path, load_spectra_many_by_source_path_prefix,
     load_spectra_many_by_source_path_prefix_relative_to,
     load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
+    load_spectra_many_by_source_vendors, load_spectra_many_by_source_vendors_relative_to,
     load_spectra_many_by_sources, load_spectra_many_by_sources_relative_to,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
@@ -2452,6 +2456,63 @@ fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
 }
 
 #[test]
+fn free_bundle_loader_set_helpers_can_restrict_sources() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+
+    let jcamp_or_jeol = load_spectra_by_source_formats(
+        &root,
+        [LoadedSourceFormat::JcampDx, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(jcamp_or_jeol.len(), 5);
+    assert_eq!(
+        jcamp_or_jeol.source_format_count(LoadedSourceFormat::JcampDx),
+        2
+    );
+    assert_eq!(
+        jcamp_or_jeol.source_format_count(LoadedSourceFormat::JeolJdf),
+        3
+    );
+
+    let relative_jcamp_or_jeol =
+        load_spectra_by_source_formats_relative_to(&root, "jcamp", ["jdx", "jdf"])?;
+    assert_eq!(relative_jcamp_or_jeol.len(), 2);
+    assert!(
+        relative_jcamp_or_jeol
+            .source_paths()
+            .all(|path| path.starts_with(Path::new("jcamp")))
+    );
+
+    let bruker_or_jeol = load_spectra_by_source_vendors(
+        &root,
+        [LoadedSourceVendor::Bruker, LoadedSourceVendor::Jeol],
+    )?;
+    assert_eq!(bruker_or_jeol.len(), 5);
+    assert_eq!(
+        bruker_or_jeol.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        bruker_or_jeol.source_vendor_count(LoadedSourceVendor::Jeol),
+        3
+    );
+
+    let relative_vendor_set =
+        load_spectra_by_source_vendors_relative_to(&root, "jeol", ["bruker", "jeol"])?;
+    assert_eq!(relative_vendor_set.len(), 3);
+    assert_eq!(
+        relative_vendor_set.source_vendor_count(LoadedSourceVendor::Jeol),
+        3
+    );
+
+    let unrestricted_formats = load_spectra_by_source_formats(&root, std::iter::empty::<&str>())?;
+    assert_eq!(unrestricted_formats.len(), 7);
+
+    let unrestricted_vendors = load_spectra_by_source_vendors(&root, std::iter::empty::<&str>())?;
+    assert_eq!(unrestricted_vendors.len(), 7);
+    Ok(())
+}
+
+#[test]
 fn generic_source_filter_helpers_can_restrict_sources() -> anyhow::Result<()> {
     let root = nmrxiv_fixture_root();
     let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
@@ -2619,6 +2680,77 @@ fn free_multi_path_bundle_loader_helpers_can_restrict_sources() -> anyhow::Resul
     assert_eq!(relative_combined.len(), 2);
     assert!(relative_combined.has_source_path(Path::new("varian_1h")));
     assert!(relative_combined.has_source_path(Path::new("bruker_without_expno/pdata/1")));
+    Ok(())
+}
+
+#[test]
+fn free_multi_path_bundle_loader_set_helpers_can_restrict_sources() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let paths = [base.join("varian_1h"), base.join("bruker_without_expno")];
+
+    let selected_formats = load_spectra_many_by_source_formats(
+        &paths,
+        [
+            LoadedSourceFormat::AgilentFid,
+            LoadedSourceFormat::BrukerProcessed,
+        ],
+    )?;
+    assert_eq!(selected_formats.len(), 2);
+    assert_eq!(
+        selected_formats.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        selected_formats.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let relative_selected_formats = load_spectra_many_by_source_formats_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        [
+            LoadedSourceFormat::AgilentFid,
+            LoadedSourceFormat::BrukerFid,
+        ],
+    )?;
+    assert_eq!(relative_selected_formats.len(), 2);
+    assert_eq!(
+        relative_selected_formats.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+    assert_eq!(
+        relative_selected_formats.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+
+    let selected_vendors = load_spectra_many_by_source_vendors(&paths, ["varian", "bruker"])?;
+    assert_eq!(selected_vendors.len(), 3);
+    assert_eq!(
+        selected_vendors.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        selected_vendors.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+
+    let relative_selected_vendors = load_spectra_many_by_source_vendors_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        [
+            LoadedSourceVendor::AgilentVarian,
+            LoadedSourceVendor::Bruker,
+        ],
+    )?;
+    assert_eq!(relative_selected_vendors.len(), 3);
+    assert_eq!(
+        relative_selected_vendors.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        relative_selected_vendors.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
     Ok(())
 }
 

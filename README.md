@@ -121,8 +121,22 @@ fn load_jcamp_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_format("data/mixed-vendor", LoadedSourceFormat::JcampDx)
 }
 
+fn load_open_format_bundle() -> Result<SpectrumBundle> {
+    load_spectra_by_source_formats(
+        "data/mixed-vendor",
+        [LoadedSourceFormat::JcampDx, LoadedSourceFormat::NmrMl],
+    )
+}
+
 fn load_bruker_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_vendor("data/mixed-vendor", LoadedSourceVendor::Bruker)
+}
+
+fn load_vendor_bundles() -> Result<SpectrumBundle> {
+    load_spectra_by_source_vendors(
+        "data/mixed-vendor",
+        [LoadedSourceVendor::Bruker, LoadedSourceVendor::Jeol],
+    )
 }
 
 fn load_with_reader_chain() -> Result<SpectrumBundle> {
