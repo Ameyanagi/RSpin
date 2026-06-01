@@ -99,6 +99,10 @@ pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceDataKindCount, SourceFormatCount,
     SourceVendorCount, SpectrumBundle, SpectrumBundleSummary,
 };
+pub use path_prefix::{
+    load_spectra_by_source_path_prefix, load_spectra_by_source_path_prefix_relative_to,
+    load_spectra_many_by_source_path_prefix, load_spectra_many_by_source_path_prefix_relative_to,
+};
 pub use source_filter::LoadedSourceFilter;
 pub use source_format::{
     LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_data_kind,

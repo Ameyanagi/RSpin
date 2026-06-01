@@ -513,6 +513,37 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_source_path_prefix_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let prefix_path =
+        load_spectra_by_source_path_prefix(&fixture_root, "bruker_without_expno/pdata")?;
+    assert_eq!(prefix_path.len(), 1);
+    assert_eq!(
+        prefix_path.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let relative_prefix_path = load_spectra_by_source_path_prefix_relative_to(
+        &fixture_root,
+        "bruker_without_expno",
+        "bruker_without_expno/pdata",
+    )?;
+    assert_eq!(relative_prefix_path.len(), 1);
+    assert_eq!(relative_prefix_path.only_1d()?.x.unit, Unit::Ppm);
+
+    let multi_prefix_path = load_spectra_many_by_source_path_prefix_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+        "bruker_without_expno/pdata",
+    )?;
+    assert_eq!(multi_prefix_path.len(), 1);
+    assert_eq!(multi_prefix_path.only_1d()?.x.unit, Unit::Ppm);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_owned_source_filtered_bundle_extractors() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

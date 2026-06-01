@@ -2,9 +2,93 @@
 
 use std::path::Path;
 
-use rspin_core::{Spectrum1D, Spectrum2D};
+use rspin_core::{Result, Spectrum1D, Spectrum2D};
 
-use super::{LoadWarning, LoadedSource, LoadedSourceFilter, LoadedSpectrum, SpectrumBundle};
+use super::{
+    LoadWarning, LoadedSource, LoadedSourceFilter, LoadedSpectrum, SpectrumBundle,
+    SpectrumBundleLoader,
+};
+
+/// Loads supported spectra from a file or directory, restricted to tracked source paths below a prefix.
+///
+/// The source path prefix is matched against relative paths recorded in the
+/// loaded bundle, such as `bruker/pdata`.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source_path_prefix(
+    path: impl AsRef<Path>,
+    source_path_prefix: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_path_prefix(source_path_prefix)
+        .read_path(path)
+}
+
+/// Loads one selected path relative to a base directory, restricted to tracked source paths below a prefix.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. The source path prefix is matched after anchoring source
+/// metadata to `base`.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_path_prefix_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    source_path_prefix: impl AsRef<Path>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source_path_prefix(source_path_prefix)
+        .read_path_relative_to(base, path)
+}
+
+/// Loads supported spectra from multiple paths, restricted to tracked source paths below a prefix.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source_path_prefix<I, P>(
+    paths: I,
+    source_path_prefix: impl AsRef<Path>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path_prefix(source_path_prefix)
+        .read_paths(paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted to tracked source paths below a prefix.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided. The source path prefix is matched after anchoring source
+/// metadata to `base`.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_path_prefix_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+    source_path_prefix: impl AsRef<Path>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source_path_prefix(source_path_prefix)
+        .read_paths_relative_to(base, paths)
+}
 
 impl SpectrumBundle {
     /// Returns a cloned bundle containing spectra from tracked source paths below a prefix.

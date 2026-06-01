@@ -13,18 +13,20 @@ use rspin_io::{
     SpectrumBundleSummary, SpectrumPathReader, load_spectra, load_spectra_by_source,
     load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
     load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
-    load_spectra_by_source_path, load_spectra_by_source_path_relative_to,
+    load_spectra_by_source_path, load_spectra_by_source_path_prefix,
+    load_spectra_by_source_path_prefix_relative_to, load_spectra_by_source_path_relative_to,
     load_spectra_by_source_relative_to, load_spectra_by_source_vendor,
     load_spectra_by_source_vendor_relative_to, load_spectra_by_sources,
     load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
     load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
     load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
-    load_spectra_many_by_source_path, load_spectra_many_by_source_path_relative_to,
-    load_spectra_many_by_source_relative_to, load_spectra_many_by_source_vendor,
-    load_spectra_many_by_source_vendor_relative_to, load_spectra_many_by_sources,
-    load_spectra_many_by_sources_relative_to, load_spectra_many_relative_to,
-    load_spectra_relative_to, load_spectrum_1d, load_spectrum_1d_many,
-    load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
+    load_spectra_many_by_source_path, load_spectra_many_by_source_path_prefix,
+    load_spectra_many_by_source_path_prefix_relative_to,
+    load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
+    load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
+    load_spectra_many_by_sources, load_spectra_many_by_sources_relative_to,
+    load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
+    load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
     load_spectrum_1d_many_with_source_relative_to, load_spectrum_1d_paths,
     load_spectrum_1d_paths_relative_to, load_spectrum_1d_paths_with_source,
     load_spectrum_1d_paths_with_source_relative_to, load_spectrum_1d_relative_to,
@@ -2348,6 +2350,23 @@ fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
     );
     assert!(relative_carbon.has_source_path(carbon_path));
 
+    let jcamp_prefix = load_spectra_by_source_path_prefix(&root, "jcamp")?;
+    assert_eq!(jcamp_prefix.len(), 2);
+    assert_eq!(
+        jcamp_prefix.source_format_count(LoadedSourceFormat::JcampDx),
+        2
+    );
+    assert!(jcamp_prefix.has_source_path_prefix("jcamp"));
+
+    let relative_jcamp_prefix =
+        load_spectra_by_source_path_prefix_relative_to(&root, "jcamp", "jcamp")?;
+    assert_eq!(relative_jcamp_prefix.len(), 2);
+    assert!(
+        relative_jcamp_prefix
+            .source_paths()
+            .all(|path| path.starts_with(Path::new("jcamp")))
+    );
+
     let combined = load_spectra_by_sources(
         &root,
         [
@@ -2502,6 +2521,18 @@ fn free_multi_path_bundle_loader_helpers_can_restrict_sources() -> anyhow::Resul
     )?;
     assert_eq!(relative_processed.len(), 1);
     assert_eq!(first_1d(&relative_processed)?.x.unit, Unit::Ppm);
+
+    let processed_prefix = load_spectra_many_by_source_path_prefix(&paths, "pdata")?;
+    assert_eq!(processed_prefix.len(), 1);
+    assert_eq!(first_1d(&processed_prefix)?.x.unit, Unit::Ppm);
+
+    let relative_processed_prefix = load_spectra_many_by_source_path_prefix_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        "bruker_without_expno/pdata",
+    )?;
+    assert_eq!(relative_processed_prefix.len(), 1);
+    assert_eq!(first_1d(&relative_processed_prefix)?.x.unit, Unit::Ppm);
 
     let combined = load_spectra_many_by_sources(
         &paths,

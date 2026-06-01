@@ -134,6 +134,10 @@ fn load_one_source_directory() -> Result<SpectrumBundle> {
         .read_relative_to("data", "mixed-vendor")
 }
 
+fn load_one_source_directory_short() -> Result<SpectrumBundle> {
+    load_spectra_by_source_path_prefix("data/mixed-vendor", "bruker/pdata")
+}
+
 fn load_raw_vendor_bundle() -> Result<SpectrumBundle> {
     load_spectra_by_source_data_kind("data/mixed-vendor", LoadedSourceDataKind::Raw)
 }
