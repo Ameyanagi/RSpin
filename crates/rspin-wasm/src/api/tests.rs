@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use rspin_core::{Axis, Metadata, RSpinError, Spectrum1D, Spectrum2D, Unit};
 use rspin_io::{
-    ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, LoadedSourceDataKind,
+    ASSIGNMENT_SET_JSON_FORMAT, J_COUPLING_GRAPH_JSON_FORMAT, LoadedSourceDataKind, LoadedSpectrum,
     NMREDATA_RECORD_JSON_FORMAT, NMREDATA_RECORDS_JSON_FORMAT, SPECTRUM_BUNDLE_JSON_FORMAT,
     SpectrumBundleSummary,
 };
@@ -25,6 +25,95 @@ mod workflow;
 
 fn io_fixture_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../rspin-io/testdata")
+}
+
+fn selected_spectrum_1d() -> anyhow::Result<Spectrum1D> {
+    Spectrum1D::new(
+        Axis::linear("time", Unit::Seconds, 0.0, 0.001, 2)?,
+        vec![1.0, 2.0],
+        Metadata::named("wasm selected 1d"),
+    )
+    .map_err(Into::into)
+}
+
+fn selected_spectrum_2d() -> anyhow::Result<Spectrum2D> {
+    Spectrum2D::new(
+        Axis::linear("direct", Unit::Seconds, 0.0, 0.001, 2)?,
+        Axis::linear("indirect", Unit::Seconds, 0.0, 0.002, 2)?,
+        vec![1.0, 2.0, 3.0, 4.0],
+        Metadata::named("wasm selected 2d"),
+    )
+    .map_err(Into::into)
+}
+
+fn selected_bundle_json() -> anyhow::Result<String> {
+    let input = serde_json::to_string(&serde_json::json!({
+        "spectra_1d": [{
+            "spectrum": selected_spectrum_1d()?,
+            "path": "vendor/fid",
+            "format": "bruker_fid"
+        }],
+        "spectra_2d": [{
+            "spectrum": selected_spectrum_2d()?,
+            "path": "vendor/hsqc.jdf",
+            "format": "jeol_jdf"
+        }]
+    }))?;
+    create_spectrum_bundle_json(&input).map_err(Into::into)
+}
+
+fn selected_1d_bundle_json() -> anyhow::Result<String> {
+    let input = serde_json::to_string(&serde_json::json!({
+        "spectra_1d": [{
+            "spectrum": selected_spectrum_1d()?,
+            "path": "vendor/fid",
+            "format": "bruker_fid"
+        }]
+    }))?;
+    create_spectrum_bundle_json(&input).map_err(Into::into)
+}
+
+fn selected_2d_bundle_json() -> anyhow::Result<String> {
+    let input = serde_json::to_string(&serde_json::json!({
+        "spectra_2d": [{
+            "spectrum": selected_spectrum_2d()?,
+            "path": "vendor/hsqc.jdf",
+            "format": "jeol_jdf"
+        }]
+    }))?;
+    create_spectrum_bundle_json(&input).map_err(Into::into)
+}
+
+fn assert_loaded_1d_source(
+    loaded_json: &str,
+    name: &str,
+    format: &str,
+    path: &str,
+) -> anyhow::Result<()> {
+    let loaded: LoadedSpectrum = from_json(loaded_json)?;
+    let LoadedSpectrum::OneD { spectrum, source } = loaded else {
+        anyhow::bail!("expected one-dimensional loaded spectrum");
+    };
+    assert_eq!(spectrum.metadata.name.as_deref(), Some(name));
+    assert_eq!(source.format, format);
+    assert_eq!(source.path, Some(PathBuf::from(path)));
+    Ok(())
+}
+
+fn assert_loaded_2d_source(
+    loaded_json: &str,
+    name: &str,
+    format: &str,
+    path: &str,
+) -> anyhow::Result<()> {
+    let loaded: LoadedSpectrum = from_json(loaded_json)?;
+    let LoadedSpectrum::TwoD { spectrum, source } = loaded else {
+        anyhow::bail!("expected two-dimensional loaded spectrum");
+    };
+    assert_eq!(spectrum.metadata.name.as_deref(), Some(name));
+    assert_eq!(source.format, format);
+    assert_eq!(source.path, Some(PathBuf::from(path)));
+    Ok(())
 }
 
 #[test]
@@ -342,30 +431,7 @@ fn extracts_exact_spectrum_from_bundle_json() -> anyhow::Result<()> {
 
 #[test]
 fn extracts_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
-    let one_d = Spectrum1D::new(
-        Axis::linear("time", Unit::Seconds, 0.0, 0.001, 2)?,
-        vec![1.0, 2.0],
-        Metadata::named("wasm selected 1d"),
-    )?;
-    let two_d = Spectrum2D::new(
-        Axis::linear("direct", Unit::Seconds, 0.0, 0.001, 2)?,
-        Axis::linear("indirect", Unit::Seconds, 0.0, 0.002, 2)?,
-        vec![1.0, 2.0, 3.0, 4.0],
-        Metadata::named("wasm selected 2d"),
-    )?;
-    let input = serde_json::to_string(&serde_json::json!({
-        "spectra_1d": [{
-            "spectrum": one_d,
-            "path": "vendor/fid",
-            "format": "bruker_fid"
-        }],
-        "spectra_2d": [{
-            "spectrum": two_d,
-            "path": "vendor/hsqc.jdf",
-            "format": "jeol_jdf"
-        }]
-    }))?;
-    let bundle_json = create_spectrum_bundle_json(&input)?;
+    let bundle_json = selected_bundle_json()?;
 
     let by_format = spectrum_bundle_1d_by_source_format_json(&bundle_json, "bruker fid")?;
     assert_eq!(
@@ -425,6 +491,53 @@ fn extracts_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
 
     let wrong_dimension = spectrum_bundle_1d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf");
     assert!(matches!(wrong_dimension, Err(RSpinError::Parse { .. })));
+    Ok(())
+}
+
+#[test]
+fn extracts_loaded_source_filtered_spectra_from_bundle_json() -> anyhow::Result<()> {
+    let bundle_json = selected_bundle_json()?;
+    let only_one_d = spectrum_bundle_only_loaded_1d_json(&selected_1d_bundle_json()?)?;
+    assert_loaded_1d_source(&only_one_d, "wasm selected 1d", "bruker_fid", "vendor/fid")?;
+    let only_two_d = spectrum_bundle_only_loaded_2d_json(&selected_2d_bundle_json()?)?;
+    assert_loaded_2d_source(
+        &only_two_d,
+        "wasm selected 2d",
+        "jeol_jdf",
+        "vendor/hsqc.jdf",
+    )?;
+
+    let one_d_loaded = [
+        spectrum_bundle_loaded_1d_by_source_format_json(&bundle_json, "bruker fid")?,
+        spectrum_bundle_loaded_1d_by_source_vendor_json(&bundle_json, "bruker")?,
+        spectrum_bundle_loaded_1d_by_source_data_kind_json(&bundle_json, "raw")?,
+        spectrum_bundle_loaded_1d_by_source_path_json(&bundle_json, "vendor/fid")?,
+    ];
+    for loaded_json in one_d_loaded {
+        assert_loaded_1d_source(&loaded_json, "wasm selected 1d", "bruker_fid", "vendor/fid")?;
+    }
+
+    let two_d_loaded = [
+        spectrum_bundle_loaded_2d_by_source_format_json(&bundle_json, "jdf")?,
+        spectrum_bundle_loaded_2d_by_source_vendor_json(&bundle_json, "jeol")?,
+        spectrum_bundle_loaded_2d_by_source_data_kind_json(&bundle_json, "other")?,
+        spectrum_bundle_loaded_2d_by_source_path_json(&bundle_json, "vendor/hsqc.jdf")?,
+    ];
+    for loaded_json in two_d_loaded {
+        assert_loaded_2d_source(
+            &loaded_json,
+            "wasm selected 2d",
+            "jeol_jdf",
+            "vendor/hsqc.jdf",
+        )?;
+    }
+
+    let unknown_data_kind =
+        spectrum_bundle_loaded_1d_by_source_data_kind_json(&bundle_json, "unknown-data-kind");
+    assert!(matches!(
+        unknown_data_kind,
+        Err(RSpinError::Unsupported { .. })
+    ));
     Ok(())
 }
 

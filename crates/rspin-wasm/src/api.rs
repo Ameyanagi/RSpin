@@ -766,22 +766,50 @@ pub fn spectrum_bundle_counts_json(input: &str) -> Result<String> {
 ///
 /// # Errors
 ///
-/// Returns an error unless the bundle contains exactly one one-dimensional
-/// spectrum, or when serialization fails.
+/// Returns an error unless the bundle contains exactly one loaded spectrum and
+/// it is one-dimensional, or when serialization fails.
 pub fn spectrum_bundle_only_1d_json(input: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
     write_spectrum1d_json(bundle.only_1d()?)
+}
+
+/// Extracts the only one-dimensional loaded spectrum from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one loaded spectrum and
+/// it is one-dimensional, or when serialization fails.
+pub fn spectrum_bundle_only_loaded_1d_json(input: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_1d()?;
+    loaded_spectrum1d_to_json(spectrum, source)
 }
 
 /// Extracts the only two-dimensional spectrum from bundle JSON.
 ///
 /// # Errors
 ///
-/// Returns an error unless the bundle contains exactly one two-dimensional
-/// spectrum, or when serialization fails.
+/// Returns an error unless the bundle contains exactly one loaded spectrum and
+/// it is two-dimensional, or when serialization fails.
 pub fn spectrum_bundle_only_2d_json(input: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
     write_spectrum2d_json(bundle.only_2d()?)
+}
+
+/// Extracts the only two-dimensional loaded spectrum from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one loaded spectrum and
+/// it is two-dimensional, or when serialization fails.
+pub fn spectrum_bundle_only_loaded_2d_json(input: &str) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_2d()?;
+    loaded_spectrum2d_to_json(spectrum, source)
 }
 
 /// Extracts exactly one one-dimensional spectrum with a source format from bundle JSON.
@@ -795,6 +823,23 @@ pub fn spectrum_bundle_1d_by_source_format_json(input: &str, format: &str) -> Re
     write_spectrum1d_json(bundle.only_1d_by_source_format(format)?)
 }
 
+/// Extracts exactly one one-dimensional loaded spectrum with a source format from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when serialization fails.
+pub fn spectrum_bundle_loaded_1d_by_source_format_json(
+    input: &str,
+    format: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_1d_by_source_format(format)?;
+    loaded_spectrum1d_to_json(spectrum, source)
+}
+
 /// Extracts exactly one two-dimensional spectrum with a source format from bundle JSON.
 ///
 /// # Errors
@@ -804,6 +849,23 @@ pub fn spectrum_bundle_1d_by_source_format_json(input: &str, format: &str) -> Re
 pub fn spectrum_bundle_2d_by_source_format_json(input: &str, format: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
     write_spectrum2d_json(bundle.only_2d_by_source_format(format)?)
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum with a source format from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when serialization fails.
+pub fn spectrum_bundle_loaded_2d_by_source_format_json(
+    input: &str,
+    format: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_2d_by_source_format(format)?;
+    loaded_spectrum2d_to_json(spectrum, source)
 }
 
 /// Extracts exactly one one-dimensional spectrum with a source vendor from bundle JSON.
@@ -817,6 +879,23 @@ pub fn spectrum_bundle_1d_by_source_vendor_json(input: &str, vendor: &str) -> Re
     write_spectrum1d_json(bundle.only_1d_by_source_vendor(vendor)?)
 }
 
+/// Extracts exactly one one-dimensional loaded spectrum with a source vendor from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when serialization fails.
+pub fn spectrum_bundle_loaded_1d_by_source_vendor_json(
+    input: &str,
+    vendor: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_1d_by_source_vendor(vendor)?;
+    loaded_spectrum1d_to_json(spectrum, source)
+}
+
 /// Extracts exactly one two-dimensional spectrum with a source vendor from bundle JSON.
 ///
 /// # Errors
@@ -826,6 +905,23 @@ pub fn spectrum_bundle_1d_by_source_vendor_json(input: &str, vendor: &str) -> Re
 pub fn spectrum_bundle_2d_by_source_vendor_json(input: &str, vendor: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
     write_spectrum2d_json(bundle.only_2d_by_source_vendor(vendor)?)
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum with a source vendor from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when serialization fails.
+pub fn spectrum_bundle_loaded_2d_by_source_vendor_json(
+    input: &str,
+    vendor: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_2d_by_source_vendor(vendor)?;
+    loaded_spectrum2d_to_json(spectrum, source)
 }
 
 /// Extracts exactly one one-dimensional spectrum with a source data kind from bundle JSON.
@@ -838,7 +934,26 @@ pub fn spectrum_bundle_2d_by_source_vendor_json(input: &str, vendor: &str) -> Re
 pub fn spectrum_bundle_1d_by_source_data_kind_json(input: &str, data_kind: &str) -> Result<String> {
     let data_kind = parse_loaded_source_data_kind(data_kind)?;
     let bundle = read_spectrum_bundle_json(input)?;
-    write_spectrum1d_json(bundle.only_1d_by_source(data_kind)?)
+    write_spectrum1d_json(bundle.only_1d_by_source_data_kind(data_kind)?)
+}
+
+/// Extracts exactly one one-dimensional loaded spectrum with a source data kind from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, the source data kind is known, or when
+/// serialization fails.
+pub fn spectrum_bundle_loaded_1d_by_source_data_kind_json(
+    input: &str,
+    data_kind: &str,
+) -> Result<String> {
+    let data_kind = parse_loaded_source_data_kind(data_kind)?;
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_1d_by_source_data_kind(data_kind)?;
+    loaded_spectrum1d_to_json(spectrum, source)
 }
 
 /// Extracts exactly one two-dimensional spectrum with a source data kind from bundle JSON.
@@ -851,7 +966,26 @@ pub fn spectrum_bundle_1d_by_source_data_kind_json(input: &str, data_kind: &str)
 pub fn spectrum_bundle_2d_by_source_data_kind_json(input: &str, data_kind: &str) -> Result<String> {
     let data_kind = parse_loaded_source_data_kind(data_kind)?;
     let bundle = read_spectrum_bundle_json(input)?;
-    write_spectrum2d_json(bundle.only_2d_by_source(data_kind)?)
+    write_spectrum2d_json(bundle.only_2d_by_source_data_kind(data_kind)?)
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum with a source data kind from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, the source data kind is known, or when
+/// serialization fails.
+pub fn spectrum_bundle_loaded_2d_by_source_data_kind_json(
+    input: &str,
+    data_kind: &str,
+) -> Result<String> {
+    let data_kind = parse_loaded_source_data_kind(data_kind)?;
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_2d_by_source_data_kind(data_kind)?;
+    loaded_spectrum2d_to_json(spectrum, source)
 }
 
 /// Extracts exactly one one-dimensional spectrum with a tracked source path from bundle JSON.
@@ -865,6 +999,23 @@ pub fn spectrum_bundle_1d_by_source_path_json(input: &str, source_path: &str) ->
     write_spectrum1d_json(bundle.only_1d_by_source_path(source_path)?)
 }
 
+/// Extracts exactly one one-dimensional loaded spectrum with a tracked source path from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// one-dimensional spectrum, or when serialization fails.
+pub fn spectrum_bundle_loaded_1d_by_source_path_json(
+    input: &str,
+    source_path: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_1d_by_source_path(source_path)?;
+    loaded_spectrum1d_to_json(spectrum, source)
+}
+
 /// Extracts exactly one two-dimensional spectrum with a tracked source path from bundle JSON.
 ///
 /// # Errors
@@ -874,6 +1025,23 @@ pub fn spectrum_bundle_1d_by_source_path_json(input: &str, source_path: &str) ->
 pub fn spectrum_bundle_2d_by_source_path_json(input: &str, source_path: &str) -> Result<String> {
     let bundle = read_spectrum_bundle_json(input)?;
     write_spectrum2d_json(bundle.only_2d_by_source_path(source_path)?)
+}
+
+/// Extracts exactly one two-dimensional loaded spectrum with a tracked source path from bundle JSON.
+///
+/// The returned JSON includes both the spectrum and its source metadata.
+///
+/// # Errors
+///
+/// Returns an error unless the bundle contains exactly one matching
+/// two-dimensional spectrum, or when serialization fails.
+pub fn spectrum_bundle_loaded_2d_by_source_path_json(
+    input: &str,
+    source_path: &str,
+) -> Result<String> {
+    let bundle = read_spectrum_bundle_json(input)?;
+    let (spectrum, source) = bundle.only_loaded_2d_by_source_path(source_path)?;
+    loaded_spectrum2d_to_json(spectrum, source)
 }
 
 /// Scales serialized `Spectrum1D` JSON.
@@ -1147,8 +1315,34 @@ fn spectrum2d_to_json(spectrum: &Spectrum2D) -> Result<String> {
     write_spectrum2d_json(spectrum)
 }
 
+fn loaded_spectrum1d_to_json(spectrum: &Spectrum1D, source: &LoadedSource) -> Result<String> {
+    to_json(&LoadedSpectrum1DJson::OneD { spectrum, source })
+}
+
+fn loaded_spectrum2d_to_json(spectrum: &Spectrum2D, source: &LoadedSource) -> Result<String> {
+    to_json(&LoadedSpectrum2DJson::TwoD { spectrum, source })
+}
+
 fn agilent_fid_loaded_source() -> LoadedSource {
     LoadedSource::new(None::<PathBuf>, "agilent_fid")
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "dimension", rename_all = "snake_case")]
+enum LoadedSpectrum1DJson<'a> {
+    OneD {
+        spectrum: &'a Spectrum1D,
+        source: &'a LoadedSource,
+    },
+}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "dimension", rename_all = "snake_case")]
+enum LoadedSpectrum2DJson<'a> {
+    TwoD {
+        spectrum: &'a Spectrum2D,
+        source: &'a LoadedSource,
+    },
 }
 
 #[derive(Debug, Serialize)]
