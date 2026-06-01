@@ -81,6 +81,22 @@ const BRUKER_SER_MARKERS: &[&str] = &["ser", "acqus", "acqu2s"];
 const AGILENT_PROCESSED_MARKERS: &[&str] = &["phasefile", "procpar"];
 const AGILENT_FID_MARKERS: &[&str] = &["fid", "procpar"];
 
+/// Discovery metadata for one built-in bundle source format.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LoadedSourceFormatInfo {
+    /// Canonical source format name.
+    pub name: &'static str,
+    /// Canonical vendor family name for vendor-specific formats.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<&'static str>,
+    /// Coarse raw/processed classification for the format.
+    pub data_kind: LoadedSourceDataKind,
+    /// Common standalone file extensions, without leading dots.
+    pub extensions: &'static [&'static str],
+    /// File names commonly used as directory or direct-file detection markers.
+    pub path_markers: &'static [&'static str],
+}
+
 /// Vendor families emitted by vendor-specific bundle readers.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -98,6 +114,24 @@ const LOADED_SOURCE_VENDORS: &[LoadedSourceVendor] = &[
     LoadedSourceVendor::Jeol,
     LoadedSourceVendor::AgilentVarian,
 ];
+
+/// Discovery metadata for one built-in bundle source vendor.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LoadedSourceVendorInfo {
+    /// Canonical vendor family name.
+    pub name: &'static str,
+    /// Canonical source format names belonging to this vendor family.
+    pub source_formats: Vec<&'static str>,
+}
+
+/// Discovery metadata for one bundle source data kind.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct LoadedSourceDataKindInfo {
+    /// Canonical source data-kind name.
+    pub name: &'static str,
+    /// Canonical built-in source format names classified with this data kind.
+    pub source_formats: Vec<&'static str>,
+}
 
 impl LoadedSourceFormat {
     /// Returns all known built-in source formats in stable display order.
@@ -161,6 +195,18 @@ impl LoadedSourceFormat {
             Self::BrukerSer => BRUKER_SER_MARKERS,
             Self::AgilentProcessed => AGILENT_PROCESSED_MARKERS,
             Self::AgilentFid => AGILENT_FID_MARKERS,
+        }
+    }
+
+    /// Returns discovery metadata for this built-in source format.
+    #[must_use]
+    pub fn info(self) -> LoadedSourceFormatInfo {
+        LoadedSourceFormatInfo {
+            name: self.as_str(),
+            vendor: self.vendor().map(LoadedSourceVendor::as_str),
+            data_kind: self.data_kind(),
+            extensions: self.file_extensions(),
+            path_markers: self.path_markers(),
         }
     }
 
@@ -258,6 +304,19 @@ impl LoadedSourceDataKind {
     pub fn parse(input: &str) -> Result<Self> {
         parse_loaded_source_data_kind(input)
     }
+
+    /// Returns discovery metadata for this source data kind.
+    #[must_use]
+    pub fn info(self) -> LoadedSourceDataKindInfo {
+        LoadedSourceDataKindInfo {
+            name: self.as_str(),
+            source_formats: LoadedSourceFormat::all()
+                .iter()
+                .filter(|format| format.data_kind() == self)
+                .map(|format| format.as_str())
+                .collect(),
+        }
+    }
 }
 
 impl AsRef<str> for LoadedSourceDataKind {
@@ -315,6 +374,19 @@ impl LoadedSourceVendor {
             Self::Bruker => BRUKER_SOURCE_FORMATS,
             Self::Jeol => JEOL_SOURCE_FORMATS,
             Self::AgilentVarian => AGILENT_VARIAN_SOURCE_FORMATS,
+        }
+    }
+
+    /// Returns discovery metadata for this vendor family.
+    #[must_use]
+    pub fn info(self) -> LoadedSourceVendorInfo {
+        LoadedSourceVendorInfo {
+            name: self.as_str(),
+            source_formats: self
+                .source_formats()
+                .iter()
+                .map(|format| format.as_str())
+                .collect(),
         }
     }
 
@@ -417,6 +489,33 @@ pub fn parse_loaded_source_vendor(input: &str) -> Result<LoadedSourceVendor> {
             feature: "bundle source vendor name",
         }),
     }
+}
+
+/// Returns discovery metadata for supported built-in bundle source formats.
+#[must_use]
+pub fn supported_bundle_source_formats() -> Vec<LoadedSourceFormatInfo> {
+    LoadedSourceFormat::all()
+        .iter()
+        .map(|format| format.info())
+        .collect()
+}
+
+/// Returns discovery metadata for supported built-in bundle source vendors.
+#[must_use]
+pub fn supported_bundle_source_vendors() -> Vec<LoadedSourceVendorInfo> {
+    LoadedSourceVendor::all()
+        .iter()
+        .map(|vendor| vendor.info())
+        .collect()
+}
+
+/// Returns discovery metadata for supported bundle source data kinds.
+#[must_use]
+pub fn supported_bundle_source_data_kinds() -> Vec<LoadedSourceDataKindInfo> {
+    LoadedSourceDataKind::all()
+        .iter()
+        .map(|data_kind| data_kind.info())
+        .collect()
 }
 
 fn normalized_source_format_name(input: &str) -> String {
@@ -532,6 +631,48 @@ mod tests {
         let error = parse_loaded_source_format("unknown-format")
             .expect_err("unsupported source format should fail");
         assert!(matches!(error, RSpinError::Unsupported { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn exposes_supported_source_metadata() -> Result<()> {
+        let formats = supported_bundle_source_formats();
+        assert!(formats.iter().any(|info| {
+            info.name == "jcamp_dx"
+                && info.vendor.is_none()
+                && info.data_kind == LoadedSourceDataKind::Other
+                && info.extensions.contains(&"jdx")
+                && info.path_markers.is_empty()
+        }));
+        assert!(formats.iter().any(|info| {
+            info.name == "bruker_ser"
+                && info.vendor == Some("bruker")
+                && info.data_kind == LoadedSourceDataKind::Raw
+                && info.extensions.is_empty()
+                && info.path_markers.contains(&"ser")
+        }));
+
+        let vendors = supported_bundle_source_vendors();
+        let bruker = vendors
+            .iter()
+            .find(|info| info.name == "bruker")
+            .ok_or_else(|| RSpinError::Parse {
+                format: "bundle source metadata",
+                message: "missing Bruker source vendor metadata".to_owned(),
+            })?;
+        assert!(bruker.source_formats.contains(&"bruker_fid"));
+        assert!(bruker.source_formats.contains(&"bruker_ser"));
+
+        let data_kinds = supported_bundle_source_data_kinds();
+        let raw = data_kinds
+            .iter()
+            .find(|info| info.name == "raw")
+            .ok_or_else(|| RSpinError::Parse {
+                format: "bundle source metadata",
+                message: "missing raw source data-kind metadata".to_owned(),
+            })?;
+        assert!(raw.source_formats.contains(&"agilent_fid"));
+        assert!(!raw.source_formats.contains(&"jcamp_dx"));
         Ok(())
     }
 

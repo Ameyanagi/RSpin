@@ -10,9 +10,11 @@ use crate::SpectrumPathReader;
 
 use super::source_filter::source_filters;
 use super::{
-    LoadedSourceDataKind, LoadedSourceFilter, SpectrumBundle, canonical_source_format_filter,
-    no_data_error_at, no_data_error_in_inputs, selected_path_from_base, source_format_filters,
-    source_vendor_filters,
+    LoadedSourceDataKind, LoadedSourceDataKindInfo, LoadedSourceFilter, LoadedSourceFormatInfo,
+    LoadedSourceVendorInfo, SpectrumBundle, canonical_source_format_filter, no_data_error_at,
+    no_data_error_in_inputs, selected_path_from_base, source_format_filters, source_vendor_filters,
+    supported_bundle_source_data_kinds, supported_bundle_source_formats,
+    supported_bundle_source_vendors,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.
@@ -63,6 +65,24 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Returns discovery metadata for supported built-in source formats.
+    #[must_use]
+    pub fn supported_source_formats() -> Vec<LoadedSourceFormatInfo> {
+        supported_bundle_source_formats()
+    }
+
+    /// Returns discovery metadata for supported built-in source vendor families.
+    #[must_use]
+    pub fn supported_source_vendors() -> Vec<LoadedSourceVendorInfo> {
+        supported_bundle_source_vendors()
+    }
+
+    /// Returns discovery metadata for supported source data kinds.
+    #[must_use]
+    pub fn supported_source_data_kinds() -> Vec<LoadedSourceDataKindInfo> {
+        supported_bundle_source_data_kinds()
     }
 
     /// Enables or disables raw spectrum candidates.

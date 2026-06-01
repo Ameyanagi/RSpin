@@ -145,8 +145,10 @@ pub use path_prefix::{
 };
 pub use source_filter::LoadedSourceFilter;
 pub use source_format::{
-    LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_data_kind,
-    parse_loaded_source_format, parse_loaded_source_vendor,
+    LoadedSourceDataKind, LoadedSourceDataKindInfo, LoadedSourceFormat, LoadedSourceFormatInfo,
+    LoadedSourceVendor, LoadedSourceVendorInfo, parse_loaded_source_data_kind,
+    parse_loaded_source_format, parse_loaded_source_vendor, supported_bundle_source_data_kinds,
+    supported_bundle_source_formats, supported_bundle_source_vendors,
 };
 
 /// High-level reader for supported `RSpin` spectrum inputs.

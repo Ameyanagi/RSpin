@@ -29,26 +29,26 @@ use rspin_analysis::{
 };
 use rspin_core::{Nucleus, RSpinError, Result, Spectrum1D, Spectrum2D};
 use rspin_io::{
-    LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
-    SpectrumBundle, inspect_agilent_procpar, inspect_bruker_parameter_file, inspect_jeol_jdf_bytes,
-    parse_jcamp_dx_version, parse_loaded_source_data_kind, parse_nmrml_version,
-    parse_spectrum_text_format, parse_spectrum1d_bytes_format, parse_spectrum1d_write_format,
-    parse_spectrum2d_bytes_format, parse_spectrum2d_write_format,
-    read_agilent_arrayed_fid_1d_bytes, read_agilent_arrayed_fid_2d_bytes,
-    read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes, read_agilent_processed_1d_bytes,
-    read_agilent_processed_2d_bytes, read_assignment_set_json, read_bruker_fid_1d_bytes,
-    read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes, read_bruker_ser_2d_bytes,
-    read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d, read_jeol_jdf_1d_bytes,
-    read_jeol_jdf_2d_bytes, read_nmredata_record_json, read_nmredata_records_json,
-    read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str, read_nmrml_2d_str,
-    read_nmrml_document_info_str, read_spectrum_bundle_json, read_spectrum1d_bytes_as,
-    read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as, read_spectrum2d_bytes_as,
-    read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as, write_assignment_set_json,
-    write_j_coupling_graph_json, write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record,
-    write_nmredata_record_json, write_nmredata_records,
-    write_nmredata_records_json as write_nmredata_records_json_io, write_nmrml_1d, write_nmrml_2d,
-    write_spectrum_bundle_json, write_spectrum1d_json, write_spectrum1d_text,
-    write_spectrum2d_json, write_spectrum2d_text,
+    LoadedSource, LoadedSourceFilter, SpectrumBundle, inspect_agilent_procpar,
+    inspect_bruker_parameter_file, inspect_jeol_jdf_bytes, parse_jcamp_dx_version,
+    parse_loaded_source_data_kind, parse_nmrml_version, parse_spectrum_text_format,
+    parse_spectrum1d_bytes_format, parse_spectrum1d_write_format, parse_spectrum2d_bytes_format,
+    parse_spectrum2d_write_format, read_agilent_arrayed_fid_1d_bytes,
+    read_agilent_arrayed_fid_2d_bytes, read_agilent_fid_1d_bytes, read_agilent_fid_2d_bytes,
+    read_agilent_processed_1d_bytes, read_agilent_processed_2d_bytes, read_assignment_set_json,
+    read_bruker_fid_1d_bytes, read_bruker_processed_1d_bytes, read_bruker_processed_2d_bytes,
+    read_bruker_ser_2d_bytes, read_j_coupling_graph_json, read_jcamp_dx_1d, read_jcamp_dx_2d,
+    read_jeol_jdf_1d_bytes, read_jeol_jdf_2d_bytes, read_nmredata_record_json,
+    read_nmredata_records_json, read_nmredata_records_str, read_nmredata_str, read_nmrml_1d_str,
+    read_nmrml_2d_str, read_nmrml_document_info_str, read_spectrum_bundle_json,
+    read_spectrum1d_bytes_as, read_spectrum1d_json, read_spectrum1d_text, read_spectrum1d_text_as,
+    read_spectrum2d_bytes_as, read_spectrum2d_json, read_spectrum2d_text, read_spectrum2d_text_as,
+    supported_bundle_source_data_kinds, supported_bundle_source_formats,
+    supported_bundle_source_vendors, write_assignment_set_json, write_j_coupling_graph_json,
+    write_jcamp_dx_1d, write_jcamp_dx_2d, write_nmredata_record, write_nmredata_record_json,
+    write_nmredata_records, write_nmredata_records_json as write_nmredata_records_json_io,
+    write_nmrml_1d, write_nmrml_2d, write_spectrum_bundle_json, write_spectrum1d_json,
+    write_spectrum1d_text, write_spectrum2d_json, write_spectrum2d_text,
 };
 use rspin_processing::{AutoPhaseOptions, auto_phase_correct, normalize_max_abs, scale_intensity};
 
@@ -659,17 +659,7 @@ pub fn validate_spectrum_bundle_json(input: &str) -> Result<String> {
 ///
 /// Returns an error only if serialization fails.
 pub fn spectrum_bundle_source_formats_json() -> Result<String> {
-    let formats = LoadedSourceFormat::all()
-        .iter()
-        .map(|format| SpectrumBundleSourceFormatInfo {
-            name: format.as_str(),
-            vendor: format.vendor().map(LoadedSourceVendor::as_str),
-            data_kind: format.data_kind(),
-            extensions: format.file_extensions(),
-            path_markers: format.path_markers(),
-        })
-        .collect::<Vec<_>>();
-    to_json(&formats)
+    to_json(&supported_bundle_source_formats())
 }
 
 /// Returns supported unified-loader vendor families as JSON.
@@ -681,18 +671,7 @@ pub fn spectrum_bundle_source_formats_json() -> Result<String> {
 ///
 /// Returns an error only if serialization fails.
 pub fn spectrum_bundle_source_vendors_json() -> Result<String> {
-    let vendors = LoadedSourceVendor::all()
-        .iter()
-        .map(|vendor| SpectrumBundleSourceVendorInfo {
-            name: vendor.as_str(),
-            source_formats: vendor
-                .source_formats()
-                .iter()
-                .map(|format| format.as_str())
-                .collect(),
-        })
-        .collect::<Vec<_>>();
-    to_json(&vendors)
+    to_json(&supported_bundle_source_vendors())
 }
 
 /// Returns supported unified-loader source data kinds as JSON.
@@ -704,18 +683,7 @@ pub fn spectrum_bundle_source_vendors_json() -> Result<String> {
 ///
 /// Returns an error only if serialization fails.
 pub fn spectrum_bundle_source_data_kinds_json() -> Result<String> {
-    let data_kinds = LoadedSourceDataKind::all()
-        .iter()
-        .map(|data_kind| SpectrumBundleSourceDataKindInfo {
-            name: data_kind.as_str(),
-            source_formats: LoadedSourceFormat::all()
-                .iter()
-                .filter(|format| format.data_kind() == *data_kind)
-                .map(|format| format.as_str())
-                .collect(),
-        })
-        .collect::<Vec<_>>();
-    to_json(&data_kinds)
+    to_json(&supported_bundle_source_data_kinds())
 }
 
 /// Builds versioned spectrum bundle JSON from serialized one- and
@@ -1491,28 +1459,6 @@ enum LoadedSpectrum2DJson<'a> {
         spectrum: &'a Spectrum2D,
         source: &'a LoadedSource,
     },
-}
-
-#[derive(Debug, Serialize)]
-struct SpectrumBundleSourceFormatInfo {
-    name: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    vendor: Option<&'static str>,
-    data_kind: LoadedSourceDataKind,
-    extensions: &'static [&'static str],
-    path_markers: &'static [&'static str],
-}
-
-#[derive(Debug, Serialize)]
-struct SpectrumBundleSourceVendorInfo {
-    name: &'static str,
-    source_formats: Vec<&'static str>,
-}
-
-#[derive(Debug, Serialize)]
-struct SpectrumBundleSourceDataKindInfo {
-    name: &'static str,
-    source_formats: Vec<&'static str>,
 }
 
 #[derive(Debug, Deserialize)]

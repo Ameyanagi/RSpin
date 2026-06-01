@@ -42,8 +42,9 @@ use rspin_io::{
     load_spectrum_2d_paths_relative_to, load_spectrum_2d_paths_with_source,
     load_spectrum_2d_paths_with_source_relative_to, load_spectrum_2d_relative_to,
     load_spectrum_2d_with_source_relative_to, parse_loaded_source_format,
-    parse_loaded_source_vendor, write_spectrum_bundle_json, write_spectrum1d_json,
-    write_spectrum2d_json,
+    parse_loaded_source_vendor, supported_bundle_source_data_kinds,
+    supported_bundle_source_formats, supported_bundle_source_vendors, write_spectrum_bundle_json,
+    write_spectrum1d_json, write_spectrum2d_json,
 };
 
 #[test]
@@ -240,6 +241,45 @@ fn reader_short_read_aliases_cover_common_workflows() -> anyhow::Result<()> {
         &relative_many,
         Path::new("bruker_without_expno/pdata/1")
     ));
+    Ok(())
+}
+
+#[test]
+fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
+    let formats = RSpinReader::supported_source_formats();
+    assert_eq!(formats, supported_bundle_source_formats());
+    assert!(formats.iter().any(|info| {
+        info.name == "jcamp_dx"
+            && info.vendor.is_none()
+            && info.data_kind == LoadedSourceDataKind::Other
+            && info.extensions.contains(&"jdx")
+            && !info.path_markers.contains(&"jdx")
+    }));
+    assert!(formats.iter().any(|info| {
+        info.name == "agilent_fid"
+            && info.vendor == Some("agilent_varian")
+            && info.data_kind == LoadedSourceDataKind::Raw
+            && info.path_markers.contains(&"procpar")
+    }));
+
+    let vendors = RSpinReader::supported_source_vendors();
+    assert_eq!(vendors, supported_bundle_source_vendors());
+    let agilent = vendors
+        .iter()
+        .find(|info| info.name == "agilent_varian")
+        .ok_or_else(|| anyhow::anyhow!("missing Agilent/Varian source vendor metadata"))?;
+    assert!(agilent.source_formats.contains(&"agilent_processed"));
+    assert!(agilent.source_formats.contains(&"agilent_fid"));
+
+    let data_kinds = RSpinReader::supported_source_data_kinds();
+    assert_eq!(data_kinds, supported_bundle_source_data_kinds());
+    let processed = data_kinds
+        .iter()
+        .find(|info| info.name == "processed")
+        .ok_or_else(|| anyhow::anyhow!("missing processed source data-kind metadata"))?;
+    assert!(processed.source_formats.contains(&"bruker_processed"));
+    assert!(processed.source_formats.contains(&"agilent_processed"));
+    assert!(!processed.source_formats.contains(&"jcamp_dx"));
     Ok(())
 }
 
