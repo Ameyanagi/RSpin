@@ -13,6 +13,7 @@ use crate::{
     inspect_agilent_procpar,
 };
 
+mod dimension;
 mod exact;
 mod loader;
 mod model;
@@ -20,6 +21,11 @@ mod path_prefix;
 mod selectors;
 mod source_filter;
 mod source_format;
+pub use dimension::{
+    load_spectra_1d, load_spectra_1d_many, load_spectra_1d_many_relative_to,
+    load_spectra_1d_relative_to, load_spectra_2d, load_spectra_2d_many,
+    load_spectra_2d_many_relative_to, load_spectra_2d_relative_to,
+};
 pub use exact::{
     load_spectrum_1d, load_spectrum_1d_by_source, load_spectrum_1d_by_source_data_kind,
     load_spectrum_1d_by_source_data_kind_relative_to, load_spectrum_1d_by_source_format,

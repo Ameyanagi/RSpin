@@ -11,22 +11,25 @@ use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
     LoadedSpectrum, RSpinReader, SourceDataKindCount, SourcePathCount, SpectrumBundle,
     SpectrumBundleLoader, SpectrumBundleSummary, SpectrumPathReader, WarningPathCount,
-    load_spectra, load_spectra_by_source, load_spectra_by_source_data_kind,
-    load_spectra_by_source_data_kind_relative_to, load_spectra_by_source_data_kinds,
-    load_spectra_by_source_data_kinds_relative_to, load_spectra_by_source_format,
-    load_spectra_by_source_format_relative_to, load_spectra_by_source_formats,
-    load_spectra_by_source_formats_relative_to, load_spectra_by_source_path,
-    load_spectra_by_source_path_prefix, load_spectra_by_source_path_prefix_relative_to,
-    load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
-    load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to,
-    load_spectra_by_source_vendors, load_spectra_by_source_vendors_relative_to,
-    load_spectra_by_sources, load_spectra_by_sources_relative_to, load_spectra_many,
-    load_spectra_many_by_source, load_spectra_many_by_source_data_kind,
-    load_spectra_many_by_source_data_kind_relative_to, load_spectra_many_by_source_data_kinds,
-    load_spectra_many_by_source_data_kinds_relative_to, load_spectra_many_by_source_format,
-    load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_formats,
-    load_spectra_many_by_source_formats_relative_to, load_spectra_many_by_source_path,
-    load_spectra_many_by_source_path_prefix, load_spectra_many_by_source_path_prefix_relative_to,
+    load_spectra, load_spectra_1d, load_spectra_1d_many, load_spectra_1d_many_relative_to,
+    load_spectra_1d_relative_to, load_spectra_2d, load_spectra_2d_many,
+    load_spectra_2d_many_relative_to, load_spectra_2d_relative_to, load_spectra_by_source,
+    load_spectra_by_source_data_kind, load_spectra_by_source_data_kind_relative_to,
+    load_spectra_by_source_data_kinds, load_spectra_by_source_data_kinds_relative_to,
+    load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
+    load_spectra_by_source_formats, load_spectra_by_source_formats_relative_to,
+    load_spectra_by_source_path, load_spectra_by_source_path_prefix,
+    load_spectra_by_source_path_prefix_relative_to, load_spectra_by_source_path_relative_to,
+    load_spectra_by_source_relative_to, load_spectra_by_source_vendor,
+    load_spectra_by_source_vendor_relative_to, load_spectra_by_source_vendors,
+    load_spectra_by_source_vendors_relative_to, load_spectra_by_sources,
+    load_spectra_by_sources_relative_to, load_spectra_many, load_spectra_many_by_source,
+    load_spectra_many_by_source_data_kind, load_spectra_many_by_source_data_kind_relative_to,
+    load_spectra_many_by_source_data_kinds, load_spectra_many_by_source_data_kinds_relative_to,
+    load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
+    load_spectra_many_by_source_formats, load_spectra_many_by_source_formats_relative_to,
+    load_spectra_many_by_source_path, load_spectra_many_by_source_path_prefix,
+    load_spectra_many_by_source_path_prefix_relative_to,
     load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
     load_spectra_many_by_source_vendors, load_spectra_many_by_source_vendors_relative_to,
@@ -211,6 +214,77 @@ fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
         anyhow::bail!("strict helper should fail on unreadable candidates");
     };
     assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
+fn dimension_specific_bundle_helpers_load_matching_spectra() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+
+    let one_d = load_spectra_1d(&mixed)?;
+    assert_eq!(one_d.len_1d(), 5);
+    assert_eq!(one_d.len_2d(), 0);
+    assert!(one_d.spectra().iter().all(LoadedSpectrum::is_1d));
+
+    let two_d = load_spectra_2d(&mixed)?;
+    assert_eq!(two_d.len_1d(), 0);
+    assert_eq!(two_d.len_2d(), 2);
+    assert!(two_d.spectra().iter().all(LoadedSpectrum::is_2d));
+
+    let selected_1d = load_spectra_1d_relative_to(&mixed, "jcamp")?;
+    assert_eq!(selected_1d.len_1d(), 2);
+    assert!(selected_1d.has_source_path("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx"));
+
+    let selected_2d = load_spectra_2d_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(selected_2d.len_2d(), 1);
+    assert!(selected_2d.has_source_path("bruker_cosy_raw"));
+
+    let many_1d = load_spectra_1d_many([fixture_root().join("bruker_without_expno")])?;
+    assert_eq!(many_1d.len_1d(), 2);
+
+    let many_2d = load_spectra_2d_many([mixed.join("bruker_cosy_raw"), mixed.join("jeol")])?;
+    assert_eq!(many_2d.len_2d(), 2);
+
+    let relative_many_1d = load_spectra_1d_many_relative_to(&mixed, ["jcamp", "jeol"])?;
+    assert_eq!(relative_many_1d.len_1d(), 4);
+
+    let relative_many_2d = load_spectra_2d_many_relative_to(&mixed, ["bruker_cosy_raw"])?;
+    assert_eq!(relative_many_2d.len_2d(), 1);
+    Ok(())
+}
+
+#[test]
+fn reader_dimension_bundle_helpers_preserve_other_filters() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+
+    let raw_bruker_2d = RSpinReader::new()
+        .raw_sources()
+        .source_vendor(LoadedSourceVendor::Bruker)
+        .read_bundle_2d(&mixed)?;
+    assert_eq!(raw_bruker_2d.len_2d(), 1);
+    assert!(raw_bruker_2d.has_source_path("bruker_cosy_raw"));
+
+    let jcamp_1d = RSpinReader::new()
+        .source_format(LoadedSourceFormat::JcampDx)
+        .read_bundle_1d_relative_to(&mixed, "jcamp")?;
+    assert_eq!(jcamp_1d.len_1d(), 2);
+    assert_eq!(jcamp_1d.source_format_count(LoadedSourceFormat::JcampDx), 2);
+
+    let reader_many = RSpinReader::new()
+        .source_vendor("jeol")
+        .read_bundle_1d_many_relative_to(&mixed, ["jcamp", "jeol"])?;
+    assert_eq!(reader_many.len_1d(), 2);
+    assert_eq!(reader_many.source_vendor_count(LoadedSourceVendor::Jeol), 2);
+
+    let wrong_dimension = RSpinReader::new().read_bundle_2d(fixture_root().join("varian_1h"));
+    let Err(error) = wrong_dimension else {
+        anyhow::bail!("2D bundle loading should reject one-dimensional-only input");
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("one-dimensional spectrum candidates are disabled")
+    );
     Ok(())
 }
 

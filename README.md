@@ -38,6 +38,10 @@ fn load_first_1d_point_count() -> Result<Option<usize>> {
     Ok(bundle.first_1d().map(|spectrum| spectrum.len()))
 }
 
+fn load_all_1d_spectra() -> Result<SpectrumBundle> {
+    load_spectra_1d("data/experiment")
+}
+
 fn summarize_dataset() -> Result<SpectrumBundleSummary> {
     load_spectra_summary("data/experiment")
 }
@@ -47,6 +51,10 @@ fn load_first_bruker_2d_shape() -> Result<Option<(usize, usize)>> {
     Ok(bundle
         .first_2d_by_source(LoadedSourceFilter::vendor("bruker"))
         .map(|spectrum| spectrum.shape()))
+}
+
+fn load_all_2d_spectra() -> Result<SpectrumBundle> {
+    load_spectra_2d("data/mixed-vendor")
 }
 
 fn load_one_dataset_with_stable_sources() -> Result<SpectrumBundle> {
@@ -63,6 +71,10 @@ fn load_selected_inputs() -> Result<SpectrumBundle> {
 
 fn load_selected_inputs_with_stable_sources() -> Result<SpectrumBundle> {
     load_spectra_many_relative_to("data", ["proton.fid", "carbon.jdf", "bruker/pdata/1"])
+}
+
+fn load_selected_1d_inputs_with_stable_sources() -> Result<SpectrumBundle> {
+    load_spectra_1d_many_relative_to("data", ["proton.fid", "carbon.jdf", "bruker/pdata/1"])
 }
 
 fn summarize_selected_inputs() -> Result<SpectrumBundleSummary> {
@@ -350,6 +362,12 @@ fn summarize_raw_vendor_data() -> Result<SpectrumBundleSummary> {
     RSpinReader::new()
         .only_raw_sources()
         .read_summary("data/mixed-vendor")
+}
+
+fn load_bruker_2d_bundle() -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .source_vendor(LoadedSourceVendor::Bruker)
+        .read_bundle_2d("data/mixed-vendor")
 }
 
 fn load_one_tracked_path() -> Result<SpectrumBundle> {

@@ -522,6 +522,32 @@ fn prelude_exports_bundle_summary_loader_helpers() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_dimension_bundle_loader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let one_d = load_spectra_1d_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(one_d.len_1d(), 2);
+    assert_eq!(one_d.len_2d(), 0);
+
+    let two_d = load_spectra_2d_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(two_d.len_2d(), 1);
+    assert_eq!(two_d.source_vendor_count(LoadedSourceVendor::Bruker), 1);
+
+    let many = load_spectra_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(many.len_1d(), 1);
+
+    let reader = RSpinReader::new()
+        .source_vendor("bruker")
+        .read_bundle_2d_many_relative_to(&mixed, ["bruker_cosy_raw", "jeol"])?;
+    assert_eq!(reader.len_2d(), 1);
+    assert!(reader.has_source_path("bruker_cosy_raw"));
+    Ok(())
+}
+
 fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
     assert_eq!(bundle.source_paths().count(), 3);
     assert_eq!(
