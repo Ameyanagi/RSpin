@@ -17,6 +17,7 @@ mod exact;
 mod loader;
 mod model;
 mod selectors;
+mod source_filter;
 mod source_format;
 pub use exact::{
     load_spectrum_1d, load_spectrum_1d_by_source_format,
@@ -73,6 +74,7 @@ pub use model::{
     LoadWarning, LoadedSource, LoadedSpectrum, SourceFormatCount, SourceVendorCount,
     SpectrumBundle, SpectrumBundleSummary,
 };
+pub use source_filter::LoadedSourceFilter;
 pub use source_format::{
     LoadedSourceFormat, LoadedSourceVendor, parse_loaded_source_format, parse_loaded_source_vendor,
 };
@@ -103,6 +105,37 @@ pub fn load_spectra_relative_to(
     path: impl AsRef<Path>,
 ) -> Result<SpectrumBundle> {
     SpectrumBundleLoader::new().read_path_relative_to(base, path)
+}
+
+/// Loads supported spectra from a file or directory, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when the path is missing or no matching readable bundle
+/// data is found.
+pub fn load_spectra_by_source(
+    path: impl AsRef<Path>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .read_path(path)
+}
+
+/// Loads one selected path relative to a base directory, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, the path is
+/// unreadable in strict mode, or no matching readable bundle data is found.
+pub fn load_spectra_by_source_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<SpectrumBundle> {
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .read_path_relative_to(base, path)
 }
 
 /// Loads supported spectra from a file or directory, restricted to one source format.
@@ -247,6 +280,48 @@ where
     P: AsRef<Path>,
 {
     SpectrumBundleLoader::new().read_paths_relative_to(base, paths)
+}
+
+/// Loads supported spectra from multiple paths, restricted by one generic source filter.
+///
+/// # Errors
+///
+/// Returns an error when no input paths are provided or no matching readable
+/// bundle data is found.
+pub fn load_spectra_many_by_source<I, P>(
+    paths: I,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .read_paths(paths)
+}
+
+/// Loads selected paths relative to a base directory, restricted by one generic source filter.
+///
+/// Relative input paths are resolved below `base`; absolute input paths are
+/// loaded as provided.
+///
+/// # Errors
+///
+/// Returns an error when `base` is missing or is not a directory, no input
+/// paths are provided, or no matching readable bundle data is found.
+pub fn load_spectra_many_by_source_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+    filter: impl Into<LoadedSourceFilter>,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .only_source(filter)
+        .read_paths_relative_to(base, paths)
 }
 
 /// Loads supported spectra from multiple paths, restricted to one source format.

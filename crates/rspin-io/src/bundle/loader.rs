@@ -9,8 +9,8 @@ use rspin_core::{RSpinError, Result};
 use crate::SpectrumPathReader;
 
 use super::{
-    SpectrumBundle, canonical_source_format_filter, no_data_error_at, no_data_error_in_inputs,
-    selected_path_from_base, source_format_filters, source_vendor_filters,
+    LoadedSourceFilter, SpectrumBundle, canonical_source_format_filter, no_data_error_at,
+    no_data_error_in_inputs, selected_path_from_base, source_format_filters, source_vendor_filters,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.
@@ -168,6 +168,19 @@ impl SpectrumBundleLoader {
     {
         self.source_path_filters = source_path_filters(paths);
         self
+    }
+
+    /// Restricts loading with one generic source filter.
+    ///
+    /// Prefer the specific `only_source_format`, `only_source_vendor`, or
+    /// `only_source_path` helpers when the filter kind is known statically.
+    #[must_use]
+    pub fn only_source(self, filter: impl Into<LoadedSourceFilter>) -> Self {
+        match filter.into() {
+            LoadedSourceFilter::Format { format } => self.only_source_format(format),
+            LoadedSourceFilter::Vendor { vendor } => self.only_source_vendor(vendor),
+            LoadedSourceFilter::Path { path } => self.only_source_path(path),
+        }
     }
 
     /// Clears any source-format restriction.

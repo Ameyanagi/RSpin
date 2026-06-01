@@ -56,6 +56,11 @@ fn load_selected_bruker_inputs() -> Result<SpectrumBundle> {
     )
 }
 
+fn load_selected_with_runtime_filter() -> Result<SpectrumBundle> {
+    let filter = LoadedSourceFilter::vendor("bruker");
+    load_spectra_many_by_source(["data/proton.fid", "data/bruker/pdata/1"], filter)
+}
+
 fn load_one_bruker_spectrum_from_selected_inputs() -> Result<Spectrum1D> {
     load_spectrum_1d_many_by_source_vendor(
         ["data/proton.fid", "data/bruker/pdata/1"],
@@ -157,6 +162,12 @@ fn load_jcamp_only() -> Result<SpectrumBundle> {
 fn load_bruker_only() -> Result<SpectrumBundle> {
     RSpinReader::new()
         .only_source_vendor(LoadedSourceVendor::Bruker)
+        .read_path("data/mixed-vendor")
+}
+
+fn load_with_runtime_filter(filter: LoadedSourceFilter) -> Result<SpectrumBundle> {
+    RSpinReader::new()
+        .only_source(filter)
         .read_path("data/mixed-vendor")
 }
 

@@ -415,6 +415,14 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
         1
     );
 
+    let generic_source =
+        load_spectra_by_source(&fixture_root, LoadedSourceFilter::vendor("varian"))?;
+    assert_eq!(generic_source.len(), 1);
+    assert_eq!(
+        generic_source.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
     let source_format = load_spectra_by_source_format(&fixture_root, "varian fid")?;
     assert_eq!(source_format.len(), 1);
     assert_eq!(
@@ -442,6 +450,14 @@ fn prelude_exports_filtered_bundle_loader_helpers() -> Result<()> {
         load_spectra_many_by_source_path_relative_to(&fixture_root, ["varian_1h"], "varian_1h")?;
     assert_eq!(multi_path.len(), 1);
     assert!(multi_path.has_source_path(std::path::Path::new("varian_1h")));
+
+    let generic_many = load_spectra_many_by_source_relative_to(
+        &fixture_root,
+        ["varian_1h", "bruker_without_expno"],
+        LoadedSourceFilter::path("varian_1h"),
+    )?;
+    assert_eq!(generic_many.len(), 1);
+    assert!(generic_many.has_source_path(std::path::Path::new("varian_1h")));
     Ok(())
 }
 

@@ -8,13 +8,15 @@ use std::{
 
 use rspin_core::{Nucleus, RSpinError, Unit};
 use rspin_io::{
-    LoadedSource, LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum, RSpinReader,
-    SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra,
-    load_spectra_by_source_format, load_spectra_by_source_format_relative_to,
-    load_spectra_by_source_path, load_spectra_by_source_path_relative_to,
+    LoadedSource, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, LoadedSpectrum,
+    RSpinReader, SpectrumBundle, SpectrumBundleLoader, SpectrumPathReader, load_spectra,
+    load_spectra_by_source, load_spectra_by_source_format,
+    load_spectra_by_source_format_relative_to, load_spectra_by_source_path,
+    load_spectra_by_source_path_relative_to, load_spectra_by_source_relative_to,
     load_spectra_by_source_vendor, load_spectra_by_source_vendor_relative_to, load_spectra_many,
-    load_spectra_many_by_source_format, load_spectra_many_by_source_format_relative_to,
-    load_spectra_many_by_source_path, load_spectra_many_by_source_path_relative_to,
+    load_spectra_many_by_source, load_spectra_many_by_source_format,
+    load_spectra_many_by_source_format_relative_to, load_spectra_many_by_source_path,
+    load_spectra_many_by_source_path_relative_to, load_spectra_many_by_source_relative_to,
     load_spectra_many_by_source_vendor, load_spectra_many_by_source_vendor_relative_to,
     load_spectra_many_relative_to, load_spectra_relative_to, load_spectrum_1d,
     load_spectrum_1d_many, load_spectrum_1d_many_relative_to, load_spectrum_1d_many_with_source,
@@ -1571,6 +1573,62 @@ fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
         Some(Nucleus::Carbon13)
     );
     assert!(relative_carbon.has_source_path(carbon_path));
+    Ok(())
+}
+
+#[test]
+fn generic_source_filter_helpers_can_restrict_sources() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let jcamp_filter = LoadedSourceFilter::format("jdx");
+    let vendor_filter = LoadedSourceFilter::from(LoadedSourceVendor::Bruker);
+    let path_filter = LoadedSourceFilter::path(carbon_path);
+
+    let jcamp = load_spectra_by_source(&root, &jcamp_filter)?;
+    assert_eq!(jcamp.len(), 2);
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert!(
+        jcamp
+            .loaded_by_source_format(LoadedSourceFormat::JcampDx)
+            .all(|loaded| jcamp_filter.matches_source(loaded.source()))
+    );
+
+    let bruker = RSpinReader::new()
+        .only_source(vendor_filter.clone())
+        .read_path(&root)?;
+    assert_eq!(bruker.len(), 2);
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert!(
+        bruker
+            .spectra()
+            .iter()
+            .all(|loaded| vendor_filter.matches_source(loaded.source()))
+    );
+
+    let relative_carbon = load_spectra_by_source_relative_to(&root, "jcamp", path_filter.clone())?;
+    assert_eq!(relative_carbon.len(), 1);
+    assert_eq!(
+        first_1d(&relative_carbon)?.metadata.nucleus,
+        Some(Nucleus::Carbon13)
+    );
+    assert!(relative_carbon.has_source_path(carbon_path));
+
+    let base = fixture_root();
+    let paths = [base.join("varian_1h"), base.join("bruker_without_expno")];
+    let agilent = load_spectra_many_by_source(&paths, LoadedSourceFilter::vendor("varian"))?;
+    assert_eq!(agilent.len(), 1);
+    assert_eq!(
+        agilent.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let processed = load_spectra_many_by_source_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+        LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+    )?;
+    assert_eq!(processed.len(), 1);
+    assert_eq!(first_1d(&processed)?.x.unit, Unit::Ppm);
     Ok(())
 }
 
