@@ -523,6 +523,28 @@ fn prelude_exports_bundle_summary_loader_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_short_bundle_load_aliases() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let bundle = load_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(bundle.len(), 1);
+    assert_eq!(
+        bundle.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        load_summary_relative_to(&fixture_root, "varian_1h")?.spectra(),
+        1
+    );
+    assert_eq!(
+        load_many_summary_relative_to(&fixture_root, ["varian_1h"])?.spectra(),
+        1
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");
