@@ -634,6 +634,15 @@ fn prelude_exports_source_subset_helpers() -> Result<()> {
         .only_source(LoadedSourceDataKind::Processed)
         .read_path_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(processed.len(), 1);
+    let processed = RSpinReader::new()
+        .source_vendor("bruker")
+        .processed_sources()
+        .read_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(processed.len(), 1);
+    assert_eq!(
+        processed.source_paths().collect::<Vec<_>>(),
+        vec![std::path::Path::new("bruker_without_expno/pdata/1")]
+    );
     Ok(())
 }
 

@@ -751,13 +751,16 @@ impl SpectrumBundleLoader {
                 message,
             })
         } else {
-            bundle.push_warning(LoadWarning::new(self.source_path(root, path), message));
+            bundle.push_warning(LoadWarning::new(
+                self.source_path_for_metadata(root, path),
+                message,
+            ));
             Ok(())
         }
     }
 
     fn loaded_source(&self, root: &Path, path: &Path, format: impl Into<String>) -> LoadedSource {
-        LoadedSource::new(self.source_path(root, path), format)
+        LoadedSource::new(self.source_path_for_metadata(root, path), format)
     }
 
     fn push_1d_if_allowed(
@@ -876,7 +879,7 @@ impl SpectrumBundleLoader {
         bundle
     }
 
-    fn source_path(&self, root: &Path, path: &Path) -> Option<PathBuf> {
+    fn source_path_for_metadata(&self, root: &Path, path: &Path) -> Option<PathBuf> {
         if !self.source_paths.is_enabled() {
             return None;
         }

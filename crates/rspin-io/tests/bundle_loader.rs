@@ -236,6 +236,109 @@ fn reader_short_read_aliases_cover_common_workflows() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reader_short_source_filter_aliases_cover_common_workflows() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let bruker_processed = RSpinReader::new()
+        .source_format(LoadedSourceFormat::BrukerProcessed)
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(bruker_processed.len(), 1);
+    assert_eq!(first_1d(&bruker_processed)?.x.unit, Unit::Ppm);
+    assert!(has_source_path(
+        &bruker_processed,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+
+    let format_many = RSpinReader::new()
+        .source_formats([
+            LoadedSourceFormat::BrukerFid,
+            LoadedSourceFormat::BrukerProcessed,
+        ])
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(format_many.len(), 2);
+
+    let vendor = RSpinReader::new()
+        .source_vendor("varian")
+        .read_relative_to(&base, "varian_1h")?;
+    assert_eq!(vendor.len(), 1);
+    assert_eq!(
+        first_1d(&vendor)?.metadata.nucleus,
+        Some(Nucleus::Hydrogen1)
+    );
+
+    let vendor_many = RSpinReader::new()
+        .source_vendors([LoadedSourceVendor::AgilentVarian])
+        .read_relative_to(&base, "varian_1h")?;
+    assert_eq!(vendor_many.len(), 1);
+
+    let processed = RSpinReader::new()
+        .source_data_kind(LoadedSourceDataKind::Processed)
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(processed.len(), 1);
+    assert_eq!(first_1d(&processed)?.x.unit, Unit::Ppm);
+
+    let raw_and_processed = RSpinReader::new()
+        .source_data_kinds([LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed])
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(raw_and_processed.len(), 2);
+
+    let raw = RSpinReader::new()
+        .raw_sources()
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(raw.len(), 1);
+    assert_eq!(first_1d(&raw)?.x.unit, Unit::Seconds);
+
+    let processed_alias = RSpinReader::new()
+        .processed_sources()
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(processed_alias.len(), 1);
+    assert_eq!(first_1d(&processed_alias)?.x.unit, Unit::Ppm);
+
+    let other_alias = RSpinReader::new()
+        .other_sources()
+        .read(nmrxiv_fixture_root())?;
+    assert!(other_alias.has_source_data_kind(LoadedSourceDataKind::Other));
+    assert_eq!(
+        other_alias.source_data_kind_count(LoadedSourceDataKind::Raw),
+        0
+    );
+    assert_eq!(
+        other_alias.source_data_kind_count(LoadedSourceDataKind::Processed),
+        0
+    );
+
+    let path_filtered = RSpinReader::new()
+        .source_path("bruker_without_expno/pdata/1")
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(path_filtered.len(), 1);
+    assert_eq!(first_1d(&path_filtered)?.x.unit, Unit::Ppm);
+
+    let path_many = RSpinReader::new()
+        .source_paths(["bruker_without_expno", "bruker_without_expno/pdata/1"])
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(path_many.len(), 2);
+
+    let runtime_filtered = RSpinReader::new()
+        .source(LoadedSourceFilter::vendor("varian"))
+        .read_relative_to(&base, "varian_1h")?;
+    assert_eq!(runtime_filtered.len(), 1);
+
+    let combined = RSpinReader::new()
+        .sources([
+            LoadedSourceFilter::vendor("varian"),
+            LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
+        ])
+        .read_many_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+    assert_eq!(combined.len(), 2);
+    assert!(has_source_path(&combined, Path::new("varian_1h")));
+    assert!(has_source_path(
+        &combined,
+        Path::new("bruker_without_expno/pdata/1")
+    ));
+    Ok(())
+}
+
+#[test]
 fn loader_can_filter_spectrum_dimensions() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
 

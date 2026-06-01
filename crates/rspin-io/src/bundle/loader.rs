@@ -115,6 +115,14 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Restricts loading to spectra read with one source format.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_format`].
+    #[must_use]
+    pub fn source_format(self, format: impl AsRef<str>) -> Self {
+        self.only_source_format(format)
+    }
+
     /// Restricts loading to spectra read with any of the source formats.
     ///
     /// Passing an empty iterator clears the source-format filter.
@@ -128,11 +136,31 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Restricts loading to spectra read with any of the source formats.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_formats`].
+    #[must_use]
+    pub fn source_formats<I, F>(self, formats: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+        F: AsRef<str>,
+    {
+        self.only_source_formats(formats)
+    }
+
     /// Restricts loading to spectra read with one vendor-specific reader family.
     #[must_use]
     pub fn only_source_vendor(mut self, vendor: impl AsRef<str>) -> Self {
         self.source_formats = source_vendor_filters([vendor]);
         self
+    }
+
+    /// Restricts loading to spectra read with one vendor-specific reader family.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_vendor`].
+    #[must_use]
+    pub fn source_vendor(self, vendor: impl AsRef<str>) -> Self {
+        self.only_source_vendor(vendor)
     }
 
     /// Restricts loading to spectra read with any of the vendor-specific reader families.
@@ -148,6 +176,18 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Restricts loading to spectra read with any vendor-specific reader families.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_vendors`].
+    #[must_use]
+    pub fn source_vendors<I, V>(self, vendors: I) -> Self
+    where
+        I: IntoIterator<Item = V>,
+        V: AsRef<str>,
+    {
+        self.only_source_vendors(vendors)
+    }
+
     /// Restricts loading to spectra with one raw/processed source data kind.
     ///
     /// Use this when callers want vendor raw acquisition data, vendor processed
@@ -155,6 +195,14 @@ impl SpectrumBundleLoader {
     #[must_use]
     pub fn only_source_data_kind(self, data_kind: LoadedSourceDataKind) -> Self {
         self.only_source(LoadedSourceFilter::data_kind(data_kind))
+    }
+
+    /// Restricts loading to spectra with one raw/processed source data kind.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_data_kind`].
+    #[must_use]
+    pub fn source_data_kind(self, data_kind: LoadedSourceDataKind) -> Self {
+        self.only_source_data_kind(data_kind)
     }
 
     /// Restricts loading to spectra with any of the raw/processed source data kinds.
@@ -168,10 +216,29 @@ impl SpectrumBundleLoader {
         self.only_sources(data_kinds.into_iter().map(LoadedSourceFilter::data_kind))
     }
 
+    /// Restricts loading to spectra with any raw/processed source data kinds.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_data_kinds`].
+    #[must_use]
+    pub fn source_data_kinds<I>(self, data_kinds: I) -> Self
+    where
+        I: IntoIterator<Item = LoadedSourceDataKind>,
+    {
+        self.only_source_data_kinds(data_kinds)
+    }
+
     /// Restricts loading to vendor raw acquisition data.
     #[must_use]
     pub fn only_raw_sources(self) -> Self {
         self.only_source_data_kind(LoadedSourceDataKind::Raw)
+    }
+
+    /// Restricts loading to vendor raw acquisition data.
+    ///
+    /// This is a short chainable alias for [`Self::only_raw_sources`].
+    #[must_use]
+    pub fn raw_sources(self) -> Self {
+        self.only_raw_sources()
     }
 
     /// Restricts loading to vendor processed data.
@@ -180,10 +247,26 @@ impl SpectrumBundleLoader {
         self.only_source_data_kind(LoadedSourceDataKind::Processed)
     }
 
+    /// Restricts loading to vendor processed data.
+    ///
+    /// This is a short chainable alias for [`Self::only_processed_sources`].
+    #[must_use]
+    pub fn processed_sources(self) -> Self {
+        self.only_processed_sources()
+    }
+
     /// Restricts loading to open exchange or custom data without raw/processed classification.
     #[must_use]
     pub fn only_other_sources(self) -> Self {
         self.only_source_data_kind(LoadedSourceDataKind::Other)
+    }
+
+    /// Restricts loading to open exchange or custom data without raw/processed classification.
+    ///
+    /// This is a short chainable alias for [`Self::only_other_sources`].
+    #[must_use]
+    pub fn other_sources(self) -> Self {
+        self.only_other_sources()
     }
 
     /// Restricts loading to spectra read from one tracked source path.
@@ -194,6 +277,14 @@ impl SpectrumBundleLoader {
     pub fn only_source_path(mut self, path: impl AsRef<Path>) -> Self {
         self.source_path_filters = vec![path.as_ref().to_path_buf()];
         self
+    }
+
+    /// Restricts loading to spectra read from one tracked source path.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_path`].
+    #[must_use]
+    pub fn source_path(self, path: impl AsRef<Path>) -> Self {
+        self.only_source_path(path)
     }
 
     /// Restricts loading to spectra read from any of the tracked source paths.
@@ -209,6 +300,18 @@ impl SpectrumBundleLoader {
     {
         self.source_path_filters = source_path_filters(paths);
         self
+    }
+
+    /// Restricts loading to spectra read from any tracked source paths.
+    ///
+    /// This is a short chainable alias for [`Self::only_source_paths`].
+    #[must_use]
+    pub fn source_paths<I, P>(self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.only_source_paths(paths)
     }
 
     /// Restricts loading with one generic source filter.
@@ -227,6 +330,14 @@ impl SpectrumBundleLoader {
         }
     }
 
+    /// Restricts loading with one generic source filter.
+    ///
+    /// This is a short chainable alias for [`Self::only_source`].
+    #[must_use]
+    pub fn source(self, filter: impl Into<LoadedSourceFilter>) -> Self {
+        self.only_source(filter)
+    }
+
     /// Restricts loading to spectra matching any generic source filter.
     ///
     /// This is useful when a caller accepts runtime filter choices from
@@ -243,6 +354,18 @@ impl SpectrumBundleLoader {
         self.source_formats.clear();
         self.source_path_filters.clear();
         self
+    }
+
+    /// Restricts loading to spectra matching any generic source filter.
+    ///
+    /// This is a short chainable alias for [`Self::only_sources`].
+    #[must_use]
+    pub fn sources<I, F>(self, filters: I) -> Self
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.only_sources(filters)
     }
 
     /// Clears all source-format, source-path, and generic source filters.
