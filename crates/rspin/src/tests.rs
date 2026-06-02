@@ -603,40 +603,37 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
     let bundle = load_spectra(&fixture_root)?;
 
-    let first = bundle
-        .first_by_source(LoadedSourceFilter::bruker())
-        .ok_or_else(|| RSpinError::Parse {
-            format: "facade bundle accessor",
-            message: "missing first Bruker spectrum".to_owned(),
-        })?;
+    let first = bundle.require_first_by_source(LoadedSourceFilter::bruker())?;
     assert_eq!(first.source().vendor(), Some(LoadedSourceVendor::Bruker));
 
-    let (carbon, source) = bundle
-        .first_loaded_1d_by_source(LoadedSourceFilter::path(
-            "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
-        ))
-        .ok_or_else(|| RSpinError::Parse {
-            format: "facade bundle accessor",
-            message: "missing selected carbon spectrum".to_owned(),
-        })?;
+    let (carbon, source) = bundle.require_first_loaded_1d_by_source(LoadedSourceFilter::path(
+        "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+    ))?;
     assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
     assert_eq!(source.format(), "jcamp_dx");
 
-    let jcamp = bundle
-        .first_1d_by_source(LoadedSourceFilter::jcamp_dx())
-        .ok_or_else(|| RSpinError::Parse {
-            format: "facade bundle accessor",
-            message: "missing first JCAMP-DX one-dimensional spectrum".to_owned(),
-        })?;
+    let jcamp = bundle.require_first_1d_by_source(LoadedSourceFilter::jcamp_dx())?;
     assert!(jcamp.metadata.nucleus.is_some());
 
-    let hsqc = bundle
-        .first_2d_by_sources([LoadedSourceFilter::jeol()])
-        .ok_or_else(|| RSpinError::Parse {
-            format: "facade bundle accessor",
-            message: "missing JEOL two-dimensional spectrum".to_owned(),
-        })?;
+    let hsqc = bundle.require_first_2d_by_sources([LoadedSourceFilter::jeol()])?;
     assert!(hsqc.shape().0 > 0);
+
+    let owned = bundle
+        .clone()
+        .into_first_by_source(LoadedSourceFilter::bruker())?;
+    assert_eq!(owned.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let (owned_carbon, owned_source) =
+        bundle
+            .clone()
+            .into_first_loaded_1d_by_source(LoadedSourceFilter::path(
+                "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+            ))?;
+    assert_eq!(owned_carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(owned_source.format(), "jcamp_dx");
+
+    let owned_hsqc = bundle.into_first_2d_by_sources([LoadedSourceFilter::jeol()])?;
+    assert!(owned_hsqc.shape().1 > 0);
     Ok(())
 }
 

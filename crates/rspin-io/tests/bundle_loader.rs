@@ -961,6 +961,94 @@ fn bundle_first_source_filter_accessors_cover_quick_selection() -> anyhow::Resul
 }
 
 #[test]
+fn bundle_required_first_source_filter_accessors_cover_fallible_selection() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    let first_any = bundle.require_first_by_sources(Vec::<LoadedSourceFilter>::new())?;
+    assert!(first_any.source().path().is_some());
+
+    let bruker = bundle.require_first_by_source(LoadedSourceFilter::bruker())?;
+    assert_eq!(bruker.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let jcamp = bundle.require_first_1d_by_source(LoadedSourceFilter::jcamp())?;
+    assert!(jcamp.metadata.nucleus.is_some());
+
+    let (carbon, source) = bundle.require_first_loaded_1d_by_source(LoadedSourceFilter::path(
+        "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+    ))?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"))
+    );
+
+    let hsqc = bundle.require_first_2d_by_sources([LoadedSourceFilter::jeol()])?;
+    assert!(hsqc.shape().0 > 0);
+
+    let (_, hsqc_source) =
+        bundle.require_first_loaded_2d_by_source(LoadedSourceFilter::path_prefix("jeol"))?;
+    let hsqc_path = hsqc_source
+        .path()
+        .ok_or_else(|| anyhow::anyhow!("missing source path"))?;
+    assert!(hsqc_path.starts_with("jeol"));
+
+    let missing_2d = bundle
+        .require_first_2d_by_source(LoadedSourceFilter::jcamp_dx())
+        .err()
+        .ok_or_else(|| anyhow::anyhow!("expected missing two-dimensional source error"))?;
+    assert!(
+        missing_2d
+            .to_string()
+            .contains("expected at least one two-dimensional spectrum")
+    );
+    Ok(())
+}
+
+#[test]
+fn bundle_consuming_first_source_filter_accessors_return_owned_spectra() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+
+    let first_any = bundle
+        .clone()
+        .into_first_by_sources(Vec::<LoadedSourceFilter>::new())?;
+    assert!(first_any.source().path().is_some());
+
+    let bruker = bundle
+        .clone()
+        .into_first_by_source(LoadedSourceFilter::bruker())?;
+    assert_eq!(bruker.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let jcamp = bundle
+        .clone()
+        .into_first_1d_by_source(LoadedSourceFilter::jcamp_dx())?;
+    assert!(jcamp.metadata.nucleus.is_some());
+
+    let (carbon, source) =
+        bundle
+            .clone()
+            .into_first_loaded_1d_by_sources([LoadedSourceFilter::path(
+                "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+            )])?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"))
+    );
+
+    let bruker_2d = bundle
+        .clone()
+        .into_first_2d_by_sources([LoadedSourceFilter::path_prefix("bruker_cosy_raw")])?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+
+    let (_, jeol_2d_source) = bundle.into_first_loaded_2d_by_source(LoadedSourceFilter::jeol())?;
+    let jeol_2d_path = jeol_2d_source
+        .path()
+        .ok_or_else(|| anyhow::anyhow!("missing two-dimensional source path"))?;
+    assert!(jeol_2d_path.starts_with("jeol"));
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

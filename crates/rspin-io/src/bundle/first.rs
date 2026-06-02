@@ -4,7 +4,9 @@ use std::path::Path;
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
-use super::{LoadedSource, LoadedSpectrum, SpectrumBundle, SpectrumBundleLoader};
+use super::{
+    LoadedSource, LoadedSourceFilter, LoadedSpectrum, SpectrumBundle, SpectrumBundleLoader,
+};
 
 /// Loads a file or directory and returns the first spectrum of any supported dimension.
 ///
@@ -286,6 +288,33 @@ impl SpectrumBundle {
             .ok_or_else(|| first_error("spectrum", self.len_1d(), self.len_2d()))
     }
 
+    /// Returns the first loaded spectrum matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no loaded spectrum matches the source filter.
+    pub fn require_first_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<&LoadedSpectrum> {
+        self.first_by_source(filter)
+            .ok_or_else(|| first_error("spectrum", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first loaded spectrum matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no loaded spectrum matches the source filters.
+    pub fn require_first_by_sources<I, F>(&self, filters: I) -> Result<&LoadedSpectrum>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_by_sources(filters)
+            .ok_or_else(|| first_error("spectrum", self.len_1d(), self.len_2d()))
+    }
+
     /// Consumes the bundle and returns the first loaded spectrum of any supported dimension.
     ///
     /// # Errors
@@ -296,6 +325,36 @@ impl SpectrumBundle {
         let two_d = self.len_2d();
         let (spectra, _, _) = self.into_parts();
         spectra
+            .into_iter()
+            .next()
+            .ok_or_else(|| first_error("spectrum", one_d, two_d))
+    }
+
+    /// Consumes the bundle and returns the first loaded spectrum matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no loaded spectrum matches the source filter.
+    pub fn into_first_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<LoadedSpectrum> {
+        self.into_first_by_sources([filter.into()])
+    }
+
+    /// Consumes the bundle and returns the first loaded spectrum matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no loaded spectrum matches the source filters.
+    pub fn into_first_by_sources<I, F>(self, filters: I) -> Result<LoadedSpectrum>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let one_d = self.len_1d();
+        let two_d = self.len_2d();
+        self.into_loaded_by_sources(filters)
             .into_iter()
             .next()
             .ok_or_else(|| first_error("spectrum", one_d, two_d))
@@ -321,6 +380,63 @@ impl SpectrumBundle {
             .ok_or_else(|| first_error("one-dimensional", self.len_1d(), self.len_2d()))
     }
 
+    /// Returns the first one-dimensional spectrum matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filter.
+    pub fn require_first_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<&Spectrum1D> {
+        self.first_1d_by_source(filter)
+            .ok_or_else(|| first_error("one-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first one-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filter.
+    pub fn require_first_loaded_1d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(&Spectrum1D, &LoadedSource)> {
+        self.first_loaded_1d_by_source(filter)
+            .ok_or_else(|| first_error("one-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first one-dimensional spectrum matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filters.
+    pub fn require_first_1d_by_sources<I, F>(&self, filters: I) -> Result<&Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_1d_by_sources(filters)
+            .ok_or_else(|| first_error("one-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first one-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filters.
+    pub fn require_first_loaded_1d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> Result<(&Spectrum1D, &LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_loaded_1d_by_sources(filters)
+            .ok_or_else(|| first_error("one-dimensional", self.len_1d(), self.len_2d()))
+    }
+
     /// Returns the first loaded two-dimensional spectrum.
     ///
     /// # Errors
@@ -338,6 +454,63 @@ impl SpectrumBundle {
     /// Returns an error when the bundle contains no two-dimensional spectra.
     pub fn require_first_loaded_2d(&self) -> Result<(&Spectrum2D, &LoadedSource)> {
         self.first_loaded_2d()
+            .ok_or_else(|| first_error("two-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first two-dimensional spectrum matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filter.
+    pub fn require_first_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<&Spectrum2D> {
+        self.first_2d_by_source(filter)
+            .ok_or_else(|| first_error("two-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first two-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filter.
+    pub fn require_first_loaded_2d_by_source(
+        &self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(&Spectrum2D, &LoadedSource)> {
+        self.first_loaded_2d_by_source(filter)
+            .ok_or_else(|| first_error("two-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first two-dimensional spectrum matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filters.
+    pub fn require_first_2d_by_sources<I, F>(&self, filters: I) -> Result<&Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_2d_by_sources(filters)
+            .ok_or_else(|| first_error("two-dimensional", self.len_1d(), self.len_2d()))
+    }
+
+    /// Returns the first two-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filters.
+    pub fn require_first_loaded_2d_by_sources<I, F>(
+        &self,
+        filters: I,
+    ) -> Result<(&Spectrum2D, &LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.first_loaded_2d_by_sources(filters)
             .ok_or_else(|| first_error("two-dimensional", self.len_1d(), self.len_2d()))
     }
 
@@ -370,6 +543,66 @@ impl SpectrumBundle {
             .ok_or_else(|| first_error("one-dimensional", one_d, two_d))
     }
 
+    /// Consumes the bundle and returns the first one-dimensional spectrum matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filter.
+    pub fn into_first_1d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<Spectrum1D> {
+        self.into_first_loaded_1d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the first one-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filter.
+    pub fn into_first_loaded_1d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(Spectrum1D, LoadedSource)> {
+        self.into_first_loaded_1d_by_sources([filter.into()])
+    }
+
+    /// Consumes the bundle and returns the first one-dimensional spectrum matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filters.
+    pub fn into_first_1d_by_sources<I, F>(self, filters: I) -> Result<Spectrum1D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.into_first_loaded_1d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the first one-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no one-dimensional spectrum matches the source filters.
+    pub fn into_first_loaded_1d_by_sources<I, F>(
+        self,
+        filters: I,
+    ) -> Result<(Spectrum1D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let one_d = self.len_1d();
+        let two_d = self.len_2d();
+        self.into_loaded_1d_by_sources(filters)
+            .into_iter()
+            .next()
+            .ok_or_else(|| first_error("one-dimensional", one_d, two_d))
+    }
+
     /// Consumes the bundle and returns the first loaded two-dimensional spectrum.
     ///
     /// # Errors
@@ -394,6 +627,66 @@ impl SpectrumBundle {
         let one_d = self.len_1d();
         let two_d = self.len_2d();
         self.into_loaded_2d()
+            .into_iter()
+            .next()
+            .ok_or_else(|| first_error("two-dimensional", one_d, two_d))
+    }
+
+    /// Consumes the bundle and returns the first two-dimensional spectrum matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filter.
+    pub fn into_first_2d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<Spectrum2D> {
+        self.into_first_loaded_2d_by_source(filter)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the first two-dimensional spectrum and source matching a generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filter.
+    pub fn into_first_loaded_2d_by_source(
+        self,
+        filter: impl Into<LoadedSourceFilter>,
+    ) -> Result<(Spectrum2D, LoadedSource)> {
+        self.into_first_loaded_2d_by_sources([filter.into()])
+    }
+
+    /// Consumes the bundle and returns the first two-dimensional spectrum matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filters.
+    pub fn into_first_2d_by_sources<I, F>(self, filters: I) -> Result<Spectrum2D>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        self.into_first_loaded_2d_by_sources(filters)
+            .map(|(spectrum, _)| spectrum)
+    }
+
+    /// Consumes the bundle and returns the first two-dimensional spectrum and source matching any generic source filter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no two-dimensional spectrum matches the source filters.
+    pub fn into_first_loaded_2d_by_sources<I, F>(
+        self,
+        filters: I,
+    ) -> Result<(Spectrum2D, LoadedSource)>
+    where
+        I: IntoIterator<Item = F>,
+        F: Into<LoadedSourceFilter>,
+    {
+        let one_d = self.len_1d();
+        let two_d = self.len_2d();
+        self.into_loaded_2d_by_sources(filters)
             .into_iter()
             .next()
             .ok_or_else(|| first_error("two-dimensional", one_d, two_d))
