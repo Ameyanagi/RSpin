@@ -24,6 +24,7 @@ mod path_prefix;
 mod selectors;
 mod source_filter;
 mod source_format;
+mod source_summary;
 pub use aliases::{
     load, load_many, load_many_relative_to, load_many_strict, load_many_strict_relative_to,
     load_many_summary, load_many_summary_relative_to, load_many_summary_strict,
@@ -405,6 +406,7 @@ pub use source_format::{
     parse_loaded_source_format, parse_loaded_source_vendor, supported_bundle_source_data_kinds,
     supported_bundle_source_formats, supported_bundle_source_vendors,
 };
+pub use source_summary::*;
 
 /// High-level reader for supported `RSpin` spectrum inputs.
 pub type RSpinReader = SpectrumBundleLoader;

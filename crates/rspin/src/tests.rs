@@ -824,6 +824,44 @@ fn prelude_exports_dimension_source_path_bundle_helpers() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_source_filtered_summary_helpers() -> Result<()> {
+    let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let carbon_path = std::path::Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let proton_path = std::path::Path::new("jeol/myrcene_1h_400mhz.jdf");
+
+    let jcamp = load_spectra_by_source_format(&mixed, "jdx")?;
+    assert_eq!(
+        load_spectra_summary_by_source_format(&mixed, LoadedSourceFormat::JcampDx)?,
+        jcamp.summary()
+    );
+
+    let jeol_prefix = RSpinReader::new()
+        .only_source_path_prefix("jeol")
+        .read_path(&mixed)?;
+    assert_eq!(
+        load_spectra_summary_by_source_path_prefix(&mixed, "jeol")?,
+        jeol_prefix.summary()
+    );
+
+    let summary = RSpinReader::new().read_summary_many_by_source_vendor_relative_to(
+        &mixed,
+        ["jcamp", "jeol"],
+        LoadedSourceVendor::Jeol,
+    )?;
+    assert_eq!(summary.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+
+    let path_summary = load_spectra_many_summary_by_source_paths_relative_to(
+        &mixed,
+        ["jcamp", "jeol"],
+        [carbon_path, proton_path],
+    )?;
+    assert_eq!(path_summary.spectra(), 2);
+    assert_eq!(path_summary.spectra_1d(), 2);
+    Ok(())
+}
+
 fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
     assert_eq!(bundle.source_paths().count(), 3);
     assert_eq!(
