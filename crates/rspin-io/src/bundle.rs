@@ -16,6 +16,7 @@ use crate::{
 mod aliases;
 mod dimension;
 mod dimension_metadata;
+mod dimension_path;
 mod exact;
 mod loader;
 mod model;
@@ -46,6 +47,7 @@ pub use dimension::{
     load_spectra_2d_summary_strict_relative_to,
 };
 pub use dimension_metadata::*;
+pub use dimension_path::*;
 pub use exact::{
     load_spectrum_1d, load_spectrum_1d_by_source, load_spectrum_1d_by_source_data_kind,
     load_spectrum_1d_by_source_data_kind_relative_to, load_spectrum_1d_by_source_format,

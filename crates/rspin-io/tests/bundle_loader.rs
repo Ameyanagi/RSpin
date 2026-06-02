@@ -3397,6 +3397,131 @@ fn dimension_source_metadata_relative_helpers_anchor_source_paths() -> anyhow::R
 }
 
 #[test]
+fn dimension_source_path_helpers_load_matching_bundles() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+    let jcamp_1h = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let jcamp_13c = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let jeol_proton_path = Path::new("jeol/myrcene_1h_400mhz.jdf");
+    let hsqc = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let proton = io::load_spectra_1d_by_source_path(&mixed, jcamp_1h)?;
+    assert_eq!(proton.len_1d(), 1);
+    assert_eq!(proton.len_2d(), 0);
+    assert!(proton.has_source_path(jcamp_1h));
+
+    let selected_1d = io::load_spectra_1d_by_source_paths(&mixed, [jcamp_13c, jeol_proton_path])?;
+    assert_eq!(selected_1d.len_1d(), 2);
+    assert!(selected_1d.has_source_path(jcamp_13c));
+    assert!(selected_1d.has_source_path(jeol_proton_path));
+
+    let jcamp_prefix = io::load_spectra_1d_by_source_path_prefix(&mixed, "jcamp")?;
+    assert_eq!(jcamp_prefix.len_1d(), 2);
+    assert_eq!(jcamp_prefix.len_2d(), 0);
+
+    let jeol_prefixes = io::load_spectra_1d_by_source_path_prefixes(&mixed, ["missing", "jeol"])?;
+    assert_eq!(jeol_prefixes.len_1d(), 2);
+    assert!(jeol_prefixes.has_source_path(jeol_proton_path));
+
+    let jeol_hsqc = io::load_spectra_2d_by_source_path(&mixed, hsqc)?;
+    assert_eq!(jeol_hsqc.len_1d(), 0);
+    assert_eq!(jeol_hsqc.len_2d(), 1);
+    assert!(jeol_hsqc.has_source_path(hsqc));
+
+    let selected_2d = RSpinReader::new()
+        .read_bundle_2d_by_source_paths(&mixed, [Path::new("bruker_cosy_raw"), hsqc])?;
+    assert_eq!(selected_2d.len_2d(), 2);
+    assert!(selected_2d.has_source_path("bruker_cosy_raw"));
+    assert!(selected_2d.has_source_path(hsqc));
+
+    let two_d_prefix =
+        io::load_spectra_2d_by_source_path_prefixes(&mixed, ["bruker_cosy_raw", "jeol"])?;
+    assert_eq!(two_d_prefix.len_2d(), 2);
+    assert_eq!(two_d_prefix.len_1d(), 0);
+    Ok(())
+}
+
+#[test]
+fn dimension_source_path_summary_helpers_match_loaded_bundles() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+    let jcamp_1h = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let jcamp_13c = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let one_d_path = io::load_spectra_1d_by_source_path(&mixed, jcamp_1h)?;
+    assert_eq!(
+        io::load_spectra_1d_summary_by_source_path(&mixed, jcamp_1h)?,
+        one_d_path.summary()
+    );
+
+    let one_d_paths = io::load_spectra_1d_by_source_paths(&mixed, [jcamp_1h, jcamp_13c])?;
+    assert_eq!(
+        RSpinReader::new().read_bundle_1d_summary_by_source_paths(&mixed, [jcamp_1h, jcamp_13c],)?,
+        one_d_paths.summary()
+    );
+
+    let jcamp_prefix = io::load_spectra_1d_by_source_path_prefix(&mixed, "jcamp")?;
+    assert_eq!(
+        io::load_spectra_1d_summary_by_source_path_prefix(&mixed, "jcamp")?,
+        jcamp_prefix.summary()
+    );
+
+    let two_d_path = io::load_spectra_2d_by_source_path(&mixed, hsqc)?;
+    assert_eq!(
+        io::load_spectra_2d_summary_by_source_path(&mixed, hsqc)?,
+        two_d_path.summary()
+    );
+
+    let two_d_prefix =
+        RSpinReader::new().read_bundle_2d_by_source_path_prefix(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(
+        io::load_spectra_2d_summary_by_source_path_prefixes(&mixed, ["bruker_cosy_raw"])?,
+        two_d_prefix.summary()
+    );
+    Ok(())
+}
+
+#[test]
+fn dimension_source_path_relative_helpers_anchor_source_paths() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+    let jcamp_1h = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let jcamp_13c = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let jeol_proton_path = Path::new("jeol/myrcene_1h_400mhz.jdf");
+    let hsqc = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let jcamp = io::load_spectra_1d_by_source_path_prefix_relative_to(&mixed, "jcamp", "jcamp")?;
+    assert_eq!(jcamp.len_1d(), 2);
+    assert!(jcamp.has_source_path(jcamp_1h));
+    assert!(jcamp.has_source_path(jcamp_13c));
+
+    let jeol = io::load_spectra_1d_by_source_paths_relative_to(
+        &mixed,
+        "jeol",
+        [jeol_proton_path, Path::new("jeol/myrcene_13c_400mhz.jdf")],
+    )?;
+    assert_eq!(jeol.len_1d(), 2);
+    assert!(jeol.has_source_path(jeol_proton_path));
+
+    let bruker_2d = io::load_spectra_2d_by_source_path_relative_to(
+        &mixed,
+        "bruker_cosy_raw",
+        "bruker_cosy_raw",
+    )?;
+    assert_eq!(bruker_2d.len_2d(), 1);
+    assert!(bruker_2d.has_source_path("bruker_cosy_raw"));
+
+    let jeol_hsqc_bundle = RSpinReader::new()
+        .read_bundle_2d_by_source_path_prefix_relative_to(&mixed, "jeol", "jeol")?;
+    assert_eq!(jeol_hsqc_bundle.len_2d(), 1);
+    assert!(jeol_hsqc_bundle.has_source_path(hsqc));
+
+    assert_eq!(
+        io::load_spectra_2d_summary_by_source_path_prefix_relative_to(&mixed, "jeol", "jeol")?,
+        jeol_hsqc_bundle.summary()
+    );
+    Ok(())
+}
+
+#[test]
 fn free_bundle_loader_helpers_can_restrict_sources() -> anyhow::Result<()> {
     let root = nmrxiv_fixture_root();
     let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");

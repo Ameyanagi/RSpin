@@ -793,6 +793,37 @@ fn prelude_exports_dimension_source_metadata_bundle_helpers() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_dimension_source_path_bundle_helpers() -> Result<()> {
+    let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let jcamp_1h = std::path::Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let jcamp_13c = std::path::Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc = std::path::Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let jcamp = load_spectra_1d_by_source_path_prefix(&mixed, "jcamp")?;
+    assert_eq!(jcamp.len_1d(), 2);
+    assert_eq!(jcamp.len_2d(), 0);
+    assert!(jcamp.has_source_path(jcamp_1h));
+    assert_eq!(
+        load_spectra_1d_summary_by_source_paths(&mixed, [jcamp_1h, jcamp_13c])?.spectra_1d(),
+        2
+    );
+
+    let jeol_2d = RSpinReader::new().read_bundle_2d_by_source_path(&mixed, hsqc)?;
+    assert_eq!(jeol_2d.len_2d(), 1);
+    assert!(jeol_2d.has_source_path(hsqc));
+    assert_eq!(
+        load_spectra_2d_summary_by_source_path(&mixed, hsqc)?,
+        jeol_2d.summary()
+    );
+
+    let relative = load_spectra_2d_by_source_path_prefix_relative_to(&mixed, "jeol", "jeol")?;
+    assert_eq!(relative.len_2d(), 1);
+    assert!(relative.has_source_path(hsqc));
+    Ok(())
+}
+
 fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
     assert_eq!(bundle.source_paths().count(), 3);
     assert_eq!(
