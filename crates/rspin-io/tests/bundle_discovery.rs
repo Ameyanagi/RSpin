@@ -584,6 +584,7 @@ fn source_discovery_summary_counts_candidates() -> Result<()> {
     assert!(summary.has_source_path("bruker_without_expno/pdata/1"));
     assert!(summary.has_source_path_prefix("empty_jcamp"));
     assert!(!summary.has_source_path("missing"));
+    assert_discovered_summary_source_path_set_counts(&summary, &sources);
     assert_eq!(
         summary.source_count(LoadedSourceFilter::path_prefix("empty_jcamp")),
         2
@@ -606,6 +607,56 @@ fn source_discovery_summary_counts_candidates() -> Result<()> {
     );
 
     Ok(())
+}
+
+fn assert_discovered_summary_source_path_set_counts(
+    summary: &DiscoveredSpectrumSummary,
+    sources: &[DiscoveredSpectrumSource],
+) {
+    assert_eq!(
+        summary.source_path_count_by_paths([
+            "varian_1h",
+            "empty_jcamp/empty.jdx",
+            "empty_jcamp/empty.jdx",
+            "missing",
+        ]),
+        select_discovered_spectra_by_sources(
+            sources,
+            [
+                LoadedSourceFilter::path("varian_1h"),
+                LoadedSourceFilter::path("empty_jcamp/empty.jdx"),
+                LoadedSourceFilter::path("missing"),
+            ],
+        )
+        .len()
+    );
+    assert_eq!(
+        summary.source_path_count_by_paths(std::iter::empty::<&str>()),
+        sources.len()
+    );
+    assert!(summary.has_any_source_path(["missing", "varian_1h"]));
+    assert!(!summary.has_any_source_path(["missing"]));
+    assert!(summary.has_any_source_path(std::iter::empty::<&str>()));
+    assert_eq!(
+        summary.source_path_prefix_count_by_prefixes([
+            "bruker_without_expno",
+            "empty_jcamp",
+            "empty_jcamp/empty.jdx",
+            "missing",
+        ]),
+        select_discovered_spectra_by_source_path_prefixes(
+            sources,
+            ["bruker_without_expno", "empty_jcamp", "missing"],
+        )
+        .len()
+    );
+    assert_eq!(
+        summary.source_path_prefix_count_by_prefixes(std::iter::empty::<&str>()),
+        sources.len()
+    );
+    assert!(summary.has_any_source_path_prefix(["missing", "empty_jcamp"]));
+    assert!(!summary.has_any_source_path_prefix(["missing"]));
+    assert!(summary.has_any_source_path_prefix(std::iter::empty::<&str>()));
 }
 
 #[test]

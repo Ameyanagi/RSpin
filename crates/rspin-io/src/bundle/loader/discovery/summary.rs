@@ -234,6 +234,40 @@ impl DiscoveredSpectrumSummary {
         self.source_path_count(path) > 0
     }
 
+    /// Returns the number of discovered sources matching any tracked source path.
+    ///
+    /// Paths are combined with logical OR. Passing an empty iterator returns
+    /// the total discovered source count, matching selector behavior.
+    #[must_use]
+    pub fn source_path_count_by_paths<I, P>(&self, paths: I) -> usize
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let paths = unique_paths(paths);
+        if paths.is_empty() {
+            return self.sources;
+        }
+        self.source_paths
+            .iter()
+            .filter(|count| paths.iter().any(|path| count.path() == path.as_path()))
+            .map(DiscoveredSpectrumPathCount::count)
+            .sum()
+    }
+
+    /// Returns true when any tracked source path is matched.
+    ///
+    /// Passing an empty iterator returns true when any discovered source exists,
+    /// matching selector behavior.
+    #[must_use]
+    pub fn has_any_source_path<I, P>(&self, paths: I) -> bool
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.source_path_count_by_paths(paths) > 0
+    }
+
     /// Returns the number of discovered sources whose tracked source path starts with a prefix.
     #[must_use]
     pub fn source_path_prefix_count(&self, path: impl AsRef<Path>) -> usize {
@@ -249,6 +283,40 @@ impl DiscoveredSpectrumSummary {
     #[must_use]
     pub fn has_source_path_prefix(&self, path: impl AsRef<Path>) -> bool {
         self.source_path_prefix_count(path) > 0
+    }
+
+    /// Returns the number of discovered sources below any tracked source path prefix.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator returns
+    /// the total discovered source count, matching selector behavior.
+    #[must_use]
+    pub fn source_path_prefix_count_by_prefixes<I, P>(&self, paths: I) -> usize
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        let paths = unique_paths(paths);
+        if paths.is_empty() {
+            return self.sources;
+        }
+        self.source_paths
+            .iter()
+            .filter(|count| paths.iter().any(|path| count.path().starts_with(path)))
+            .map(DiscoveredSpectrumPathCount::count)
+            .sum()
+    }
+
+    /// Returns true when any discovered source path starts with one of the prefixes.
+    ///
+    /// Passing an empty iterator returns true when any discovered source exists,
+    /// matching selector behavior.
+    #[must_use]
+    pub fn has_any_source_path_prefix<I, P>(&self, paths: I) -> bool
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.source_path_prefix_count_by_prefixes(paths) > 0
     }
 
     /// Returns the number of discovered sources with one inferred dimension.
@@ -343,6 +411,21 @@ fn discovered_dimension_counts(
         }
     }
     counts
+}
+
+fn unique_paths<I, P>(paths: I) -> Vec<PathBuf>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut unique = Vec::new();
+    for path in paths {
+        let path = path.as_ref().to_path_buf();
+        if !unique.iter().any(|existing| existing == &path) {
+            unique.push(path);
+        }
+    }
+    unique
 }
 
 fn dimension_count_from_counts(

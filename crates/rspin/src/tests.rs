@@ -792,6 +792,7 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
     assert_eq!(summary.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
     assert_eq!(summary.source_path_count("varian_1h"), 1);
     assert!(summary.has_source_path_prefix("bruker_without_expno"));
+    assert_prelude_discovered_summary_path_sets(&summary, sources.len());
     assert_eq!(summary.source_count(LoadedSourceFilter::format("jdx")), 2);
     assert_eq!(summary.source_count(LoadedSourceFilter::raw()), 2);
     assert!(summary.has_source(LoadedSourceFilter::path_prefix("bruker_without_expno")));
@@ -884,6 +885,26 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
     let loaded = RSpinReader::new().read_discovered(&fixture_root, &processed)?;
     assert_eq!(loaded.len(), 1);
     Ok(())
+}
+
+fn assert_prelude_discovered_summary_path_sets(
+    summary: &DiscoveredSpectrumSummary,
+    source_count: usize,
+) {
+    assert_eq!(
+        summary.source_path_count_by_paths(["varian_1h", "empty_jcamp/empty.jdx", "missing"]),
+        3
+    );
+    assert_eq!(
+        summary.source_path_prefix_count_by_prefixes(["bruker_without_expno", "empty_jcamp"]),
+        4
+    );
+    assert_eq!(
+        summary.source_path_prefix_count_by_prefixes(std::iter::empty::<&str>()),
+        source_count
+    );
+    assert!(summary.has_any_source_path(["missing", "varian_1h"]));
+    assert!(summary.has_any_source_path_prefix(["missing", "empty_jcamp"]));
 }
 
 #[test]
