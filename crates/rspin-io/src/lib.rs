@@ -74,6 +74,7 @@ pub use bruker::{
     read_bruker_processed_2d_bytes, read_bruker_processed_2d_dir, read_bruker_ser_2d_bytes,
     read_bruker_ser_2d_dir,
 };
+pub use bundle::*;
 pub use bundle::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
     DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary, LoadWarning,

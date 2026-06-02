@@ -155,6 +155,7 @@ pub use exact::{
     load_spectrum_2d_with_source_relative_to,
 };
 use loader::FileCandidateKind;
+pub use loader::*;
 pub use loader::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
     DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary,

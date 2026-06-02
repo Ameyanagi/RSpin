@@ -1178,6 +1178,72 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_dimension_metadata_loaders() -> Result<()> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&root)?;
+
+    let jcamp_1d =
+        load_discovered_spectra_1d_by_source_format(&root, &sources, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(jcamp_1d.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(
+        load_discovered_spectra_1d_summary_by_source_formats(
+            &root,
+            &sources,
+            [LoadedSourceFormat::JcampDx],
+        )?,
+        jcamp_1d.summary()
+    );
+
+    let jeol_1d =
+        RSpinReader::new().read_discovered_bundle_1d_by_source_vendor(&root, &sources, "jeol")?;
+    assert_eq!(jeol_1d.source_vendor_count(LoadedSourceVendor::Jeol), 2);
+    assert_eq!(
+        load_discovered_spectra_1d_summary_strict_by_source_vendor(&root, &sources, "jeol")?,
+        jeol_1d.summary()
+    );
+
+    let raw_1d =
+        load_discovered_spectra_1d_by_source_data_kind(&root, &sources, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
+
+    let bruker_2d =
+        load_discovered_spectra_2d_by_source_vendor(&root, &sources, LoadedSourceVendor::Bruker)?;
+    assert_eq!(
+        bruker_2d.source_format_count(LoadedSourceFormat::BrukerSer),
+        1
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_2d_summary_by_source_format(
+            &root,
+            &sources,
+            "bruker ser",
+        )?,
+        bruker_2d.summary()
+    );
+
+    let two_d_formats = load_discovered_spectra_2d_by_source_formats(
+        &root,
+        &sources,
+        [LoadedSourceFormat::BrukerSer, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(
+        two_d_formats.source_format_count(LoadedSourceFormat::JeolJdf),
+        1
+    );
+    assert_eq!(
+        load_discovered_spectra_2d_summary_strict_by_source_data_kind(
+            &root,
+            &sources,
+            LoadedSourceDataKind::Raw,
+        )?,
+        bruker_2d.summary()
+    );
+
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
     let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

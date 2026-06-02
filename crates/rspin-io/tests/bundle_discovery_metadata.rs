@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
+use rspin_io as io;
 use rspin_io::{
     LoadedSourceDataKind, LoadedSourceFormat, LoadedSourceVendor, RSpinReader, discover_spectra,
     load_discovered_spectra_by_source_data_kind, load_discovered_spectra_by_source_data_kinds,
@@ -223,6 +224,297 @@ fn metadata_filter_summary_helpers_match_loaded_bundles() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[test]
+fn dimension_metadata_filter_helpers_load_discovered_1d_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let jcamp_1d =
+        io::load_discovered_spectra_1d_by_source_format_relative_to(&root, &sources, "jdx")?;
+    assert_eq!(jcamp_1d.len(), 2);
+    assert_eq!(jcamp_1d.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(
+        io::load_discovered_spectra_1d_by_source_format(
+            &root,
+            &sources,
+            LoadedSourceFormat::JcampDx,
+        )?,
+        jcamp_1d
+    );
+
+    let one_d_formats = io::load_discovered_spectra_1d_by_source_formats(
+        &root,
+        &sources,
+        [LoadedSourceFormat::JcampDx, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(
+        one_d_formats.source_format_count(LoadedSourceFormat::JcampDx),
+        2
+    );
+    assert_eq!(
+        one_d_formats.source_format_count(LoadedSourceFormat::JeolJdf),
+        2
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_1d_by_source_formats_relative_to(
+            &root,
+            &sources,
+            ["jdx", "jdf"],
+        )?,
+        one_d_formats
+    );
+
+    let jeol_1d = io::load_discovered_spectra_1d_by_source_vendor(&root, &sources, "jeol")?;
+    assert_eq!(jeol_1d.len(), 2);
+    assert_eq!(jeol_1d.source_vendor_count(LoadedSourceVendor::Jeol), 2);
+    let one_d_vendors = io::load_discovered_spectra_1d_by_source_vendors(
+        &root,
+        &sources,
+        [LoadedSourceVendor::Bruker, LoadedSourceVendor::Jeol],
+    )?;
+    assert_eq!(
+        one_d_vendors.source_vendor_count(LoadedSourceVendor::Bruker),
+        1
+    );
+    assert_eq!(
+        one_d_vendors.source_vendor_count(LoadedSourceVendor::Jeol),
+        2
+    );
+
+    let raw_1d = io::load_discovered_spectra_1d_by_source_data_kind(
+        &root,
+        &sources,
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.len(), 1);
+    assert_eq!(raw_1d.source_data_kind_count(LoadedSourceDataKind::Raw), 1);
+    assert_eq!(
+        io::load_discovered_spectra_1d_by_source_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw],
+        )?,
+        raw_1d
+    );
+    assert_eq!(
+        io::load_discovered_spectra_1d_strict_by_source_format(&root, &sources, "jcamp")?,
+        jcamp_1d
+    );
+
+    Ok(())
+}
+
+#[test]
+fn dimension_metadata_filter_helpers_load_discovered_2d_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let jeol_2d = io::load_discovered_spectra_2d_by_source_format(
+        &root,
+        &sources,
+        LoadedSourceFormat::JeolJdf,
+    )?;
+    assert_eq!(jeol_2d.len(), 1);
+    assert_eq!(jeol_2d.source_format_count(LoadedSourceFormat::JeolJdf), 1);
+    let two_d_formats = io::load_discovered_spectra_2d_by_source_formats(
+        &root,
+        &sources,
+        [LoadedSourceFormat::BrukerSer, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(
+        two_d_formats.source_format_count(LoadedSourceFormat::BrukerSer),
+        1
+    );
+    assert_eq!(
+        two_d_formats.source_format_count(LoadedSourceFormat::JeolJdf),
+        1
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_2d_by_source_formats(
+            &root,
+            &sources,
+            ["bruker ser", "jdf"],
+        )?,
+        two_d_formats
+    );
+
+    let bruker_2d = io::load_discovered_spectra_2d_by_source_vendor(&root, &sources, "bruker")?;
+    assert_eq!(bruker_2d.len(), 1);
+    assert_eq!(bruker_2d.source_vendor_count(LoadedSourceVendor::Bruker), 1);
+    let two_d_vendors = io::load_discovered_spectra_2d_by_source_vendors(
+        &root,
+        &sources,
+        [LoadedSourceVendor::Bruker, LoadedSourceVendor::Jeol],
+    )?;
+    assert_eq!(two_d_vendors, two_d_formats);
+
+    let raw_2d = io::load_discovered_spectra_2d_by_source_data_kind(
+        &root,
+        &sources,
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_2d.len(), 1);
+    assert_eq!(raw_2d.source_format_count(LoadedSourceFormat::BrukerSer), 1);
+    assert_eq!(
+        io::load_discovered_spectra_2d_by_source_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw],
+        )?,
+        raw_2d
+    );
+    assert_eq!(
+        io::load_discovered_spectra_2d_strict_by_source_vendor(
+            &root,
+            &sources,
+            LoadedSourceVendor::Bruker,
+        )?,
+        bruker_2d
+    );
+
+    Ok(())
+}
+
+#[test]
+fn dimension_metadata_filter_1d_summary_helpers_match_loaded_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let jcamp_1d = io::load_discovered_spectra_1d_by_source_format(&root, &sources, "jcamp")?;
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_source_format(&root, &sources, "jdx")?,
+        jcamp_1d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_source_formats(
+            &root,
+            &sources,
+            [LoadedSourceFormat::JcampDx],
+        )?,
+        jcamp_1d.summary()
+    );
+
+    let jeol_1d = io::load_discovered_spectra_1d_by_source_vendor(&root, &sources, "jeol")?;
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_source_vendor(
+            &root,
+            &sources,
+            LoadedSourceVendor::Jeol,
+        )?,
+        jeol_1d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_source_vendors(
+            &root,
+            &sources,
+            [LoadedSourceVendor::Jeol],
+        )?,
+        jeol_1d.summary()
+    );
+
+    let raw_1d = io::load_discovered_spectra_1d_by_source_data_kind(
+        &root,
+        &sources,
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_source_data_kind(
+            &root,
+            &sources,
+            LoadedSourceDataKind::Raw,
+        )?,
+        raw_1d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_source_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw],
+        )?,
+        raw_1d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_strict_by_source_vendor(&root, &sources, "jeol",)?,
+        jeol_1d.summary()
+    );
+
+    Ok(())
+}
+
+#[test]
+fn dimension_metadata_filter_2d_summary_helpers_match_loaded_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let bruker_2d = io::load_discovered_spectra_2d_by_source_format(
+        &root,
+        &sources,
+        LoadedSourceFormat::BrukerSer,
+    )?;
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_by_source_format(&root, &sources, "bruker ser")?,
+        bruker_2d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_by_source_formats(
+            &root,
+            &sources,
+            [LoadedSourceFormat::BrukerSer],
+        )?,
+        bruker_2d.summary()
+    );
+
+    let jeol_2d = io::load_discovered_spectra_2d_by_source_vendor(&root, &sources, "jeol")?;
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_by_source_vendor(&root, &sources, "jeol")?,
+        jeol_2d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_by_source_vendors(
+            &root,
+            &sources,
+            [LoadedSourceVendor::Jeol],
+        )?,
+        jeol_2d.summary()
+    );
+
+    let raw_2d = io::load_discovered_spectra_2d_by_source_data_kind(
+        &root,
+        &sources,
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_2d_summary_by_source_data_kind(
+            &root,
+            &sources,
+            LoadedSourceDataKind::Raw,
+        )?,
+        raw_2d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_strict_by_source_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw],
+        )?,
+        raw_2d.summary()
+    );
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_strict_by_source_format(
+            &root,
+            &sources,
+            LoadedSourceFormat::BrukerSer,
+        )?,
+        bruker_2d.summary()
+    );
+
+    Ok(())
+}
+
+fn cc0_myrcene_fixture_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0/myrcene")
 }
 
 fn fixture_root() -> PathBuf {

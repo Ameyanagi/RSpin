@@ -53,6 +53,7 @@ pub use core::{
     AnnotationTarget, Atom, Axis, Bond, BondOrder, Metadata, Molecule, Nucleus, ProcessingRecord,
     RSpinError, Result, Spectrum1D, Spectrum2D, SpectrumAnnotation, Unit, atoms_from_formula,
 };
+pub use io::*;
 pub use io::{
     ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION,
     ASSIGNMENT_JSON_VERSION, ASSIGNMENT_SET_JSON_FORMAT, AgilentBinaryFileInfo, AgilentFid1D,
@@ -584,6 +585,7 @@ pub use workflow::{AnalyzeProcessedSpectrum1D, AnalyzeProcessedSpectrum2D};
 /// primitives, processing pipeline traits, prediction types, and exact
 /// simulation APIs.
 pub mod prelude {
+    pub use crate::io::*;
     pub use crate::{
         ANALYSIS_1D_JSON_FORMAT, ANALYSIS_2D_JSON_FORMAT, ANALYSIS_JSON_VERSION,
         ASSIGNMENT_JSON_VERSION, ASSIGNMENT_SET_JSON_FORMAT, Abs1D, Abs2D, AgilentBinaryFileInfo,

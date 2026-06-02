@@ -17,6 +17,7 @@ use super::{
     source_vendor_filters, supported_bundle_source_data_kinds, supported_bundle_source_formats,
     supported_bundle_source_vendors,
 };
+pub use discovery::*;
 pub use discovery::{
     DiscoveredSpectrumDimension, DiscoveredSpectrumDimensionCount, DiscoveredSpectrumPathCount,
     DiscoveredSpectrumSource, DiscoveredSpectrumSourcesExt, DiscoveredSpectrumSummary,

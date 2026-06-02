@@ -1,6 +1,7 @@
 //! Source discovery for the spectrum bundle loader.
 
 mod dimension;
+mod dimension_metadata;
 mod dimension_path;
 mod dimension_summary;
 mod exact;
@@ -48,6 +49,7 @@ pub use dimension::{
     load_discovered_spectra_2d_strict_by_sources_relative_to,
     load_discovered_spectra_2d_strict_relative_to,
 };
+pub use dimension_metadata::*;
 pub use dimension_path::{
     load_discovered_spectra_1d_by_source_path, load_discovered_spectra_1d_by_source_path_prefix,
     load_discovered_spectra_1d_by_source_path_prefix_relative_to,
