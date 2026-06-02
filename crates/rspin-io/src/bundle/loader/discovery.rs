@@ -2,6 +2,7 @@
 
 mod dimension;
 mod dimension_path;
+mod dimension_summary;
 mod exact;
 mod exact_path;
 mod exact_path_prefix_set;
@@ -77,6 +78,28 @@ pub use dimension_path::{
     load_discovered_spectra_2d_summary_by_source_path_prefixes_relative_to,
     load_discovered_spectra_2d_summary_strict_by_source_path_prefixes,
     load_discovered_spectra_2d_summary_strict_by_source_path_prefixes_relative_to,
+};
+pub use dimension_summary::{
+    load_discovered_spectra_1d_summary, load_discovered_spectra_1d_summary_by_source,
+    load_discovered_spectra_1d_summary_by_source_relative_to,
+    load_discovered_spectra_1d_summary_by_sources,
+    load_discovered_spectra_1d_summary_by_sources_relative_to,
+    load_discovered_spectra_1d_summary_relative_to, load_discovered_spectra_1d_summary_strict,
+    load_discovered_spectra_1d_summary_strict_by_source,
+    load_discovered_spectra_1d_summary_strict_by_source_relative_to,
+    load_discovered_spectra_1d_summary_strict_by_sources,
+    load_discovered_spectra_1d_summary_strict_by_sources_relative_to,
+    load_discovered_spectra_1d_summary_strict_relative_to, load_discovered_spectra_2d_summary,
+    load_discovered_spectra_2d_summary_by_source,
+    load_discovered_spectra_2d_summary_by_source_relative_to,
+    load_discovered_spectra_2d_summary_by_sources,
+    load_discovered_spectra_2d_summary_by_sources_relative_to,
+    load_discovered_spectra_2d_summary_relative_to, load_discovered_spectra_2d_summary_strict,
+    load_discovered_spectra_2d_summary_strict_by_source,
+    load_discovered_spectra_2d_summary_strict_by_source_relative_to,
+    load_discovered_spectra_2d_summary_strict_by_sources,
+    load_discovered_spectra_2d_summary_strict_by_sources_relative_to,
+    load_discovered_spectra_2d_summary_strict_relative_to,
 };
 pub use exact::{
     load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,

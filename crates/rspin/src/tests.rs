@@ -1266,6 +1266,66 @@ fn prelude_exports_discovered_dimension_source_path_prefix_set_loaders() -> Resu
 }
 
 #[test]
+fn prelude_exports_discovered_dimension_summary_source_loaders() -> Result<()> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&root)?;
+    let two_d_sources: Vec<_> = sources.iter().filter(|source| source.is_2d()).collect();
+
+    let one_d =
+        load_discovered_spectra_1d_by_source(&root, &sources, LoadedSourceFilter::vendor("jeol"))?;
+    let one_d_summary = load_discovered_spectra_1d_summary_by_source(
+        &root,
+        &sources,
+        LoadedSourceFilter::vendor("jeol"),
+    )?;
+    assert_eq!(one_d_summary, one_d.summary());
+    assert_eq!(
+        load_discovered_spectra_1d_summary_strict_by_source(
+            &root,
+            &sources,
+            LoadedSourceFilter::vendor("jeol"),
+        )?,
+        one_d_summary
+    );
+
+    let one_d_all_summary = load_discovered_spectra_1d_summary(&root, &sources)?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_1d_summary_by_sources(
+            &root,
+            &sources,
+            std::iter::empty::<LoadedSourceFilter>(),
+        )?,
+        one_d_all_summary
+    );
+
+    let two_d_filters = [
+        LoadedSourceFilter::path_prefix("bruker_cosy_raw"),
+        LoadedSourceFilter::path("jeol/myrcene_hsqc_400mhz.jdf"),
+    ];
+    let two_d = load_discovered_spectra_2d_by_sources(&root, &sources, two_d_filters.clone())?;
+    let two_d_summary =
+        load_discovered_spectra_2d_summary_by_sources(&root, &sources, two_d_filters.clone())?;
+    assert_eq!(two_d_summary, two_d.summary());
+    assert_eq!(
+        load_discovered_spectra_2d_summary_strict_by_sources(&root, &sources, two_d_filters)?,
+        two_d_summary
+    );
+
+    let two_d_all_summary = load_discovered_spectra_2d_summary(&root, two_d_sources.clone())?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_2d_summary_by_sources_relative_to(
+            &root,
+            two_d_sources,
+            std::iter::empty::<LoadedSourceFilter>(),
+        )?,
+        two_d_all_summary
+    );
+
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
     let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
