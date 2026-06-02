@@ -1413,6 +1413,77 @@ fn free_first_source_strict_helpers_load_directly_and_reject_selected_bad_source
 }
 
 #[test]
+fn reader_first_short_source_strict_aliases_load_directly() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let base = fixture_root();
+
+    let first = reader.read_first_strict_by_vendor_relative_to(&base, "varian_1h", "varian")?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let proton = reader.read_first_1d_strict_by_data_kind_relative_to(
+        &base,
+        "varian_1h",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(proton.x.unit, Unit::Seconds);
+
+    let (_, source) = reader.read_first_1d_with_source_strict_by_format_relative_to(
+        &base,
+        "varian_1h",
+        "agilent fid",
+    )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let mixed = nmrxiv_fixture_root();
+    let hsqc = reader.read_first_2d_strict_by_vendor_relative_to(&mixed, "jeol", "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let first_many = reader.read_first_many_strict_by_vendor_relative_to(
+        &base,
+        ["empty_jcamp/empty.jdx", "varian_1h"],
+        "varian",
+    )?;
+    assert!(first_many.is_1d());
+    assert_eq!(first_many.source().path(), Some(Path::new("varian_1h")));
+    Ok(())
+}
+
+#[test]
+fn free_first_short_source_strict_aliases_load_and_reject_selected_bad_source() -> anyhow::Result<()>
+{
+    let base = fixture_root();
+
+    let first = io::load_first_spectrum_strict_by_vendor_relative_to(&base, "varian_1h", "varian")?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let (proton, source) = io::load_first_spectrum_1d_with_source_strict_by_data_kind_relative_to(
+        &base,
+        "varian_1h",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let mixed = nmrxiv_fixture_root();
+    let hsqc = io::load_first_spectrum_2d_strict_by_format_relative_to(&mixed, "jeol", "jdf")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let selected_bad = io::load_first_spectrum_1d_many_strict_by_format_relative_to(
+        &base,
+        ["empty_jcamp/empty.jdx", "varian_1h"],
+        "jdx",
+    );
+    let Err(error) = selected_bad else {
+        anyhow::bail!("strict format alias should reject a selected malformed source");
+    };
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

@@ -693,6 +693,17 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
         [LoadedSourceFilter::jeol()],
     )?;
     assert_eq!(strict_hsqc.shape(), (1024, 32));
+
+    let strict_short_jcamp =
+        load_first_spectrum_1d_strict_by_format_relative_to(&fixture_root, "jcamp", "jdx")?;
+    assert!(strict_short_jcamp.metadata.nucleus.is_some());
+
+    let strict_short_hsqc = RSpinReader::new().read_first_2d_strict_by_vendor_relative_to(
+        &fixture_root,
+        "jeol",
+        "jeol",
+    )?;
+    assert_eq!(strict_short_hsqc.shape(), (1024, 32));
     Ok(())
 }
 
