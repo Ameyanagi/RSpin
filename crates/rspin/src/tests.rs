@@ -704,6 +704,17 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
         "jeol",
     )?;
     assert_eq!(strict_short_hsqc.shape(), (1024, 32));
+
+    let strict_typed_jcamp =
+        load_first_spectrum_1d_strict_by_source_format_relative_to(&fixture_root, "jcamp", "jdx")?;
+    assert!(strict_typed_jcamp.metadata.nucleus.is_some());
+
+    let strict_typed_hsqc = RSpinReader::new().read_first_2d_strict_by_source_path_relative_to(
+        &fixture_root,
+        "jeol",
+        "jeol/myrcene_hsqc_400mhz.jdf",
+    )?;
+    assert_eq!(strict_typed_hsqc.shape(), (1024, 32));
     Ok(())
 }
 
