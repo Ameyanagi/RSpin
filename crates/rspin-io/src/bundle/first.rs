@@ -6,6 +6,216 @@ use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
 use super::{LoadedSource, SpectrumBundle, SpectrumBundleLoader};
 
+/// Loads a file or directory and returns the first one-dimensional spectrum.
+///
+/// This is for quick inspection workflows. Use [`crate::load_spectrum_1d`] when
+/// the input must resolve to exactly one one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d(path: impl AsRef<Path>) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_first_1d(path)
+}
+
+/// Loads a file or directory and returns the first one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_with_source(
+    path: impl AsRef<Path>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_first_1d_with_source(path)
+}
+
+/// Loads a file or directory and returns the first two-dimensional spectrum.
+///
+/// This is for quick inspection workflows. Use [`crate::load_spectrum_2d`] when
+/// the input must resolve to exactly one two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d(path: impl AsRef<Path>) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_first_2d(path)
+}
+
+/// Loads a file or directory and returns the first two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_with_source(
+    path: impl AsRef<Path>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_first_2d_with_source(path)
+}
+
+/// Loads one selected path relative to a base directory and returns the first one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Spectrum1D> {
+    SpectrumBundleLoader::new().read_first_1d_relative_to(base, path)
+}
+
+/// Loads one selected path relative to a base directory and returns the first one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_with_source_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<(Spectrum1D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_first_1d_with_source_relative_to(base, path)
+}
+
+/// Loads one selected path relative to a base directory and returns the first two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<Spectrum2D> {
+    SpectrumBundleLoader::new().read_first_2d_relative_to(base, path)
+}
+
+/// Loads one selected path relative to a base directory and returns the first two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_with_source_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<(Spectrum2D, LoadedSource)> {
+    SpectrumBundleLoader::new().read_first_2d_with_source_relative_to(base, path)
+}
+
+/// Loads selected paths and returns the first one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_many<I, P>(paths: I) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_1d_many(paths)
+}
+
+/// Loads selected paths and returns the first one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_many_with_source<I, P>(paths: I) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_1d_many_with_source(paths)
+}
+
+/// Loads selected paths and returns the first two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_many<I, P>(paths: I) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_2d_many(paths)
+}
+
+/// Loads selected paths and returns the first two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_many_with_source<I, P>(paths: I) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_2d_many_with_source(paths)
+}
+
+/// Loads selected paths relative to a base directory and returns the first one-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Spectrum1D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_1d_many_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory and returns the first one-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no one-dimensional spectrum is found.
+pub fn load_first_spectrum_1d_many_with_source_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<(Spectrum1D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_1d_many_with_source_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory and returns the first two-dimensional spectrum.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<Spectrum2D>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_2d_many_relative_to(base, paths)
+}
+
+/// Loads selected paths relative to a base directory and returns the first two-dimensional spectrum with source metadata.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no two-dimensional spectrum is found.
+pub fn load_first_spectrum_2d_many_with_source_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<(Spectrum2D, LoadedSource)>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_2d_many_with_source_relative_to(base, paths)
+}
+
 impl SpectrumBundle {
     /// Returns the first loaded one-dimensional spectrum.
     ///

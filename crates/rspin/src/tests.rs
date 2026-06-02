@@ -538,6 +538,34 @@ fn prelude_supports_first_spectrum_reader_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_first_spectrum_free_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let mixed_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let one_d = load_first_spectrum_1d_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (one_d, source) =
+        load_first_spectrum_1d_with_source_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
+
+    let one_d = load_first_spectrum_1d_many_relative_to(&fixture_root, ["varian_1h"])?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let two_d = load_first_spectrum_2d_relative_to(&mixed_root, "bruker_cosy_raw")?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) =
+        load_first_spectrum_2d_many_with_source_relative_to(&mixed_root, ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(std::path::Path::new("bruker_cosy_raw")));
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_first_source_filter_accessors() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

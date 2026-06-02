@@ -635,6 +635,87 @@ fn reader_first_spectrum_helpers_work_with_direct_and_many_paths() -> anyhow::Re
 }
 
 #[test]
+fn free_first_spectrum_helpers_cover_quick_inspection() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let mixed = nmrxiv_fixture_root();
+
+    let one_d = io::load_first_spectrum_1d_relative_to(&base, "varian_1h")?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (one_d, source) = io::load_first_spectrum_1d_with_source_relative_to(&base, "varian_1h")?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let one_d = io::load_first_spectrum_1d(base.join("varian_1h"))?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (one_d, source) = io::load_first_spectrum_1d_with_source(base.join("varian_1h"))?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let first_many =
+        io::load_first_spectrum_1d_many_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+    assert_eq!(first_many.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (first_many, source) = io::load_first_spectrum_1d_many_with_source_relative_to(
+        &base,
+        ["varian_1h", "bruker_without_expno"],
+    )?;
+    assert_eq!(first_many.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let first_many = io::load_first_spectrum_1d_many([base.join("varian_1h")])?;
+    assert_eq!(first_many.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (first_many, source) =
+        io::load_first_spectrum_1d_many_with_source([base.join("varian_1h")])?;
+    assert_eq!(first_many.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let two_d = io::load_first_spectrum_2d_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) =
+        io::load_first_spectrum_2d_with_source_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+
+    let two_d = io::load_first_spectrum_2d(mixed.join("bruker_cosy_raw"))?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) = io::load_first_spectrum_2d_with_source(mixed.join("bruker_cosy_raw"))?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+
+    let two_d = io::load_first_spectrum_2d_many_relative_to(&mixed, ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) =
+        io::load_first_spectrum_2d_many_with_source_relative_to(&mixed, ["bruker_cosy_raw"])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+
+    let two_d = io::load_first_spectrum_2d_many([mixed.join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) =
+        io::load_first_spectrum_2d_many_with_source([mixed.join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+
+    let missing = io::load_first_spectrum_2d_many([base.join("varian_1h")]);
+    let Err(error) = missing else {
+        anyhow::bail!("missing first 2D free helper should fail");
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("expected at least one two-dimensional spectrum")
+    );
+    Ok(())
+}
+
+#[test]
 fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()> {
     let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
     let first_1d = one_d_bundle
