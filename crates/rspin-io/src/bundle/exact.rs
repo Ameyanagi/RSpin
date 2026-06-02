@@ -5,6 +5,7 @@ mod generic_source_filtered;
 mod many_source_filtered;
 mod path_prefix_filtered;
 mod path_prefix_set_filtered;
+mod short_source;
 mod source_filtered;
 mod strict_source_filtered;
 
@@ -103,6 +104,7 @@ pub use path_prefix_set_filtered::{
     load_spectrum_2d_with_source_by_source_path_prefixes,
     load_spectrum_2d_with_source_by_source_path_prefixes_relative_to,
 };
+pub use short_source::*;
 pub use source_filtered::{
     load_spectrum_1d_by_source_format, load_spectrum_1d_by_source_format_relative_to,
     load_spectrum_1d_by_source_path, load_spectrum_1d_by_source_path_relative_to,

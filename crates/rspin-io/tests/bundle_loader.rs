@@ -1653,6 +1653,79 @@ fn free_strict_source_filtered_exact_helpers_reject_selected_bad_source() -> any
 }
 
 #[test]
+fn reader_short_exact_source_aliases_load_directly() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let base = fixture_root();
+
+    let proton = reader.read_1d_by_vendor_relative_to(&base, "varian_1h", "varian")?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let raw =
+        reader.read_1d_by_data_kind_relative_to(&base, "varian_1h", LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw.x.unit, Unit::Seconds);
+
+    let (_, source) =
+        reader.read_1d_with_source_by_format_relative_to(&base, "varian_1h", "agilent fid")?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let mixed = nmrxiv_fixture_root();
+    let hsqc = reader.read_2d_by_path_prefix_relative_to(&mixed, "jeol", "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (hsqc, hsqc_source) =
+        reader.read_2d_many_with_source_by_vendor_relative_to(&mixed, ["jcamp", "jeol"], "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(
+        hsqc_source.path(),
+        Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+    Ok(())
+}
+
+#[test]
+fn free_short_strict_exact_source_aliases_reject_selected_bad_source() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let proton = io::load_spectrum_1d_many_strict_by_path_prefix_relative_to(
+        &base,
+        ["empty_jcamp/empty.jdx", "varian_1h"],
+        "varian_1h",
+    )?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (_, source) = io::load_spectrum_1d_with_source_strict_by_format_relative_to(
+        &base,
+        "varian_1h",
+        "agilent fid",
+    )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let raw = io::load_spectrum_1d_strict_by_data_kind_relative_to(
+        &base,
+        "varian_1h",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let mixed = nmrxiv_fixture_root();
+    let (hsqc, hsqc_source) =
+        io::load_spectrum_2d_with_source_strict_by_vendor_relative_to(&mixed, "jeol", "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(hsqc_source.vendor(), Some(LoadedSourceVendor::Jeol));
+
+    let selected_bad = io::load_spectrum_1d_many_strict_by_format_relative_to(
+        &base,
+        ["empty_jcamp/empty.jdx", "varian_1h"],
+        "jdx",
+    );
+    let Err(error) = selected_bad else {
+        anyhow::bail!("strict short exact loading should reject a selected malformed source");
+    };
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

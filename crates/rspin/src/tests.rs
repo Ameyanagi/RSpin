@@ -2979,6 +2979,36 @@ fn prelude_exports_strict_source_filtered_exact_bundle_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_short_exact_source_aliases() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let bruker = load_spectrum_1d_by_format(&mixed_vendor_root, LoadedSourceFormat::BrukerFid)?;
+    assert_eq!(bruker.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let hsqc = RSpinReader::new().read_2d_by_vendor(&mixed_vendor_root, "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let carbon = load_spectrum_1d_by_path_prefix(
+        &mixed_vendor_root,
+        "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+
+    let strict_bruker =
+        load_spectrum_1d_strict_by_format(&mixed_vendor_root, LoadedSourceFormat::BrukerFid)?;
+    assert_eq!(strict_bruker.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (_, hsqc_source) =
+        RSpinReader::new().read_2d_with_source_strict_by_path_prefix(&mixed_vendor_root, "jeol")?;
+    assert_eq!(
+        hsqc_source.path(),
+        Some(std::path::Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_source_path_prefix_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
