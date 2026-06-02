@@ -440,6 +440,42 @@ fn prelude_supports_short_bundle_reader_chains() -> Result<()> {
         .source_vendor("bruker")
         .read_relative_to(&fixture_root, "bruker_without_expno")?;
     assert_eq!(all_bruker.len(), 2);
+
+    let bruker_shortcut = RSpinReader::new()
+        .bruker()
+        .processed()
+        .read_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(
+        bruker_shortcut.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let varian_shortcut = RSpinReader::new()
+        .varian()
+        .read_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(
+        varian_shortcut.source_format_count(LoadedSourceFormat::AgilentFid),
+        1
+    );
+
+    let mixed_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let jeol_shortcut = RSpinReader::new()
+        .jeol()
+        .read_relative_to(&mixed_root, "jeol")?;
+    assert_eq!(
+        jeol_shortcut.source_vendor_count(LoadedSourceVendor::Jeol),
+        3
+    );
+
+    let jcamp_shortcut = RSpinReader::new()
+        .jcamp()
+        .one_d()
+        .read_relative_to(&mixed_root, "jcamp")?;
+    assert_eq!(
+        jcamp_shortcut.source_format_count(LoadedSourceFormat::JcampDx),
+        2
+    );
     Ok(())
 }
 
@@ -476,7 +512,7 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
     let bundle = load_spectra(&fixture_root)?;
 
     let first = bundle
-        .first_by_source(LoadedSourceFilter::vendor("bruker"))
+        .first_by_source(LoadedSourceFilter::bruker())
         .ok_or_else(|| RSpinError::Parse {
             format: "facade bundle accessor",
             message: "missing first Bruker spectrum".to_owned(),
@@ -494,8 +530,16 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
     assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
     assert_eq!(source.format(), "jcamp_dx");
 
+    let jcamp = bundle
+        .first_1d_by_source(LoadedSourceFilter::jcamp_dx())
+        .ok_or_else(|| RSpinError::Parse {
+            format: "facade bundle accessor",
+            message: "missing first JCAMP-DX one-dimensional spectrum".to_owned(),
+        })?;
+    assert!(jcamp.metadata.nucleus.is_some());
+
     let hsqc = bundle
-        .first_2d_by_sources([LoadedSourceFilter::path_prefix("jeol")])
+        .first_2d_by_sources([LoadedSourceFilter::jeol()])
         .ok_or_else(|| RSpinError::Parse {
             format: "facade bundle accessor",
             message: "missing JEOL two-dimensional spectrum".to_owned(),

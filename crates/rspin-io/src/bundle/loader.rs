@@ -2,6 +2,7 @@
 
 mod discovery;
 mod routing;
+mod shortcuts;
 
 use std::path::{Path, PathBuf};
 

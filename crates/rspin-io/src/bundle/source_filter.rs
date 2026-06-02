@@ -63,6 +63,66 @@ impl LoadedSourceFilter {
         }
     }
 
+    /// Creates a Bruker source filter.
+    #[must_use]
+    pub fn bruker() -> Self {
+        Self::vendor(LoadedSourceVendor::Bruker)
+    }
+
+    /// Creates a JEOL Delta source filter.
+    #[must_use]
+    pub fn jeol() -> Self {
+        Self::vendor(LoadedSourceVendor::Jeol)
+    }
+
+    /// Creates an Agilent/Varian source filter.
+    #[must_use]
+    pub fn agilent_varian() -> Self {
+        Self::vendor(LoadedSourceVendor::AgilentVarian)
+    }
+
+    /// Creates an Agilent/Varian source filter.
+    #[must_use]
+    pub fn agilent() -> Self {
+        Self::agilent_varian()
+    }
+
+    /// Creates an Agilent/Varian source filter.
+    #[must_use]
+    pub fn varian() -> Self {
+        Self::agilent_varian()
+    }
+
+    /// Creates a JCAMP-DX source filter.
+    #[must_use]
+    pub fn jcamp_dx() -> Self {
+        Self::format(LoadedSourceFormat::JcampDx)
+    }
+
+    /// Creates a JCAMP-DX source filter.
+    #[must_use]
+    pub fn jcamp() -> Self {
+        Self::jcamp_dx()
+    }
+
+    /// Creates an nmrML source filter.
+    #[must_use]
+    pub fn nmrml() -> Self {
+        Self::format(LoadedSourceFormat::NmrMl)
+    }
+
+    /// Creates an `RSpin` JSON source filter.
+    #[must_use]
+    pub fn json() -> Self {
+        Self::format(LoadedSourceFormat::Json)
+    }
+
+    /// Creates an `RSpin` CSV source filter.
+    #[must_use]
+    pub fn csv() -> Self {
+        Self::format(LoadedSourceFormat::Csv)
+    }
+
     /// Creates a raw/processed source data kind filter.
     #[must_use]
     pub const fn data_kind(data_kind: LoadedSourceDataKind) -> Self {

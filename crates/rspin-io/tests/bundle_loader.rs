@@ -620,12 +620,12 @@ fn bundle_first_source_filter_accessors_cover_quick_selection() -> anyhow::Resul
     assert!(first_any.source().path().is_some());
 
     let jeol = bundle
-        .first_by_source(LoadedSourceFilter::vendor("jeol"))
+        .first_by_source(LoadedSourceFilter::jeol())
         .ok_or_else(|| anyhow::anyhow!("missing first JEOL spectrum"))?;
     assert_eq!(jeol.source().vendor(), Some(LoadedSourceVendor::Jeol));
 
     let jcamp = bundle
-        .first_1d_by_source(LoadedSourceFormat::JcampDx)
+        .first_1d_by_source(LoadedSourceFilter::jcamp())
         .ok_or_else(|| anyhow::anyhow!("missing first JCAMP-DX one-dimensional spectrum"))?;
     assert!(jcamp.metadata.nucleus.is_some());
 
@@ -664,6 +664,19 @@ fn bundle_first_source_filter_accessors_cover_quick_selection() -> anyhow::Resul
             .first_loaded_2d_by_source(LoadedSourceFormat::JcampDx)
             .is_none()
     );
+
+    let bruker_source = LoadedSource::new(None, LoadedSourceFormat::BrukerFid.as_str());
+    assert!(LoadedSourceFilter::bruker().matches_source(&bruker_source));
+    let varian_source = LoadedSource::new(None, LoadedSourceFormat::AgilentFid.as_str());
+    assert!(LoadedSourceFilter::varian().matches_source(&varian_source));
+    assert!(LoadedSourceFilter::agilent().matches_source(&varian_source));
+    assert!(LoadedSourceFilter::agilent_varian().matches_source(&varian_source));
+    let json_source = LoadedSource::new(None, LoadedSourceFormat::Json.as_str());
+    assert!(LoadedSourceFilter::json().matches_source(&json_source));
+    let csv_source = LoadedSource::new(None, LoadedSourceFormat::Csv.as_str());
+    assert!(LoadedSourceFilter::csv().matches_source(&csv_source));
+    let nmrml_source = LoadedSource::new(None, LoadedSourceFormat::NmrMl.as_str());
+    assert!(LoadedSourceFilter::nmrml().matches_source(&nmrml_source));
     Ok(())
 }
 
@@ -806,6 +819,58 @@ fn reader_short_source_filter_aliases_cover_common_workflows() -> anyhow::Result
         &combined,
         Path::new("bruker_without_expno/pdata/1")
     ));
+    Ok(())
+}
+
+#[test]
+fn reader_named_source_shortcuts_cover_vendor_and_format_workflows() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let bruker_processed = RSpinReader::new()
+        .source_format(LoadedSourceFormat::BrukerProcessed)
+        .read_relative_to(&base, "bruker_without_expno")?;
+    let bruker_shortcut = RSpinReader::new()
+        .bruker()
+        .processed()
+        .read_relative_to(&base, "bruker_without_expno")?;
+    assert_eq!(bruker_shortcut.summary(), bruker_processed.summary());
+
+    let varian = RSpinReader::new()
+        .source_vendor("varian")
+        .read_relative_to(&base, "varian_1h")?;
+    let varian_shortcut = RSpinReader::new()
+        .varian()
+        .read_relative_to(&base, "varian_1h")?;
+    assert_eq!(varian_shortcut.summary(), varian.summary());
+
+    let agilent_shortcut = RSpinReader::new()
+        .agilent()
+        .read_relative_to(&base, "varian_1h")?;
+    assert_eq!(agilent_shortcut.summary(), varian.summary());
+
+    let mixed = nmrxiv_fixture_root();
+    let jeol_shortcut = RSpinReader::new().jeol().read_relative_to(&mixed, "jeol")?;
+    assert_eq!(
+        jeol_shortcut.source_vendor_count(LoadedSourceVendor::Jeol),
+        3
+    );
+
+    let jcamp_shortcut = RSpinReader::new()
+        .jcamp()
+        .one_d()
+        .read_relative_to(&mixed, "jcamp")?;
+    assert_eq!(
+        jcamp_shortcut.source_format_count(LoadedSourceFormat::JcampDx),
+        2
+    );
+    assert_eq!(
+        RSpinReader::new()
+            .jcamp_dx()
+            .one_d()
+            .read_relative_to(&mixed, "jcamp")?
+            .summary(),
+        jcamp_shortcut.summary()
+    );
     Ok(())
 }
 
