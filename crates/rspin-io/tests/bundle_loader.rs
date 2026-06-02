@@ -1273,6 +1273,59 @@ fn free_first_short_source_aliases_load_directly() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reader_first_strict_helpers_load_directly() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let base = fixture_root();
+
+    let first = reader.read_first_spectrum_strict_relative_to(&base, "varian_1h")?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let proton = reader.read_first_1d_strict_relative_to(&base, "varian_1h")?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (_, source) = reader.read_first_1d_with_source_strict_relative_to(&base, "varian_1h")?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let many = reader.read_first_spectrum_many_strict_relative_to(&base, ["varian_1h"])?;
+    assert!(many.is_1d());
+
+    let mixed = nmrxiv_fixture_root();
+    let hsqc = reader.read_first_2d_strict_relative_to(&mixed, "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    Ok(())
+}
+
+#[test]
+fn free_first_strict_helpers_load_directly_and_reject_bad_candidates() -> anyhow::Result<()> {
+    let base = fixture_root();
+
+    let first = io::load_first_spectrum_strict_relative_to(&base, "varian_1h")?;
+    assert!(first.is_1d());
+
+    let (proton, source) =
+        io::load_first_spectrum_1d_with_source_strict_relative_to(&base, "varian_1h")?;
+    assert_eq!(proton.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let mixed = nmrxiv_fixture_root();
+    let (hsqc, hsqc_source) =
+        io::load_first_spectrum_2d_with_source_strict_relative_to(&mixed, "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    assert_eq!(hsqc_source.vendor(), Some(LoadedSourceVendor::Jeol));
+
+    let strict = io::load_first_spectrum_1d_many_strict_relative_to(
+        &base,
+        ["empty_jcamp/empty.jdx", "varian_1h"],
+    );
+    let Err(error) = strict else {
+        anyhow::bail!("strict first-spectrum loading should reject malformed candidates");
+    };
+    assert!(matches!(error, RSpinError::Parse { .. }));
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());
