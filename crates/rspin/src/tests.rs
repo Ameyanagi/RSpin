@@ -1110,6 +1110,74 @@ fn prelude_exports_discovered_source_path_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let fid = load_discovered_spectra_by_source_format(
+        &fixture_root,
+        &sources,
+        LoadedSourceFormat::AgilentFid,
+    )?;
+    assert_eq!(fid.len(), 1);
+    assert_eq!(fid.source_format_count(LoadedSourceFormat::AgilentFid), 1);
+
+    let selected_formats = load_discovered_spectra_by_source_formats(
+        &fixture_root,
+        &sources,
+        [
+            LoadedSourceFormat::AgilentFid,
+            LoadedSourceFormat::BrukerProcessed,
+        ],
+    )?;
+    assert_eq!(selected_formats.len(), 2);
+
+    let varian = load_discovered_spectra_by_source_vendor(&fixture_root, &sources, "varian")?;
+    assert_eq!(
+        varian.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    let vendor_summary = load_discovered_spectra_summary_by_source_vendors(
+        &fixture_root,
+        &sources,
+        ["bruker", "varian"],
+    )?;
+    assert_eq!(
+        vendor_summary.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        vendor_summary.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let processed = RSpinReader::new().read_discovered_by_source_data_kind(
+        &fixture_root,
+        &sources,
+        LoadedSourceDataKind::Processed,
+    )?;
+    assert_eq!(
+        processed.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+    let processed_summary = load_discovered_spectra_summary_strict_by_source_data_kind(
+        &fixture_root,
+        &sources,
+        LoadedSourceDataKind::Processed,
+    )?;
+    assert_eq!(processed_summary, processed.summary());
+
+    let strict_fid_summary = load_discovered_spectra_summary_strict_by_source_format(
+        &fixture_root,
+        &sources,
+        "varian fid",
+    )?;
+    assert_eq!(strict_fid_summary, fid.summary());
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_dimension_bundle_loaders() -> Result<()> {
     let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

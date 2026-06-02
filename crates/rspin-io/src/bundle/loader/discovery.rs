@@ -10,6 +10,7 @@ mod loaded_summary;
 mod model;
 mod selected;
 mod selection;
+mod source_metadata;
 mod source_path;
 mod strict;
 mod summary;
@@ -191,6 +192,54 @@ pub use selection::{
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
     select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_source_paths,
     select_discovered_spectra_by_sources,
+};
+pub use source_metadata::{
+    load_discovered_spectra_by_source_data_kind,
+    load_discovered_spectra_by_source_data_kind_relative_to,
+    load_discovered_spectra_by_source_data_kinds,
+    load_discovered_spectra_by_source_data_kinds_relative_to,
+    load_discovered_spectra_by_source_format, load_discovered_spectra_by_source_format_relative_to,
+    load_discovered_spectra_by_source_formats,
+    load_discovered_spectra_by_source_formats_relative_to,
+    load_discovered_spectra_by_source_vendor, load_discovered_spectra_by_source_vendor_relative_to,
+    load_discovered_spectra_by_source_vendors,
+    load_discovered_spectra_by_source_vendors_relative_to,
+    load_discovered_spectra_strict_by_source_data_kind,
+    load_discovered_spectra_strict_by_source_data_kind_relative_to,
+    load_discovered_spectra_strict_by_source_data_kinds,
+    load_discovered_spectra_strict_by_source_data_kinds_relative_to,
+    load_discovered_spectra_strict_by_source_format,
+    load_discovered_spectra_strict_by_source_format_relative_to,
+    load_discovered_spectra_strict_by_source_formats,
+    load_discovered_spectra_strict_by_source_formats_relative_to,
+    load_discovered_spectra_strict_by_source_vendor,
+    load_discovered_spectra_strict_by_source_vendor_relative_to,
+    load_discovered_spectra_strict_by_source_vendors,
+    load_discovered_spectra_strict_by_source_vendors_relative_to,
+    load_discovered_spectra_summary_by_source_data_kind,
+    load_discovered_spectra_summary_by_source_data_kind_relative_to,
+    load_discovered_spectra_summary_by_source_data_kinds,
+    load_discovered_spectra_summary_by_source_data_kinds_relative_to,
+    load_discovered_spectra_summary_by_source_format,
+    load_discovered_spectra_summary_by_source_format_relative_to,
+    load_discovered_spectra_summary_by_source_formats,
+    load_discovered_spectra_summary_by_source_formats_relative_to,
+    load_discovered_spectra_summary_by_source_vendor,
+    load_discovered_spectra_summary_by_source_vendor_relative_to,
+    load_discovered_spectra_summary_by_source_vendors,
+    load_discovered_spectra_summary_by_source_vendors_relative_to,
+    load_discovered_spectra_summary_strict_by_source_data_kind,
+    load_discovered_spectra_summary_strict_by_source_data_kind_relative_to,
+    load_discovered_spectra_summary_strict_by_source_data_kinds,
+    load_discovered_spectra_summary_strict_by_source_data_kinds_relative_to,
+    load_discovered_spectra_summary_strict_by_source_format,
+    load_discovered_spectra_summary_strict_by_source_format_relative_to,
+    load_discovered_spectra_summary_strict_by_source_formats,
+    load_discovered_spectra_summary_strict_by_source_formats_relative_to,
+    load_discovered_spectra_summary_strict_by_source_vendor,
+    load_discovered_spectra_summary_strict_by_source_vendor_relative_to,
+    load_discovered_spectra_summary_strict_by_source_vendors,
+    load_discovered_spectra_summary_strict_by_source_vendors_relative_to,
 };
 pub use source_path::{
     load_discovered_spectra_by_source_path, load_discovered_spectra_by_source_path_prefix,
