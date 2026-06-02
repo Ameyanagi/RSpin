@@ -407,6 +407,43 @@ fn prelude_supports_simple_multi_path_bundle_loading() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_short_bundle_reader_chains() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let raw_bruker = RSpinReader::new()
+        .raw()
+        .one_d()
+        .source_vendor("bruker")
+        .read_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(raw_bruker.len(), 1);
+    assert_eq!(raw_bruker.len_1d(), 1);
+    assert_eq!(
+        raw_bruker.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+
+    let processed_bruker = RSpinReader::new()
+        .processed()
+        .source_vendor("bruker")
+        .read_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(processed_bruker.len(), 1);
+    assert_eq!(
+        processed_bruker.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
+    let all_bruker = RSpinReader::new()
+        .raw()
+        .raw_and_processed()
+        .one_d()
+        .source_vendor("bruker")
+        .read_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(all_bruker.len(), 2);
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_first_bundle_accessors() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

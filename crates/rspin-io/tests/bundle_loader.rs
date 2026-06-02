@@ -200,6 +200,34 @@ fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
     assert_eq!(processed_only.len(), 1);
     assert_eq!(first_1d(&processed_only)?.x.unit, Unit::Ppm);
 
+    let raw_alias = RSpinReader::new()
+        .processed_only()
+        .raw()
+        .read_path(&bruker)?;
+    assert_eq!(raw_alias.len(), 1);
+    assert_eq!(first_1d(&raw_alias)?.x.unit, Unit::Seconds);
+
+    let processed_alias = RSpinReader::new()
+        .raw_only()
+        .processed()
+        .read_path(&bruker)?;
+    assert_eq!(processed_alias.len(), 1);
+    assert_eq!(first_1d(&processed_alias)?.x.unit, Unit::Ppm);
+
+    let all_candidate_aliases = RSpinReader::new()
+        .raw()
+        .raw_and_processed()
+        .read_path(&bruker)?;
+    assert_eq!(all_candidate_aliases.len(), 2);
+    assert_eq!(
+        all_candidate_aliases.source_format_count(LoadedSourceFormat::BrukerFid),
+        1
+    );
+    assert_eq!(
+        all_candidate_aliases.source_format_count(LoadedSourceFormat::BrukerProcessed),
+        1
+    );
+
     let mixed = nmrxiv_fixture_root();
     let one_d_only = RSpinReader::new().one_d_only().read_path(&mixed)?;
     assert_eq!(one_d_only.len_1d(), 5);
@@ -208,6 +236,21 @@ fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
     let two_d_only = RSpinReader::new().two_d_only().read_path(&mixed)?;
     assert_eq!(two_d_only.len_1d(), 0);
     assert_eq!(two_d_only.len_2d(), 2);
+
+    let one_d_alias = RSpinReader::new().two_d_only().one_d().read_path(&mixed)?;
+    assert_eq!(one_d_alias.len_1d(), 5);
+    assert_eq!(one_d_alias.len_2d(), 0);
+
+    let two_d_alias = RSpinReader::new().one_d_only().two_d().read_path(&mixed)?;
+    assert_eq!(two_d_alias.len_1d(), 0);
+    assert_eq!(two_d_alias.len_2d(), 2);
+
+    let all_dimension_aliases = RSpinReader::new()
+        .one_d()
+        .one_d_and_two_d()
+        .read_path(&mixed)?;
+    assert_eq!(all_dimension_aliases.len_1d(), 5);
+    assert_eq!(all_dimension_aliases.len_2d(), 2);
 
     let no_sources = RSpinReader::new()
         .without_source_paths()
@@ -219,6 +262,25 @@ fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
             .all(|loaded| loaded.source().path.is_none())
     );
 
+    let hidden_sources = RSpinReader::new().hide_source_paths().read_path(&bruker)?;
+    assert!(
+        hidden_sources
+            .spectra()
+            .iter()
+            .all(|loaded| loaded.source().path.is_none())
+    );
+
+    let tracked_sources = RSpinReader::new()
+        .hide_source_paths()
+        .track_source_paths()
+        .read_path(&bruker)?;
+    assert!(
+        tracked_sources
+            .spectra()
+            .iter()
+            .all(|loaded| loaded.source().path.is_some())
+    );
+
     let strict_error = RSpinReader::new()
         .strict()
         .read_path(fixture_root().join("empty_jcamp/empty.jdx"));
@@ -226,6 +288,12 @@ fn reader_named_option_helpers_cover_common_modes() -> anyhow::Result<()> {
         anyhow::bail!("strict helper should fail on unreadable candidates");
     };
     assert!(error.to_string().contains("missing XYDATA values"));
+
+    let lenient = RSpinReader::new()
+        .strict()
+        .lenient()
+        .read_path(fixture_root())?;
+    assert!(lenient.has_warnings());
     Ok(())
 }
 

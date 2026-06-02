@@ -724,10 +724,34 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Enables raw candidates and disables processed candidates.
+    ///
+    /// This is a short chainable alias for [`Self::raw_only`].
+    #[must_use]
+    pub fn raw(self) -> Self {
+        self.raw_only()
+    }
+
     /// Enables processed candidates and disables raw candidates.
     #[must_use]
     pub fn processed_only(mut self) -> Self {
         self.raw = Toggle::Disabled;
+        self.processed = Toggle::Enabled;
+        self
+    }
+
+    /// Enables processed candidates and disables raw candidates.
+    ///
+    /// This is a short chainable alias for [`Self::processed_only`].
+    #[must_use]
+    pub fn processed(self) -> Self {
+        self.processed_only()
+    }
+
+    /// Enables both raw and processed candidates.
+    #[must_use]
+    pub fn raw_and_processed(mut self) -> Self {
+        self.raw = Toggle::Enabled;
         self.processed = Toggle::Enabled;
         self
     }
@@ -740,10 +764,34 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Enables one-dimensional candidates and disables two-dimensional candidates.
+    ///
+    /// This is a short chainable alias for [`Self::one_d_only`].
+    #[must_use]
+    pub fn one_d(self) -> Self {
+        self.one_d_only()
+    }
+
     /// Enables two-dimensional candidates and disables one-dimensional candidates.
     #[must_use]
     pub fn two_d_only(mut self) -> Self {
         self.one_d = Toggle::Disabled;
+        self.two_d = Toggle::Enabled;
+        self
+    }
+
+    /// Enables two-dimensional candidates and disables one-dimensional candidates.
+    ///
+    /// This is a short chainable alias for [`Self::two_d_only`].
+    #[must_use]
+    pub fn two_d(self) -> Self {
+        self.two_d_only()
+    }
+
+    /// Enables both one-dimensional and two-dimensional candidates.
+    #[must_use]
+    pub fn one_d_and_two_d(mut self) -> Self {
+        self.one_d = Toggle::Enabled;
         self.two_d = Toggle::Enabled;
         self
     }
@@ -755,11 +803,33 @@ impl SpectrumBundleLoader {
         self
     }
 
+    /// Disables strict mode.
+    #[must_use]
+    pub fn lenient(mut self) -> Self {
+        self.strict = Toggle::Disabled;
+        self
+    }
+
+    /// Enables relative source paths in loaded spectra and warnings.
+    #[must_use]
+    pub fn track_source_paths(mut self) -> Self {
+        self.source_paths = Toggle::Enabled;
+        self
+    }
+
     /// Disables source paths in loaded spectra and warnings.
     #[must_use]
     pub fn without_source_paths(mut self) -> Self {
         self.source_paths = Toggle::Disabled;
         self
+    }
+
+    /// Disables source paths in loaded spectra and warnings.
+    ///
+    /// This is a short chainable alias for [`Self::without_source_paths`].
+    #[must_use]
+    pub fn hide_source_paths(self) -> Self {
+        self.without_source_paths()
     }
 
     /// Loads all supported spectra from a file or directory path.
