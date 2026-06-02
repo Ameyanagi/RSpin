@@ -1143,6 +1143,76 @@ fn free_first_source_filter_helpers_load_directly() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reader_first_typed_source_filter_helpers_load_directly() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let root = nmrxiv_fixture_root();
+
+    let first = reader.read_first_spectrum_by_source_vendor(&root, "bruker")?;
+    assert_eq!(first.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let jcamp = reader.read_first_1d_by_source_format(&root, "jcamp_dx")?;
+    assert!(jcamp.metadata.nucleus.is_some());
+
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let (carbon, carbon_source) =
+        reader.read_first_1d_with_source_by_source_path(&root, carbon_path)?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(carbon_source.path(), Some(carbon_path));
+
+    let hsqc = reader.read_first_2d_by_source_path_prefix(&root, "jeol")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let raw = reader.read_first_spectrum_by_source_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw.source().data_kind(), LoadedSourceDataKind::Raw);
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let first_many = reader.read_first_spectrum_many_by_source_path_prefix_relative_to(
+        &base,
+        ["myrcene"],
+        "myrcene/jeol",
+    )?;
+    assert_eq!(first_many.source().vendor(), Some(LoadedSourceVendor::Jeol));
+    Ok(())
+}
+
+#[test]
+fn free_first_typed_source_filter_helpers_load_directly() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+
+    let first = io::load_first_spectrum_by_source_vendor(&root, "jeol")?;
+    assert_eq!(first.source().vendor(), Some(LoadedSourceVendor::Jeol));
+
+    let (jcamp, jcamp_source) =
+        io::load_first_spectrum_1d_with_source_by_source_format(&root, "jcamp")?;
+    assert!(jcamp.metadata.nucleus.is_some());
+    assert_eq!(jcamp_source.format(), "jcamp_dx");
+
+    let hsqc = io::load_first_spectrum_2d_by_source_path(&root, "jeol/myrcene_hsqc_400mhz.jdf")?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let (bruker_2d, bruker_source) =
+        io::load_first_spectrum_2d_many_with_source_by_source_data_kind_relative_to(
+            &base,
+            ["myrcene/bruker_cosy_raw"],
+            LoadedSourceDataKind::Raw,
+        )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    assert_eq!(
+        bruker_source.path(),
+        Some(Path::new("myrcene/bruker_cosy_raw"))
+    );
+
+    let carbon = io::load_first_spectrum_1d_many_by_source_path_relative_to(
+        &base,
+        ["myrcene"],
+        "myrcene/jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

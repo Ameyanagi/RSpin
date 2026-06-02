@@ -648,6 +648,13 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
     let direct_hsqc =
         RSpinReader::new().read_first_2d_by_source(&fixture_root, LoadedSourceFilter::jeol())?;
     assert!(direct_hsqc.shape().0 > 0);
+
+    let direct_format = load_first_spectrum_1d_by_source_format(&fixture_root, "jcamp")?;
+    assert!(direct_format.metadata.nucleus.is_some());
+
+    let direct_prefix =
+        RSpinReader::new().read_first_2d_by_source_path_prefix(&fixture_root, "jeol")?;
+    assert!(direct_prefix.shape().0 > 0);
     Ok(())
 }
 
