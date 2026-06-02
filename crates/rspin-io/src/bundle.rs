@@ -26,6 +26,7 @@ mod source_filter;
 mod source_format;
 mod source_read;
 mod source_strict;
+mod source_strict_read;
 mod source_summary;
 pub use aliases::{
     load, load_many, load_many_relative_to, load_many_strict, load_many_strict_relative_to,

@@ -3679,6 +3679,76 @@ fn strict_source_filtered_helpers_return_parser_errors() -> anyhow::Result<()> {
 }
 
 #[test]
+fn strict_source_filtered_reader_methods_match_helpers() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let jcamp =
+        RSpinReader::new().read_strict_by_source_format(&root, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(
+        jcamp.summary(),
+        io::load_spectra_strict_by_source_format(&root, "jdx")?.summary()
+    );
+
+    let jeol = RSpinReader::new().read_strict_by_source_vendor_relative_to(
+        &root,
+        "jeol",
+        LoadedSourceVendor::Jeol,
+    )?;
+    assert_eq!(
+        jeol.summary(),
+        io::load_spectra_strict_by_source_vendor_relative_to(&root, "jeol", "jeol")?.summary()
+    );
+
+    let selected = RSpinReader::new().read_strict_by_sources(
+        &root,
+        [
+            LoadedSourceFilter::path(carbon_path),
+            LoadedSourceFilter::path(hsqc_path),
+        ],
+    )?;
+    assert_eq!(
+        selected.summary(),
+        io::load_spectra_strict_by_sources(
+            &root,
+            [
+                LoadedSourceFilter::path(carbon_path),
+                LoadedSourceFilter::path(hsqc_path),
+            ],
+        )?
+        .summary()
+    );
+
+    let summary = RSpinReader::new().read_summary_many_strict_by_source_paths_relative_to(
+        &root,
+        ["jcamp", "jeol"],
+        [carbon_path, hsqc_path],
+    )?;
+    assert_eq!(
+        summary,
+        io::load_spectra_many_summary_strict_by_source_paths_relative_to(
+            &root,
+            ["jcamp", "jeol"],
+            [carbon_path, hsqc_path],
+        )?
+    );
+    Ok(())
+}
+
+#[test]
+fn strict_source_filtered_reader_methods_return_parser_errors() -> anyhow::Result<()> {
+    let root = fixture_root();
+    let Err(error) = RSpinReader::new()
+        .read_summary_strict_by_source_path(&root, Path::new("empty_jcamp/empty.jdx"))
+    else {
+        anyhow::bail!("strict source-path summary reader should reject malformed JCAMP-DX");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
 fn source_filtered_summary_helpers_match_loaded_bundles() -> anyhow::Result<()> {
     let root = nmrxiv_fixture_root();
     let proton_path = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
