@@ -1772,6 +1772,75 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_short_summary_aliases() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let fid = load_discovered_spectra_summary_by_source_format(
+        &fixture_root,
+        &sources,
+        LoadedSourceFormat::AgilentFid,
+    )?;
+    assert_eq!(
+        load_discovered_spectra_summary_by_format(&fixture_root, &sources, "varian fid")?,
+        fid
+    );
+
+    let formats = load_discovered_spectra_summary_by_source_formats(
+        &fixture_root,
+        &sources,
+        ["agilent fid", "bruker processed"],
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_formats(
+            &fixture_root,
+            &sources,
+            ["agilent fid", "bruker processed"],
+        )?,
+        formats
+    );
+
+    let varian =
+        load_discovered_spectra_summary_by_source_vendor(&fixture_root, &sources, "varian")?;
+    assert_eq!(
+        load_discovered_spectra_summary_by_vendor(&fixture_root, &sources, "varian")?,
+        varian
+    );
+
+    let processed = load_discovered_spectra_summary_by_source_data_kind(
+        &fixture_root,
+        &sources,
+        LoadedSourceDataKind::Processed,
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_data_kind(
+            &fixture_root,
+            &sources,
+            LoadedSourceDataKind::Processed,
+        )?,
+        processed
+    );
+
+    let bruker = load_discovered_spectra_summary_by_path_prefix(
+        &fixture_root,
+        &sources,
+        "bruker_without_expno",
+    )?;
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+
+    let strict_varian =
+        load_discovered_spectra_summary_strict_by_source_vendor(&fixture_root, &sources, "varian")?;
+    assert_eq!(
+        RSpinReader::new()
+            .strict()
+            .read_discovered_summary_by_vendor(&fixture_root, &sources, "varian")?,
+        strict_varian
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_dimension_metadata_loaders() -> Result<()> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

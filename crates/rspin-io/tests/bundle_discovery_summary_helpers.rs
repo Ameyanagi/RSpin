@@ -6,7 +6,13 @@ use anyhow::{Result, anyhow};
 use rspin_io::{
     DiscoveredSpectrumSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat,
     LoadedSourceVendor, RSpinReader, SpectrumBundleSummary, discover_spectra,
-    load_discovered_spectra_summary, load_discovered_spectra_summary_by_source,
+    load_discovered_spectra_summary, load_discovered_spectra_summary_by_data_kind,
+    load_discovered_spectra_summary_by_format, load_discovered_spectra_summary_by_path_prefix,
+    load_discovered_spectra_summary_by_path_prefixes, load_discovered_spectra_summary_by_source,
+    load_discovered_spectra_summary_by_source_data_kind,
+    load_discovered_spectra_summary_by_source_data_kinds,
+    load_discovered_spectra_summary_by_source_format,
+    load_discovered_spectra_summary_by_source_formats,
     load_discovered_spectra_summary_by_source_path,
     load_discovered_spectra_summary_by_source_path_prefix,
     load_discovered_spectra_summary_by_source_path_prefix_relative_to,
@@ -16,7 +22,8 @@ use rspin_io::{
     load_discovered_spectra_summary_by_source_paths,
     load_discovered_spectra_summary_by_source_paths_relative_to,
     load_discovered_spectra_summary_by_source_relative_to,
-    load_discovered_spectra_summary_by_sources,
+    load_discovered_spectra_summary_by_source_vendor,
+    load_discovered_spectra_summary_by_source_vendors, load_discovered_spectra_summary_by_sources,
     load_discovered_spectra_summary_by_sources_relative_to,
     load_discovered_spectra_summary_relative_to, load_discovered_spectra_summary_strict,
     load_discovered_spectra_summary_strict_by_source,
@@ -29,6 +36,7 @@ use rspin_io::{
     load_discovered_spectra_summary_strict_by_source_paths,
     load_discovered_spectra_summary_strict_by_source_paths_relative_to,
     load_discovered_spectra_summary_strict_by_source_relative_to,
+    load_discovered_spectra_summary_strict_by_source_vendor,
     load_discovered_spectra_summary_strict_by_sources,
 };
 
@@ -279,6 +287,95 @@ fn reader_loaded_summary_methods_preserve_filters_and_strict_mode() -> Result<()
         ));
     };
     assert!(error.to_string().contains("missing XYDATA values"));
+
+    Ok(())
+}
+
+#[test]
+fn short_loaded_summary_aliases_match_source_metadata_helpers() -> Result<()> {
+    let root = fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let fid = load_discovered_spectra_summary_by_source_format(&root, &sources, "agilent fid")?;
+    assert_eq!(
+        load_discovered_spectra_summary_by_format(&root, &sources, "varian fid")?,
+        fid
+    );
+
+    let selected_formats = load_discovered_spectra_summary_by_source_formats(
+        &root,
+        &sources,
+        ["agilent fid", "bruker processed"],
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_formats_relative_to(
+            &root,
+            &sources,
+            ["agilent fid", "bruker processed"],
+        )?,
+        selected_formats
+    );
+
+    let varian = load_discovered_spectra_summary_by_source_vendor(&root, &sources, "varian")?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_vendor(&root, &sources, "varian")?,
+        varian
+    );
+
+    let known_vendors =
+        load_discovered_spectra_summary_by_source_vendors(&root, &sources, ["bruker", "varian"])?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_vendors(
+            &root,
+            &sources,
+            ["bruker", "varian"],
+        )?,
+        known_vendors
+    );
+
+    let raw = load_discovered_spectra_summary_by_source_data_kind(
+        &root,
+        &sources,
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(
+        load_discovered_spectra_summary_by_data_kind(&root, &sources, LoadedSourceDataKind::Raw)?,
+        raw
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+        )?,
+        load_discovered_spectra_summary_by_source_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+        )?
+    );
+
+    let bruker =
+        load_discovered_spectra_summary_by_path_prefix(&root, &sources, "bruker_without_expno")?;
+    assert_eq!(bruker.spectra(), 2);
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
+    assert_eq!(
+        load_discovered_spectra_summary_by_path_prefixes(
+            &root,
+            &sources,
+            ["bruker_without_expno", "varian_1h"],
+        )?,
+        known_vendors
+    );
+
+    let strict_varian =
+        load_discovered_spectra_summary_strict_by_source_vendor(&root, &sources, "varian")?;
+    assert_eq!(
+        RSpinReader::new()
+            .strict()
+            .read_discovered_summary_by_vendor(&root, &sources, "varian")?,
+        strict_varian
+    );
 
     Ok(())
 }

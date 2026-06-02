@@ -14,6 +14,7 @@ mod preview;
 mod selected;
 mod selection;
 mod short_source;
+mod short_summary;
 mod source_metadata;
 mod source_path;
 mod strict;
@@ -205,6 +206,7 @@ pub use selection::{
     select_discovered_spectra_by_sources,
 };
 pub use short_source::*;
+pub use short_summary::*;
 pub use source_metadata::{
     load_discovered_spectra_by_source_data_kind,
     load_discovered_spectra_by_source_data_kind_relative_to,
