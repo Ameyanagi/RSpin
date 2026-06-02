@@ -25,6 +25,7 @@ mod selectors;
 mod source_filter;
 mod source_format;
 mod source_read;
+mod source_strict;
 mod source_summary;
 pub use aliases::{
     load, load_many, load_many_relative_to, load_many_strict, load_many_strict_relative_to,
@@ -408,6 +409,7 @@ pub use source_format::{
     supported_bundle_source_formats, supported_bundle_source_vendors,
 };
 pub use source_read::*;
+pub use source_strict::*;
 pub use source_summary::*;
 
 /// High-level reader for supported `RSpin` spectrum inputs.

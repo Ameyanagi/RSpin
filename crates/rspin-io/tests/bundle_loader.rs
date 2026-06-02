@@ -3628,6 +3628,57 @@ fn source_path_set_helpers_load_matching_bundles() -> anyhow::Result<()> {
 }
 
 #[test]
+fn strict_source_filtered_helpers_load_matching_bundles() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let proton_path = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let jcamp = io::load_spectra_strict_by_source_format(&root, "jdx")?;
+    assert_eq!(jcamp.len(), 2);
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert!(jcamp.has_source_path(proton_path));
+    assert!(jcamp.has_source_path(carbon_path));
+
+    let jeol = io::load_spectra_strict_by_source_vendor_relative_to(&root, "jeol", "jeol")?;
+    assert_eq!(jeol.len(), 3);
+    assert_eq!(jeol.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+    assert!(jeol.has_source_path(hsqc_path));
+
+    let selected = io::load_spectra_strict_by_source_paths(&root, [carbon_path, hsqc_path])?;
+    assert_eq!(selected.len(), 2);
+    assert!(selected.has_source_path(carbon_path));
+    assert!(selected.has_source_path(hsqc_path));
+
+    let summary = io::load_spectra_many_summary_strict_by_source_paths_relative_to(
+        &root,
+        ["jcamp", "jeol"],
+        [carbon_path, hsqc_path],
+    )?;
+    assert_eq!(summary.spectra(), 2);
+    assert_eq!(summary.spectra_1d(), 1);
+    assert_eq!(summary.spectra_2d(), 1);
+    Ok(())
+}
+
+#[test]
+fn strict_source_filtered_helpers_return_parser_errors() -> anyhow::Result<()> {
+    let root = fixture_root();
+    let Err(error) = io::load_spectra_strict_by_source_format(&root, "jdx") else {
+        anyhow::bail!("strict source-format loading should reject malformed JCAMP-DX");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+
+    let Err(error) =
+        io::load_spectra_summary_strict_by_source_path(&root, Path::new("empty_jcamp/empty.jdx"))
+    else {
+        anyhow::bail!("strict source-path summary should reject malformed JCAMP-DX");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
 fn source_filtered_summary_helpers_match_loaded_bundles() -> anyhow::Result<()> {
     let root = nmrxiv_fixture_root();
     let proton_path = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
