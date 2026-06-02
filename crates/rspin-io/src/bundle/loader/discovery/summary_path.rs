@@ -65,6 +65,46 @@ pub fn load_discovered_spectra_summary_by_source_path_prefix<'a>(
     load_discovered_spectra_summary_by_source_path_prefix_relative_to(base, sources, path)
 }
 
+/// Loads discovered source candidates below any source path prefix and returns summary counts.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source matching unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when loading the matching discovered sources fails.
+pub fn load_discovered_spectra_summary_by_source_path_prefixes_relative_to<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .read_discovered_summary_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
+/// Loads discovered source candidates below any source path prefix and returns summary counts.
+///
+/// This short alias mirrors [`load_discovered_spectra_summary_by_source_path_prefixes_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the matching discovered sources fails.
+pub fn load_discovered_spectra_summary_by_source_path_prefixes<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    load_discovered_spectra_summary_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
 /// Strictly loads discovered source candidates matching one source path and returns summary counts.
 ///
 /// # Errors
@@ -123,6 +163,47 @@ pub fn load_discovered_spectra_summary_strict_by_source_path_prefix<'a>(
     path: impl AsRef<Path>,
 ) -> Result<SpectrumBundleSummary> {
     load_discovered_spectra_summary_strict_by_source_path_prefix_relative_to(base, sources, path)
+}
+
+/// Strictly loads discovered source candidates below any source path prefix and returns summary counts.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source matching unrestricted.
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching discovered sources fails.
+pub fn load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_discovered_summary_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
+/// Strictly loads discovered source candidates below any source path prefix and returns summary counts.
+///
+/// This short alias mirrors [`load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching discovered sources fails.
+pub fn load_discovered_spectra_summary_strict_by_source_path_prefixes<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundleSummary>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to(base, sources, paths)
 }
 
 impl SpectrumBundleLoader {
@@ -193,4 +274,61 @@ impl SpectrumBundleLoader {
     ) -> Result<SpectrumBundleSummary> {
         self.read_discovered_summary_by_source_path_prefix_relative_to(base, sources, path)
     }
+
+    /// Loads discovered source candidates below any source path prefix and returns summary counts.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching discovered sources fails.
+    pub fn read_discovered_summary_by_source_path_prefixes_relative_to<'a, I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        paths: I,
+    ) -> Result<SpectrumBundleSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_discovered_summary_by_sources_relative_to(
+            base,
+            sources,
+            path_prefix_filters(paths),
+        )
+    }
+
+    /// Loads discovered source candidates below any source path prefix and returns summary counts.
+    ///
+    /// This short alias mirrors [`Self::read_discovered_summary_by_source_path_prefixes_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching discovered sources fails.
+    pub fn read_discovered_summary_by_source_path_prefixes<'a, I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        paths: I,
+    ) -> Result<SpectrumBundleSummary>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_discovered_summary_by_source_path_prefixes_relative_to(base, sources, paths)
+    }
+}
+
+fn path_prefix_filters<I, P>(paths: I) -> Vec<LoadedSourceFilter>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut filters = Vec::new();
+    for path in paths {
+        filters.push(LoadedSourceFilter::path_prefix(path));
+    }
+    filters
 }

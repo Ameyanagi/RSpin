@@ -9,6 +9,8 @@ use rspin_io::{
     load_discovered_spectra_summary_by_source_path,
     load_discovered_spectra_summary_by_source_path_prefix,
     load_discovered_spectra_summary_by_source_path_prefix_relative_to,
+    load_discovered_spectra_summary_by_source_path_prefixes,
+    load_discovered_spectra_summary_by_source_path_prefixes_relative_to,
     load_discovered_spectra_summary_by_source_path_relative_to,
     load_discovered_spectra_summary_by_source_relative_to,
     load_discovered_spectra_summary_by_sources,
@@ -18,6 +20,8 @@ use rspin_io::{
     load_discovered_spectra_summary_strict_by_source_path,
     load_discovered_spectra_summary_strict_by_source_path_prefix,
     load_discovered_spectra_summary_strict_by_source_path_prefix_relative_to,
+    load_discovered_spectra_summary_strict_by_source_path_prefixes,
+    load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to,
     load_discovered_spectra_summary_strict_by_source_path_relative_to,
     load_discovered_spectra_summary_strict_by_source_relative_to,
     load_discovered_spectra_summary_strict_by_sources,
@@ -81,6 +85,37 @@ fn loaded_summary_helpers_report_selected_discovered_sources() -> Result<()> {
         "bruker_without_expno",
     )?;
     assert_eq!(bruker_by_prefix_alias, bruker_by_prefix);
+
+    let selected_by_prefixes = load_discovered_spectra_summary_by_source_path_prefixes_relative_to(
+        &root,
+        &sources,
+        ["missing", "bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(selected_by_prefixes.spectra(), 3);
+    assert_eq!(selected_by_prefixes.warnings(), 0);
+    assert_eq!(
+        selected_by_prefixes.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        selected_by_prefixes.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let selected_by_prefixes_alias = load_discovered_spectra_summary_by_source_path_prefixes(
+        &root,
+        &sources,
+        ["bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(selected_by_prefixes_alias, selected_by_prefixes);
+
+    let unrestricted_by_empty_prefixes =
+        load_discovered_spectra_summary_by_source_path_prefixes_relative_to(
+            &root,
+            &sources,
+            std::iter::empty::<&str>(),
+        )?;
+    assert_eq!(unrestricted_by_empty_prefixes, summary);
 
     let selected = load_discovered_spectra_summary_by_sources(
         &root,
@@ -226,6 +261,60 @@ fn reader_loaded_summary_methods_preserve_filters_and_strict_mode() -> Result<()
     };
     assert!(error.to_string().contains("missing XYDATA values"));
 
+    Ok(())
+}
+
+#[test]
+fn reader_loaded_summary_prefix_set_methods_preserve_filters_and_strict_mode() -> Result<()> {
+    let root = fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let selected_by_prefixes = RSpinReader::new()
+        .read_discovered_summary_by_source_path_prefixes_relative_to(
+            &root,
+            &sources,
+            ["missing", "bruker_without_expno", "varian_1h"],
+        )?;
+    assert_eq!(selected_by_prefixes.spectra(), 3);
+    assert_eq!(
+        selected_by_prefixes.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        selected_by_prefixes.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let selected_by_prefixes_alias = RSpinReader::new()
+        .read_discovered_summary_by_source_path_prefixes(
+            &root,
+            &sources,
+            ["bruker_without_expno", "varian_1h"],
+        )?;
+    assert_eq!(selected_by_prefixes_alias, selected_by_prefixes);
+
+    let strict_prefixes =
+        load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to(
+            &root,
+            &sources,
+            ["missing", "bruker_without_expno", "varian_1h"],
+        )?;
+    assert_eq!(strict_prefixes.spectra(), 3);
+    assert_eq!(
+        strict_prefixes.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        strict_prefixes.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+
+    let strict_prefixes_alias = load_discovered_spectra_summary_strict_by_source_path_prefixes(
+        &root,
+        &sources,
+        ["bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(strict_prefixes_alias, strict_prefixes);
     Ok(())
 }
 

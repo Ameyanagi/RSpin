@@ -582,6 +582,10 @@ fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
         "bruker_without_expno",
     )?;
     assert_eq!(selected_by_prefix.spectra(), 2);
+    assert_eq!(
+        selected_by_prefix.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
 
     let selected_by_path_reader = RSpinReader::new().read_discovered_summary_by_source_path(
         &fixture_root,
@@ -616,6 +620,59 @@ fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
         "bruker_without_expno",
     )?;
     assert_eq!(strict_by_prefix.spectra(), 2);
+    Ok(())
+}
+
+#[test]
+fn prelude_exports_discovered_summary_prefix_set_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let selected_by_prefixes = load_discovered_spectra_summary_by_source_path_prefixes_relative_to(
+        &fixture_root,
+        &sources,
+        ["missing", "bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(selected_by_prefixes.spectra(), 3);
+    assert_eq!(selected_by_prefixes.warnings(), 0);
+    assert_eq!(
+        selected_by_prefixes.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        selected_by_prefixes.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let selected_by_prefixes_alias = load_discovered_spectra_summary_by_source_path_prefixes(
+        &fixture_root,
+        &sources,
+        ["bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(selected_by_prefixes_alias, selected_by_prefixes);
+
+    let selected_by_prefixes_reader = RSpinReader::new()
+        .read_discovered_summary_by_source_path_prefixes(
+            &fixture_root,
+            &sources,
+            ["bruker_without_expno", "varian_1h"],
+        )?;
+    assert_eq!(selected_by_prefixes_reader, selected_by_prefixes);
+
+    let strict_by_prefixes =
+        load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to(
+            &fixture_root,
+            &sources,
+            ["missing", "bruker_without_expno", "varian_1h"],
+        )?;
+    assert_eq!(strict_by_prefixes.spectra(), 3);
+    let strict_by_prefixes_alias = load_discovered_spectra_summary_strict_by_source_path_prefixes(
+        &fixture_root,
+        &sources,
+        ["bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(strict_by_prefixes_alias, strict_by_prefixes);
     Ok(())
 }
 
