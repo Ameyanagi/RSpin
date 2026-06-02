@@ -1264,6 +1264,18 @@ fn prelude_exports_exact_discovered_source_path_helpers() -> Result<()> {
         "varian_1h",
     )?;
     assert_eq!(source.format(), "agilent_fid");
+    let spectrum = load_discovered_spectrum_1d_by_source_path_prefixes(
+        &fixture_root,
+        &sources,
+        ["missing", "varian_1h"],
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+    let (_, source) = RSpinReader::new().read_discovered_1d_with_source_by_source_path_prefixes(
+        &fixture_root,
+        &sources,
+        ["missing", "varian_1h"],
+    )?;
+    assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
 
     let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
@@ -1279,6 +1291,18 @@ fn prelude_exports_exact_discovered_source_path_helpers() -> Result<()> {
         hsqc_path,
     )?;
     assert_eq!(source.path(), Some(std::path::Path::new(hsqc_path)));
+    let hsqc = load_discovered_spectrum_2d_by_source_path_prefixes(
+        &myrcene_root,
+        &myrcene_sources,
+        ["missing", hsqc_path],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    let (_, source) = load_discovered_spectrum_2d_with_source_by_source_path_prefixes_relative_to(
+        &myrcene_root,
+        &myrcene_sources,
+        ["missing", hsqc_path],
+    )?;
+    assert_eq!(source.format(), "jeol_jdf");
     Ok(())
 }
 

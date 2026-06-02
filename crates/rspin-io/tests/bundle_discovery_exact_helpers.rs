@@ -8,21 +8,25 @@ use rspin_io::{
     load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,
     load_discovered_spectrum_1d_by_source_path,
     load_discovered_spectrum_1d_by_source_path_prefix_relative_to,
+    load_discovered_spectrum_1d_by_source_path_prefixes,
     load_discovered_spectrum_1d_by_source_relative_to, load_discovered_spectrum_1d_by_sources,
     load_discovered_spectrum_1d_by_sources_relative_to, load_discovered_spectrum_1d_relative_to,
     load_discovered_spectrum_1d_with_source, load_discovered_spectrum_1d_with_source_by_source,
     load_discovered_spectrum_1d_with_source_by_source_path,
     load_discovered_spectrum_1d_with_source_by_source_path_prefix_relative_to,
+    load_discovered_spectrum_1d_with_source_by_source_path_prefixes_relative_to,
     load_discovered_spectrum_1d_with_source_by_source_relative_to,
     load_discovered_spectrum_1d_with_source_by_sources,
     load_discovered_spectrum_1d_with_source_by_sources_relative_to,
     load_discovered_spectrum_1d_with_source_relative_to, load_discovered_spectrum_2d,
     load_discovered_spectrum_2d_by_source, load_discovered_spectrum_2d_by_source_path_prefix,
+    load_discovered_spectrum_2d_by_source_path_prefixes_relative_to,
     load_discovered_spectrum_2d_by_source_path_relative_to,
     load_discovered_spectrum_2d_by_source_relative_to, load_discovered_spectrum_2d_by_sources,
     load_discovered_spectrum_2d_by_sources_relative_to, load_discovered_spectrum_2d_relative_to,
     load_discovered_spectrum_2d_with_source, load_discovered_spectrum_2d_with_source_by_source,
     load_discovered_spectrum_2d_with_source_by_source_path_prefix,
+    load_discovered_spectrum_2d_with_source_by_source_path_prefixes,
     load_discovered_spectrum_2d_with_source_by_source_path_relative_to,
     load_discovered_spectrum_2d_with_source_by_source_relative_to,
     load_discovered_spectrum_2d_with_source_by_sources,
@@ -148,6 +152,41 @@ fn free_helpers_load_exact_discovered_1d_sources_by_path() -> Result<()> {
 }
 
 #[test]
+fn free_helpers_load_exact_discovered_1d_sources_by_path_prefixes() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+
+    let spectrum = load_discovered_spectrum_1d_by_source_path_prefixes(
+        fixture_root(),
+        &sources,
+        ["missing", "varian_1h"],
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (_, source) = load_discovered_spectrum_1d_with_source_by_source_path_prefixes_relative_to(
+        fixture_root(),
+        &sources,
+        ["missing", "varian_1h"],
+    )?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let spectrum = rspin_io::RSpinReader::new().read_discovered_1d_by_source_path_prefixes(
+        fixture_root(),
+        &sources,
+        ["missing", "varian_1h"],
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (_, source) = rspin_io::RSpinReader::new()
+        .read_discovered_1d_with_source_by_source_path_prefixes_relative_to(
+            fixture_root(),
+            &sources,
+            ["missing", "varian_1h"],
+        )?;
+    assert_eq!(source.format(), "agilent_fid");
+    Ok(())
+}
+
+#[test]
 fn free_helpers_load_exact_discovered_2d_sources() -> Result<()> {
     let sources = discover_spectra(cc0_myrcene_fixture_root())?;
     let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
@@ -265,6 +304,43 @@ fn free_helpers_load_exact_discovered_2d_sources_by_path() -> Result<()> {
         hsqc_path,
     )?;
     assert_eq!(source.path(), Some(Path::new(hsqc_path)));
+    Ok(())
+}
+
+#[test]
+fn free_helpers_load_exact_discovered_2d_sources_by_path_prefixes() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    let spectrum = load_discovered_spectrum_2d_by_source_path_prefixes_relative_to(
+        cc0_myrcene_fixture_root(),
+        &sources,
+        ["missing", hsqc_path],
+    )?;
+    assert_eq!(spectrum.shape(), (1024, 32));
+
+    let (_, source) = load_discovered_spectrum_2d_with_source_by_source_path_prefixes(
+        cc0_myrcene_fixture_root(),
+        &sources,
+        ["missing", hsqc_path],
+    )?;
+    assert_eq!(source.path(), Some(Path::new(hsqc_path)));
+
+    let spectrum = rspin_io::RSpinReader::new()
+        .read_discovered_2d_by_source_path_prefixes_relative_to(
+            cc0_myrcene_fixture_root(),
+            &sources,
+            ["missing", hsqc_path],
+        )?;
+    assert_eq!(spectrum.shape(), (1024, 32));
+
+    let (_, source) = rspin_io::RSpinReader::new()
+        .read_discovered_2d_with_source_by_source_path_prefixes(
+            cc0_myrcene_fixture_root(),
+            &sources,
+            ["missing", hsqc_path],
+        )?;
+    assert_eq!(source.format(), "jeol_jdf");
     Ok(())
 }
 
