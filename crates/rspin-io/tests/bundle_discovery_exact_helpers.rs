@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use rspin_io::{
-    DiscoveredSpectrumSource, LoadedSourceFilter, LoadedSourceFormat, discover_spectra,
-    load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,
+    DiscoveredSpectrumSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat,
+    discover_spectra, load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,
     load_discovered_spectrum_1d_by_source_path,
     load_discovered_spectrum_1d_by_source_path_prefix_relative_to,
     load_discovered_spectrum_1d_by_source_path_prefixes,
@@ -183,6 +183,62 @@ fn free_helpers_load_exact_discovered_1d_sources_by_path_prefixes() -> Result<()
             ["missing", "varian_1h"],
         )?;
     assert_eq!(source.format(), "agilent_fid");
+    Ok(())
+}
+
+#[test]
+fn short_source_aliases_load_exact_discovered_sources() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+    let varian = discovered_source(&sources, "varian_1h", LoadedSourceFormat::AgilentFid)?;
+
+    let spectrum =
+        rspin_io::load_discovered_spectrum_1d_by_format(fixture_root(), [varian], "varian fid")?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (_, source) = rspin_io::load_discovered_spectrum_1d_with_source_by_vendor(
+        fixture_root(),
+        [varian],
+        "varian",
+    )?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let raw = rspin_io::RSpinReader::new().read_discovered_1d_by_data_kind(
+        fixture_root(),
+        [varian],
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw.len(), 16_384);
+
+    let (_, source) = rspin_io::RSpinReader::new().read_discovered_1d_with_source_by_path_prefix(
+        fixture_root(),
+        [varian],
+        "varian_1h",
+    )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let myrcene_root = cc0_myrcene_fixture_root();
+    let myrcene_sources = discover_spectra(&myrcene_root)?;
+    let hsqc_source = discovered_source(
+        &myrcene_sources,
+        "jeol/myrcene_hsqc_400mhz.jdf",
+        LoadedSourceFormat::JeolJdf,
+    )?;
+    let hsqc = rspin_io::RSpinReader::new().read_discovered_2d_by_vendor(
+        &myrcene_root,
+        [hsqc_source],
+        "jeol",
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (_, source) = rspin_io::load_discovered_spectrum_2d_with_source_by_path_prefix(
+        &myrcene_root,
+        [hsqc_source],
+        "jeol",
+    )?;
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
     Ok(())
 }
 

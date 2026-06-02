@@ -7,6 +7,7 @@ mod dimension_summary;
 mod exact;
 mod exact_path;
 mod exact_path_prefix_set;
+mod exact_short_source;
 mod loaded_summary;
 mod model;
 mod preview;
@@ -165,6 +166,7 @@ pub use exact_path_prefix_set::{
     load_discovered_spectrum_2d_with_source_by_source_path_prefixes,
     load_discovered_spectrum_2d_with_source_by_source_path_prefixes_relative_to,
 };
+pub use exact_short_source::*;
 pub use loaded_summary::{
     load_discovered_spectra_summary, load_discovered_spectra_summary_by_source,
     load_discovered_spectra_summary_by_source_relative_to,
