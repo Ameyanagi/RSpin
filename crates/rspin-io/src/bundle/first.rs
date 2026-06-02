@@ -4,7 +4,60 @@ use std::path::Path;
 
 use rspin_core::{RSpinError, Result, Spectrum1D, Spectrum2D};
 
-use super::{LoadedSource, SpectrumBundle, SpectrumBundleLoader};
+use super::{LoadedSource, LoadedSpectrum, SpectrumBundle, SpectrumBundleLoader};
+
+/// Loads a file or directory and returns the first spectrum of any supported dimension.
+///
+/// This is for quick inspection workflows where callers do not want to choose
+/// one-dimensional or two-dimensional data up front.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no spectrum is found.
+pub fn load_first_spectrum(path: impl AsRef<Path>) -> Result<LoadedSpectrum> {
+    SpectrumBundleLoader::new().read_first_spectrum(path)
+}
+
+/// Loads one selected path relative to a base directory and returns the first spectrum of any supported dimension.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no spectrum is found.
+pub fn load_first_spectrum_relative_to(
+    base: impl AsRef<Path>,
+    path: impl AsRef<Path>,
+) -> Result<LoadedSpectrum> {
+    SpectrumBundleLoader::new().read_first_spectrum_relative_to(base, path)
+}
+
+/// Loads selected paths and returns the first spectrum of any supported dimension.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no spectrum is found.
+pub fn load_first_spectrum_many<I, P>(paths: I) -> Result<LoadedSpectrum>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_spectrum_many(paths)
+}
+
+/// Loads selected paths relative to a base directory and returns the first spectrum of any supported dimension.
+///
+/// # Errors
+///
+/// Returns an error when loading fails or no spectrum is found.
+pub fn load_first_spectrum_many_relative_to<I, P>(
+    base: impl AsRef<Path>,
+    paths: I,
+) -> Result<LoadedSpectrum>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new().read_first_spectrum_many_relative_to(base, paths)
+}
 
 /// Loads a file or directory and returns the first one-dimensional spectrum.
 ///
@@ -217,6 +270,37 @@ where
 }
 
 impl SpectrumBundle {
+    /// Returns the first loaded spectrum of any supported dimension.
+    #[must_use]
+    pub fn first_spectrum(&self) -> Option<&LoadedSpectrum> {
+        self.spectra().first()
+    }
+
+    /// Returns the first loaded spectrum of any supported dimension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bundle contains no spectra.
+    pub fn require_first_spectrum(&self) -> Result<&LoadedSpectrum> {
+        self.first_spectrum()
+            .ok_or_else(|| first_error("spectrum", self.len_1d(), self.len_2d()))
+    }
+
+    /// Consumes the bundle and returns the first loaded spectrum of any supported dimension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bundle contains no spectra.
+    pub fn into_first_spectrum(self) -> Result<LoadedSpectrum> {
+        let one_d = self.len_1d();
+        let two_d = self.len_2d();
+        let (spectra, _, _) = self.into_parts();
+        spectra
+            .into_iter()
+            .next()
+            .ok_or_else(|| first_error("spectrum", one_d, two_d))
+    }
+
     /// Returns the first loaded one-dimensional spectrum.
     ///
     /// # Errors
@@ -317,6 +401,18 @@ impl SpectrumBundle {
 }
 
 impl SpectrumBundleLoader {
+    /// Loads a file or directory and returns the first spectrum of any supported dimension.
+    ///
+    /// This is for quick inspection workflows where callers do not want to choose
+    /// one-dimensional or two-dimensional data up front.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or no spectrum is found.
+    pub fn read_first_spectrum(&self, path: impl AsRef<Path>) -> Result<LoadedSpectrum> {
+        self.read_path(path)?.into_first_spectrum()
+    }
+
     /// Loads a file or directory and returns the first one-dimensional spectrum.
     ///
     /// This is for quick inspection workflows. Use [`Self::read_1d`] when the
@@ -363,6 +459,20 @@ impl SpectrumBundleLoader {
         path: impl AsRef<Path>,
     ) -> Result<(Spectrum2D, LoadedSource)> {
         self.read_path(path)?.into_first_loaded_2d()
+    }
+
+    /// Loads one selected path relative to a base directory and returns the first spectrum of any supported dimension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or no spectrum is found.
+    pub fn read_first_spectrum_relative_to(
+        &self,
+        base: impl AsRef<Path>,
+        path: impl AsRef<Path>,
+    ) -> Result<LoadedSpectrum> {
+        self.read_path_relative_to(base, path)?
+            .into_first_spectrum()
     }
 
     /// Loads one selected path relative to a base directory and returns the first one-dimensional spectrum.
@@ -417,6 +527,19 @@ impl SpectrumBundleLoader {
     ) -> Result<(Spectrum2D, LoadedSource)> {
         self.read_path_relative_to(base, path)?
             .into_first_loaded_2d()
+    }
+
+    /// Loads selected paths and returns the first spectrum of any supported dimension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or no spectrum is found.
+    pub fn read_first_spectrum_many<I, P>(&self, paths: I) -> Result<LoadedSpectrum>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths(paths)?.into_first_spectrum()
     }
 
     /// Loads selected paths and returns the first one-dimensional spectrum.
@@ -475,6 +598,24 @@ impl SpectrumBundleLoader {
         P: AsRef<Path>,
     {
         self.read_paths(paths)?.into_first_loaded_2d()
+    }
+
+    /// Loads selected paths relative to a base directory and returns the first spectrum of any supported dimension.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading fails or no spectrum is found.
+    pub fn read_first_spectrum_many_relative_to<I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        paths: I,
+    ) -> Result<LoadedSpectrum>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_paths_relative_to(base, paths)?
+            .into_first_spectrum()
     }
 
     /// Loads selected paths relative to a base directory and returns the first one-dimensional spectrum.
@@ -549,10 +690,14 @@ impl SpectrumBundleLoader {
 }
 
 fn first_error(expected: &'static str, one_d: usize, two_d: usize) -> RSpinError {
+    let expected = match expected {
+        "spectrum" => "spectrum".to_owned(),
+        other => format!("{other} spectrum"),
+    };
     RSpinError::Parse {
         format: "spectrum bundle",
         message: format!(
-            "expected at least one {expected} spectrum, found {one_d} one-dimensional and {two_d} two-dimensional spectra"
+            "expected at least one {expected}, found {one_d} one-dimensional and {two_d} two-dimensional spectra"
         ),
     }
 }

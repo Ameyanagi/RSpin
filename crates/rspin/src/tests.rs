@@ -566,6 +566,38 @@ fn prelude_supports_first_spectrum_free_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_first_any_spectrum_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let mixed_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let first = load_first_spectrum_relative_to(&fixture_root, "varian_1h")?;
+    assert!(first.is_1d());
+    assert_eq!(
+        first.source().path(),
+        Some(std::path::Path::new("varian_1h"))
+    );
+
+    let first =
+        RSpinReader::new().read_first_spectrum_relative_to(&mixed_root, "bruker_cosy_raw")?;
+    assert!(first.is_2d());
+    assert_eq!(
+        first.source().path(),
+        Some(std::path::Path::new("bruker_cosy_raw"))
+    );
+
+    let bundle = load_spectra_relative_to(&fixture_root, "varian_1h")?;
+    let first = bundle.require_first_spectrum()?;
+    assert!(first.is_1d());
+    assert_eq!(
+        first.source().path(),
+        Some(std::path::Path::new("varian_1h"))
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_first_source_filter_accessors() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

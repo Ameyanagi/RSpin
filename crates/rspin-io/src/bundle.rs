@@ -167,14 +167,15 @@ pub use exact::{
     load_spectrum_2d_with_source_relative_to,
 };
 pub use first::{
-    load_first_spectrum_1d, load_first_spectrum_1d_many, load_first_spectrum_1d_many_relative_to,
-    load_first_spectrum_1d_many_with_source, load_first_spectrum_1d_many_with_source_relative_to,
-    load_first_spectrum_1d_relative_to, load_first_spectrum_1d_with_source,
-    load_first_spectrum_1d_with_source_relative_to, load_first_spectrum_2d,
-    load_first_spectrum_2d_many, load_first_spectrum_2d_many_relative_to,
+    load_first_spectrum, load_first_spectrum_1d, load_first_spectrum_1d_many,
+    load_first_spectrum_1d_many_relative_to, load_first_spectrum_1d_many_with_source,
+    load_first_spectrum_1d_many_with_source_relative_to, load_first_spectrum_1d_relative_to,
+    load_first_spectrum_1d_with_source, load_first_spectrum_1d_with_source_relative_to,
+    load_first_spectrum_2d, load_first_spectrum_2d_many, load_first_spectrum_2d_many_relative_to,
     load_first_spectrum_2d_many_with_source, load_first_spectrum_2d_many_with_source_relative_to,
     load_first_spectrum_2d_relative_to, load_first_spectrum_2d_with_source,
-    load_first_spectrum_2d_with_source_relative_to,
+    load_first_spectrum_2d_with_source_relative_to, load_first_spectrum_many,
+    load_first_spectrum_many_relative_to, load_first_spectrum_relative_to,
 };
 use loader::FileCandidateKind;
 pub use loader::*;

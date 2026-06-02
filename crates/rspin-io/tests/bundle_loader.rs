@@ -635,6 +635,37 @@ fn reader_first_spectrum_helpers_work_with_direct_and_many_paths() -> anyhow::Re
 }
 
 #[test]
+fn reader_first_any_spectrum_helpers_cover_quick_inspection() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let mixed = nmrxiv_fixture_root();
+
+    let first = RSpinReader::new().read_first_spectrum_relative_to(&base, "varian_1h")?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+    let Some(spectrum) = first.as_1d() else {
+        anyhow::bail!("first spectrum should be one-dimensional");
+    };
+    assert_eq!(spectrum.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let first = RSpinReader::new().read_first_spectrum_many_relative_to(&base, ["varian_1h"])?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let first = RSpinReader::new().read_first_spectrum(mixed.join("bruker_cosy_raw"))?;
+    assert!(first.is_2d());
+    assert_eq!(first.source().path(), Some(Path::new("bruker_cosy_raw")));
+    let Some(spectrum) = first.as_2d() else {
+        anyhow::bail!("first spectrum should be two-dimensional");
+    };
+    assert_eq!(spectrum.shape(), (2048, 512));
+
+    let first = RSpinReader::new().read_first_spectrum_many([mixed.join("bruker_cosy_raw")])?;
+    assert!(first.is_2d());
+    assert_eq!(first.source().path(), Some(Path::new("bruker_cosy_raw")));
+    Ok(())
+}
+
+#[test]
 fn free_first_spectrum_helpers_cover_quick_inspection() -> anyhow::Result<()> {
     let base = fixture_root();
     let mixed = nmrxiv_fixture_root();
@@ -716,6 +747,29 @@ fn free_first_spectrum_helpers_cover_quick_inspection() -> anyhow::Result<()> {
 }
 
 #[test]
+fn free_first_any_spectrum_helpers_cover_quick_inspection() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let mixed = nmrxiv_fixture_root();
+
+    let first = io::load_first_spectrum_relative_to(&base, "varian_1h")?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let first = io::load_first_spectrum_many_relative_to(&base, ["varian_1h"])?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let first = io::load_first_spectrum(mixed.join("bruker_cosy_raw"))?;
+    assert!(first.is_2d());
+    assert_eq!(first.source().path(), Some(Path::new("bruker_cosy_raw")));
+
+    let first = io::load_first_spectrum_many([mixed.join("bruker_cosy_raw")])?;
+    assert!(first.is_2d());
+    assert_eq!(first.source().path(), Some(Path::new("bruker_cosy_raw")));
+    Ok(())
+}
+
+#[test]
 fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()> {
     let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
     let first_1d = one_d_bundle
@@ -752,6 +806,38 @@ fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()
     assert!(empty.first_loaded_1d().is_none());
     assert!(empty.first_2d().is_none());
     assert!(empty.first_loaded_2d().is_none());
+    Ok(())
+}
+
+#[test]
+fn bundle_first_any_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()> {
+    let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
+    let first = one_d_bundle
+        .first_spectrum()
+        .ok_or_else(|| anyhow::anyhow!("missing first spectrum"))?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+    assert_eq!(
+        one_d_bundle.require_first_spectrum()?.source(),
+        first.source()
+    );
+
+    let first = one_d_bundle.clone().into_first_spectrum()?;
+    assert!(first.is_1d());
+    assert_eq!(first.source().path(), Some(Path::new("varian_1h")));
+
+    let two_d_bundle = load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?;
+    let first = two_d_bundle.require_first_spectrum()?;
+    assert!(first.is_2d());
+    assert_eq!(first.source().path(), Some(Path::new("bruker_cosy_raw")));
+
+    let empty = SpectrumBundle::new();
+    assert!(empty.first_spectrum().is_none());
+    let missing = empty.require_first_spectrum();
+    let Err(error) = missing else {
+        anyhow::bail!("empty bundle should not have a first spectrum");
+    };
+    assert!(error.to_string().contains("expected at least one spectrum"));
     Ok(())
 }
 
