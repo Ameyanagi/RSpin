@@ -1200,6 +1200,19 @@ fn prelude_exports_discovered_dimension_source_path_prefix_set_loaders() -> Resu
             ["jcamp", "jeol/myrcene_1h_400mhz.jdf"],
         )?;
     assert_eq!(one_d_reader, one_d);
+    let one_d_summary = load_discovered_spectra_1d_summary_by_source_path_prefixes(
+        &myrcene_root,
+        &sources,
+        ["jcamp", "jeol/myrcene_1h_400mhz.jdf"],
+    )?;
+    assert_eq!(one_d_summary, one_d.summary());
+    let one_d_summary_reader = RSpinReader::new()
+        .read_discovered_bundle_1d_summary_by_source_path_prefixes_relative_to(
+            &myrcene_root,
+            &sources,
+            ["jcamp", "jeol/myrcene_1h_400mhz.jdf"],
+        )?;
+    assert_eq!(one_d_summary_reader, one_d_summary);
 
     let strict_one_d = load_discovered_spectra_1d_strict_by_source_path_prefixes(
         &myrcene_root,
@@ -1207,6 +1220,13 @@ fn prelude_exports_discovered_dimension_source_path_prefix_set_loaders() -> Resu
         ["jcamp", "jeol/myrcene_1h_400mhz.jdf"],
     )?;
     assert_eq!(strict_one_d, one_d);
+    let strict_one_d_summary =
+        load_discovered_spectra_1d_summary_strict_by_source_path_prefixes_relative_to(
+            &myrcene_root,
+            &sources,
+            ["jcamp", "jeol/myrcene_1h_400mhz.jdf"],
+        )?;
+    assert_eq!(strict_one_d_summary, strict_one_d.summary());
 
     let two_d = load_discovered_spectra_2d_by_source_path_prefixes_relative_to(
         &myrcene_root,
@@ -1215,6 +1235,19 @@ fn prelude_exports_discovered_dimension_source_path_prefix_set_loaders() -> Resu
     )?;
     assert_eq!(two_d.len_1d(), 0);
     assert_eq!(two_d.len_2d(), 2);
+    let two_d_summary = load_discovered_spectra_2d_summary_by_source_path_prefixes(
+        &myrcene_root,
+        &sources,
+        ["bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"],
+    )?;
+    assert_eq!(two_d_summary, two_d.summary());
+    let two_d_summary_reader = RSpinReader::new()
+        .read_discovered_bundle_2d_summary_by_source_path_prefixes(
+            &myrcene_root,
+            &sources,
+            ["bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"],
+        )?;
+    assert_eq!(two_d_summary_reader, two_d_summary);
 
     let strict_two_d = load_discovered_spectra_2d_strict_by_source_path_prefixes(
         &myrcene_root,
@@ -1222,6 +1255,13 @@ fn prelude_exports_discovered_dimension_source_path_prefix_set_loaders() -> Resu
         ["bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"],
     )?;
     assert_eq!(strict_two_d, two_d);
+    let strict_two_d_summary =
+        load_discovered_spectra_2d_summary_strict_by_source_path_prefixes_relative_to(
+            &myrcene_root,
+            &sources,
+            ["bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"],
+        )?;
+    assert_eq!(strict_two_d_summary, strict_two_d.summary());
     Ok(())
 }
 

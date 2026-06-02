@@ -58,6 +58,10 @@ pub use dimension_path::{
     load_discovered_spectra_1d_strict_by_source_path_prefixes,
     load_discovered_spectra_1d_strict_by_source_path_prefixes_relative_to,
     load_discovered_spectra_1d_strict_by_source_path_relative_to,
+    load_discovered_spectra_1d_summary_by_source_path_prefixes,
+    load_discovered_spectra_1d_summary_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_1d_summary_strict_by_source_path_prefixes,
+    load_discovered_spectra_1d_summary_strict_by_source_path_prefixes_relative_to,
     load_discovered_spectra_2d_by_source_path, load_discovered_spectra_2d_by_source_path_prefix,
     load_discovered_spectra_2d_by_source_path_prefix_relative_to,
     load_discovered_spectra_2d_by_source_path_prefixes,
@@ -69,6 +73,10 @@ pub use dimension_path::{
     load_discovered_spectra_2d_strict_by_source_path_prefixes,
     load_discovered_spectra_2d_strict_by_source_path_prefixes_relative_to,
     load_discovered_spectra_2d_strict_by_source_path_relative_to,
+    load_discovered_spectra_2d_summary_by_source_path_prefixes,
+    load_discovered_spectra_2d_summary_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_2d_summary_strict_by_source_path_prefixes,
+    load_discovered_spectra_2d_summary_strict_by_source_path_prefixes_relative_to,
 };
 pub use exact::{
     load_discovered_spectrum_1d, load_discovered_spectrum_1d_by_source,
