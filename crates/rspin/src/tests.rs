@@ -652,6 +652,12 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
     let direct_format = load_first_spectrum_1d_by_source_format(&fixture_root, "jcamp")?;
     assert!(direct_format.metadata.nucleus.is_some());
 
+    let short_format = load_first_spectrum_1d_by_format(&fixture_root, "jdx")?;
+    assert!(short_format.metadata.nucleus.is_some());
+
+    let short_vendor = RSpinReader::new().read_first_2d_by_vendor(&fixture_root, "jeol")?;
+    assert!(short_vendor.shape().0 > 0);
+
     let direct_prefix =
         RSpinReader::new().read_first_2d_by_source_path_prefix(&fixture_root, "jeol")?;
     assert!(direct_prefix.shape().0 > 0);

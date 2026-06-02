@@ -20,6 +20,7 @@ mod dimension_metadata_strict;
 mod dimension_path;
 mod exact;
 mod first;
+mod first_short_source;
 mod first_source;
 mod first_typed_source;
 mod loader;
@@ -179,6 +180,7 @@ pub use first::{
     load_first_spectrum_2d_with_source_relative_to, load_first_spectrum_many,
     load_first_spectrum_many_relative_to, load_first_spectrum_relative_to,
 };
+pub use first_short_source::*;
 pub use first_source::*;
 pub use first_typed_source::*;
 use loader::FileCandidateKind;
