@@ -1250,6 +1250,39 @@ fn prelude_exports_exact_discovered_free_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_exact_discovered_source_path_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+
+    let spectrum =
+        load_discovered_spectrum_1d_by_source_path(&fixture_root, &sources, "varian_1h")?;
+    assert_eq!(spectrum.len(), 16_384);
+    let (_, source) = load_discovered_spectrum_1d_with_source_by_source_path_prefix(
+        &fixture_root,
+        &sources,
+        "varian_1h",
+    )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let myrcene_sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    let hsqc =
+        load_discovered_spectrum_2d_by_source_path(&myrcene_root, &myrcene_sources, hsqc_path)?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    let (_, source) = RSpinReader::new().read_discovered_2d_with_source_by_source_path_prefix(
+        &myrcene_root,
+        &myrcene_sources,
+        hsqc_path,
+    )?;
+    assert_eq!(source.path(), Some(std::path::Path::new(hsqc_path)));
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_strict_discovered_free_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");
