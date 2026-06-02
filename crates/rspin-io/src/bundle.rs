@@ -25,6 +25,7 @@ mod selectors;
 mod source_filter;
 mod source_format;
 mod source_read;
+mod source_short_read;
 mod source_strict;
 mod source_strict_read;
 mod source_summary;

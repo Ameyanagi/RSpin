@@ -742,6 +742,63 @@ fn reader_short_source_filter_aliases_cover_common_workflows() -> anyhow::Result
 }
 
 #[test]
+fn reader_short_source_metadata_read_aliases_match_long_methods() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+
+    let jcamp = RSpinReader::new().read_by_format(&root, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(
+        jcamp.summary(),
+        RSpinReader::new()
+            .read_by_source_format(&root, "jcamp dx")?
+            .summary()
+    );
+
+    let jeol =
+        RSpinReader::new().read_by_vendor_relative_to(&root, "jeol", LoadedSourceVendor::Jeol)?;
+    assert_eq!(
+        jeol.summary(),
+        RSpinReader::new()
+            .read_by_source_vendor_relative_to(&root, "jeol", "jeol")?
+            .summary()
+    );
+
+    let raw_summary =
+        RSpinReader::new().read_summary_by_data_kind(&root, LoadedSourceDataKind::Raw)?;
+    assert_eq!(
+        raw_summary,
+        RSpinReader::new().read_summary_by_source_data_kind(&root, LoadedSourceDataKind::Raw,)?
+    );
+
+    let strict_jeol = RSpinReader::new().read_summary_strict_by_vendor_relative_to(
+        &root,
+        "jeol",
+        LoadedSourceVendor::Jeol,
+    )?;
+    assert_eq!(
+        strict_jeol,
+        RSpinReader::new()
+            .read_summary_strict_by_source_vendor_relative_to(&root, "jeol", "jeol")?
+    );
+
+    let strict_formats = RSpinReader::new().read_many_strict_by_formats_relative_to(
+        &root,
+        ["jcamp", "jeol"],
+        [LoadedSourceFormat::JcampDx, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(
+        strict_formats.summary(),
+        RSpinReader::new()
+            .read_many_strict_by_source_formats_relative_to(
+                &root,
+                ["jcamp", "jeol"],
+                ["jdx", "jdf"],
+            )?
+            .summary()
+    );
+    Ok(())
+}
+
+#[test]
 fn reader_source_path_prefix_aliases_cover_directory_filters() -> anyhow::Result<()> {
     let base = fixture_root();
 

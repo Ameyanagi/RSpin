@@ -887,6 +887,33 @@ fn prelude_exports_source_filtered_reader_methods() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_short_source_metadata_reader_aliases() -> Result<()> {
+    let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let jcamp = RSpinReader::new().read_by_format(&mixed, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+
+    let jeol =
+        RSpinReader::new().read_by_vendor_relative_to(&mixed, "jeol", LoadedSourceVendor::Jeol)?;
+    assert_eq!(jeol.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+
+    let raw = RSpinReader::new().read_by_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+
+    let strict_summary = RSpinReader::new().read_summary_strict_by_vendor_relative_to(
+        &mixed,
+        "jeol",
+        LoadedSourceVendor::Jeol,
+    )?;
+    assert_eq!(
+        strict_summary.source_vendor_count(LoadedSourceVendor::Jeol),
+        3
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_strict_source_filtered_helpers() -> Result<()> {
     let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
