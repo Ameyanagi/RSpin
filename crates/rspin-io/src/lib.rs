@@ -128,6 +128,8 @@ pub use bundle::{
     load_discovered_spectra_2d_strict_relative_to, load_discovered_spectra_by_source,
     load_discovered_spectra_by_source_path, load_discovered_spectra_by_source_path_prefix,
     load_discovered_spectra_by_source_path_prefix_relative_to,
+    load_discovered_spectra_by_source_path_prefixes,
+    load_discovered_spectra_by_source_path_prefixes_relative_to,
     load_discovered_spectra_by_source_path_relative_to,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,

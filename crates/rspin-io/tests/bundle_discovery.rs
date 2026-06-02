@@ -33,6 +33,8 @@ use rspin_io::{
     load_discovered_spectra_by_source, load_discovered_spectra_by_source_path,
     load_discovered_spectra_by_source_path_prefix,
     load_discovered_spectra_by_source_path_prefix_relative_to,
+    load_discovered_spectra_by_source_path_prefixes,
+    load_discovered_spectra_by_source_path_prefixes_relative_to,
     load_discovered_spectra_by_source_path_relative_to,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
@@ -1430,6 +1432,36 @@ fn discovered_source_path_helpers_load_matching_candidates() -> Result<()> {
         "bruker_without_expno",
     )?;
     assert_eq!(reader_bruker_by_prefix, bruker_by_prefix);
+
+    let selected_prefixes = ["missing", "bruker_without_expno", "varian_1h"];
+    let bundle_by_prefixes = load_discovered_spectra_by_source_path_prefixes_relative_to(
+        fixture_root(),
+        &sources,
+        selected_prefixes,
+    )?;
+    assert_eq!(bundle_by_prefixes.len(), 3);
+    assert_eq!(
+        bundle_by_prefixes.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+    assert_eq!(
+        bundle_by_prefixes.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let bundle_by_prefixes_alias = load_discovered_spectra_by_source_path_prefixes(
+        fixture_root(),
+        &sources,
+        selected_prefixes,
+    )?;
+    assert_eq!(bundle_by_prefixes_alias, bundle_by_prefixes);
+
+    let reader_bundle_by_prefixes = RSpinReader::new().read_discovered_by_source_path_prefixes(
+        fixture_root(),
+        &sources,
+        selected_prefixes,
+    )?;
+    assert_eq!(reader_bundle_by_prefixes, bundle_by_prefixes);
     Ok(())
 }
 

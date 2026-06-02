@@ -964,6 +964,21 @@ fn prelude_exports_discovered_source_path_loaders() -> Result<()> {
     )?;
     assert_eq!(loaded.len(), 2);
 
+    let loaded = load_discovered_spectra_by_source_path_prefixes(
+        &fixture_root,
+        &sources,
+        ["missing", "bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(loaded.len(), 3);
+    assert!(loaded.has_source_path(std::path::Path::new("varian_1h")));
+
+    let loaded = RSpinReader::new().read_discovered_by_source_path_prefixes_relative_to(
+        &fixture_root,
+        &sources,
+        ["missing", "bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(loaded.len(), 3);
+
     let loaded =
         load_discovered_spectra_strict_by_source_path(&fixture_root, &sources, "varian_1h")?;
     assert_eq!(loaded.len(), 1);
