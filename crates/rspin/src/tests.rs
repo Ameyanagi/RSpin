@@ -794,6 +794,61 @@ fn prelude_exports_dimension_source_metadata_bundle_helpers() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_strict_dimension_source_metadata_bundle_helpers() -> Result<()> {
+    let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let jcamp = load_spectra_1d_strict_by_source_format(&mixed, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(jcamp.len_1d(), 2);
+    assert_eq!(jcamp.len_2d(), 0);
+    assert_eq!(
+        load_spectra_1d_summary_strict_by_source_formats(&mixed, [LoadedSourceFormat::JcampDx],)?,
+        jcamp.summary()
+    );
+
+    let jeol = RSpinReader::new().read_bundle_1d_strict_by_source_vendor_relative_to(
+        &mixed,
+        "jeol/myrcene_1h_400mhz.jdf",
+        "jeol",
+    )?;
+    assert_eq!(jeol.len_1d(), 1);
+    assert_eq!(jeol.source_vendor_count(LoadedSourceVendor::Jeol), 1);
+    assert_eq!(
+        RSpinReader::new().read_bundle_1d_summary_strict_by_source_vendor_relative_to(
+            &mixed,
+            "jeol/myrcene_1h_400mhz.jdf",
+            "jeol",
+        )?,
+        jeol.summary()
+    );
+
+    let raw_2d = RSpinReader::new()
+        .read_bundle_2d_strict_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.len_2d(), 1);
+    assert_eq!(raw_2d.source_format_count(LoadedSourceFormat::BrukerSer), 1);
+    assert_eq!(
+        load_spectra_2d_summary_strict_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?,
+        raw_2d.summary()
+    );
+
+    let two_d = load_spectra_2d_strict_by_source_format_relative_to(
+        &mixed,
+        "bruker_cosy_raw",
+        LoadedSourceFormat::BrukerSer,
+    )?;
+    assert_eq!(two_d.len_1d(), 0);
+    assert_eq!(two_d.len_2d(), 1);
+
+    let hsqc_summary = load_spectra_2d_summary_strict_by_source_format_relative_to(
+        &mixed,
+        "jeol/myrcene_hsqc_400mhz.jdf",
+        LoadedSourceFormat::JeolJdf,
+    )?;
+    assert_eq!(hsqc_summary.spectra_2d(), 1);
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_dimension_source_path_bundle_helpers() -> Result<()> {
     let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

@@ -3454,6 +3454,113 @@ fn dimension_source_metadata_relative_helpers_anchor_source_paths() -> anyhow::R
 }
 
 #[test]
+fn strict_dimension_source_metadata_helpers_match_strict_loader_composition() -> anyhow::Result<()>
+{
+    let mixed = nmrxiv_fixture_root();
+    let sources = RSpinReader::new().discover_path(&mixed)?;
+
+    let jcamp_1d = io::load_spectra_1d_strict_by_source_format(&mixed, "jdx")?;
+    assert_eq!(jcamp_1d.len_1d(), 2);
+    assert_eq!(jcamp_1d.len_2d(), 0);
+    assert_eq!(jcamp_1d.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(
+        jcamp_1d.summary(),
+        RSpinReader::new()
+            .strict()
+            .read_discovered_bundle_1d_by_source_format(
+                &mixed,
+                &sources,
+                LoadedSourceFormat::JcampDx,
+            )?
+            .summary()
+    );
+
+    let jeol_1d_summary = RSpinReader::new()
+        .read_bundle_1d_summary_strict_by_source_vendor_relative_to(
+            &mixed,
+            "jeol/myrcene_1h_400mhz.jdf",
+            LoadedSourceVendor::Jeol,
+        )?;
+    assert_eq!(jeol_1d_summary.spectra_1d(), 1);
+    assert_eq!(jeol_1d_summary.spectra_2d(), 0);
+    assert_eq!(
+        jeol_1d_summary,
+        RSpinReader::new()
+            .strict()
+            .read_discovered_bundle_1d_summary_by_source_paths(
+                &mixed,
+                &sources,
+                ["jeol/myrcene_1h_400mhz.jdf"],
+            )?
+    );
+
+    let raw_2d = io::load_spectra_2d_strict_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.len_1d(), 0);
+    assert_eq!(raw_2d.len_2d(), 1);
+    assert_eq!(raw_2d.source_format_count(LoadedSourceFormat::BrukerSer), 1);
+    assert_eq!(
+        raw_2d.summary(),
+        RSpinReader::new()
+            .strict()
+            .read_discovered_bundle_2d_by_source_data_kind(
+                &mixed,
+                &sources,
+                LoadedSourceDataKind::Raw,
+            )?
+            .summary()
+    );
+
+    let two_d_summary = io::load_spectra_2d_summary_strict_by_source_formats_relative_to(
+        &mixed,
+        "bruker_cosy_raw",
+        [LoadedSourceFormat::BrukerSer],
+    )?;
+    assert_eq!(two_d_summary.spectra_1d(), 0);
+    assert_eq!(two_d_summary.spectra_2d(), 1);
+    assert_eq!(
+        two_d_summary,
+        RSpinReader::new()
+            .strict()
+            .read_discovered_bundle_2d_summary_by_source_paths(
+                &mixed,
+                &sources,
+                ["bruker_cosy_raw"]
+            )?
+    );
+
+    let jeol_2d_summary = RSpinReader::new()
+        .read_bundle_2d_summary_strict_by_source_format_relative_to(
+            &mixed,
+            "jeol/myrcene_hsqc_400mhz.jdf",
+            "jdf",
+        )?;
+    assert_eq!(jeol_2d_summary.spectra_1d(), 0);
+    assert_eq!(jeol_2d_summary.spectra_2d(), 1);
+    assert_eq!(
+        jeol_2d_summary.source_format_count(LoadedSourceFormat::JeolJdf),
+        1
+    );
+    Ok(())
+}
+
+#[test]
+fn strict_dimension_source_metadata_helpers_return_parser_errors() -> anyhow::Result<()> {
+    let root = fixture_root();
+    let Err(error) = io::load_spectra_1d_strict_by_source_format(&root, "jdx") else {
+        anyhow::bail!("strict dimension source-format loading should reject malformed JCAMP-DX");
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+
+    let Err(error) = io::load_spectra_1d_summary_strict_by_source_format(&root, "jcamp dx") else {
+        anyhow::bail!(
+            "strict dimension source-format summary loading should reject malformed JCAMP-DX"
+        );
+    };
+    assert!(error.to_string().contains("missing XYDATA values"));
+    Ok(())
+}
+
+#[test]
 fn dimension_source_path_helpers_load_matching_bundles() -> anyhow::Result<()> {
     let mixed = nmrxiv_fixture_root();
     let jcamp_1h = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
