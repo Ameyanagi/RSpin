@@ -45,6 +45,13 @@ pub trait DiscoveredSpectrumSourcesExt {
         path: impl AsRef<Path>,
     ) -> Vec<&DiscoveredSpectrumSource>;
 
+    /// Selects discovered one-dimensional source candidates below any source path prefix.
+    #[must_use]
+    fn select_1d_by_source_path_prefixes<I, P>(&self, paths: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>;
+
     /// Selects discovered two-dimensional source candidates.
     #[must_use]
     fn select_2d(&self) -> Vec<&DiscoveredSpectrumSource>;
@@ -73,6 +80,13 @@ pub trait DiscoveredSpectrumSourcesExt {
         &self,
         path: impl AsRef<Path>,
     ) -> Vec<&DiscoveredSpectrumSource>;
+
+    /// Selects discovered two-dimensional source candidates below any source path prefix.
+    #[must_use]
+    fn select_2d_by_source_path_prefixes<I, P>(&self, paths: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>;
 
     /// Selects discovered source candidates with one inferred dimension.
     #[must_use]
@@ -125,6 +139,13 @@ pub trait DiscoveredSpectrumSourcesExt {
         path: impl AsRef<Path>,
     ) -> Vec<&DiscoveredSpectrumSource>;
 
+    /// Selects discovered source candidates below any source path prefix.
+    #[must_use]
+    fn select_by_source_path_prefixes<I, P>(&self, paths: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>;
+
     /// Summarizes discovered source candidates.
     #[must_use]
     fn summarize(&self) -> DiscoveredSpectrumSummary;
@@ -161,6 +182,14 @@ impl DiscoveredSpectrumSourcesExt for [DiscoveredSpectrumSource] {
         select_discovered_spectra_1d_by_source_path_prefix(self, path)
     }
 
+    fn select_1d_by_source_path_prefixes<I, P>(&self, paths: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        select_discovered_spectra_1d_by_source_path_prefixes(self, paths)
+    }
+
     fn select_2d(&self) -> Vec<&DiscoveredSpectrumSource> {
         select_discovered_spectra_2d(self)
     }
@@ -189,6 +218,14 @@ impl DiscoveredSpectrumSourcesExt for [DiscoveredSpectrumSource] {
         path: impl AsRef<Path>,
     ) -> Vec<&DiscoveredSpectrumSource> {
         select_discovered_spectra_2d_by_source_path_prefix(self, path)
+    }
+
+    fn select_2d_by_source_path_prefixes<I, P>(&self, paths: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        select_discovered_spectra_2d_by_source_path_prefixes(self, paths)
     }
 
     fn select_by_dimension(
@@ -242,6 +279,14 @@ impl DiscoveredSpectrumSourcesExt for [DiscoveredSpectrumSource] {
         path: impl AsRef<Path>,
     ) -> Vec<&DiscoveredSpectrumSource> {
         select_discovered_spectra_by_source_path_prefix(self, path)
+    }
+
+    fn select_by_source_path_prefixes<I, P>(&self, paths: I) -> Vec<&DiscoveredSpectrumSource>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        select_discovered_spectra_by_source_path_prefixes(self, paths)
     }
 
     fn summarize(&self) -> DiscoveredSpectrumSummary {
@@ -305,6 +350,22 @@ pub fn select_discovered_spectra_1d_by_source_path_prefix(
     select_discovered_spectra_1d_by_source(sources, LoadedSourceFilter::path_prefix(path))
 }
 
+/// Selects discovered one-dimensional source candidates below any source path prefix.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator returns all
+/// discovered one-dimensional source candidates.
+#[must_use]
+pub fn select_discovered_spectra_1d_by_source_path_prefixes<I, P>(
+    sources: &[DiscoveredSpectrumSource],
+    paths: I,
+) -> Vec<&DiscoveredSpectrumSource>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    select_discovered_spectra_1d_by_sources(sources, path_prefix_filters(paths))
+}
+
 /// Selects discovered two-dimensional source candidates.
 #[must_use]
 pub fn select_discovered_spectra_2d(
@@ -359,6 +420,22 @@ pub fn select_discovered_spectra_2d_by_source_path_prefix(
     path: impl AsRef<Path>,
 ) -> Vec<&DiscoveredSpectrumSource> {
     select_discovered_spectra_2d_by_source(sources, LoadedSourceFilter::path_prefix(path))
+}
+
+/// Selects discovered two-dimensional source candidates below any source path prefix.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator returns all
+/// discovered two-dimensional source candidates.
+#[must_use]
+pub fn select_discovered_spectra_2d_by_source_path_prefixes<I, P>(
+    sources: &[DiscoveredSpectrumSource],
+    paths: I,
+) -> Vec<&DiscoveredSpectrumSource>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    select_discovered_spectra_2d_by_sources(sources, path_prefix_filters(paths))
 }
 
 /// Selects discovered source candidates with one inferred dimension.
@@ -446,6 +523,22 @@ pub fn select_discovered_spectra_by_source_path_prefix(
     select_discovered_spectra_by_source(sources, LoadedSourceFilter::path_prefix(path))
 }
 
+/// Selects discovered source candidates below any source path prefix.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator returns all
+/// provided discovered sources, matching the unrestricted loader behavior.
+#[must_use]
+pub fn select_discovered_spectra_by_source_path_prefixes<I, P>(
+    sources: &[DiscoveredSpectrumSource],
+    paths: I,
+) -> Vec<&DiscoveredSpectrumSource>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    select_discovered_spectra_by_sources(sources, path_prefix_filters(paths))
+}
+
 pub(super) fn select_discovered_source_refs_by_dimension<'a, S>(
     sources: S,
     dimension: DiscoveredSpectrumDimension,
@@ -508,4 +601,16 @@ where
         }
     }
     unique
+}
+
+fn path_prefix_filters<I, P>(paths: I) -> Vec<LoadedSourceFilter>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut filters = Vec::new();
+    for path in paths {
+        filters.push(LoadedSourceFilter::path_prefix(path));
+    }
+    filters
 }

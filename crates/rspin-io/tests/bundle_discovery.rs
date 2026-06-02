@@ -48,14 +48,17 @@ use rspin_io::{
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
     select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
     select_discovered_spectra_1d_by_source_path,
-    select_discovered_spectra_1d_by_source_path_prefix, select_discovered_spectra_1d_by_sources,
+    select_discovered_spectra_1d_by_source_path_prefix,
+    select_discovered_spectra_1d_by_source_path_prefixes, select_discovered_spectra_1d_by_sources,
     select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
     select_discovered_spectra_2d_by_source_path,
-    select_discovered_spectra_2d_by_source_path_prefix, select_discovered_spectra_2d_by_sources,
+    select_discovered_spectra_2d_by_source_path_prefix,
+    select_discovered_spectra_2d_by_source_path_prefixes, select_discovered_spectra_2d_by_sources,
     select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
     select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
-    select_discovered_spectra_by_sources, summarize_discovered_spectra,
+    select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_sources,
+    summarize_discovered_spectra,
 };
 
 #[test]
@@ -455,6 +458,65 @@ fn discovered_source_slice_methods_match_free_helpers() -> Result<()> {
     assert_eq!(
         sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
         select_discovered_spectra_by_sources(&sources, [LoadedSourceFilter::path(proton_path)])
+    );
+    Ok(())
+}
+
+#[test]
+fn discovered_source_path_prefix_set_selectors_match_free_helpers() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+
+    let selected_all =
+        select_discovered_spectra_by_source_path_prefixes(&sources, ["jcamp", "jeol"]);
+    assert_eq!(
+        selected_all.len(),
+        select_discovered_spectra_by_source_path_prefix(&sources, "jcamp").len()
+            + select_discovered_spectra_by_source_path_prefix(&sources, "jeol").len()
+    );
+    assert_eq!(
+        sources.select_by_source_path_prefixes(["jcamp", "jeol"]),
+        selected_all
+    );
+
+    let selected_1d =
+        select_discovered_spectra_1d_by_source_path_prefixes(&sources, ["jcamp", "jeol"]);
+    assert_eq!(
+        selected_1d.len(),
+        select_discovered_spectra_1d_by_source_path_prefix(&sources, "jcamp").len()
+            + select_discovered_spectra_1d_by_source_path_prefix(&sources, "jeol").len()
+    );
+    assert!(selected_1d.iter().all(|source| source.is_1d()));
+    assert_eq!(
+        sources.select_1d_by_source_path_prefixes(["jcamp", "jeol"]),
+        selected_1d
+    );
+
+    let selected_2d =
+        select_discovered_spectra_2d_by_source_path_prefixes(&sources, ["bruker_cosy_raw", "jeol"]);
+    assert_eq!(
+        selected_2d.len(),
+        select_discovered_spectra_2d_by_source_path_prefix(&sources, "bruker_cosy_raw").len()
+            + select_discovered_spectra_2d_by_source_path_prefix(&sources, "jeol").len()
+    );
+    assert!(selected_2d.iter().all(|source| source.is_2d()));
+    assert_eq!(
+        sources.select_2d_by_source_path_prefixes(["bruker_cosy_raw", "jeol"]),
+        selected_2d
+    );
+
+    let empty_prefixes: [&str; 0] = [];
+    let all_sources: Vec<_> = sources.iter().collect();
+    assert_eq!(
+        select_discovered_spectra_by_source_path_prefixes(&sources, empty_prefixes),
+        all_sources
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_source_path_prefixes(&sources, empty_prefixes),
+        select_discovered_spectra_1d(&sources)
+    );
+    assert_eq!(
+        select_discovered_spectra_2d_by_source_path_prefixes(&sources, empty_prefixes),
+        select_discovered_spectra_2d(&sources)
     );
     Ok(())
 }

@@ -135,14 +135,17 @@ pub use discovery::{
     load_discovered_spectrum_2d_with_source_by_sources_relative_to,
     load_discovered_spectrum_2d_with_source_relative_to, select_discovered_spectra_1d,
     select_discovered_spectra_1d_by_source, select_discovered_spectra_1d_by_source_path,
-    select_discovered_spectra_1d_by_source_path_prefix, select_discovered_spectra_1d_by_sources,
+    select_discovered_spectra_1d_by_source_path_prefix,
+    select_discovered_spectra_1d_by_source_path_prefixes, select_discovered_spectra_1d_by_sources,
     select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
     select_discovered_spectra_2d_by_source_path,
-    select_discovered_spectra_2d_by_source_path_prefix, select_discovered_spectra_2d_by_sources,
+    select_discovered_spectra_2d_by_source_path_prefix,
+    select_discovered_spectra_2d_by_source_path_prefixes, select_discovered_spectra_2d_by_sources,
     select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
     select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
-    select_discovered_spectra_by_sources, summarize_discovered_spectra,
+    select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_sources,
+    summarize_discovered_spectra,
 };
 
 /// Chainable options for loading all recognizable spectra from a path.

@@ -1307,6 +1307,18 @@ fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
         select_discovered_spectra_by_source_path_prefix(&sources, "jeol")
     );
     assert_eq!(
+        sources.select_by_source_path_prefixes(["jcamp", "jeol"]),
+        select_discovered_spectra_by_source_path_prefixes(&sources, ["jcamp", "jeol"])
+    );
+    assert_eq!(
+        sources.select_1d_by_source_path_prefixes(["jcamp", "jeol"]),
+        select_discovered_spectra_1d_by_source_path_prefixes(&sources, ["jcamp", "jeol"])
+    );
+    assert_eq!(
+        sources.select_2d_by_source_path_prefixes(["bruker_cosy_raw", "jeol"]),
+        select_discovered_spectra_2d_by_source_path_prefixes(&sources, ["bruker_cosy_raw", "jeol"],)
+    );
+    assert_eq!(
         sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
         select_discovered_spectra_by_sources(&sources, [LoadedSourceFilter::path(proton_path)])
     );
