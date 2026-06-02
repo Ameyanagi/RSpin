@@ -4,14 +4,17 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use rspin_io::{
-    LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor, RSpinReader,
-    discover_spectra, load_discovered_spectra_summary, load_discovered_spectra_summary_by_source,
+    DiscoveredSpectrumSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat,
+    LoadedSourceVendor, RSpinReader, SpectrumBundleSummary, discover_spectra,
+    load_discovered_spectra_summary, load_discovered_spectra_summary_by_source,
     load_discovered_spectra_summary_by_source_path,
     load_discovered_spectra_summary_by_source_path_prefix,
     load_discovered_spectra_summary_by_source_path_prefix_relative_to,
     load_discovered_spectra_summary_by_source_path_prefixes,
     load_discovered_spectra_summary_by_source_path_prefixes_relative_to,
     load_discovered_spectra_summary_by_source_path_relative_to,
+    load_discovered_spectra_summary_by_source_paths,
+    load_discovered_spectra_summary_by_source_paths_relative_to,
     load_discovered_spectra_summary_by_source_relative_to,
     load_discovered_spectra_summary_by_sources,
     load_discovered_spectra_summary_by_sources_relative_to,
@@ -23,6 +26,8 @@ use rspin_io::{
     load_discovered_spectra_summary_strict_by_source_path_prefixes,
     load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to,
     load_discovered_spectra_summary_strict_by_source_path_relative_to,
+    load_discovered_spectra_summary_strict_by_source_paths,
+    load_discovered_spectra_summary_strict_by_source_paths_relative_to,
     load_discovered_spectra_summary_strict_by_source_relative_to,
     load_discovered_spectra_summary_strict_by_sources,
 };
@@ -67,6 +72,8 @@ fn loaded_summary_helpers_report_selected_discovered_sources() -> Result<()> {
     let varian_by_path_alias =
         load_discovered_spectra_summary_by_source_path(&root, &sources, "varian_1h")?;
     assert_eq!(varian_by_path_alias, varian);
+
+    assert_loaded_summary_source_path_sets(&root, &sources, &summary)?;
 
     let bruker_by_prefix = load_discovered_spectra_summary_by_source_path_prefix_relative_to(
         &root,
@@ -117,9 +124,18 @@ fn loaded_summary_helpers_report_selected_discovered_sources() -> Result<()> {
         )?;
     assert_eq!(unrestricted_by_empty_prefixes, summary);
 
+    assert_loaded_summary_generic_source_filters(&root, &sources)?;
+
+    Ok(())
+}
+
+fn assert_loaded_summary_generic_source_filters(
+    root: &Path,
+    sources: &[DiscoveredSpectrumSource],
+) -> Result<()> {
     let selected = load_discovered_spectra_summary_by_sources(
-        &root,
-        &sources,
+        root,
+        sources,
         [
             LoadedSourceFilter::path("varian_1h"),
             LoadedSourceFilter::path("bruker_without_expno/pdata/1"),
@@ -132,8 +148,8 @@ fn loaded_summary_helpers_report_selected_discovered_sources() -> Result<()> {
     );
 
     let selected_relative = load_discovered_spectra_summary_by_sources_relative_to(
-        &root,
-        &sources,
+        root,
+        sources,
         [LoadedSourceFilter::path("bruker_without_expno/pdata/1")],
     )?;
     assert_eq!(selected_relative.spectra(), 1);
@@ -141,7 +157,6 @@ fn loaded_summary_helpers_report_selected_discovered_sources() -> Result<()> {
         selected_relative.source_data_kind_count(LoadedSourceDataKind::Processed),
         1
     );
-
     Ok(())
 }
 
@@ -193,6 +208,8 @@ fn reader_loaded_summary_methods_preserve_filters_and_strict_mode() -> Result<()
         RSpinReader::new().read_discovered_summary_by_source_path(&root, &sources, "varian_1h")?;
     assert_eq!(selected_by_path_alias, selected);
 
+    assert_reader_loaded_summary_source_path_sets(&root, &sources, &selected)?;
+
     let selected_by_prefix = RSpinReader::new()
         .read_discovered_summary_by_source_path_prefix_relative_to(
             &root,
@@ -233,6 +250,8 @@ fn reader_loaded_summary_methods_preserve_filters_and_strict_mode() -> Result<()
         load_discovered_spectra_summary_strict_by_source_path(&root, &sources, "varian_1h")?;
     assert_eq!(strict_path_alias, strict);
 
+    assert_strict_loaded_summary_source_path_sets(&root, &sources, &strict)?;
+
     let strict_prefix = load_discovered_spectra_summary_strict_by_source_path_prefix_relative_to(
         &root,
         &sources,
@@ -261,6 +280,78 @@ fn reader_loaded_summary_methods_preserve_filters_and_strict_mode() -> Result<()
     };
     assert!(error.to_string().contains("missing XYDATA values"));
 
+    Ok(())
+}
+
+fn assert_loaded_summary_source_path_sets(
+    root: &Path,
+    sources: &[DiscoveredSpectrumSource],
+    summary: &SpectrumBundleSummary,
+) -> Result<()> {
+    let selected = load_discovered_spectra_summary_by_source_paths_relative_to(
+        root,
+        sources,
+        ["varian_1h", "bruker_without_expno/pdata/1", "missing"],
+    )?;
+    assert_eq!(selected.spectra(), 2);
+    assert_eq!(
+        selected.source_data_kind_count(LoadedSourceDataKind::Processed),
+        1
+    );
+    assert_eq!(
+        selected.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let selected_alias = load_discovered_spectra_summary_by_source_paths(
+        root,
+        sources,
+        ["varian_1h", "bruker_without_expno/pdata/1"],
+    )?;
+    assert_eq!(selected_alias, selected);
+
+    let unrestricted = load_discovered_spectra_summary_by_source_paths_relative_to(
+        root,
+        sources,
+        std::iter::empty::<&str>(),
+    )?;
+    assert_eq!(unrestricted, *summary);
+    Ok(())
+}
+
+fn assert_reader_loaded_summary_source_path_sets(
+    root: &Path,
+    sources: &[DiscoveredSpectrumSource],
+    selected: &SpectrumBundleSummary,
+) -> Result<()> {
+    let selected_paths = RSpinReader::new().read_discovered_summary_by_source_paths_relative_to(
+        root,
+        sources,
+        ["varian_1h", "missing"],
+    )?;
+    assert_eq!(selected_paths, *selected);
+
+    let selected_paths_reader =
+        RSpinReader::new().read_discovered_summary_by_source_paths(root, sources, ["varian_1h"])?;
+    assert_eq!(selected_paths_reader, *selected);
+    Ok(())
+}
+
+fn assert_strict_loaded_summary_source_path_sets(
+    root: &Path,
+    sources: &[DiscoveredSpectrumSource],
+    strict: &SpectrumBundleSummary,
+) -> Result<()> {
+    let strict_paths = load_discovered_spectra_summary_strict_by_source_paths_relative_to(
+        root,
+        sources,
+        ["varian_1h", "missing"],
+    )?;
+    assert_eq!(strict_paths, *strict);
+
+    let strict_paths_reader =
+        load_discovered_spectra_summary_strict_by_source_paths(root, sources, ["varian_1h"])?;
+    assert_eq!(strict_paths_reader, *strict);
     Ok(())
 }
 

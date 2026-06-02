@@ -163,22 +163,26 @@ pub use selection::{
     DiscoveredSpectrumSourcesExt, select_discovered_spectra_1d,
     select_discovered_spectra_1d_by_source, select_discovered_spectra_1d_by_source_path,
     select_discovered_spectra_1d_by_source_path_prefix,
-    select_discovered_spectra_1d_by_source_path_prefixes, select_discovered_spectra_1d_by_sources,
+    select_discovered_spectra_1d_by_source_path_prefixes,
+    select_discovered_spectra_1d_by_source_paths, select_discovered_spectra_1d_by_sources,
     select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
     select_discovered_spectra_2d_by_source_path,
     select_discovered_spectra_2d_by_source_path_prefix,
-    select_discovered_spectra_2d_by_source_path_prefixes, select_discovered_spectra_2d_by_sources,
+    select_discovered_spectra_2d_by_source_path_prefixes,
+    select_discovered_spectra_2d_by_source_paths, select_discovered_spectra_2d_by_sources,
     select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
     select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
-    select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_sources,
+    select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_source_paths,
+    select_discovered_spectra_by_sources,
 };
 pub use source_path::{
     load_discovered_spectra_by_source_path, load_discovered_spectra_by_source_path_prefix,
     load_discovered_spectra_by_source_path_prefix_relative_to,
     load_discovered_spectra_by_source_path_prefixes,
     load_discovered_spectra_by_source_path_prefixes_relative_to,
-    load_discovered_spectra_by_source_path_relative_to,
+    load_discovered_spectra_by_source_path_relative_to, load_discovered_spectra_by_source_paths,
+    load_discovered_spectra_by_source_paths_relative_to,
 };
 pub use strict::{
     load_discovered_spectra_strict, load_discovered_spectra_strict_by_source,
@@ -202,12 +206,16 @@ pub use summary_path::{
     load_discovered_spectra_summary_by_source_path_prefixes,
     load_discovered_spectra_summary_by_source_path_prefixes_relative_to,
     load_discovered_spectra_summary_by_source_path_relative_to,
+    load_discovered_spectra_summary_by_source_paths,
+    load_discovered_spectra_summary_by_source_paths_relative_to,
     load_discovered_spectra_summary_strict_by_source_path,
     load_discovered_spectra_summary_strict_by_source_path_prefix,
     load_discovered_spectra_summary_strict_by_source_path_prefix_relative_to,
     load_discovered_spectra_summary_strict_by_source_path_prefixes,
     load_discovered_spectra_summary_strict_by_source_path_prefixes_relative_to,
     load_discovered_spectra_summary_strict_by_source_path_relative_to,
+    load_discovered_spectra_summary_strict_by_source_paths,
+    load_discovered_spectra_summary_strict_by_source_paths_relative_to,
 };
 
 /// Loads selected discovered source candidates relative to a common base directory.

@@ -52,22 +52,25 @@ use rspin_io::{
     load_discovered_spectra_by_source_path_prefix_relative_to,
     load_discovered_spectra_by_source_path_prefixes,
     load_discovered_spectra_by_source_path_prefixes_relative_to,
-    load_discovered_spectra_by_source_path_relative_to,
+    load_discovered_spectra_by_source_path_relative_to, load_discovered_spectra_by_source_paths,
+    load_discovered_spectra_by_source_paths_relative_to,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
     select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
     select_discovered_spectra_1d_by_source_path,
     select_discovered_spectra_1d_by_source_path_prefix,
-    select_discovered_spectra_1d_by_source_path_prefixes, select_discovered_spectra_1d_by_sources,
+    select_discovered_spectra_1d_by_source_path_prefixes,
+    select_discovered_spectra_1d_by_source_paths, select_discovered_spectra_1d_by_sources,
     select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
     select_discovered_spectra_2d_by_source_path,
     select_discovered_spectra_2d_by_source_path_prefix,
-    select_discovered_spectra_2d_by_source_path_prefixes, select_discovered_spectra_2d_by_sources,
+    select_discovered_spectra_2d_by_source_path_prefixes,
+    select_discovered_spectra_2d_by_source_paths, select_discovered_spectra_2d_by_sources,
     select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
     select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
-    select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_sources,
-    summarize_discovered_spectra,
+    select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_source_paths,
+    select_discovered_spectra_by_sources, summarize_discovered_spectra,
 };
 
 #[test]
@@ -467,6 +470,55 @@ fn discovered_source_slice_methods_match_free_helpers() -> Result<()> {
     assert_eq!(
         sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
         select_discovered_spectra_by_sources(&sources, [LoadedSourceFilter::path(proton_path)])
+    );
+    Ok(())
+}
+
+#[test]
+fn discovered_source_path_set_selectors_match_free_helpers() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    let selected_all =
+        select_discovered_spectra_by_source_paths(&sources, [proton_path, hsqc_path, "missing"]);
+    assert_eq!(selected_all.len(), 2);
+    assert_eq!(
+        sources.select_by_source_paths([proton_path, hsqc_path, "missing"]),
+        selected_all
+    );
+
+    let selected_1d =
+        select_discovered_spectra_1d_by_source_paths(&sources, [proton_path, hsqc_path]);
+    assert_eq!(selected_1d.len(), 1);
+    assert!(selected_1d.iter().all(|source| source.is_1d()));
+    assert_eq!(
+        sources.select_1d_by_source_paths([proton_path, hsqc_path]),
+        selected_1d
+    );
+
+    let selected_2d =
+        select_discovered_spectra_2d_by_source_paths(&sources, [proton_path, hsqc_path]);
+    assert_eq!(selected_2d.len(), 1);
+    assert!(selected_2d.iter().all(|source| source.is_2d()));
+    assert_eq!(
+        sources.select_2d_by_source_paths([proton_path, hsqc_path]),
+        selected_2d
+    );
+
+    let empty_paths: [&str; 0] = [];
+    let all_sources: Vec<_> = sources.iter().collect();
+    assert_eq!(
+        select_discovered_spectra_by_source_paths(&sources, empty_paths),
+        all_sources
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_source_paths(&sources, empty_paths),
+        select_discovered_spectra_1d(&sources)
+    );
+    assert_eq!(
+        select_discovered_spectra_2d_by_source_paths(&sources, empty_paths),
+        select_discovered_spectra_2d(&sources)
     );
     Ok(())
 }
@@ -1724,6 +1776,42 @@ fn discovered_source_path_helpers_load_matching_candidates() -> Result<()> {
     let reader_varian_by_path =
         RSpinReader::new().read_discovered_by_source_path(fixture_root(), &sources, "varian_1h")?;
     assert_eq!(reader_varian_by_path, varian);
+
+    let selected_paths = ["missing", "varian_1h", "bruker_without_expno/pdata/1"];
+    let bundle_by_paths = load_discovered_spectra_by_source_paths_relative_to(
+        fixture_root(),
+        &sources,
+        selected_paths,
+    )?;
+    assert_eq!(bundle_by_paths.len(), 2);
+    assert_eq!(
+        bundle_by_paths.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+    assert_eq!(
+        bundle_by_paths.source_data_kind_count(LoadedSourceDataKind::Processed),
+        1
+    );
+
+    let bundle_by_paths_alias =
+        load_discovered_spectra_by_source_paths(fixture_root(), &sources, selected_paths)?;
+    assert_eq!(bundle_by_paths_alias, bundle_by_paths);
+
+    let reader_bundle_by_paths = RSpinReader::new().read_discovered_by_source_paths(
+        fixture_root(),
+        &sources,
+        selected_paths,
+    )?;
+    assert_eq!(reader_bundle_by_paths, bundle_by_paths);
+
+    let unrestricted_by_empty_paths = RSpinReader::new()
+        .read_discovered_by_source_paths_relative_to(
+            fixture_root(),
+            &sources,
+            std::iter::empty::<&str>(),
+        )?;
+    assert_eq!(unrestricted_by_empty_paths.len(), 3);
+    assert_eq!(unrestricted_by_empty_paths.warning_count(), 2);
 
     let bruker_by_prefix = load_discovered_spectra_by_source_path_prefix_relative_to(
         fixture_root(),

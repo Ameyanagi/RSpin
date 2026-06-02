@@ -576,6 +576,24 @@ fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
     )?;
     assert_eq!(selected_by_path, selected);
 
+    let selected_by_paths = load_discovered_spectra_summary_by_source_paths_relative_to(
+        &fixture_root,
+        &sources,
+        ["bruker_without_expno/pdata/1", "varian_1h", "missing"],
+    )?;
+    assert_eq!(selected_by_paths.spectra(), 2);
+    assert_eq!(
+        selected_by_paths.source_vendor_count(LoadedSourceVendor::AgilentVarian),
+        1
+    );
+
+    let path_set_summary = RSpinReader::new().read_discovered_summary_by_source_paths(
+        &fixture_root,
+        &sources,
+        ["bruker_without_expno/pdata/1", "varian_1h"],
+    )?;
+    assert_eq!(path_set_summary, selected_by_paths);
+
     let selected_by_prefix = load_discovered_spectra_summary_by_source_path_prefix(
         &fixture_root,
         &sources,
@@ -614,6 +632,12 @@ fn prelude_exports_discovered_summary_loader_helpers() -> Result<()> {
         "varian_1h",
     )?;
     assert_eq!(strict_by_path, strict);
+    let strict_by_paths = load_discovered_spectra_summary_strict_by_source_paths(
+        &fixture_root,
+        &sources,
+        ["varian_1h", "missing"],
+    )?;
+    assert_eq!(strict_by_paths, strict);
     let strict_by_prefix = load_discovered_spectra_summary_strict_by_source_path_prefix(
         &fixture_root,
         &sources,
@@ -1024,6 +1048,14 @@ fn prelude_exports_discovered_source_path_loaders() -> Result<()> {
     assert_eq!(loaded.len(), 1);
     assert!(loaded.has_source_path(std::path::Path::new("varian_1h")));
 
+    let loaded = load_discovered_spectra_by_source_paths(
+        &fixture_root,
+        &sources,
+        ["varian_1h", "bruker_without_expno/pdata/1", "missing"],
+    )?;
+    assert_eq!(loaded.len(), 2);
+    assert!(loaded.has_source_path(std::path::Path::new("bruker_without_expno/pdata/1")));
+
     let loaded = load_discovered_spectra_by_source_path_prefix(
         &fixture_root,
         &sources,
@@ -1033,6 +1065,13 @@ fn prelude_exports_discovered_source_path_loaders() -> Result<()> {
 
     let loaded =
         RSpinReader::new().read_discovered_by_source_path(&fixture_root, &sources, "varian_1h")?;
+    assert_eq!(loaded.len(), 1);
+
+    let loaded = RSpinReader::new().read_discovered_by_source_paths_relative_to(
+        &fixture_root,
+        &sources,
+        ["varian_1h", "missing"],
+    )?;
     assert_eq!(loaded.len(), 1);
 
     let loaded = RSpinReader::new().read_discovered_by_source_path_prefix(
@@ -1442,6 +1481,29 @@ fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
     assert_eq!(
         sources.select_by_sources([LoadedSourceFilter::path(proton_path)]),
         select_discovered_spectra_by_sources(&sources, [LoadedSourceFilter::path(proton_path)])
+    );
+    Ok(())
+}
+
+#[test]
+fn prelude_exports_discovered_source_path_set_selectors() -> Result<()> {
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+
+    assert_eq!(
+        sources.select_1d_by_source_paths([proton_path, "missing"]),
+        select_discovered_spectra_1d_by_source_paths(&sources, [proton_path, "missing"])
+    );
+    assert_eq!(
+        sources.select_2d_by_source_paths([hsqc_path, "missing"]),
+        select_discovered_spectra_2d_by_source_paths(&sources, [hsqc_path, "missing"])
+    );
+    assert_eq!(
+        sources.select_by_source_paths([proton_path, hsqc_path]),
+        select_discovered_spectra_by_source_paths(&sources, [proton_path, hsqc_path])
     );
     Ok(())
 }
