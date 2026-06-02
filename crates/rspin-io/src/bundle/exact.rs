@@ -6,6 +6,7 @@ mod many_source_filtered;
 mod path_prefix_filtered;
 mod path_prefix_set_filtered;
 mod source_filtered;
+mod strict_source_filtered;
 
 use std::path::Path;
 
@@ -121,6 +122,7 @@ pub use source_filtered::{
     load_spectrum_2d_with_source_by_source_vendor,
     load_spectrum_2d_with_source_by_source_vendor_relative_to,
 };
+pub use strict_source_filtered::*;
 
 impl SpectrumBundleLoader {
     /// Loads exactly one one-dimensional spectrum from a file or directory path.

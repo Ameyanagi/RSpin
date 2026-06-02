@@ -2950,6 +2950,35 @@ fn prelude_exports_source_filtered_exact_bundle_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_strict_source_filtered_exact_bundle_loaders() -> Result<()> {
+    let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let strict_bruker_1d = load_spectrum_1d_strict_by_source_format(
+        &mixed_vendor_root,
+        LoadedSourceFormat::BrukerFid,
+    )?;
+    assert_eq!(strict_bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (strict_raw_1d, strict_raw_source) =
+        load_spectrum_1d_with_source_strict_by_source_data_kind(
+            &mixed_vendor_root,
+            LoadedSourceDataKind::Raw,
+        )?;
+    assert_eq!(strict_raw_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(strict_raw_source.format(), "bruker_fid");
+
+    let (strict_hsqc, strict_hsqc_source) = RSpinReader::new()
+        .read_2d_with_source_strict_by_source_path_prefix(&mixed_vendor_root, "jeol")?;
+    assert_eq!(strict_hsqc.shape(), (1024, 32));
+    assert_eq!(
+        strict_hsqc_source.path(),
+        Some(std::path::Path::new("jeol/myrcene_hsqc_400mhz.jdf"))
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_source_path_prefix_exact_bundle_loaders() -> Result<()> {
     let mixed_vendor_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
