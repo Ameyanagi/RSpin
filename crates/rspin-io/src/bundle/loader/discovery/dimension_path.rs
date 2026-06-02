@@ -65,6 +65,46 @@ pub fn load_discovered_spectra_1d_by_source_path_prefix<'a>(
     load_discovered_spectra_1d_by_source_path_prefix_relative_to(base, sources, path)
 }
 
+/// Loads discovered source candidates below any source path prefix as a one-dimensional bundle.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source matching unrestricted before one-dimensional filtering.
+///
+/// # Errors
+///
+/// Returns an error when loading the matching one-dimensional discovered sources fails.
+pub fn load_discovered_spectra_1d_by_source_path_prefixes_relative_to<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .read_discovered_bundle_1d_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
+/// Loads discovered source candidates below any source path prefix as a one-dimensional bundle.
+///
+/// This short alias mirrors [`load_discovered_spectra_1d_by_source_path_prefixes_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the matching one-dimensional discovered sources fails.
+pub fn load_discovered_spectra_1d_by_source_path_prefixes<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    load_discovered_spectra_1d_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
 /// Strictly loads discovered source candidates matching one source path as a one-dimensional bundle.
 ///
 /// # Errors
@@ -125,6 +165,47 @@ pub fn load_discovered_spectra_1d_strict_by_source_path_prefix<'a>(
     load_discovered_spectra_1d_strict_by_source_path_prefix_relative_to(base, sources, path)
 }
 
+/// Strictly loads discovered source candidates below any source path prefix as a one-dimensional bundle.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source matching unrestricted before one-dimensional filtering.
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching one-dimensional discovered sources fails.
+pub fn load_discovered_spectra_1d_strict_by_source_path_prefixes_relative_to<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_discovered_bundle_1d_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
+/// Strictly loads discovered source candidates below any source path prefix as a one-dimensional bundle.
+///
+/// This short alias mirrors [`load_discovered_spectra_1d_strict_by_source_path_prefixes_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching one-dimensional discovered sources fails.
+pub fn load_discovered_spectra_1d_strict_by_source_path_prefixes<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    load_discovered_spectra_1d_strict_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
 /// Loads discovered source candidates matching one source path as a two-dimensional bundle.
 ///
 /// # Errors
@@ -181,6 +262,46 @@ pub fn load_discovered_spectra_2d_by_source_path_prefix<'a>(
     path: impl AsRef<Path>,
 ) -> Result<SpectrumBundle> {
     load_discovered_spectra_2d_by_source_path_prefix_relative_to(base, sources, path)
+}
+
+/// Loads discovered source candidates below any source path prefix as a two-dimensional bundle.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source matching unrestricted before two-dimensional filtering.
+///
+/// # Errors
+///
+/// Returns an error when loading the matching two-dimensional discovered sources fails.
+pub fn load_discovered_spectra_2d_by_source_path_prefixes_relative_to<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .read_discovered_bundle_2d_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
+/// Loads discovered source candidates below any source path prefix as a two-dimensional bundle.
+///
+/// This short alias mirrors [`load_discovered_spectra_2d_by_source_path_prefixes_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when loading the matching two-dimensional discovered sources fails.
+pub fn load_discovered_spectra_2d_by_source_path_prefixes<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    load_discovered_spectra_2d_by_source_path_prefixes_relative_to(base, sources, paths)
 }
 
 /// Strictly loads discovered source candidates matching one source path as a two-dimensional bundle.
@@ -241,6 +362,47 @@ pub fn load_discovered_spectra_2d_strict_by_source_path_prefix<'a>(
     path: impl AsRef<Path>,
 ) -> Result<SpectrumBundle> {
     load_discovered_spectra_2d_strict_by_source_path_prefix_relative_to(base, sources, path)
+}
+
+/// Strictly loads discovered source candidates below any source path prefix as a two-dimensional bundle.
+///
+/// Prefixes are combined with logical OR. Passing an empty iterator leaves
+/// source matching unrestricted before two-dimensional filtering.
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching two-dimensional discovered sources fails.
+pub fn load_discovered_spectra_2d_strict_by_source_path_prefixes_relative_to<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    SpectrumBundleLoader::new()
+        .strict()
+        .read_discovered_bundle_2d_by_source_path_prefixes_relative_to(base, sources, paths)
+}
+
+/// Strictly loads discovered source candidates below any source path prefix as a two-dimensional bundle.
+///
+/// This short alias mirrors [`load_discovered_spectra_2d_strict_by_source_path_prefixes_relative_to`].
+///
+/// # Errors
+///
+/// Returns an error when strict loading the matching two-dimensional discovered sources fails.
+pub fn load_discovered_spectra_2d_strict_by_source_path_prefixes<'a, I, P>(
+    base: impl AsRef<Path>,
+    sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+    paths: I,
+) -> Result<SpectrumBundle>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    load_discovered_spectra_2d_strict_by_source_path_prefixes_relative_to(base, sources, paths)
 }
 
 impl SpectrumBundleLoader {
@@ -312,6 +474,51 @@ impl SpectrumBundleLoader {
         self.read_discovered_bundle_1d_by_source_path_prefix_relative_to(base, sources, path)
     }
 
+    /// Loads discovered source candidates below any source path prefix as a one-dimensional bundle.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted before one-dimensional filtering.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching one-dimensional discovered sources fails.
+    pub fn read_discovered_bundle_1d_by_source_path_prefixes_relative_to<'a, I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        paths: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_discovered_bundle_1d_by_sources_relative_to(
+            base,
+            sources,
+            path_prefix_filters(paths),
+        )
+    }
+
+    /// Loads discovered source candidates below any source path prefix as a one-dimensional bundle.
+    ///
+    /// This short alias mirrors [`Self::read_discovered_bundle_1d_by_source_path_prefixes_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching one-dimensional discovered sources fails.
+    pub fn read_discovered_bundle_1d_by_source_path_prefixes<'a, I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        paths: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_discovered_bundle_1d_by_source_path_prefixes_relative_to(base, sources, paths)
+    }
+
     /// Loads discovered source candidates matching one source path as a two-dimensional bundle.
     ///
     /// # Errors
@@ -379,4 +586,61 @@ impl SpectrumBundleLoader {
     ) -> Result<SpectrumBundle> {
         self.read_discovered_bundle_2d_by_source_path_prefix_relative_to(base, sources, path)
     }
+
+    /// Loads discovered source candidates below any source path prefix as a two-dimensional bundle.
+    ///
+    /// Prefixes are combined with logical OR. Passing an empty iterator leaves
+    /// source matching unrestricted before two-dimensional filtering.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching two-dimensional discovered sources fails.
+    pub fn read_discovered_bundle_2d_by_source_path_prefixes_relative_to<'a, I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        paths: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_discovered_bundle_2d_by_sources_relative_to(
+            base,
+            sources,
+            path_prefix_filters(paths),
+        )
+    }
+
+    /// Loads discovered source candidates below any source path prefix as a two-dimensional bundle.
+    ///
+    /// This short alias mirrors [`Self::read_discovered_bundle_2d_by_source_path_prefixes_relative_to`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when loading the matching two-dimensional discovered sources fails.
+    pub fn read_discovered_bundle_2d_by_source_path_prefixes<'a, I, P>(
+        &self,
+        base: impl AsRef<Path>,
+        sources: impl IntoIterator<Item = &'a DiscoveredSpectrumSource>,
+        paths: I,
+    ) -> Result<SpectrumBundle>
+    where
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    {
+        self.read_discovered_bundle_2d_by_source_path_prefixes_relative_to(base, sources, paths)
+    }
+}
+
+fn path_prefix_filters<I, P>(paths: I) -> Vec<LoadedSourceFilter>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut filters = Vec::new();
+    for path in paths {
+        filters.push(LoadedSourceFilter::path_prefix(path));
+    }
+    filters
 }
