@@ -1326,6 +1326,71 @@ fn prelude_exports_discovered_dimension_source_path_prefix_set_loaders() -> Resu
 }
 
 #[test]
+fn prelude_exports_discovered_dimension_source_path_set_loaders() -> Result<()> {
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
+    let one_d_paths = [
+        "jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
+        "jeol/myrcene_13c_400mhz.jdf",
+    ];
+    let two_d_paths = ["bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"];
+
+    let one_d = load_discovered_spectra_1d_by_source_paths(&myrcene_root, &sources, one_d_paths)?;
+    assert_eq!(one_d.len_1d(), 2);
+    assert_eq!(one_d.len_2d(), 0);
+    assert_eq!(one_d.source_format_count(LoadedSourceFormat::JcampDx), 1);
+    assert_eq!(one_d.source_format_count(LoadedSourceFormat::JeolJdf), 1);
+
+    let one_d_reader = RSpinReader::new().read_discovered_bundle_1d_by_source_paths_relative_to(
+        &myrcene_root,
+        &sources,
+        one_d_paths,
+    )?;
+    assert_eq!(one_d_reader, one_d);
+    let one_d_summary =
+        load_discovered_spectra_1d_summary_by_source_paths(&myrcene_root, &sources, one_d_paths)?;
+    assert_eq!(one_d_summary, one_d.summary());
+
+    let strict_one_d =
+        load_discovered_spectra_1d_strict_by_source_paths(&myrcene_root, &sources, one_d_paths)?;
+    assert_eq!(strict_one_d, one_d);
+    let strict_one_d_summary =
+        load_discovered_spectra_1d_summary_strict_by_source_paths_relative_to(
+            &myrcene_root,
+            &sources,
+            one_d_paths,
+        )?;
+    assert_eq!(strict_one_d_summary, strict_one_d.summary());
+
+    let two_d = load_discovered_spectra_2d_by_source_paths_relative_to(
+        &myrcene_root,
+        &sources,
+        two_d_paths,
+    )?;
+    assert_eq!(two_d.len_1d(), 0);
+    assert_eq!(two_d.len_2d(), 2);
+    let two_d_summary = RSpinReader::new().read_discovered_bundle_2d_summary_by_source_paths(
+        &myrcene_root,
+        &sources,
+        two_d_paths,
+    )?;
+    assert_eq!(two_d_summary, two_d.summary());
+
+    let strict_two_d =
+        load_discovered_spectra_2d_strict_by_source_paths(&myrcene_root, &sources, two_d_paths)?;
+    assert_eq!(strict_two_d, two_d);
+    let strict_two_d_summary =
+        load_discovered_spectra_2d_summary_strict_by_source_paths_relative_to(
+            &myrcene_root,
+            &sources,
+            two_d_paths,
+        )?;
+    assert_eq!(strict_two_d_summary, strict_two_d.summary());
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_dimension_summary_source_loaders() -> Result<()> {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");

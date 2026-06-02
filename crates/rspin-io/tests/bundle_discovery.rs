@@ -26,27 +26,42 @@ use rspin_io::{
     load_discovered_spectra_1d_by_source_path_prefix_relative_to,
     load_discovered_spectra_1d_by_source_path_prefixes,
     load_discovered_spectra_1d_by_source_path_prefixes_relative_to,
-    load_discovered_spectra_1d_relative_to,
+    load_discovered_spectra_1d_by_source_paths,
+    load_discovered_spectra_1d_by_source_paths_relative_to, load_discovered_spectra_1d_relative_to,
     load_discovered_spectra_1d_strict_by_source_path_prefix,
     load_discovered_spectra_1d_strict_by_source_path_prefixes,
     load_discovered_spectra_1d_strict_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_1d_strict_by_source_paths,
+    load_discovered_spectra_1d_strict_by_source_paths_relative_to,
     load_discovered_spectra_1d_strict_by_source_relative_to,
     load_discovered_spectra_1d_summary_by_source_path_prefixes,
     load_discovered_spectra_1d_summary_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_1d_summary_by_source_paths,
+    load_discovered_spectra_1d_summary_by_source_paths_relative_to,
     load_discovered_spectra_1d_summary_strict_by_source_path_prefixes,
     load_discovered_spectra_1d_summary_strict_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_1d_summary_strict_by_source_paths,
+    load_discovered_spectra_1d_summary_strict_by_source_paths_relative_to,
     load_discovered_spectra_2d_by_source_path_prefixes,
     load_discovered_spectra_2d_by_source_path_prefixes_relative_to,
     load_discovered_spectra_2d_by_source_path_relative_to,
+    load_discovered_spectra_2d_by_source_paths,
+    load_discovered_spectra_2d_by_source_paths_relative_to,
     load_discovered_spectra_2d_by_sources_relative_to, load_discovered_spectra_2d_relative_to,
     load_discovered_spectra_2d_strict_by_source_path,
     load_discovered_spectra_2d_strict_by_source_path_prefixes,
     load_discovered_spectra_2d_strict_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_2d_strict_by_source_paths,
+    load_discovered_spectra_2d_strict_by_source_paths_relative_to,
     load_discovered_spectra_2d_strict_by_sources,
     load_discovered_spectra_2d_summary_by_source_path_prefixes,
     load_discovered_spectra_2d_summary_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_2d_summary_by_source_paths,
+    load_discovered_spectra_2d_summary_by_source_paths_relative_to,
     load_discovered_spectra_2d_summary_strict_by_source_path_prefixes,
     load_discovered_spectra_2d_summary_strict_by_source_path_prefixes_relative_to,
+    load_discovered_spectra_2d_summary_strict_by_source_paths,
+    load_discovered_spectra_2d_summary_strict_by_source_paths_relative_to,
     load_discovered_spectra_by_source, load_discovered_spectra_by_source_path,
     load_discovered_spectra_by_source_path_prefix,
     load_discovered_spectra_by_source_path_prefix_relative_to,
@@ -1283,6 +1298,185 @@ fn discovered_dimension_source_path_prefix_set_helpers_load_matching_candidates(
     let strict_two_d_alias =
         load_discovered_spectra_2d_strict_by_source_path_prefixes(&root, &sources, two_d_prefixes)?;
     assert_eq!(strict_two_d_alias, strict_two_d);
+    Ok(())
+}
+
+#[test]
+fn discovered_dimension_source_path_set_helpers_load_matching_candidates() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+    let one_d_paths = [
+        "missing",
+        "jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
+        "jeol/myrcene_13c_400mhz.jdf",
+    ];
+    let two_d_paths = ["missing", "bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"];
+
+    let one_d =
+        load_discovered_spectra_1d_by_source_paths_relative_to(&root, &sources, one_d_paths)?;
+    assert_eq!(one_d.len_1d(), 2);
+    assert_eq!(one_d.len_2d(), 0);
+    assert_eq!(one_d.source_format_count(LoadedSourceFormat::JcampDx), 1);
+    assert_eq!(one_d.source_format_count(LoadedSourceFormat::JeolJdf), 1);
+
+    let one_d_alias = load_discovered_spectra_1d_by_source_paths(&root, &sources, one_d_paths)?;
+    assert_eq!(one_d_alias, one_d);
+    let one_d_reader = RSpinReader::new().read_discovered_bundle_1d_by_source_paths_relative_to(
+        &root,
+        &sources,
+        one_d_paths,
+    )?;
+    assert_eq!(one_d_reader, one_d);
+
+    let unrestricted_one_d = RSpinReader::new()
+        .read_discovered_bundle_1d_by_source_paths_relative_to(
+            &root,
+            &sources,
+            std::iter::empty::<&str>(),
+        )?;
+    assert_eq!(
+        unrestricted_one_d,
+        load_discovered_spectra_1d_relative_to(&root, &sources)?
+    );
+
+    let strict_one_d = load_discovered_spectra_1d_strict_by_source_paths_relative_to(
+        &root,
+        &sources,
+        one_d_paths,
+    )?;
+    assert_eq!(strict_one_d, one_d);
+    let strict_one_d_alias =
+        load_discovered_spectra_1d_strict_by_source_paths(&root, &sources, one_d_paths)?;
+    assert_eq!(strict_one_d_alias, strict_one_d);
+
+    let two_d =
+        load_discovered_spectra_2d_by_source_paths_relative_to(&root, &sources, two_d_paths)?;
+    assert_eq!(two_d.len_1d(), 0);
+    assert_eq!(two_d.len_2d(), 2);
+    assert_eq!(two_d.source_format_count(LoadedSourceFormat::BrukerSer), 1);
+    assert_eq!(two_d.source_format_count(LoadedSourceFormat::JeolJdf), 1);
+
+    let two_d_alias = load_discovered_spectra_2d_by_source_paths(&root, &sources, two_d_paths)?;
+    assert_eq!(two_d_alias, two_d);
+    let two_d_reader = RSpinReader::new().read_discovered_bundle_2d_by_source_paths(
+        &root,
+        &sources,
+        two_d_paths,
+    )?;
+    assert_eq!(two_d_reader, two_d);
+
+    let unrestricted_two_d = RSpinReader::new()
+        .read_discovered_bundle_2d_by_source_paths_relative_to(
+            &root,
+            &sources,
+            std::iter::empty::<&str>(),
+        )?;
+    assert_eq!(
+        unrestricted_two_d,
+        load_discovered_spectra_2d_relative_to(&root, &sources)?
+    );
+
+    let strict_two_d = load_discovered_spectra_2d_strict_by_source_paths_relative_to(
+        &root,
+        &sources,
+        two_d_paths,
+    )?;
+    assert_eq!(strict_two_d, two_d);
+    let strict_two_d_alias =
+        load_discovered_spectra_2d_strict_by_source_paths(&root, &sources, two_d_paths)?;
+    assert_eq!(strict_two_d_alias, strict_two_d);
+    Ok(())
+}
+
+#[test]
+fn discovered_1d_summary_path_set_helpers_match_loaded_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+    let one_d_paths = [
+        "missing",
+        "jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx",
+        "jeol/myrcene_13c_400mhz.jdf",
+    ];
+
+    let one_d =
+        load_discovered_spectra_1d_by_source_paths_relative_to(&root, &sources, one_d_paths)?;
+    let one_d_summary = load_discovered_spectra_1d_summary_by_source_paths_relative_to(
+        &root,
+        &sources,
+        one_d_paths,
+    )?;
+    assert_eq!(one_d_summary, one_d.summary());
+    let one_d_summary_alias =
+        load_discovered_spectra_1d_summary_by_source_paths(&root, &sources, one_d_paths)?;
+    assert_eq!(one_d_summary_alias, one_d_summary);
+
+    let one_d_reader_summary = RSpinReader::new()
+        .read_discovered_bundle_1d_summary_by_source_paths_relative_to(
+            &root,
+            &sources,
+            one_d_paths,
+        )?;
+    assert_eq!(one_d_reader_summary, one_d.summary());
+
+    let strict_one_d = load_discovered_spectra_1d_strict_by_source_paths_relative_to(
+        &root,
+        &sources,
+        one_d_paths,
+    )?;
+    let strict_one_d_summary =
+        load_discovered_spectra_1d_summary_strict_by_source_paths_relative_to(
+            &root,
+            &sources,
+            one_d_paths,
+        )?;
+    assert_eq!(strict_one_d_summary, strict_one_d.summary());
+    let strict_one_d_summary_alias =
+        load_discovered_spectra_1d_summary_strict_by_source_paths(&root, &sources, one_d_paths)?;
+    assert_eq!(strict_one_d_summary_alias, strict_one_d_summary);
+    Ok(())
+}
+
+#[test]
+fn discovered_2d_summary_path_set_helpers_match_loaded_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+    let two_d_paths = ["missing", "bruker_cosy_raw", "jeol/myrcene_hsqc_400mhz.jdf"];
+
+    let two_d =
+        load_discovered_spectra_2d_by_source_paths_relative_to(&root, &sources, two_d_paths)?;
+    let two_d_summary = load_discovered_spectra_2d_summary_by_source_paths_relative_to(
+        &root,
+        &sources,
+        two_d_paths,
+    )?;
+    assert_eq!(two_d_summary, two_d.summary());
+    let two_d_summary_alias =
+        load_discovered_spectra_2d_summary_by_source_paths(&root, &sources, two_d_paths)?;
+    assert_eq!(two_d_summary_alias, two_d_summary);
+
+    let two_d_reader_summary = RSpinReader::new()
+        .read_discovered_bundle_2d_summary_by_source_paths_relative_to(
+            &root,
+            &sources,
+            two_d_paths,
+        )?;
+    assert_eq!(two_d_reader_summary, two_d.summary());
+
+    let strict_two_d = load_discovered_spectra_2d_strict_by_source_paths_relative_to(
+        &root,
+        &sources,
+        two_d_paths,
+    )?;
+    let strict_two_d_summary =
+        load_discovered_spectra_2d_summary_strict_by_source_paths_relative_to(
+            &root,
+            &sources,
+            two_d_paths,
+        )?;
+    assert_eq!(strict_two_d_summary, strict_two_d.summary());
+    let strict_two_d_summary_alias =
+        load_discovered_spectra_2d_summary_strict_by_source_paths(&root, &sources, two_d_paths)?;
+    assert_eq!(strict_two_d_summary_alias, strict_two_d_summary);
     Ok(())
 }
 
