@@ -3522,6 +3522,112 @@ fn dimension_source_path_relative_helpers_anchor_source_paths() -> anyhow::Resul
 }
 
 #[test]
+fn source_filtered_reader_methods_match_free_helpers() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let paths = vec![root.join("jcamp"), root.join("jeol")];
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    assert_eq!(
+        RSpinReader::new()
+            .read_by_source_format(&root, LoadedSourceFormat::JcampDx)?
+            .summary(),
+        load_spectra_by_source_format(&root, "jdx")?.summary()
+    );
+
+    assert_eq!(
+        RSpinReader::new()
+            .read_by_source_vendor_relative_to(&root, "jeol", LoadedSourceVendor::Jeol)?
+            .summary(),
+        load_spectra_by_source_vendor_relative_to(&root, "jeol", "jeol")?.summary()
+    );
+
+    assert_eq!(
+        RSpinReader::new()
+            .read_many_by_source_data_kind(paths.clone(), LoadedSourceDataKind::Other)?
+            .summary(),
+        load_spectra_many_by_source_data_kind(paths.clone(), LoadedSourceDataKind::Other)?
+            .summary()
+    );
+
+    assert_eq!(
+        RSpinReader::new()
+            .read_by_sources(
+                &root,
+                [
+                    LoadedSourceFilter::path(carbon_path),
+                    LoadedSourceFilter::path(hsqc_path),
+                ],
+            )?
+            .summary(),
+        load_spectra_by_sources(
+            &root,
+            [
+                LoadedSourceFilter::path(carbon_path),
+                LoadedSourceFilter::path(hsqc_path),
+            ],
+        )?
+        .summary()
+    );
+
+    assert_eq!(
+        RSpinReader::new()
+            .read_many_by_source_path_prefix_relative_to(&root, ["jcamp", "jeol"], "jeol")?
+            .summary(),
+        io::load_spectra_many_by_source_path_prefix_relative_to(&root, ["jcamp", "jeol"], "jeol",)?
+            .summary()
+    );
+    Ok(())
+}
+
+#[test]
+fn source_path_set_helpers_load_matching_bundles() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let jcamp_1h = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let jcamp_13c = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let selected = io::load_spectra_by_source_paths(&root, [jcamp_1h, hsqc_path])?;
+    assert_eq!(selected.len(), 2);
+    assert!(selected.has_source_path(jcamp_1h));
+    assert!(selected.has_source_path(hsqc_path));
+
+    let relative =
+        io::load_spectra_by_source_paths_relative_to(&root, "jcamp", [jcamp_1h, jcamp_13c])?;
+    assert_eq!(relative.len_1d(), 2);
+    assert!(relative.has_source_path(jcamp_13c));
+
+    let paths = vec![root.join("jcamp"), root.join("jeol")];
+    let local_carbon_path = Path::new("myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let local_proton_path = Path::new("myrcene_1h_400mhz.jdf");
+    let many =
+        io::load_spectra_many_by_source_paths(paths, [local_carbon_path, local_proton_path])?;
+    assert_eq!(many.len(), 2);
+    assert!(many.has_source_path(local_carbon_path));
+    assert!(many.has_source_path(local_proton_path));
+
+    let relative_many = RSpinReader::new().read_many_by_source_paths_relative_to(
+        &root,
+        ["jcamp", "jeol"],
+        [jcamp_13c, hsqc_path],
+    )?;
+    assert_eq!(relative_many.len(), 2);
+    assert!(relative_many.has_source_path(jcamp_13c));
+    assert!(relative_many.has_source_path(hsqc_path));
+
+    assert_eq!(
+        io::load_spectra_many_by_source_paths_relative_to(
+            &root,
+            ["jcamp", "jeol"],
+            [jcamp_13c, hsqc_path],
+        )?
+        .summary(),
+        relative_many.summary()
+    );
+    Ok(())
+}
+
+#[test]
 fn source_filtered_summary_helpers_match_loaded_bundles() -> anyhow::Result<()> {
     let root = nmrxiv_fixture_root();
     let proton_path = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
