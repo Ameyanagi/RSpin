@@ -1049,6 +1049,100 @@ fn bundle_consuming_first_source_filter_accessors_return_owned_spectra() -> anyh
 }
 
 #[test]
+fn reader_first_source_filter_helpers_load_directly() -> anyhow::Result<()> {
+    let reader = RSpinReader::new();
+    let root = nmrxiv_fixture_root();
+
+    let first = reader.read_first_spectrum_by_source(&root, LoadedSourceFilter::bruker())?;
+    assert_eq!(first.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let jcamp = reader.read_first_1d_by_source(&root, LoadedSourceFilter::jcamp_dx())?;
+    assert!(jcamp.metadata.nucleus.is_some());
+
+    let (carbon, source) = reader.read_first_1d_with_source_by_sources(
+        &root,
+        [LoadedSourceFilter::path(
+            "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx",
+        )],
+    )?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(
+        source.path(),
+        Some(Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"))
+    );
+
+    let hsqc = reader.read_first_2d_by_source(&root, LoadedSourceFilter::jeol())?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let hsqc_path = Path::new("myrcene/jeol/myrcene_hsqc_400mhz.jdf");
+    let (_, hsqc_source) = reader.read_first_2d_with_source_by_source_relative_to(
+        &base,
+        "myrcene",
+        LoadedSourceFilter::path(hsqc_path),
+    )?;
+    assert_eq!(hsqc_source.path(), Some(hsqc_path));
+
+    let first_many = reader.read_first_spectrum_many_by_source_relative_to(
+        &base,
+        ["myrcene/bruker_cosy_raw", "myrcene"],
+        LoadedSourceFilter::path("myrcene/bruker_cosy_raw"),
+    )?;
+    assert!(first_many.is_2d());
+
+    let missing_2d = reader
+        .read_first_2d_by_source(&root, LoadedSourceFilter::jcamp_dx())
+        .err()
+        .ok_or_else(|| anyhow::anyhow!("expected missing two-dimensional source error"))?;
+    assert!(
+        missing_2d
+            .to_string()
+            .contains("expected at least one two-dimensional spectrum")
+    );
+    Ok(())
+}
+
+#[test]
+fn free_first_source_filter_helpers_load_directly() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+
+    let first = io::load_first_spectrum_by_source(&root, LoadedSourceFilter::jeol())?;
+    assert_eq!(first.source().vendor(), Some(LoadedSourceVendor::Jeol));
+
+    let (jcamp, jcamp_source) =
+        io::load_first_spectrum_1d_with_source_by_source(&root, LoadedSourceFilter::jcamp())?;
+    assert!(jcamp.metadata.nucleus.is_some());
+    assert_eq!(jcamp_source.format(), "jcamp_dx");
+
+    let hsqc = io::load_first_spectrum_2d_by_sources(
+        &root,
+        [LoadedSourceFilter::path("jeol/myrcene_hsqc_400mhz.jdf")],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let base = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("testdata/nmrxiv/cc0");
+    let (bruker_1d, bruker_source) =
+        io::load_first_spectrum_1d_many_with_source_by_source_relative_to(
+            &base,
+            ["myrcene/bruker_1h_raw", "myrcene/bruker_cosy_raw"],
+            LoadedSourceFilter::path("myrcene/bruker_1h_raw"),
+        )?;
+    assert_eq!(bruker_1d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(
+        bruker_source.path(),
+        Some(Path::new("myrcene/bruker_1h_raw"))
+    );
+
+    let bruker_2d = io::load_first_spectrum_2d_many_by_sources_relative_to(
+        &base,
+        ["myrcene"],
+        [LoadedSourceFilter::path_prefix("myrcene/bruker_cosy_raw")],
+    )?;
+    assert_eq!(bruker_2d.shape(), (2048, 512));
+    Ok(())
+}
+
+#[test]
 fn reader_exposes_supported_source_metadata() -> anyhow::Result<()> {
     let formats = RSpinReader::supported_source_formats();
     assert_eq!(formats, supported_bundle_source_formats());

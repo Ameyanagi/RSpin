@@ -634,6 +634,20 @@ fn prelude_supports_first_source_filter_accessors() -> Result<()> {
 
     let owned_hsqc = bundle.into_first_2d_by_sources([LoadedSourceFilter::jeol()])?;
     assert!(owned_hsqc.shape().1 > 0);
+
+    let direct = load_first_spectrum_by_source(&fixture_root, LoadedSourceFilter::bruker())?;
+    assert_eq!(direct.source().vendor(), Some(LoadedSourceVendor::Bruker));
+
+    let (direct_carbon, direct_source) = load_first_spectrum_1d_with_source_by_source(
+        &fixture_root,
+        LoadedSourceFilter::path("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx"),
+    )?;
+    assert_eq!(direct_carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(direct_source.format(), "jcamp_dx");
+
+    let direct_hsqc =
+        RSpinReader::new().read_first_2d_by_source(&fixture_root, LoadedSourceFilter::jeol())?;
+    assert!(direct_hsqc.shape().0 > 0);
     Ok(())
 }
 
