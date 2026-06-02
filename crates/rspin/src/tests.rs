@@ -502,6 +502,38 @@ fn prelude_supports_first_bundle_accessors() -> Result<()> {
     assert!(source.path().is_some());
     assert!(bundle.first_2d().is_none());
     assert!(bundle.first_loaded_2d().is_none());
+
+    let required = bundle.require_first_1d()?;
+    assert_eq!(required.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (required_loaded, source) = bundle.require_first_loaded_1d()?;
+    assert_eq!(required_loaded.len(), required.len());
+    assert!(source.path().is_some());
+
+    let owned = bundle.clone().into_first_1d()?;
+    assert_eq!(owned.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    let (owned_loaded, source) = bundle.into_first_loaded_1d()?;
+    assert_eq!(owned_loaded.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert!(source.path().is_some());
+    Ok(())
+}
+
+#[test]
+fn prelude_supports_first_spectrum_reader_helpers() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let mixed_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let one_d = RSpinReader::new().read_first_1d_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (one_d, source) =
+        RSpinReader::new().read_first_1d_with_source_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(std::path::Path::new("varian_1h")));
+
+    let two_d = RSpinReader::new().read_first_2d_relative_to(&mixed_root, "bruker_cosy_raw")?;
+    assert_eq!(two_d.shape(), (2048, 512));
     Ok(())
 }
 

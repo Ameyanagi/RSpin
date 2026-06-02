@@ -19,6 +19,7 @@ mod dimension_metadata;
 mod dimension_metadata_strict;
 mod dimension_path;
 mod exact;
+mod first;
 mod loader;
 mod model;
 mod path_prefix;

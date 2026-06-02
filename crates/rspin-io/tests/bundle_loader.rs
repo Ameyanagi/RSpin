@@ -571,6 +571,70 @@ fn reader_short_read_aliases_cover_common_workflows() -> anyhow::Result<()> {
 }
 
 #[test]
+fn reader_first_spectrum_helpers_cover_quick_inspection() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let mixed = nmrxiv_fixture_root();
+
+    let varian = RSpinReader::new().read_first_1d_relative_to(&base, "varian_1h")?;
+    assert_eq!(varian.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (varian, source) =
+        RSpinReader::new().read_first_1d_with_source_relative_to(&base, "varian_1h")?;
+    assert_eq!(varian.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let first_many = RSpinReader::new()
+        .read_first_1d_many_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+    assert_eq!(first_many.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (first_many, source) = RSpinReader::new()
+        .read_first_1d_many_with_source_relative_to(&base, ["varian_1h", "bruker_without_expno"])?;
+    assert_eq!(first_many.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let cosy = RSpinReader::new().read_first_2d_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(cosy.shape(), (2048, 512));
+
+    let (cosy, source) =
+        RSpinReader::new().read_first_2d_with_source_relative_to(&mixed, "bruker_cosy_raw")?;
+    assert_eq!(cosy.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+    Ok(())
+}
+
+#[test]
+fn reader_first_spectrum_helpers_work_with_direct_and_many_paths() -> anyhow::Result<()> {
+    let base = fixture_root();
+    let mixed = nmrxiv_fixture_root();
+
+    let one_d = RSpinReader::new().read_first_1d(base.join("varian_1h"))?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (one_d, source) = RSpinReader::new().read_first_1d_with_source(base.join("varian_1h"))?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let two_d = RSpinReader::new().read_first_2d(mixed.join("bruker_cosy_raw"))?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) =
+        RSpinReader::new().read_first_2d_many_with_source([mixed.join("bruker_cosy_raw")])?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+
+    let missing = RSpinReader::new().read_first_2d_many([base.join("varian_1h")]);
+    let Err(error) = missing else {
+        anyhow::bail!("missing first 2D reader helper should fail");
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("expected at least one two-dimensional spectrum")
+    );
+    Ok(())
+}
+
+#[test]
 fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()> {
     let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
     let first_1d = one_d_bundle
@@ -607,6 +671,55 @@ fn bundle_first_spectrum_accessors_cover_quick_inspection() -> anyhow::Result<()
     assert!(empty.first_loaded_1d().is_none());
     assert!(empty.first_2d().is_none());
     assert!(empty.first_loaded_2d().is_none());
+    Ok(())
+}
+
+#[test]
+fn bundle_required_first_accessors_return_typed_errors() -> anyhow::Result<()> {
+    let one_d_bundle = load_spectra(fixture_root().join("varian_1h"))?;
+    assert_eq!(
+        one_d_bundle.require_first_1d()?.metadata.nucleus,
+        Some(Nucleus::Hydrogen1)
+    );
+    let (first_loaded, source) = one_d_bundle.require_first_loaded_1d()?;
+    assert_eq!(first_loaded.len(), one_d_bundle.require_first_1d()?.len());
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let missing_2d = one_d_bundle.require_first_2d();
+    let Err(error) = missing_2d else {
+        anyhow::bail!("missing 2D first accessor should fail");
+    };
+    assert!(
+        error
+            .to_string()
+            .contains("expected at least one two-dimensional spectrum")
+    );
+
+    let two_d_bundle = load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?;
+    assert_eq!(two_d_bundle.require_first_2d()?.shape(), (2048, 512));
+    let (first_2d, source) = two_d_bundle.require_first_loaded_2d()?;
+    assert_eq!(first_2d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
+    Ok(())
+}
+
+#[test]
+fn bundle_consuming_first_accessors_return_owned_spectra() -> anyhow::Result<()> {
+    let one_d = load_spectra(fixture_root().join("bruker_without_expno"))?.into_first_1d()?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+
+    let (one_d, source) =
+        load_spectra(fixture_root().join("bruker_without_expno"))?.into_first_loaded_1d()?;
+    assert_eq!(one_d.metadata.nucleus, Some(Nucleus::Hydrogen1));
+    assert!(source.path().is_some());
+
+    let two_d = load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?.into_first_2d()?;
+    assert_eq!(two_d.shape(), (2048, 512));
+
+    let (two_d, source) =
+        load_spectra(nmrxiv_fixture_root().join("bruker_cosy_raw"))?.into_first_loaded_2d()?;
+    assert_eq!(two_d.shape(), (2048, 512));
+    assert_eq!(source.path(), Some(Path::new("bruker_cosy_raw")));
     Ok(())
 }
 
