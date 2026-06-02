@@ -747,6 +747,52 @@ fn prelude_exports_dimension_bundle_loader_helpers() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_dimension_source_metadata_bundle_helpers() -> Result<()> {
+    let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+
+    let jcamp = load_spectra_1d_by_source_format(&mixed, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(jcamp.len_1d(), 2);
+    assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
+    assert_eq!(
+        load_spectra_1d_summary_by_source_formats(&mixed, [LoadedSourceFormat::JcampDx])?,
+        jcamp.summary()
+    );
+
+    let jeol = RSpinReader::new().read_bundle_1d_by_source_vendor(&mixed, "jeol")?;
+    assert_eq!(jeol.len_1d(), 2);
+    assert_eq!(
+        load_spectra_1d_summary_by_source_vendor(&mixed, LoadedSourceVendor::Jeol)?,
+        jeol.summary()
+    );
+
+    let raw_1d = load_spectra_1d_by_source_data_kind_relative_to(
+        &mixed,
+        "bruker_1h_raw",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.len_1d(), 1);
+    assert!(raw_1d.has_source_path("bruker_1h_raw"));
+
+    let two_d = load_spectra_2d_by_source_formats(
+        &mixed,
+        [LoadedSourceFormat::BrukerSer, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(two_d.len_2d(), 2);
+    assert_eq!(two_d.source_format_count(LoadedSourceFormat::BrukerSer), 1);
+    assert_eq!(two_d.source_format_count(LoadedSourceFormat::JeolJdf), 1);
+
+    let raw_2d =
+        RSpinReader::new().read_bundle_2d_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_2d.len_2d(), 1);
+    assert_eq!(
+        load_spectra_2d_summary_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?,
+        raw_2d.summary()
+    );
+    Ok(())
+}
+
 fn assert_multi_path_source_counts(bundle: &SpectrumBundle, summary: &SpectrumBundleSummary) {
     assert_eq!(bundle.source_paths().count(), 3);
     assert_eq!(

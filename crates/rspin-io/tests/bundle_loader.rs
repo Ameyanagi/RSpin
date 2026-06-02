@@ -7,6 +7,7 @@ use std::{
 };
 
 use rspin_core::{Nucleus, RSpinError, Unit};
+use rspin_io as io;
 use rspin_io::{
     LoadedSource, LoadedSourceDataKind, LoadedSourceFilter, LoadedSourceFormat, LoadedSourceVendor,
     LoadedSpectrum, RSpinReader, SourceDataKindCount, SourcePathCount, SpectrumBundle,
@@ -3255,6 +3256,143 @@ fn loader_can_restrict_source_paths() -> anyhow::Result<()> {
         anyhow::bail!("missing source-path filter should leave no readable spectra");
     };
     assert!(error.to_string().contains("no readable bundle data found"));
+    Ok(())
+}
+
+#[test]
+fn dimension_source_metadata_helpers_load_matching_bundles() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+
+    let jcamp_1d = io::load_spectra_1d_by_source_format(&mixed, "jdx")?;
+    assert_eq!(jcamp_1d.len_1d(), 2);
+    assert_eq!(jcamp_1d.len_2d(), 0);
+    assert_eq!(jcamp_1d.source_format_count(LoadedSourceFormat::JcampDx), 2);
+
+    let one_d_formats = io::load_spectra_1d_by_source_formats(
+        &mixed,
+        [LoadedSourceFormat::JcampDx, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(one_d_formats.len_1d(), 4);
+    assert_eq!(
+        one_d_formats.source_format_count(LoadedSourceFormat::JeolJdf),
+        2
+    );
+
+    let jeol_1d = io::load_spectra_1d_by_source_vendor(&mixed, "jeol")?;
+    assert_eq!(jeol_1d.len_1d(), 2);
+    assert_eq!(jeol_1d.source_vendor_count(LoadedSourceVendor::Jeol), 2);
+
+    let raw_1d = io::load_spectra_1d_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(raw_1d.len_1d(), 1);
+    assert_eq!(raw_1d.source_format_count(LoadedSourceFormat::BrukerFid), 1);
+
+    let jeol_2d = io::load_spectra_2d_by_source_format(&mixed, LoadedSourceFormat::JeolJdf)?;
+    assert_eq!(jeol_2d.len_1d(), 0);
+    assert_eq!(jeol_2d.len_2d(), 1);
+    assert_eq!(jeol_2d.source_format_count(LoadedSourceFormat::JeolJdf), 1);
+
+    let two_d_vendors = io::load_spectra_2d_by_source_vendors(
+        &mixed,
+        [LoadedSourceVendor::Bruker, LoadedSourceVendor::Jeol],
+    )?;
+    assert_eq!(two_d_vendors.len_2d(), 2);
+    assert_eq!(
+        two_d_vendors.source_vendor_count(LoadedSourceVendor::Bruker),
+        1
+    );
+    assert_eq!(
+        two_d_vendors.source_vendor_count(LoadedSourceVendor::Jeol),
+        1
+    );
+
+    let raw_2d = RSpinReader::new()
+        .read_bundle_2d_by_source_data_kinds(&mixed, [LoadedSourceDataKind::Raw])?;
+    assert_eq!(raw_2d.len_2d(), 1);
+    assert_eq!(raw_2d.source_format_count(LoadedSourceFormat::BrukerSer), 1);
+    Ok(())
+}
+
+#[test]
+fn dimension_source_metadata_summary_helpers_match_loaded_bundles() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+
+    let jcamp_1d = io::load_spectra_1d_by_source_format(&mixed, LoadedSourceFormat::JcampDx)?;
+    assert_eq!(
+        io::load_spectra_1d_summary_by_source_format(&mixed, "jdx")?,
+        jcamp_1d.summary()
+    );
+
+    let jeol_1d = RSpinReader::new().read_bundle_1d_by_source_vendor(&mixed, "jeol")?;
+    assert_eq!(
+        io::load_spectra_1d_summary_by_source_vendors(&mixed, [LoadedSourceVendor::Jeol])?,
+        jeol_1d.summary()
+    );
+
+    let raw_1d = io::load_spectra_1d_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(
+        io::load_spectra_1d_summary_by_source_data_kinds(&mixed, [LoadedSourceDataKind::Raw])?,
+        raw_1d.summary()
+    );
+
+    let bruker_2d = io::load_spectra_2d_by_source_vendor(&mixed, LoadedSourceVendor::Bruker)?;
+    assert_eq!(
+        RSpinReader::new().read_bundle_2d_summary_by_source_vendor(&mixed, "bruker")?,
+        bruker_2d.summary()
+    );
+
+    let two_d_formats = io::load_spectra_2d_by_source_formats(
+        &mixed,
+        [LoadedSourceFormat::BrukerSer, LoadedSourceFormat::JeolJdf],
+    )?;
+    assert_eq!(
+        io::load_spectra_2d_summary_by_source_formats(
+            &mixed,
+            [LoadedSourceFormat::BrukerSer, LoadedSourceFormat::JeolJdf],
+        )?,
+        two_d_formats.summary()
+    );
+
+    let raw_2d = io::load_spectra_2d_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
+    assert_eq!(
+        io::load_spectra_2d_summary_by_source_data_kind(&mixed, LoadedSourceDataKind::Raw)?,
+        raw_2d.summary()
+    );
+    Ok(())
+}
+
+#[test]
+fn dimension_source_metadata_relative_helpers_anchor_source_paths() -> anyhow::Result<()> {
+    let mixed = nmrxiv_fixture_root();
+
+    let jcamp_1d = io::load_spectra_1d_by_source_format_relative_to(&mixed, "jcamp", "jcamp")?;
+    assert_eq!(jcamp_1d.len_1d(), 2);
+    assert!(jcamp_1d.has_source_path(Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx")));
+
+    let jeol_1d = io::load_spectra_1d_by_source_vendor_relative_to(&mixed, "jeol", "jeol")?;
+    assert_eq!(jeol_1d.len_1d(), 2);
+    assert_eq!(jeol_1d.source_vendor_count(LoadedSourceVendor::Jeol), 2);
+
+    let raw_1d = RSpinReader::new().read_bundle_1d_by_source_data_kind_relative_to(
+        &mixed,
+        "bruker_1h_raw",
+        LoadedSourceDataKind::Raw,
+    )?;
+    assert_eq!(raw_1d.len_1d(), 1);
+    assert!(raw_1d.has_source_path("bruker_1h_raw"));
+
+    let bruker_2d =
+        io::load_spectra_2d_by_source_vendor_relative_to(&mixed, "bruker_cosy_raw", "bruker")?;
+    assert_eq!(bruker_2d.len_2d(), 1);
+    assert!(bruker_2d.has_source_path("bruker_cosy_raw"));
+
+    assert_eq!(
+        io::load_spectra_2d_summary_by_source_format_relative_to(
+            &mixed,
+            "bruker_cosy_raw",
+            LoadedSourceFormat::BrukerSer,
+        )?,
+        bruker_2d.summary()
+    );
     Ok(())
 }
 
