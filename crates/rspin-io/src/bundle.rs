@@ -22,6 +22,7 @@ mod exact;
 mod first;
 mod first_short_source;
 mod first_source;
+mod first_source_strict;
 mod first_strict;
 mod first_typed_source;
 mod loader;
@@ -183,6 +184,7 @@ pub use first::{
 };
 pub use first_short_source::*;
 pub use first_source::*;
+pub use first_source_strict::*;
 pub use first_strict::*;
 pub use first_typed_source::*;
 use loader::FileCandidateKind;
