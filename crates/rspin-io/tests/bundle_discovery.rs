@@ -20,8 +20,8 @@ use rspin_io::{
     discover_spectra_many_by_source, discover_spectra_many_by_source_relative_to,
     discover_spectra_many_by_sources, discover_spectra_many_by_sources_relative_to,
     discover_spectra_many_relative_to, discover_spectra_many_summary,
-    discover_spectra_many_summary_relative_to, discover_spectra_summary,
-    discover_spectra_summary_relative_to, load_discovered_spectra,
+    discover_spectra_many_summary_relative_to, discover_spectra_relative_to,
+    discover_spectra_summary, discover_spectra_summary_relative_to, load_discovered_spectra,
     load_discovered_spectra_1d_by_source, load_discovered_spectra_1d_by_source_path,
     load_discovered_spectra_1d_by_source_path_prefix_relative_to,
     load_discovered_spectra_1d_by_source_path_prefixes,
@@ -71,7 +71,9 @@ use rspin_io::{
     load_discovered_spectra_by_source_paths_relative_to,
     load_discovered_spectra_by_source_relative_to, load_discovered_spectra_by_sources,
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
-    select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
+    preview_spectra, preview_spectra_many, preview_spectra_many_relative_to,
+    preview_spectra_relative_to, scan_spectra, scan_spectra_many, scan_spectra_many_relative_to,
+    scan_spectra_relative_to, select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
     select_discovered_spectra_1d_by_source_path,
     select_discovered_spectra_1d_by_source_path_prefix,
     select_discovered_spectra_1d_by_source_path_prefixes,
@@ -154,6 +156,92 @@ fn source_discovery_respects_chainable_loader_filters() -> Result<()> {
             .all(|source| source.vendor() == Some(LoadedSourceVendor::Bruker))
     );
 
+    Ok(())
+}
+
+#[test]
+fn discovery_preview_and_scan_aliases_match_existing_methods() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let reader = RSpinReader::new().source_vendor("jeol");
+
+    let scanned = reader.scan(&root)?;
+    assert_eq!(scanned, reader.discover(&root)?);
+    assert_eq!(scanned.len(), 3);
+    assert!(scanned.iter().all(|source| source.is_vendor("jeol")));
+
+    let preview = reader.preview(&root)?;
+    assert_eq!(preview, reader.discover_summary(&root)?);
+    assert_eq!(preview.sources(), scanned.len());
+    assert_eq!(preview.source_vendor_count(LoadedSourceVendor::Jeol), 3);
+
+    let scanned_1d = RSpinReader::new().scan_1d(&root)?;
+    assert_eq!(scanned_1d, RSpinReader::new().discover_1d(&root)?);
+    assert!(scanned_1d.iter().all(DiscoveredSpectrumSource::is_1d));
+    let preview_1d = RSpinReader::new().preview_1d(&root)?;
+    assert_eq!(preview_1d.sources(), scanned_1d.len());
+    assert_eq!(preview_1d.sources_2d(), 0);
+
+    let scanned_2d = RSpinReader::new().scan_2d(&root)?;
+    assert_eq!(scanned_2d, RSpinReader::new().discover_2d(&root)?);
+    assert!(scanned_2d.iter().all(DiscoveredSpectrumSource::is_2d));
+    let preview_2d = RSpinReader::new().preview_2d(&root)?;
+    assert_eq!(preview_2d.sources(), scanned_2d.len());
+    assert_eq!(preview_2d.sources_1d(), 0);
+
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let relative = reader.scan_relative_to(&root, hsqc_path)?;
+    assert_eq!(relative, reader.discover_relative_to(&root, hsqc_path)?);
+    assert_eq!(relative.len(), 1);
+    assert_eq!(relative[0].path(), Some(Path::new(hsqc_path)));
+
+    let relative_preview = reader.preview_relative_to(&root, hsqc_path)?;
+    assert_eq!(
+        relative_preview,
+        reader.discover_summary_relative_to(&root, hsqc_path)?
+    );
+    assert_eq!(relative_preview.sources_2d(), 1);
+    Ok(())
+}
+
+#[test]
+fn free_preview_and_scan_aliases_match_existing_discovery_helpers() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+
+    assert_eq!(scan_spectra(&root)?, discover_spectra(&root)?);
+    assert_eq!(preview_spectra(&root)?, discover_spectra_summary(&root)?);
+
+    let selected_path = "jeol/myrcene_1h_400mhz.jdf";
+    assert_eq!(
+        scan_spectra_relative_to(&root, selected_path)?,
+        discover_spectra_relative_to(&root, selected_path)?
+    );
+    assert_eq!(
+        preview_spectra_relative_to(&root, selected_path)?,
+        discover_spectra_summary_relative_to(&root, selected_path)?
+    );
+
+    let many_paths = [root.join("jcamp"), root.join("jeol")];
+    assert_eq!(
+        scan_spectra_many(many_paths.clone())?,
+        discover_spectra_many(many_paths.clone())?
+    );
+    assert_eq!(
+        preview_spectra_many(many_paths.clone())?,
+        discover_spectra_many_summary(many_paths)?
+    );
+
+    let relative_paths = ["jcamp", "jeol"];
+    assert_eq!(
+        scan_spectra_many_relative_to(&root, relative_paths)?,
+        discover_spectra_many_relative_to(&root, relative_paths)?
+    );
+    let relative_preview = preview_spectra_many_relative_to(&root, relative_paths)?;
+    assert_eq!(
+        relative_preview,
+        discover_spectra_many_summary_relative_to(&root, relative_paths)?
+    );
+    assert_eq!(relative_preview.source_path_prefix_count("jcamp"), 4);
+    assert_eq!(relative_preview.source_path_prefix_count("jeol"), 3);
     Ok(())
 }
 

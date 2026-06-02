@@ -1223,6 +1223,46 @@ fn prelude_exports_source_candidate_discovery() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn prelude_exports_preview_and_scan_discovery_aliases() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+
+    let scanned = scan_spectra(&fixture_root)?;
+    assert_eq!(scanned, discover_spectra(&fixture_root)?);
+    assert_eq!(preview_spectra(&fixture_root)?.sources(), scanned.len());
+
+    let selected = scan_spectra_relative_to(&fixture_root, "varian_1h")?;
+    assert_eq!(selected.len(), 1);
+    assert_eq!(
+        preview_spectra_relative_to(&fixture_root, "varian_1h")?.sources(),
+        selected.len()
+    );
+
+    let selected_paths = ["varian_1h", "bruker_without_expno"];
+    let many_preview = preview_spectra_many_relative_to(&fixture_root, selected_paths)?;
+    assert_eq!(many_preview.sources(), 3);
+    assert_eq!(
+        scan_spectra_many_relative_to(&fixture_root, selected_paths)?.len(),
+        many_preview.sources()
+    );
+
+    let reader_preview = RSpinReader::new()
+        .processed()
+        .source_vendor("bruker")
+        .preview_relative_to(&fixture_root, "bruker_without_expno")?;
+    assert_eq!(reader_preview.sources(), 1);
+    assert_eq!(
+        RSpinReader::new()
+            .processed()
+            .source_vendor("bruker")
+            .scan_relative_to(&fixture_root, "bruker_without_expno")?
+            .len(),
+        reader_preview.sources()
+    );
+    Ok(())
+}
+
 fn assert_prelude_discovered_summary_path_sets(
     summary: &DiscoveredSpectrumSummary,
     source_count: usize,

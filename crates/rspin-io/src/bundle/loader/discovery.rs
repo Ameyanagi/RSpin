@@ -9,6 +9,7 @@ mod exact_path;
 mod exact_path_prefix_set;
 mod loaded_summary;
 mod model;
+mod preview;
 mod selected;
 mod selection;
 mod source_metadata;
@@ -177,6 +178,11 @@ pub use loaded_summary::{
     load_discovered_spectra_summary_strict_relative_to,
 };
 pub use model::{DiscoveredSpectrumDimension, DiscoveredSpectrumSource};
+pub use preview::{
+    preview_spectra, preview_spectra_many, preview_spectra_many_relative_to,
+    preview_spectra_relative_to, scan_spectra, scan_spectra_many, scan_spectra_many_relative_to,
+    scan_spectra_relative_to,
+};
 pub use selected::SelectedDiscoveredSpectrumSourcesExt;
 pub use selection::{
     DiscoveredSpectrumSourcesExt, select_discovered_spectra_1d,
