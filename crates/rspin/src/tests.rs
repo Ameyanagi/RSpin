@@ -1688,6 +1688,10 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
     )?;
     assert_eq!(fid.len(), 1);
     assert_eq!(fid.source_format_count(LoadedSourceFormat::AgilentFid), 1);
+    assert_eq!(
+        load_discovered_spectra_by_format(&fixture_root, &sources, "varian fid")?,
+        fid
+    );
 
     let selected_formats = load_discovered_spectra_by_source_formats(
         &fixture_root,
@@ -1698,11 +1702,23 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
         ],
     )?;
     assert_eq!(selected_formats.len(), 2);
+    assert_eq!(
+        RSpinReader::new().read_discovered_by_formats(
+            &fixture_root,
+            &sources,
+            ["agilent fid", "bruker processed"],
+        )?,
+        selected_formats
+    );
 
     let varian = load_discovered_spectra_by_source_vendor(&fixture_root, &sources, "varian")?;
     assert_eq!(
         varian.source_vendor_count(LoadedSourceVendor::AgilentVarian),
         1
+    );
+    assert_eq!(
+        load_discovered_spectra_by_vendor(&fixture_root, &sources, "varian")?,
+        varian
     );
     let vendor_summary = load_discovered_spectra_summary_by_source_vendors(
         &fixture_root,
@@ -1727,6 +1743,14 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
         processed.source_format_count(LoadedSourceFormat::BrukerProcessed),
         1
     );
+    assert_eq!(
+        load_discovered_spectra_by_data_kind(
+            &fixture_root,
+            &sources,
+            LoadedSourceDataKind::Processed,
+        )?,
+        processed
+    );
     let processed_summary = load_discovered_spectra_summary_strict_by_source_data_kind(
         &fixture_root,
         &sources,
@@ -1740,6 +1764,10 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
         "varian fid",
     )?;
     assert_eq!(strict_fid_summary, fid.summary());
+
+    let bruker =
+        load_discovered_spectra_by_path_prefix(&fixture_root, &sources, "bruker_without_expno")?;
+    assert_eq!(bruker.source_vendor_count(LoadedSourceVendor::Bruker), 2);
     Ok(())
 }
 

@@ -109,10 +109,21 @@ fn metadata_filter_helpers_load_discovered_bundles() -> Result<()> {
         load_discovered_spectra_relative_to(&root, &sources)?
     );
 
+    Ok(())
+}
+
+#[test]
+fn strict_metadata_filter_helpers_match_loaded_bundles() -> Result<()> {
+    let root = fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let fid = load_discovered_spectra_by_source_format(&root, &sources, "agilent fid")?;
     assert_eq!(
         load_discovered_spectra_strict_by_source_format(&root, &sources, "agilent fid")?,
         fid
     );
+
+    let varian = load_discovered_spectra_by_source_vendor(&root, &sources, "varian")?;
     assert_eq!(
         load_discovered_spectra_strict_by_source_vendor(
             &root,
@@ -121,6 +132,9 @@ fn metadata_filter_helpers_load_discovered_bundles() -> Result<()> {
         )?,
         varian
     );
+
+    let raw =
+        load_discovered_spectra_by_source_data_kind(&root, &sources, LoadedSourceDataKind::Raw)?;
     assert_eq!(
         load_discovered_spectra_strict_by_source_data_kind(
             &root,
@@ -129,7 +143,77 @@ fn metadata_filter_helpers_load_discovered_bundles() -> Result<()> {
         )?,
         raw
     );
+    Ok(())
+}
 
+#[test]
+fn short_metadata_filter_aliases_load_discovered_bundles() -> Result<()> {
+    let root = fixture_root();
+    let sources = discover_spectra(&root)?;
+
+    let fid = load_discovered_spectra_by_source_format(&root, &sources, "agilent fid")?;
+    assert_eq!(
+        io::load_discovered_spectra_by_format(&root, &sources, "varian fid")?,
+        fid
+    );
+
+    let selected_formats = load_discovered_spectra_by_source_formats(
+        &root,
+        &sources,
+        ["agilent fid", "bruker processed"],
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_by_formats_relative_to(
+            &root,
+            &sources,
+            ["agilent fid", "bruker processed"],
+        )?,
+        selected_formats
+    );
+
+    let varian = load_discovered_spectra_by_source_vendor(&root, &sources, "varian")?;
+    assert_eq!(
+        io::load_discovered_spectra_by_vendor(&root, &sources, "varian")?,
+        varian
+    );
+
+    let known_vendors =
+        load_discovered_spectra_by_source_vendors(&root, &sources, ["bruker", "varian"])?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_by_vendors(&root, &sources, ["bruker", "varian"])?,
+        known_vendors
+    );
+
+    let raw =
+        load_discovered_spectra_by_source_data_kind(&root, &sources, LoadedSourceDataKind::Raw)?;
+    assert_eq!(
+        io::load_discovered_spectra_by_data_kind(&root, &sources, LoadedSourceDataKind::Raw)?,
+        raw
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_discovered_by_data_kinds(
+            &root,
+            &sources,
+            [LoadedSourceDataKind::Raw, LoadedSourceDataKind::Processed],
+        )?,
+        known_vendors
+    );
+
+    let bruker_prefix =
+        io::load_discovered_spectra_by_path_prefix(&root, &sources, "bruker_without_expno")?;
+    assert_eq!(bruker_prefix.len(), 2);
+    assert_eq!(
+        bruker_prefix.source_vendor_count(LoadedSourceVendor::Bruker),
+        2
+    );
+
+    let prefix_set = RSpinReader::new().read_discovered_by_path_prefixes(
+        &root,
+        &sources,
+        ["bruker_without_expno", "varian_1h"],
+    )?;
+    assert_eq!(prefix_set, known_vendors);
     Ok(())
 }
 
