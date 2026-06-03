@@ -243,6 +243,72 @@ fn short_source_aliases_load_exact_discovered_sources() -> Result<()> {
 }
 
 #[test]
+fn short_path_aliases_load_exact_discovered_sources() -> Result<()> {
+    let sources = discover_spectra(fixture_root())?;
+
+    let spectrum =
+        rspin_io::load_discovered_spectrum_1d_by_path(fixture_root(), &sources, "varian_1h")?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (_, source) = rspin_io::RSpinReader::new()
+        .read_discovered_1d_with_source_by_path_relative_to(
+            fixture_root(),
+            &sources,
+            "varian_1h",
+        )?;
+    assert_eq!(source.path(), Some(Path::new("varian_1h")));
+
+    let spectrum = rspin_io::load_discovered_spectrum_1d_by_path_prefixes(
+        fixture_root(),
+        &sources,
+        ["missing", "varian_1h"],
+    )?;
+    assert_eq!(spectrum.len(), 16_384);
+
+    let (_, source) = rspin_io::RSpinReader::new()
+        .read_discovered_1d_with_source_by_path_prefixes(
+            fixture_root(),
+            &sources,
+            ["missing", "varian_1h"],
+        )?;
+    assert_eq!(source.format(), "agilent_fid");
+
+    let myrcene_root = cc0_myrcene_fixture_root();
+    let myrcene_sources = discover_spectra(&myrcene_root)?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let hsqc = rspin_io::RSpinReader::new().read_discovered_2d_by_path(
+        &myrcene_root,
+        &myrcene_sources,
+        hsqc_path,
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (_, source) = rspin_io::load_discovered_spectrum_2d_with_source_by_path(
+        &myrcene_root,
+        &myrcene_sources,
+        hsqc_path,
+    )?;
+    assert_eq!(source.path(), Some(Path::new(hsqc_path)));
+
+    let hsqc = rspin_io::load_discovered_spectrum_2d_by_path_prefixes(
+        &myrcene_root,
+        &myrcene_sources,
+        ["missing", hsqc_path],
+    )?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+
+    let (_, source) = rspin_io::RSpinReader::new()
+        .read_discovered_2d_with_source_by_path_prefixes_relative_to(
+            &myrcene_root,
+            &myrcene_sources,
+            ["missing", hsqc_path],
+        )?;
+    assert_eq!(source.format(), "jeol_jdf");
+
+    Ok(())
+}
+
+#[test]
 fn free_helpers_load_exact_discovered_2d_sources() -> Result<()> {
     let sources = discover_spectra(cc0_myrcene_fixture_root())?;
     let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
