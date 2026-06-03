@@ -176,11 +176,27 @@ fn short_metadata_filter_aliases_load_discovered_bundles() -> Result<()> {
         io::load_discovered_spectra_by_vendor(&root, &sources, "varian")?,
         varian
     );
+    assert_eq!(
+        io::load_discovered_spectra_by_path(&root, &sources, "varian_1h")?,
+        varian
+    );
 
     let known_vendors =
         load_discovered_spectra_by_source_vendors(&root, &sources, ["bruker", "varian"])?;
     assert_eq!(
         RSpinReader::new().read_discovered_by_vendors(&root, &sources, ["bruker", "varian"])?,
+        known_vendors
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_by_paths_relative_to(
+            &root,
+            &sources,
+            [
+                "bruker_without_expno",
+                "bruker_without_expno/pdata/1",
+                "varian_1h",
+            ],
+        )?,
         known_vendors
     );
 
@@ -705,6 +721,44 @@ fn short_dimension_metadata_aliases_load_discovered_bundles() -> Result<()> {
 }
 
 #[test]
+fn short_dimension_path_aliases_load_discovered_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+    let jcamp_1h_path = "jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx";
+    let jcamp_13c_path = "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx";
+
+    assert_eq!(
+        io::load_discovered_spectra_1d_by_path(&root, &sources, jcamp_1h_path)?.len(),
+        1
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_1d_by_paths(
+            &root,
+            &sources,
+            [jcamp_1h_path, jcamp_13c_path],
+        )?,
+        io::load_discovered_spectra_1d_by_source_format(&root, &sources, "jcamp")?
+    );
+
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let bruker_2d = io::load_discovered_spectra_2d_by_source_vendor(&root, &sources, "bruker")?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_2d_by_path(&root, &sources, "bruker_cosy_raw")?,
+        bruker_2d
+    );
+    assert_eq!(
+        io::load_discovered_spectra_2d_by_paths(&root, &sources, ["bruker_cosy_raw", hsqc_path])?,
+        io::load_discovered_spectra_2d_by_source_formats(
+            &root,
+            &sources,
+            [LoadedSourceFormat::BrukerSer, LoadedSourceFormat::JeolJdf],
+        )?
+    );
+
+    Ok(())
+}
+
+#[test]
 fn short_dimension_metadata_summary_aliases_match_loaded_bundles() -> Result<()> {
     let root = cc0_myrcene_fixture_root();
     let sources = discover_spectra(&root)?;
@@ -795,6 +849,58 @@ fn short_dimension_metadata_summary_aliases_match_loaded_bundles() -> Result<()>
             .strict()
             .read_discovered_bundle_2d_summary_by_format(&root, &sources, "bruker ser")?,
         bruker_2d.summary()
+    );
+
+    Ok(())
+}
+
+#[test]
+fn short_dimension_path_summary_aliases_match_loaded_bundles() -> Result<()> {
+    let root = cc0_myrcene_fixture_root();
+    let sources = discover_spectra(&root)?;
+    let jcamp_1h_path = "jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx";
+    let jcamp_13c_path = "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx";
+
+    assert_eq!(
+        io::load_discovered_spectra_1d_summary_by_path(&root, &sources, jcamp_1h_path)?.spectra(),
+        1
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_1d_summary_by_paths(
+            &root,
+            &sources,
+            [jcamp_1h_path, jcamp_13c_path],
+        )?,
+        io::load_discovered_spectra_1d_by_source_format(&root, &sources, "jcamp")?.summary()
+    );
+
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let bruker_2d = io::load_discovered_spectra_2d_by_source_format(
+        &root,
+        &sources,
+        LoadedSourceFormat::BrukerSer,
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_2d_summary_by_path(
+            &root,
+            &sources,
+            "bruker_cosy_raw",
+        )?,
+        bruker_2d.summary()
+    );
+
+    let selected_2d_paths = io::load_discovered_spectra_2d_by_source_paths(
+        &root,
+        &sources,
+        ["bruker_cosy_raw", hsqc_path],
+    )?;
+    assert_eq!(
+        io::load_discovered_spectra_2d_summary_by_paths(
+            &root,
+            &sources,
+            ["bruker_cosy_raw", hsqc_path],
+        )?,
+        selected_2d_paths.summary()
     );
 
     Ok(())

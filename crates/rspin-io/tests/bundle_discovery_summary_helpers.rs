@@ -321,6 +321,10 @@ fn short_loaded_summary_aliases_match_source_metadata_helpers() -> Result<()> {
         RSpinReader::new().read_discovered_summary_by_vendor(&root, &sources, "varian")?,
         varian
     );
+    assert_eq!(
+        rspin_io::load_discovered_spectra_summary_by_path(&root, &sources, "varian_1h")?,
+        varian
+    );
 
     let known_vendors =
         load_discovered_spectra_summary_by_source_vendors(&root, &sources, ["bruker", "varian"])?;
@@ -329,6 +333,18 @@ fn short_loaded_summary_aliases_match_source_metadata_helpers() -> Result<()> {
             &root,
             &sources,
             ["bruker", "varian"],
+        )?,
+        known_vendors
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_paths_relative_to(
+            &root,
+            &sources,
+            [
+                "bruker_without_expno",
+                "bruker_without_expno/pdata/1",
+                "varian_1h",
+            ],
         )?,
         known_vendors
     );

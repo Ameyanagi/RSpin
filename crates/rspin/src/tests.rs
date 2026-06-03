@@ -1772,6 +1772,54 @@ fn prelude_exports_discovered_source_metadata_loaders() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_bundle_path_aliases() -> Result<()> {
+    let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/zenodo_7100132");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&fixture_root)?;
+    let selected_paths = [
+        "bruker_without_expno",
+        "bruker_without_expno/pdata/1",
+        "varian_1h",
+    ];
+
+    let varian = load_discovered_spectra_by_source_vendor(&fixture_root, &sources, "varian")?;
+    assert_eq!(
+        load_discovered_spectra_by_path(&fixture_root, &sources, "varian_1h")?,
+        varian
+    );
+
+    let known_sources =
+        load_discovered_spectra_by_source_vendors(&fixture_root, &sources, ["bruker", "varian"])?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_by_paths(&fixture_root, &sources, selected_paths)?,
+        known_sources
+    );
+
+    let varian_summary =
+        load_discovered_spectra_summary_by_source_vendor(&fixture_root, &sources, "varian")?;
+    assert_eq!(
+        load_discovered_spectra_summary_by_path(&fixture_root, &sources, "varian_1h")?,
+        varian_summary
+    );
+
+    let known_summary = load_discovered_spectra_summary_by_source_vendors(
+        &fixture_root,
+        &sources,
+        ["bruker", "varian"],
+    )?;
+    assert_eq!(
+        RSpinReader::new().read_discovered_summary_by_paths(
+            &fixture_root,
+            &sources,
+            selected_paths,
+        )?,
+        known_summary
+    );
+
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_short_summary_aliases() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");
@@ -1918,6 +1966,20 @@ fn prelude_exports_short_discovered_dimension_metadata_loaders() -> Result<()> {
         load_discovered_spectra_1d_summary_by_path_prefix(&root, &sources, "jcamp")?,
         jcamp_1d.summary()
     );
+    let jcamp_1h_path = "jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx";
+    let jcamp_13c_path = "jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx";
+    assert_eq!(
+        load_discovered_spectra_1d_by_path(&root, &sources, jcamp_1h_path)?.len(),
+        1
+    );
+    assert_eq!(
+        RSpinReader::new().read_discovered_bundle_1d_summary_by_paths(
+            &root,
+            &sources,
+            [jcamp_1h_path, jcamp_13c_path],
+        )?,
+        jcamp_1d.summary()
+    );
 
     let jeol_1d =
         RSpinReader::new().read_discovered_bundle_1d_by_vendor(&root, &sources, "jeol")?;
@@ -1942,6 +2004,20 @@ fn prelude_exports_short_discovered_dimension_metadata_loaders() -> Result<()> {
             "bruker_cosy_raw",
         )?,
         bruker_2d.summary()
+    );
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    assert_eq!(
+        load_discovered_spectra_2d_by_path(&root, &sources, "bruker_cosy_raw")?,
+        bruker_2d
+    );
+    assert_eq!(
+        load_discovered_spectra_2d_summary_by_paths(
+            &root,
+            &sources,
+            ["bruker_cosy_raw", hsqc_path]
+        )?
+        .source_format_count(LoadedSourceFormat::JeolJdf),
+        1
     );
 
     Ok(())

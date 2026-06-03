@@ -268,6 +268,33 @@ set_discovered_summary_aliases! {
 }
 
 single_discovered_summary_aliases! {
+    filter = "tracked source path";
+    value = source_path: impl AsRef<Path>;
+    reader_relative = read_discovered_summary_by_path_relative_to;
+    reader = read_discovered_summary_by_path;
+    free_relative = load_discovered_spectra_summary_by_path_relative_to;
+    free = load_discovered_spectra_summary_by_path;
+    target_relative = read_discovered_summary_by_source_path_relative_to;
+    target = read_discovered_summary_by_source_path;
+}
+
+set_discovered_summary_aliases! {
+    filter = "tracked source path";
+    values = source_paths;
+    generics = [I, P];
+    where = {
+        I: IntoIterator<Item = P>,
+        P: AsRef<Path>,
+    };
+    reader_relative = read_discovered_summary_by_paths_relative_to;
+    reader = read_discovered_summary_by_paths;
+    free_relative = load_discovered_spectra_summary_by_paths_relative_to;
+    free = load_discovered_spectra_summary_by_paths;
+    target_relative = read_discovered_summary_by_source_paths_relative_to;
+    target = read_discovered_summary_by_source_paths;
+}
+
+single_discovered_summary_aliases! {
     filter = "tracked source path prefix";
     value = source_path_prefix: impl AsRef<Path>;
     reader_relative = read_discovered_summary_by_path_prefix_relative_to;
