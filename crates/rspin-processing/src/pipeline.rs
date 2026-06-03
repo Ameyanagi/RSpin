@@ -4,11 +4,12 @@ use rspin_core::{Axis, Result, Spectrum1D};
 
 use crate::{
     Abs1D, AutoPhaseOptions, BaselineMethod, ConvolutionDifferenceApodization, Crop1D,
-    ExponentialApodization, Fft1D, FftDirection, FirstPointScale, GaussMultiplyBrukerApodization,
-    GaussianApodization, LinearPredictionBackward, LinearPredictionForward,
-    LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs, OffsetIntensity,
-    PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis, SineBellApodization,
-    SubsampleShift, SubtractBaseline, TrafApodization, TrapezoidalApodization, ZeroFill,
+    DcOffsetCorrection, DcOffsetMethod, ExponentialApodization, Fft1D, FftDirection,
+    FirstPointScale, GaussMultiplyBrukerApodization, GaussianApodization, LinearPredictionBackward,
+    LinearPredictionForward, LorentzToGaussApodization, Magnitude, NormalizeArea, NormalizeMaxAbs,
+    OffsetIntensity, PhaseCorrection, ProcessingStep, Resample1D, ScaleIntensity, ShiftAxis,
+    SineBellApodization, SubsampleShift, SubtractBaseline, SuppressRegion1D, SuppressionFill,
+    TrafApodization, TrapezoidalApodization, ZeroFill,
 };
 
 /// Chainable processor for one-dimensional spectra.
@@ -75,6 +76,12 @@ impl Spectrum1DPipeline {
         self.then(OffsetIntensity::new(offset))
     }
 
+    /// Subtracts a constant real and optional imaginary DC offset.
+    #[must_use]
+    pub fn correct_dc_offset(self, method: DcOffsetMethod) -> Self {
+        self.then(DcOffsetCorrection::new(method))
+    }
+
     /// Normalizes real intensities by their maximum absolute value.
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
@@ -103,6 +110,12 @@ impl Spectrum1DPipeline {
     #[must_use]
     pub fn shift_axis(self, delta: f64) -> Self {
         self.then(ShiftAxis::new(delta))
+    }
+
+    /// Suppresses an explicit x-axis region.
+    #[must_use]
+    pub fn suppress_region(self, from: f64, to: f64, fill: SuppressionFill) -> Self {
+        self.then(SuppressRegion1D::new(from, to, fill))
     }
 
     /// Appends zeroes until the spectrum reaches `target_len` points.

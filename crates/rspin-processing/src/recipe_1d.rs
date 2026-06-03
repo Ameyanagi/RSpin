@@ -5,13 +5,14 @@ use serde::{Deserialize, Serialize};
 use rspin_core::{Axis, RSpinError, Result, Spectrum1D};
 
 use crate::{
-    AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingStep, abs_1d, apply_subsample_shift,
-    auto_phase_correct, convolution_difference_apodization, crop_1d, exponential_apodization,
+    AutoPhaseOptions, BaselineMethod, DcOffsetMethod, FftDirection, ProcessingStep,
+    SuppressionFill, abs_1d, apply_subsample_shift, auto_phase_correct,
+    convolution_difference_apodization, correct_dc_offset, crop_1d, exponential_apodization,
     fft_1d, first_point_scale, gauss_multiply_bruker_apodization, gaussian_apodization,
     linear_predict_backward, linear_predict_forward, lorentz_to_gauss_apodization,
     magnitude_spectrum, normalize_area, normalize_max_abs, offset_intensity, phase_correct,
     resample_1d, scale_intensity, shift_axis, sine_bell_apodization, subtract_baseline,
-    traf_apodization, trapezoidal_apodization, zero_fill,
+    suppress_region_1d, traf_apodization, trapezoidal_apodization, zero_fill,
 };
 
 /// A serializable one-dimensional processing operation.
@@ -28,6 +29,11 @@ pub enum ProcessingOperation1D {
         /// Additive offset.
         offset: f64,
     },
+    /// Subtracts a constant real and optional imaginary DC offset.
+    CorrectDcOffset {
+        /// Offset estimation or explicit offset method.
+        method: DcOffsetMethod,
+    },
     /// Normalizes real intensities by their maximum absolute value.
     NormalizeMaxAbs,
     /// Normalizes real and imaginary intensities by trapezoidal area.
@@ -43,6 +49,15 @@ pub enum ProcessingOperation1D {
     ShiftAxis {
         /// Shift amount in the x-axis unit.
         delta: f64,
+    },
+    /// Suppresses an explicit x-axis range.
+    SuppressRegion {
+        /// First requested x coordinate.
+        from: f64,
+        /// Second requested x coordinate.
+        to: f64,
+        /// Fill strategy used inside the selected region.
+        fill: SuppressionFill,
     },
     /// Appends zeroes until the spectrum reaches `target_len` points.
     ZeroFill {
@@ -193,6 +208,7 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
         match self {
             Self::Scale { factor } => scale_intensity(spectrum, *factor),
             Self::Offset { offset } => offset_intensity(spectrum, *offset),
+            Self::CorrectDcOffset { method } => correct_dc_offset(spectrum, *method),
             Self::NormalizeMaxAbs => normalize_max_abs(spectrum),
             Self::NormalizeArea {
                 target_area,
@@ -200,6 +216,9 @@ impl ProcessingStep<Spectrum1D> for ProcessingOperation1D {
             } => normalize_area(spectrum, *target_area, *use_absolute_intensity),
             Self::AbsoluteValue => abs_1d(spectrum),
             Self::ShiftAxis { delta } => shift_axis(spectrum, *delta),
+            Self::SuppressRegion { from, to, fill } => {
+                suppress_region_1d(spectrum, *from, *to, *fill)
+            }
             Self::ZeroFill { target_len } => zero_fill(spectrum, *target_len),
             Self::Crop { from, to } => crop_1d(spectrum, *from, *to),
             Self::Resample {
@@ -376,6 +395,12 @@ impl ProcessingRecipe1D {
         self.with_operation(ProcessingOperation1D::Offset { offset })
     }
 
+    /// Appends a DC offset correction operation.
+    #[must_use]
+    pub fn correct_dc_offset(self, method: DcOffsetMethod) -> Self {
+        self.with_operation(ProcessingOperation1D::CorrectDcOffset { method })
+    }
+
     /// Appends a maximum-absolute normalization operation.
     #[must_use]
     pub fn normalize_max_abs(self) -> Self {
@@ -413,6 +438,12 @@ impl ProcessingRecipe1D {
     #[must_use]
     pub fn shift_axis(self, delta: f64) -> Self {
         self.with_operation(ProcessingOperation1D::ShiftAxis { delta })
+    }
+
+    /// Appends an explicit region-suppression operation.
+    #[must_use]
+    pub fn suppress_region(self, from: f64, to: f64, fill: SuppressionFill) -> Self {
+        self.with_operation(ProcessingOperation1D::SuppressRegion { from, to, fill })
     }
 
     /// Appends a zero-fill operation.

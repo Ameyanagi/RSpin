@@ -72,6 +72,63 @@ fn prelude_supports_common_processing_workflow() -> Result<()> {
 }
 
 #[test]
+fn prelude_supports_normal_processing_methods() -> Result<()> {
+    let corrected = Spectrum1D::new(
+        Axis::linear_ppm(0.0, 4.0, 5)?,
+        vec![5.0, 6.0, 100.0, 8.0, 5.0],
+        Metadata::named("cleanup"),
+    )?
+    .process()
+    .correct_dc_offset(DcOffsetMethod::MeanEdges { count: 1 })
+    .suppress_region(2.0, 2.0, SuppressionFill::LinearInterpolate)
+    .finish()?;
+    assert_eq!(corrected.intensities, vec![0.0, 1.0, 2.0, 3.0, 0.0]);
+
+    let snr = estimate_snr_1d(
+        &Spectrum1D::new(
+            Axis::linear_ppm(0.0, 6.0, 7)?,
+            vec![-1.0, 1.0, 0.0, 20.0, 0.0, 1.0, -1.0],
+            Metadata::named("snr"),
+        )?,
+        SignalRegion::AxisRange { from: 3.0, to: 3.0 },
+        NoiseRegion::Indices { start: 0, end: 3 },
+    )?;
+    assert!(snr.snr > 20.0);
+
+    let referenced = reference_spectrum_1d(
+        &Spectrum1D::new(
+            Axis::linear_ppm(0.0, 4.0, 5)?,
+            vec![0.0, 1.0, 8.0, 1.0, 0.0],
+            Metadata::named("reference"),
+        )?,
+        ReferencePeakOptions::new(2.1).with_search_window(0.2),
+    )?;
+    assert!((referenced.spectrum.x.values[2] - 2.1).abs() < 1.0e-12);
+
+    let fit_axis = Axis::linear_ppm(1.5, 2.5, 101)?;
+    let fit_spectrum = Spectrum1D::new(
+        fit_axis.clone(),
+        fit_axis
+            .values
+            .iter()
+            .map(|x| {
+                let scaled = (x - 2.0) / 0.08;
+                0.1 + 4.0 / (1.0 + 4.0 * scaled * scaled)
+            })
+            .collect(),
+        Metadata::named("fit"),
+    )?;
+    let fit = fit_peak_1d(
+        &fit_spectrum,
+        2.0,
+        PeakFitOptions::new(PeakLineShapeModel::Lorentzian, 0.3),
+    )?;
+    assert!((fit.center - 2.0).abs() < 1.0e-3);
+
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_processed_analysis_bridge() -> Result<()> {
     let analysis = read_spectrum1d_csv("x,intensity\n0,0\n1,4\n2,0\n")?
         .process()

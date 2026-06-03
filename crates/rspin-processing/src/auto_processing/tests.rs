@@ -118,6 +118,31 @@ fn process_spectrum_auto_can_disable_baseline_and_phase() -> anyhow::Result<()> 
 }
 
 #[test]
+fn process_spectrum_auto_can_apply_opt_in_dc_correction() -> anyhow::Result<()> {
+    let fid = synthetic_complex_fid(128, 1.0e-3, &[(20.0, 1.0, 3.0)])?;
+    let opts = AutoProcessingOptions {
+        dc_offset_method: Some(DcOffsetMethod::Explicit {
+            real_offset: 0.1,
+            imaginary_offset: Some(-0.2),
+        }),
+        auto_phase: false,
+        subtract_baseline: false,
+        zero_fill_multiplier: 1,
+        ..AutoProcessingOptions::default()
+    };
+    let processed = process_spectrum_auto(&fid, &opts)?;
+    let operations = processed
+        .processing
+        .iter()
+        .map(|record| record.operation.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(operations[0], "correct_dc_offset");
+    assert!(operations.iter().any(|op| op == &"fft_1d"));
+    Ok(())
+}
+
+#[test]
 fn process_spectrum_auto_nucleus_lookup_picks_correct_lb() -> anyhow::Result<()> {
     // 13C nucleus should pull LB = 1.0 Hz from the default look-up.
     let mut fid = synthetic_complex_fid(256, 1.0e-3, &[(15.0, 1.0, 5.0)])?;

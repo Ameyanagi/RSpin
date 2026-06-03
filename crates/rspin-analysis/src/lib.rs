@@ -12,9 +12,12 @@ mod matrix;
 mod multiplets;
 mod pairwise;
 mod pca;
+mod peak_fitting;
 mod peak_optimization;
 mod peaks;
+mod quality;
 mod ranges;
+mod referencing;
 mod signals;
 mod traits;
 mod workflow;
@@ -70,11 +73,18 @@ pub use pca::{
     MatrixPcaOptions, MatrixPcaResult, MatrixScaling, pca_bucket_matrix_1d, pca_bucket_matrix_2d,
     pca_matrix, pca_spectrum_matrix_1d, pca_spectrum_matrix_2d,
 };
+pub use peak_fitting::{
+    PeakFitOptions, PeakFitResult, PeakLineShapeModel, fit_peak_1d, fit_peaks_1d,
+};
 pub use peak_optimization::{
     OptimizedPeak, PeakOptimizationOptions, QuadraticPeakOptimizer, optimize_peaks_quadratic,
 };
 pub use peaks::{LocalExtremaPeakPicker, Peak, PeakPickOptions, PeakPolarity, pick_peaks};
+pub use quality::{
+    NoiseEstimate, NoiseRegion, SignalRegion, SnrEstimate, estimate_noise_1d, estimate_snr_1d,
+};
 pub use ranges::{DetectedRange, RangeDetectionOptions, ThresholdRangeDetector, detect_ranges};
+pub use referencing::{ReferencePeakOptions, ReferenceResult, reference_spectrum_1d};
 pub use signals::{
     SignalSummary1D, SignalSummary2D, SignalSummary2DOptions, SignalSummaryOptions,
     summarize_signals_1d, summarize_signals_2d,

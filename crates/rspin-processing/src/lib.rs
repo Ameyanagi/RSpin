@@ -11,6 +11,7 @@ mod baseline;
 #[cfg(test)]
 mod builder_tests;
 mod contours;
+mod corrections_1d;
 mod crop_1d;
 mod crop_2d;
 mod hypercomplex_2d;
@@ -55,6 +56,11 @@ pub use baseline::{
     BaselineFit, BaselineMethod, BaselineReport, SubtractBaseline, fit_baseline, subtract_baseline,
 };
 pub use contours::{ContourPoint, ContourSegment, ContourSet, contour_segments, extract_contours};
+pub use corrections_1d::{
+    DcOffsetCorrection, DcOffsetMethod, DcOffsetReport, SuppressRegion1D, SuppressionFill,
+    SuppressionReport, correct_dc_offset, correct_dc_offset_with_report, estimate_dc_offset,
+    suppress_region_1d, suppress_region_1d_with_report,
+};
 pub use crop_1d::{Crop1D, crop_1d};
 pub use crop_2d::{Crop2D, crop_2d};
 pub use hypercomplex_2d::{

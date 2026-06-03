@@ -52,6 +52,24 @@ fn applies_recipe_prefix_for_rollback_reapply() -> anyhow::Result<()> {
 }
 
 #[test]
+fn applies_explicit_correction_recipe_operations() -> anyhow::Result<()> {
+    let spectrum = Spectrum1D::new(
+        Axis::linear("shift", Unit::Ppm, 0.0, 4.0, 5)?,
+        vec![5.0, 6.0, 100.0, 8.0, 5.0],
+        Metadata::default(),
+    )?;
+    let processed = ProcessingRecipe1D::new()
+        .correct_dc_offset(DcOffsetMethod::MeanEdges { count: 1 })
+        .suppress_region(2.0, 2.0, SuppressionFill::LinearInterpolate)
+        .apply(&spectrum)?;
+
+    assert_eq!(processed.intensities, vec![0.0, 1.0, 2.0, 3.0, 0.0]);
+    assert_eq!(processed.processing[0].operation, "correct_dc_offset");
+    assert_eq!(processed.processing[1].operation, "suppress_region_1d");
+    Ok(())
+}
+
+#[test]
 fn rejects_recipe_prefix_past_end() -> anyhow::Result<()> {
     let recipe = ProcessingRecipe1D::new().scale(2.0);
     let error = apply_processing_recipe_1d_until(&demo_spectrum()?, &recipe, 2)

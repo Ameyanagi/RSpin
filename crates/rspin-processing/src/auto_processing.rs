@@ -34,9 +34,10 @@ use rspin_core::{Metadata, Nucleus, RSpinError, Result, Spectrum1D, Unit};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AutoPhaseOptions, BaselineMethod, FftDirection, ProcessingRecipe1D, apply_subsample_shift,
-    auto_phase_correct, auto_phase_correct_polynomial, exponential_apodization, first_point_scale,
-    linear_predict_backward, matched_filter_em, remove_group_delay, subtract_baseline,
+    AutoPhaseOptions, BaselineMethod, DcOffsetMethod, FftDirection, ProcessingRecipe1D,
+    apply_subsample_shift, auto_phase_correct, auto_phase_correct_polynomial, correct_dc_offset,
+    exponential_apodization, first_point_scale, linear_predict_backward, matched_filter_em,
+    remove_group_delay, subtract_baseline,
 };
 
 /// Options controlling [`process_spectrum_auto`].
@@ -65,6 +66,10 @@ pub struct AutoProcessingOptions {
     pub backward_lp_n_repair: usize,
     /// AR order for backward LP. Default 16.
     pub backward_lp_order: usize,
+    /// Optional time-domain DC offset correction applied before
+    /// group-delay removal. Defaults to `None` so existing automatic
+    /// processing output is unchanged unless the caller opts in.
+    pub dc_offset_method: Option<DcOffsetMethod>,
     /// Override the apodization line-broadening in Hz. When `None`
     /// the LB is picked from [`AutoProcessingOptions::nucleus_lb_hz`]
     /// using the spectrum's `Metadata::nucleus`.
@@ -157,6 +162,7 @@ impl Default for AutoProcessingOptions {
             // they know the FID needs it.
             backward_lp_n_repair: 0,
             backward_lp_order: 16,
+            dc_offset_method: None,
             apodization_lb_hz: None,
             nucleus_lb_hz: NucleusLbDefaults::default(),
             first_point_scale: true,
@@ -258,6 +264,12 @@ pub fn process_spectrum_auto(
         return run_group_delay_sweep(fid, options, &sweep);
     }
 
+    let after_dc = if let Some(method) = options.dc_offset_method {
+        correct_dc_offset(fid, method)?
+    } else {
+        fid.clone()
+    };
+
     // 1. Group-delay handling. Integer part is dropped + zero-padded
     //    in the time domain; the fractional residual is remembered and
     //    applied as a frequency-domain phase ramp after FFT.
@@ -266,22 +278,22 @@ pub fn process_spectrum_auto(
     //    `remove_group_delay` record (e.g. it was re-imported from a
     //    pipeline that already corrected it), do not re-apply unless
     //    the caller explicitly overrides via `group_delay_samples`.
-    let already_corrected = fid
+    let already_corrected = after_dc
         .processing
         .iter()
         .any(|record| record.operation == "remove_group_delay");
     let group_delay = match options.group_delay_samples {
         Some(value) => value,
         None if already_corrected => 0.0,
-        None => group_delay_from_metadata(&fid.metadata),
+        None => group_delay_from_metadata(&after_dc.metadata),
     };
     let group_delay = validate_group_delay_samples(group_delay)?;
     let group_delay_integer = group_delay.trunc();
     let group_delay_frac = group_delay - group_delay_integer;
     let after_group_delay = if group_delay_integer > 0.0 {
-        remove_group_delay(fid, group_delay_integer)?
+        remove_group_delay(&after_dc, group_delay_integer)?
     } else {
-        fid.clone()
+        after_dc
     };
 
     // 2. Optional backward linear-prediction repair on the first few

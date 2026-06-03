@@ -17,13 +17,16 @@ mod ruviz_example {
     use std::{
         fs,
         path::{Path, PathBuf},
+        time::{Duration, Instant},
     };
 
     use anyhow::{Context, Result};
     use rspin::plot::{Spectrum2DPlotOptions, plot_spectrum_2d, plot_spectrum_2d_with};
     use rspin_analysis::{
-        PeakPickOptions, PeakPolarity, RangeDetectionOptions, SpectrumAnalysis1D,
-        SpectrumAnalysis1DOptions, analyze_spectrum_1d, pick_peaks,
+        NoiseRegion, PeakFitOptions, PeakLineShapeModel, PeakPickOptions, PeakPolarity,
+        RangeDetectionOptions, ReferencePeakOptions, SignalRegion, SpectrumAnalysis1D,
+        SpectrumAnalysis1DOptions, analyze_spectrum_1d, estimate_noise_1d, estimate_snr_1d,
+        fit_peak_1d, pick_peaks, reference_spectrum_1d,
     };
     use rspin_core::{Axis, Metadata, Nucleus, Spectrum1D, Spectrum2D, Unit};
     use rspin_io::{
@@ -35,12 +38,14 @@ mod ruviz_example {
     };
     use rspin_processing::{
         AutoPhaseCost, AutoPhaseOptions, AutoPhaseStrategy, AutoProcessingOptions, BaselineMethod,
-        FftDirection, HyperComplex2DOptions, ProcessSpectrum2D, ProcessingRecipe1D,
-        apply_subsample_shift, auto_phase_correct, auto_phase_correct_with_peaks,
-        convolution_difference_apodization, exponential_apodization, fit_baseline,
+        DcOffsetMethod, FftDirection, HyperComplex2DOptions, ProcessSpectrum2D,
+        ProcessingRecipe1D, SuppressionFill, apply_subsample_shift, auto_phase_correct,
+        auto_phase_correct_with_peaks, convolution_difference_apodization,
+        correct_dc_offset_with_report, exponential_apodization, fit_baseline,
         gauss_multiply_bruker_apodization, gaussian_apodization, lorentz_to_gauss_apodization,
         magnitude_spectrum, matched_filter_em, process_hypercomplex_planes_magnitude,
-        process_spectrum_auto, remove_group_delay, traf_apodization, trapezoidal_apodization,
+        process_spectrum_auto, remove_group_delay, suppress_region_1d_with_report,
+        traf_apodization, trapezoidal_apodization,
     };
     use ruviz::core::subplot::subplots;
     use ruviz::prelude::{IntoPlot, LegendPosition, Plot};
@@ -55,26 +60,80 @@ mod ruviz_example {
             )
         })?;
 
-        write_recipe_chain_plot(&output_dir.join("processed_recipe_chain.png"))?;
-        write_baseline_plot(&output_dir.join("processed_baseline.png"))?;
-        write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))?;
-        write_curated_auto_phase_plot(&root, &output_dir)?;
-        write_apodization_comparison_plot(&root, &output_dir)?;
-        write_auto_processing_plot(&root, &output_dir)?;
+        let mut timings = Vec::new();
+        timed_step("recipe chain", &mut timings, || {
+            write_recipe_chain_plot(&output_dir.join("processed_recipe_chain.png"))
+        })?;
+        timed_step("baseline", &mut timings, || {
+            write_baseline_plot(&output_dir.join("processed_baseline.png"))
+        })?;
+        timed_step("analysis", &mut timings, || {
+            write_analysis_plot(&output_dir.join("analysis_peaks_ranges.png"))
+        })?;
+        timed_step("processing methods", &mut timings, || {
+            write_processing_methods_gallery(&output_dir.join("processing_methods_gallery.png"))
+        })?;
+        timed_step("auto phase", &mut timings, || {
+            write_curated_auto_phase_plot(&root, &output_dir)
+        })?;
+        timed_step("apodization", &mut timings, || {
+            write_apodization_comparison_plot(&root, &output_dir)
+        })?;
+        timed_step("auto processing", &mut timings, || {
+            write_auto_processing_plot(&root, &output_dir)
+        })?;
         let vendor_dir = output_dir.join("vendors");
-        write_vendor_showcase(&root, &vendor_dir)?;
-        write_jeol_group_delay_comparison(&root, &output_dir)?;
-        write_hsqc_phase_sensitive_contours(&root, &output_dir)?;
+        timed_step("vendor showcase", &mut timings, || {
+            write_vendor_showcase(&root, &vendor_dir)
+        })?;
+        timed_step("jeol group delay", &mut timings, || {
+            write_jeol_group_delay_comparison(&root, &output_dir)
+        })?;
+        timed_step("hsqc contours", &mut timings, || {
+            write_hsqc_phase_sensitive_contours(&root, &output_dir)
+        })?;
         let visual_output_dir = root.join("target/rspin-visual-tests");
-        write_oracle_visual_artifacts(&root, &visual_output_dir)?;
+        timed_step("oracle visual artifacts", &mut timings, || {
+            write_oracle_visual_artifacts(&root, &visual_output_dir)
+        })?;
+        fs::create_dir_all(&visual_output_dir).with_context(|| {
+            format!(
+                "failed to create visual output directory {}",
+                visual_output_dir.display()
+            )
+        })?;
+        write_timing_summary(&visual_output_dir.join("gallery-timings.txt"), &timings)?;
 
         println!(
-            "Generated {}, {}, {}, and local visual artifacts under {}",
+            "Generated {}, {}, {}, {}, and local visual artifacts under {}",
             output_dir.join("processed_recipe_chain.png").display(),
             output_dir.join("processed_baseline.png").display(),
             output_dir.join("analysis_peaks_ranges.png").display(),
+            output_dir.join("processing_methods_gallery.png").display(),
             visual_output_dir.display()
         );
+        Ok(())
+    }
+
+    fn timed_step<F>(label: &'static str, timings: &mut Vec<(&'static str, Duration)>, f: F) -> Result<()>
+    where
+        F: FnOnce() -> Result<()>,
+    {
+        let start = Instant::now();
+        let result = f();
+        let elapsed = start.elapsed();
+        println!("gallery stage {label}: {:.3}s", elapsed.as_secs_f64());
+        timings.push((label, elapsed));
+        result
+    }
+
+    fn write_timing_summary(path: &Path, timings: &[(&'static str, Duration)]) -> Result<()> {
+        let mut text = String::from("# RSpin visual gallery timings\n\n");
+        for (label, elapsed) in timings {
+            text.push_str(&format!("{label}\t{:.6}s\n", elapsed.as_secs_f64()));
+        }
+        fs::write(path, text)
+            .with_context(|| format!("failed to write timing summary {}", path.display()))?;
         Ok(())
     }
 
@@ -179,6 +238,167 @@ mod ruviz_example {
         let spectrum = synthetic_analysis_spectrum()?;
         let analysis = analyze_for_visual(&spectrum)?;
         write_analysis_overlay_plot(path, "RSpin 1D Analysis", &spectrum, &analysis)
+    }
+
+    fn write_processing_methods_gallery(path: &Path) -> Result<()> {
+        let dc_raw = synthetic_dc_offset_spectrum()?;
+        let (dc_corrected, dc_report) =
+            correct_dc_offset_with_report(&dc_raw, DcOffsetMethod::MeanEdges { count: 40 })?;
+
+        let quality = synthetic_quality_spectrum()?;
+        let noise = estimate_noise_1d(
+            &quality,
+            NoiseRegion::AxisRange {
+                from: 8.5,
+                to: 10.0,
+            },
+        )?;
+        let snr = estimate_snr_1d(
+            &quality,
+            SignalRegion::AxisRange { from: 2.05, to: 2.35 },
+            NoiseRegion::AxisRange {
+                from: 8.5,
+                to: 10.0,
+            },
+        )?;
+        let (noise_x, noise_y) = axis_range_points(&quality, 8.5, 10.0);
+
+        let reference_raw = synthetic_reference_spectrum()?;
+        let reference = reference_spectrum_1d(
+            &reference_raw,
+            ReferencePeakOptions::new(7.26).with_search_window(0.15),
+        )?;
+
+        let suppression_raw = synthetic_suppression_spectrum()?;
+        let (suppressed, suppression_report) = suppress_region_1d_with_report(
+            &suppression_raw,
+            4.60,
+            4.82,
+            SuppressionFill::LinearInterpolate,
+        )?;
+
+        let fit_spectrum = synthetic_fit_spectrum()?;
+        let fit = fit_peak_1d(
+            &fit_spectrum,
+            3.20,
+            PeakFitOptions::new(PeakLineShapeModel::Lorentzian, 0.35),
+        )?;
+        let fit_curve = fit_spectrum
+            .x
+            .values
+            .iter()
+            .map(|x| {
+                let scaled = (x - fit.center) / fit.fwhm;
+                fit.baseline + fit.amplitude / (1.0 + 4.0 * scaled * scaled)
+            })
+            .collect::<Vec<_>>();
+
+        let dc_plot = nmr_plot_base(
+            &format!("DC offset correction (offset {:.3})", dc_report.real_offset),
+            "chemical shift / ppm",
+            "intensity",
+            &dc_raw.x.values,
+            &[&dc_raw.intensities, &dc_corrected.intensities],
+            dc_raw.x.unit,
+        )
+        .line(&dc_raw.x.values, &dc_raw.intensities)
+        .label("raw offset")
+        .line(&dc_corrected.x.values, &dc_corrected.intensities)
+        .label("corrected")
+        .into_plot();
+
+        let quality_plot = nmr_plot_base(
+            &format!("Noise/SNR estimate (SNR {:.1})", snr.snr),
+            "chemical shift / ppm",
+            "intensity",
+            &quality.x.values,
+            &[&quality.intensities],
+            quality.x.unit,
+        )
+        .line(&quality.x.values, &quality.intensities)
+        .label("spectrum")
+        .scatter(&noise_x, &noise_y)
+        .marker_size(4.0)
+        .label(format!("noise σ={:.3}", noise.std_dev))
+        .scatter(&[snr.signal_x], &[snr.signal_peak])
+        .marker_size(12.0)
+        .label("signal peak")
+        .into_plot();
+
+        let reference_plot = nmr_plot_base(
+            &format!("Reference peak shift ({:+.3} ppm)", reference.delta),
+            "chemical shift / ppm",
+            "intensity",
+            &reference_raw.x.values,
+            &[&reference_raw.intensities, &reference.spectrum.intensities],
+            reference_raw.x.unit,
+        )
+        .line(&reference_raw.x.values, &reference_raw.intensities)
+        .label("before")
+        .line(&reference.spectrum.x.values, &reference.spectrum.intensities)
+        .label("after")
+        .into_plot();
+
+        let suppression_plot = nmr_plot_base(
+            &format!(
+                "Explicit solvent suppression ({} points)",
+                suppression_report.suppressed_points
+            ),
+            "chemical shift / ppm",
+            "intensity",
+            &suppression_raw.x.values,
+            &[&suppression_raw.intensities, &suppressed.intensities],
+            suppression_raw.x.unit,
+        )
+        .line(&suppression_raw.x.values, &suppression_raw.intensities)
+        .label("with solvent")
+        .line(&suppressed.x.values, &suppressed.intensities)
+        .label("suppressed")
+        .into_plot();
+
+        let fit_plot = nmr_plot_base(
+            &format!("Lorentzian fit (FWHM {:.3} ppm)", fit.fwhm),
+            "chemical shift / ppm",
+            "intensity",
+            &fit_spectrum.x.values,
+            &[&fit_spectrum.intensities, &fit_curve],
+            fit_spectrum.x.unit,
+        )
+        .line(&fit_spectrum.x.values, &fit_spectrum.intensities)
+        .label("spectrum")
+        .line(&fit_spectrum.x.values, &fit_curve)
+        .label("fit")
+        .into_plot();
+
+        let processed_recipe = ProcessingRecipe1D::new()
+            .correct_dc_offset(DcOffsetMethod::MeanEdges { count: 40 })
+            .suppress_region(4.60, 4.82, SuppressionFill::LinearInterpolate)
+            .normalize_max_abs()
+            .apply(&synthetic_combined_cleanup_spectrum()?)?;
+        let combined_raw = synthetic_combined_cleanup_spectrum()?;
+        let combined_plot = nmr_plot_base(
+            "Recipe: DC + solvent cleanup",
+            "chemical shift / ppm",
+            "intensity",
+            &combined_raw.x.values,
+            &[&combined_raw.intensities, &processed_recipe.intensities],
+            combined_raw.x.unit,
+        )
+        .line(&combined_raw.x.values, &combined_raw.intensities)
+        .label("raw")
+        .line(&processed_recipe.x.values, &processed_recipe.intensities)
+        .label("recipe output")
+        .into_plot();
+
+        let figure = subplots(3, 2, 2200, 2400)?
+            .subplot_at(0, dc_plot)?
+            .subplot_at(1, quality_plot)?
+            .subplot_at(2, reference_plot)?
+            .subplot_at(3, suppression_plot)?
+            .subplot_at(4, fit_plot)?
+            .subplot_at(5, combined_plot)?;
+        figure.save(path_to_str(path)?)?;
+        Ok(())
     }
 
     fn write_curated_auto_phase_plot(root: &Path, output_dir: &Path) -> Result<()> {
@@ -1323,14 +1543,15 @@ mod ruviz_example {
 
         let cascade = run(None)?;
         let empirical = run(Some(16.46))?;
-        // Demonstrate the opt-in auto_group_delay_sweep: lets the
-        // orchestrator pick the best value automatically without the
-        // caller knowing the empirical optimum.
+        // Demonstrate the opt-in auto_group_delay_sweep without making the
+        // full gallery spend minutes on this one panel. Users who need a
+        // precise empirical correction can run the same option with finer
+        // spacing in their own workflow.
         let sweep_opts = AutoProcessingOptions {
             subtract_baseline: false,
             auto_group_delay_sweep: Some(rspin_processing::GroupDelaySweepOptions {
-                delta_samples: 5.0,
-                step_samples: 0.2,
+                delta_samples: 3.0,
+                step_samples: 1.0,
             }),
             ..AutoProcessingOptions::default()
         };
@@ -1358,7 +1579,7 @@ mod ruviz_example {
         .line(&empirical.x.values, &empirical.intensities)
         .label("empirical override (16.46)")
         .line(&auto_swept.x.values, &auto_swept.intensities)
-        .label("auto_group_delay_sweep (Δ±5, step 0.2)")
+        .label("auto_group_delay_sweep (Δ±3, step 1.0)")
         .save(path_to_str(&png_path)?)?;
         Ok(())
     }
@@ -2166,6 +2387,146 @@ JSON and CSV outputs are consistency artifacts; PNG outputs are generated with r
             Unit::Arbitrary => "x",
             _ => "x",
         }
+    }
+
+    fn axis_range_points(spectrum: &Spectrum1D, from: f64, to: f64) -> (Vec<f64>, Vec<f64>) {
+        let lower = from.min(to);
+        let upper = from.max(to);
+        spectrum
+            .points()
+            .filter(|(x, _)| *x >= lower && *x <= upper)
+            .unzip()
+    }
+
+    fn synthetic_dc_offset_spectrum() -> Result<Spectrum1D> {
+        let axis = Axis::linear_ppm(0.0, 10.0, 512)?;
+        let intensities = axis
+            .values
+            .iter()
+            .copied()
+            .map(|x| {
+                0.18
+                    + gaussian(x, 2.1, 0.06, 1.0)
+                    + gaussian(x, 4.2, 0.08, 0.65)
+                    + gaussian(x, 7.4, 0.12, 0.85)
+            })
+            .collect();
+
+        Ok(Spectrum1D::new(
+            axis,
+            intensities,
+            Metadata::new()
+                .with_name("dc-offset-demo")
+                .with_frequency_mhz(400.0),
+        )?)
+    }
+
+    fn synthetic_quality_spectrum() -> Result<Spectrum1D> {
+        let axis = Axis::linear_ppm(0.0, 10.0, 700)?;
+        let intensities = axis
+            .values
+            .iter()
+            .copied()
+            .map(|x| {
+                0.018 * (13.0 * x).sin()
+                    + 0.012 * (29.0 * x).cos()
+                    + gaussian(x, 2.18, 0.07, 0.92)
+                    + gaussian(x, 4.95, 0.12, 0.45)
+                    + gaussian(x, 6.4, 0.09, 0.60)
+            })
+            .collect();
+
+        Ok(Spectrum1D::new(
+            axis,
+            intensities,
+            Metadata::new().with_name("quality-demo"),
+        )?)
+    }
+
+    fn synthetic_reference_spectrum() -> Result<Spectrum1D> {
+        let axis = Axis::linear_ppm(0.0, 10.0, 700)?;
+        let intensities = axis
+            .values
+            .iter()
+            .copied()
+            .map(|x| {
+                0.01 * (7.0 * x).sin()
+                    + gaussian(x, 7.32, 0.05, 1.1)
+                    + gaussian(x, 3.1, 0.08, 0.4)
+            })
+            .collect();
+
+        Ok(Spectrum1D::new(
+            axis,
+            intensities,
+            Metadata::new().with_name("reference-demo"),
+        )?)
+    }
+
+    fn synthetic_suppression_spectrum() -> Result<Spectrum1D> {
+        let axis = Axis::linear_ppm(0.0, 10.0, 900)?;
+        let intensities = axis
+            .values
+            .iter()
+            .copied()
+            .map(|x| {
+                0.01 * (11.0 * x).sin()
+                    + gaussian(x, 1.4, 0.05, 0.35)
+                    + gaussian(x, 3.2, 0.08, 0.55)
+                    + gaussian(x, 4.71, 0.035, 2.8)
+                    + gaussian(x, 7.8, 0.10, 0.42)
+            })
+            .collect();
+
+        Ok(Spectrum1D::new(
+            axis,
+            intensities,
+            Metadata::new().with_name("suppression-demo"),
+        )?)
+    }
+
+    fn synthetic_fit_spectrum() -> Result<Spectrum1D> {
+        let axis = Axis::linear_ppm(2.6, 3.8, 500)?;
+        let center = 3.20;
+        let fwhm = 0.11;
+        let intensities = axis
+            .values
+            .iter()
+            .copied()
+            .map(|x| {
+                let scaled = (x - center) / fwhm;
+                0.08 + 1.4 / (1.0 + 4.0 * scaled * scaled)
+            })
+            .collect();
+
+        Ok(Spectrum1D::new(
+            axis,
+            intensities,
+            Metadata::new().with_name("fit-demo"),
+        )?)
+    }
+
+    fn synthetic_combined_cleanup_spectrum() -> Result<Spectrum1D> {
+        let axis = Axis::linear_ppm(0.0, 10.0, 900)?;
+        let intensities = axis
+            .values
+            .iter()
+            .copied()
+            .map(|x| {
+                0.12
+                    + 0.01 * (9.0 * x).sin()
+                    + gaussian(x, 1.4, 0.05, 0.35)
+                    + gaussian(x, 3.2, 0.08, 0.55)
+                    + gaussian(x, 4.71, 0.035, 2.8)
+                    + gaussian(x, 7.8, 0.10, 0.42)
+            })
+            .collect();
+
+        Ok(Spectrum1D::new(
+            axis,
+            intensities,
+            Metadata::new().with_name("combined-cleanup-demo"),
+        )?)
     }
 
     fn synthetic_baseline_spectrum() -> Result<Spectrum1D> {

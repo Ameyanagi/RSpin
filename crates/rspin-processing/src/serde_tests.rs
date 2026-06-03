@@ -5,11 +5,12 @@ use serde::{Serialize, de::DeserializeOwned};
 
 use crate::{
     Abs1D, Abs2D, AutoPhaseCorrection, AutoPhaseCorrection2D, BaselineMethod, Crop1D, Crop2D,
-    ExponentialApodization, ExponentialApodization2D, Fft1D, Fft2D, FftDirection,
-    GaussianApodization, GaussianApodization2D, Magnitude, Normalize2DMaxAbs, Normalize2DVolume,
-    NormalizeArea, NormalizeMaxAbs, Offset2D, OffsetIntensity, PhaseCorrection, PhaseCorrection2D,
-    ProjectionMode, Resample1D, Resample2D, Scale2D, ScaleIntensity, Shift2DAxes, ShiftAxis,
-    SineBellApodization, SineBellApodization2D, SubtractBaseline, ZeroFill, ZeroFill2D,
+    DcOffsetCorrection, DcOffsetMethod, ExponentialApodization, ExponentialApodization2D, Fft1D,
+    Fft2D, FftDirection, GaussianApodization, GaussianApodization2D, Magnitude, Normalize2DMaxAbs,
+    Normalize2DVolume, NormalizeArea, NormalizeMaxAbs, Offset2D, OffsetIntensity, PhaseCorrection,
+    PhaseCorrection2D, ProjectionMode, Resample1D, Resample2D, Scale2D, ScaleIntensity,
+    Shift2DAxes, ShiftAxis, SineBellApodization, SineBellApodization2D, SubtractBaseline,
+    SuppressRegion1D, SuppressionFill, ZeroFill, ZeroFill2D,
 };
 
 #[test]
@@ -19,9 +20,17 @@ fn serializes_one_dimensional_steps() -> anyhow::Result<()> {
     round_trip(&Abs1D)?;
     round_trip(&ScaleIntensity { factor: 2.0 })?;
     round_trip(&OffsetIntensity { offset: -0.5 })?;
+    round_trip(&DcOffsetCorrection::new(DcOffsetMethod::MeanLastPoints {
+        count: 16,
+    }))?;
     round_trip(&NormalizeMaxAbs)?;
     round_trip(&NormalizeArea::absolute(10.0))?;
     round_trip(&ShiftAxis { delta: 0.03 })?;
+    round_trip(&SuppressRegion1D::new(
+        4.8,
+        4.6,
+        SuppressionFill::LinearInterpolate,
+    ))?;
     round_trip(&ZeroFill { target_len: 16 })?;
     round_trip(&Crop1D { from: 7.0, to: 0.0 })?;
     round_trip(&Resample1D::new(target_axis).with_outside_value(-1.0))?;
