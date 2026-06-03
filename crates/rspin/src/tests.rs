@@ -2504,6 +2504,55 @@ fn prelude_exports_discovered_source_slice_methods() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_discovered_short_path_selectors() -> Result<()> {
+    let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let sources: Vec<DiscoveredSpectrumSource> = discover_spectra(&myrcene_root)?;
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+
+    assert_eq!(
+        sources.select_1d_by_path(proton_path),
+        select_discovered_spectra_1d_by_source_path(&sources, proton_path)
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_path_prefix(&sources, "jeol"),
+        select_discovered_spectra_1d_by_source_path_prefix(&sources, "jeol")
+    );
+    assert_eq!(
+        sources.select_1d_by_path_prefix("jeol"),
+        select_discovered_spectra_1d_by_path_prefix(&sources, "jeol")
+    );
+
+    assert_eq!(
+        sources.select_2d_by_path(hsqc_path),
+        select_discovered_spectra_2d_by_source_path(&sources, hsqc_path)
+    );
+    assert_eq!(
+        select_discovered_spectra_2d_by_path_prefix(&sources, "bruker_cosy_raw"),
+        select_discovered_spectra_2d_by_source_path_prefix(&sources, "bruker_cosy_raw")
+    );
+    assert_eq!(
+        sources.select_2d_by_path_prefix("bruker_cosy_raw"),
+        select_discovered_spectra_2d_by_path_prefix(&sources, "bruker_cosy_raw")
+    );
+
+    assert_eq!(
+        sources.select_by_path(proton_path),
+        select_discovered_spectra_by_source_path(&sources, proton_path)
+    );
+    assert_eq!(
+        select_discovered_spectra_by_path_prefix(&sources, "jeol"),
+        select_discovered_spectra_by_source_path_prefix(&sources, "jeol")
+    );
+    assert_eq!(
+        sources.select_by_path_prefix("jeol"),
+        select_discovered_spectra_by_path_prefix(&sources, "jeol")
+    );
+    Ok(())
+}
+
+#[test]
 fn prelude_exports_discovered_source_path_set_selectors() -> Result<()> {
     let myrcene_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
@@ -2516,13 +2565,37 @@ fn prelude_exports_discovered_source_path_set_selectors() -> Result<()> {
         select_discovered_spectra_1d_by_source_paths(&sources, [proton_path, "missing"])
     );
     assert_eq!(
+        sources.select_1d_by_paths([proton_path, "missing"]),
+        select_discovered_spectra_1d_by_paths(&sources, [proton_path, "missing"])
+    );
+    assert_eq!(
         sources.select_2d_by_source_paths([hsqc_path, "missing"]),
         select_discovered_spectra_2d_by_source_paths(&sources, [hsqc_path, "missing"])
+    );
+    assert_eq!(
+        sources.select_2d_by_paths([hsqc_path, "missing"]),
+        select_discovered_spectra_2d_by_paths(&sources, [hsqc_path, "missing"])
     );
     assert_eq!(
         sources.select_by_source_paths([proton_path, hsqc_path]),
         select_discovered_spectra_by_source_paths(&sources, [proton_path, hsqc_path])
     );
+    assert_eq!(
+        sources.select_by_paths([proton_path, hsqc_path]),
+        select_discovered_spectra_by_paths(&sources, [proton_path, hsqc_path])
+    );
+
+    let loaded_1d = sources
+        .select_1d_by_path(proton_path)
+        .load_1d(&myrcene_root)?;
+    assert_eq!(loaded_1d.len_1d(), 1);
+    assert!(loaded_1d.has_source_path(proton_path));
+
+    let loaded_2d = sources
+        .select_2d_by_path(hsqc_path)
+        .load_2d(&myrcene_root)?;
+    assert_eq!(loaded_2d.len_2d(), 1);
+    assert!(loaded_2d.has_source_path(hsqc_path));
     Ok(())
 }
 

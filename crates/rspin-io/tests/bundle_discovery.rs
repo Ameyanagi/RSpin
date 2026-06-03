@@ -73,18 +73,24 @@ use rspin_io::{
     load_discovered_spectra_by_sources_relative_to, load_discovered_spectra_relative_to,
     preview_spectra, preview_spectra_many, preview_spectra_many_relative_to,
     preview_spectra_relative_to, scan_spectra, scan_spectra_many, scan_spectra_many_relative_to,
-    scan_spectra_relative_to, select_discovered_spectra_1d, select_discovered_spectra_1d_by_source,
+    scan_spectra_relative_to, select_discovered_spectra_1d, select_discovered_spectra_1d_by_path,
+    select_discovered_spectra_1d_by_path_prefix, select_discovered_spectra_1d_by_path_prefixes,
+    select_discovered_spectra_1d_by_paths, select_discovered_spectra_1d_by_source,
     select_discovered_spectra_1d_by_source_path,
     select_discovered_spectra_1d_by_source_path_prefix,
     select_discovered_spectra_1d_by_source_path_prefixes,
     select_discovered_spectra_1d_by_source_paths, select_discovered_spectra_1d_by_sources,
-    select_discovered_spectra_2d, select_discovered_spectra_2d_by_source,
+    select_discovered_spectra_2d, select_discovered_spectra_2d_by_path,
+    select_discovered_spectra_2d_by_path_prefix, select_discovered_spectra_2d_by_path_prefixes,
+    select_discovered_spectra_2d_by_paths, select_discovered_spectra_2d_by_source,
     select_discovered_spectra_2d_by_source_path,
     select_discovered_spectra_2d_by_source_path_prefix,
     select_discovered_spectra_2d_by_source_path_prefixes,
     select_discovered_spectra_2d_by_source_paths, select_discovered_spectra_2d_by_sources,
     select_discovered_spectra_by_dimension, select_discovered_spectra_by_dimension_and_source,
-    select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_source,
+    select_discovered_spectra_by_dimension_and_sources, select_discovered_spectra_by_path,
+    select_discovered_spectra_by_path_prefix, select_discovered_spectra_by_path_prefixes,
+    select_discovered_spectra_by_paths, select_discovered_spectra_by_source,
     select_discovered_spectra_by_source_path, select_discovered_spectra_by_source_path_prefix,
     select_discovered_spectra_by_source_path_prefixes, select_discovered_spectra_by_source_paths,
     select_discovered_spectra_by_sources, summarize_discovered_spectra,
@@ -578,6 +584,66 @@ fn discovered_source_slice_methods_match_free_helpers() -> Result<()> {
 }
 
 #[test]
+fn short_discovered_path_selector_aliases_match_source_path_helpers() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    assert_eq!(
+        select_discovered_spectra_1d_by_path(&sources, proton_path),
+        select_discovered_spectra_1d_by_source_path(&sources, proton_path)
+    );
+    assert_eq!(
+        sources.select_1d_by_path(proton_path),
+        select_discovered_spectra_1d_by_path(&sources, proton_path)
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_path_prefix(&sources, "jeol"),
+        select_discovered_spectra_1d_by_source_path_prefix(&sources, "jeol")
+    );
+    assert_eq!(
+        sources.select_1d_by_path_prefix("jeol"),
+        select_discovered_spectra_1d_by_path_prefix(&sources, "jeol")
+    );
+
+    assert_eq!(
+        select_discovered_spectra_2d_by_path(&sources, hsqc_path),
+        select_discovered_spectra_2d_by_source_path(&sources, hsqc_path)
+    );
+    assert_eq!(
+        sources.select_2d_by_path(hsqc_path),
+        select_discovered_spectra_2d_by_path(&sources, hsqc_path)
+    );
+    assert_eq!(
+        select_discovered_spectra_2d_by_path_prefix(&sources, "bruker_cosy_raw"),
+        select_discovered_spectra_2d_by_source_path_prefix(&sources, "bruker_cosy_raw")
+    );
+    assert_eq!(
+        sources.select_2d_by_path_prefix("bruker_cosy_raw"),
+        select_discovered_spectra_2d_by_path_prefix(&sources, "bruker_cosy_raw")
+    );
+
+    assert_eq!(
+        select_discovered_spectra_by_path(&sources, proton_path),
+        select_discovered_spectra_by_source_path(&sources, proton_path)
+    );
+    assert_eq!(
+        sources.select_by_path(proton_path),
+        select_discovered_spectra_by_path(&sources, proton_path)
+    );
+    assert_eq!(
+        select_discovered_spectra_by_path_prefix(&sources, "jeol"),
+        select_discovered_spectra_by_source_path_prefix(&sources, "jeol")
+    );
+    assert_eq!(
+        sources.select_by_path_prefix("jeol"),
+        select_discovered_spectra_by_path_prefix(&sources, "jeol")
+    );
+
+    Ok(())
+}
+
+#[test]
 fn discovered_source_path_set_selectors_match_free_helpers() -> Result<()> {
     let sources = discover_spectra(cc0_myrcene_fixture_root())?;
     let proton_path = "jeol/myrcene_1h_400mhz.jdf";
@@ -590,6 +656,14 @@ fn discovered_source_path_set_selectors_match_free_helpers() -> Result<()> {
         sources.select_by_source_paths([proton_path, hsqc_path, "missing"]),
         selected_all
     );
+    assert_eq!(
+        sources.select_by_paths([proton_path, hsqc_path, "missing"]),
+        select_discovered_spectra_by_paths(&sources, [proton_path, hsqc_path, "missing"])
+    );
+    assert_eq!(
+        sources.select_by_paths([proton_path, hsqc_path, "missing"]),
+        selected_all
+    );
 
     let selected_1d =
         select_discovered_spectra_1d_by_source_paths(&sources, [proton_path, hsqc_path]);
@@ -597,6 +671,14 @@ fn discovered_source_path_set_selectors_match_free_helpers() -> Result<()> {
     assert!(selected_1d.iter().all(|source| source.is_1d()));
     assert_eq!(
         sources.select_1d_by_source_paths([proton_path, hsqc_path]),
+        selected_1d
+    );
+    assert_eq!(
+        sources.select_1d_by_paths([proton_path, hsqc_path]),
+        select_discovered_spectra_1d_by_paths(&sources, [proton_path, hsqc_path])
+    );
+    assert_eq!(
+        sources.select_1d_by_paths([proton_path, hsqc_path]),
         selected_1d
     );
 
@@ -608,6 +690,14 @@ fn discovered_source_path_set_selectors_match_free_helpers() -> Result<()> {
         sources.select_2d_by_source_paths([proton_path, hsqc_path]),
         selected_2d
     );
+    assert_eq!(
+        sources.select_2d_by_paths([proton_path, hsqc_path]),
+        select_discovered_spectra_2d_by_paths(&sources, [proton_path, hsqc_path])
+    );
+    assert_eq!(
+        sources.select_2d_by_paths([proton_path, hsqc_path]),
+        selected_2d
+    );
 
     let empty_paths: [&str; 0] = [];
     let all_sources: Vec<_> = sources.iter().collect();
@@ -616,13 +706,90 @@ fn discovered_source_path_set_selectors_match_free_helpers() -> Result<()> {
         all_sources
     );
     assert_eq!(
+        select_discovered_spectra_by_paths(&sources, empty_paths),
+        all_sources
+    );
+    assert_eq!(
         select_discovered_spectra_1d_by_source_paths(&sources, empty_paths),
+        select_discovered_spectra_1d(&sources)
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_paths(&sources, empty_paths),
         select_discovered_spectra_1d(&sources)
     );
     assert_eq!(
         select_discovered_spectra_2d_by_source_paths(&sources, empty_paths),
         select_discovered_spectra_2d(&sources)
     );
+    assert_eq!(
+        select_discovered_spectra_2d_by_paths(&sources, empty_paths),
+        select_discovered_spectra_2d(&sources)
+    );
+    Ok(())
+}
+
+#[test]
+fn short_discovered_path_set_selector_aliases_match_source_path_helpers() -> Result<()> {
+    let sources = discover_spectra(cc0_myrcene_fixture_root())?;
+    let proton_path = "jeol/myrcene_1h_400mhz.jdf";
+    let hsqc_path = "jeol/myrcene_hsqc_400mhz.jdf";
+
+    let paths = [proton_path, hsqc_path, "missing"];
+    assert_eq!(
+        select_discovered_spectra_by_paths(&sources, paths),
+        select_discovered_spectra_by_source_paths(&sources, paths)
+    );
+    assert_eq!(
+        sources.select_by_paths(paths),
+        select_discovered_spectra_by_paths(&sources, paths)
+    );
+
+    let dimension_paths = [proton_path, hsqc_path];
+    assert_eq!(
+        select_discovered_spectra_1d_by_paths(&sources, dimension_paths),
+        select_discovered_spectra_1d_by_source_paths(&sources, dimension_paths)
+    );
+    assert_eq!(
+        sources.select_1d_by_paths(dimension_paths),
+        select_discovered_spectra_1d_by_paths(&sources, dimension_paths)
+    );
+    assert_eq!(
+        select_discovered_spectra_2d_by_paths(&sources, dimension_paths),
+        select_discovered_spectra_2d_by_source_paths(&sources, dimension_paths)
+    );
+    assert_eq!(
+        sources.select_2d_by_paths(dimension_paths),
+        select_discovered_spectra_2d_by_paths(&sources, dimension_paths)
+    );
+
+    let prefixes = ["jcamp", "jeol"];
+    assert_eq!(
+        select_discovered_spectra_by_path_prefixes(&sources, prefixes),
+        select_discovered_spectra_by_source_path_prefixes(&sources, prefixes)
+    );
+    assert_eq!(
+        sources.select_by_path_prefixes(prefixes),
+        select_discovered_spectra_by_path_prefixes(&sources, prefixes)
+    );
+    assert_eq!(
+        select_discovered_spectra_1d_by_path_prefixes(&sources, prefixes),
+        select_discovered_spectra_1d_by_source_path_prefixes(&sources, prefixes)
+    );
+    assert_eq!(
+        sources.select_1d_by_path_prefixes(prefixes),
+        select_discovered_spectra_1d_by_path_prefixes(&sources, prefixes)
+    );
+
+    let two_d_prefixes = ["bruker_cosy_raw", "jeol"];
+    assert_eq!(
+        select_discovered_spectra_2d_by_path_prefixes(&sources, two_d_prefixes),
+        select_discovered_spectra_2d_by_source_path_prefixes(&sources, two_d_prefixes)
+    );
+    assert_eq!(
+        sources.select_2d_by_path_prefixes(two_d_prefixes),
+        select_discovered_spectra_2d_by_path_prefixes(&sources, two_d_prefixes)
+    );
+
     Ok(())
 }
 
@@ -641,6 +808,14 @@ fn discovered_source_path_prefix_set_selectors_match_free_helpers() -> Result<()
         sources.select_by_source_path_prefixes(["jcamp", "jeol"]),
         selected_all
     );
+    assert_eq!(
+        sources.select_by_path_prefixes(["jcamp", "jeol"]),
+        select_discovered_spectra_by_path_prefixes(&sources, ["jcamp", "jeol"])
+    );
+    assert_eq!(
+        sources.select_by_path_prefixes(["jcamp", "jeol"]),
+        selected_all
+    );
 
     let selected_1d =
         select_discovered_spectra_1d_by_source_path_prefixes(&sources, ["jcamp", "jeol"]);
@@ -652,6 +827,14 @@ fn discovered_source_path_prefix_set_selectors_match_free_helpers() -> Result<()
     assert!(selected_1d.iter().all(|source| source.is_1d()));
     assert_eq!(
         sources.select_1d_by_source_path_prefixes(["jcamp", "jeol"]),
+        selected_1d
+    );
+    assert_eq!(
+        sources.select_1d_by_path_prefixes(["jcamp", "jeol"]),
+        select_discovered_spectra_1d_by_path_prefixes(&sources, ["jcamp", "jeol"])
+    );
+    assert_eq!(
+        sources.select_1d_by_path_prefixes(["jcamp", "jeol"]),
         selected_1d
     );
 
@@ -667,6 +850,14 @@ fn discovered_source_path_prefix_set_selectors_match_free_helpers() -> Result<()
         sources.select_2d_by_source_path_prefixes(["bruker_cosy_raw", "jeol"]),
         selected_2d
     );
+    assert_eq!(
+        sources.select_2d_by_path_prefixes(["bruker_cosy_raw", "jeol"]),
+        select_discovered_spectra_2d_by_path_prefixes(&sources, ["bruker_cosy_raw", "jeol"])
+    );
+    assert_eq!(
+        sources.select_2d_by_path_prefixes(["bruker_cosy_raw", "jeol"]),
+        selected_2d
+    );
 
     let empty_prefixes: [&str; 0] = [];
     let all_sources: Vec<_> = sources.iter().collect();
@@ -675,11 +866,23 @@ fn discovered_source_path_prefix_set_selectors_match_free_helpers() -> Result<()
         all_sources
     );
     assert_eq!(
+        select_discovered_spectra_by_path_prefixes(&sources, empty_prefixes),
+        all_sources
+    );
+    assert_eq!(
         select_discovered_spectra_1d_by_source_path_prefixes(&sources, empty_prefixes),
         select_discovered_spectra_1d(&sources)
     );
     assert_eq!(
+        select_discovered_spectra_1d_by_path_prefixes(&sources, empty_prefixes),
+        select_discovered_spectra_1d(&sources)
+    );
+    assert_eq!(
         select_discovered_spectra_2d_by_source_path_prefixes(&sources, empty_prefixes),
+        select_discovered_spectra_2d(&sources)
+    );
+    assert_eq!(
+        select_discovered_spectra_2d_by_path_prefixes(&sources, empty_prefixes),
         select_discovered_spectra_2d(&sources)
     );
     Ok(())
