@@ -518,6 +518,45 @@ fn prelude_supports_first_bundle_accessors() -> Result<()> {
 }
 
 #[test]
+fn prelude_exports_bundle_short_path_selectors() -> Result<()> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let bundle = load_spectra(&root)?;
+    let carbon_path = std::path::Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = std::path::Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let loaded = bundle
+        .loaded_by_path(carbon_path)
+        .ok_or_else(|| RSpinError::Parse {
+            format: "facade bundle path selector",
+            message: "missing loaded carbon spectrum".to_owned(),
+        })?;
+    assert!(loaded.is_1d());
+
+    let (carbon, carbon_source) =
+        bundle
+            .loaded_1d_by_path(carbon_path)
+            .ok_or_else(|| RSpinError::Parse {
+                format: "facade bundle path selector",
+                message: "missing loaded carbon spectrum".to_owned(),
+            })?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(carbon_source.path(), Some(carbon_path));
+
+    let hsqc = bundle.only_2d_by_path(hsqc_path)?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    let (_, hsqc_source) = bundle.only_loaded_2d_by_path(hsqc_path)?;
+    assert_eq!(hsqc_source.path(), Some(hsqc_path));
+
+    let owned_carbon = bundle.clone().into_only_1d_by_path(carbon_path)?;
+    assert_eq!(owned_carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    let (owned_hsqc, owned_source) = bundle.into_only_loaded_2d_by_path(hsqc_path)?;
+    assert_eq!(owned_hsqc.shape(), (1024, 32));
+    assert_eq!(owned_source.path(), Some(hsqc_path));
+    Ok(())
+}
+
+#[test]
 fn prelude_supports_first_spectrum_reader_helpers() -> Result<()> {
     let fixture_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/zenodo_7100132");

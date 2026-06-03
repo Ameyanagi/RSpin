@@ -162,6 +162,44 @@ fn source_path_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
 }
 
 #[test]
+fn short_path_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
+    let bundle = load_spectra(nmrxiv_fixture_root())?;
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let loaded = bundle
+        .loaded_by_path(carbon_path)
+        .ok_or_else(|| anyhow::anyhow!("missing loaded entry at {}", carbon_path.display()))?;
+    assert!(loaded.is_1d());
+
+    let (carbon, carbon_source) = bundle
+        .loaded_1d_by_path(carbon_path)
+        .ok_or_else(|| anyhow::anyhow!("missing 1D entry at {}", carbon_path.display()))?;
+    assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    assert_eq!(carbon_source.path(), Some(carbon_path));
+
+    let hsqc = bundle.only_2d_by_path(hsqc_path)?;
+    assert_eq!(hsqc.shape(), (1024, 32));
+    let (_, hsqc_source) = bundle.only_loaded_2d_by_path(hsqc_path)?;
+    assert_eq!(hsqc_source.path(), Some(hsqc_path));
+
+    assert!(bundle.loaded_2d_by_path(carbon_path).is_none());
+    assert_single_error(
+        bundle.only_loaded_1d_by_path(hsqc_path),
+        "expected exactly one one-dimensional spectrum for source path jeol/myrcene_hsqc_400mhz.jdf",
+        "found 0 one-dimensional and 1 two-dimensional spectra",
+    )?;
+
+    let owned_carbon = bundle.clone().into_only_1d_by_path(carbon_path)?;
+    assert_eq!(owned_carbon.metadata.nucleus, Some(Nucleus::Carbon13));
+    let (owned_hsqc, owned_source) = bundle.into_only_loaded_2d_by_path(hsqc_path)?;
+    assert_eq!(owned_hsqc.shape(), (1024, 32));
+    assert_eq!(owned_source.path(), Some(hsqc_path));
+
+    Ok(())
+}
+
+#[test]
 fn source_path_prefix_exact_helpers_select_matching_dimension() -> anyhow::Result<()> {
     let bundle = load_spectra(nmrxiv_fixture_root())?;
     let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");

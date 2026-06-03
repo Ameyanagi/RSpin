@@ -29,6 +29,7 @@ mod first_typed_source;
 mod first_typed_source_strict;
 mod loader;
 mod model;
+mod path_alias;
 mod path_prefix;
 mod selectors;
 mod source_filter;

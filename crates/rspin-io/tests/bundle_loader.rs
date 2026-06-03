@@ -3343,22 +3343,38 @@ fn bundle_source_path_lookup_helpers_find_entries_and_warnings() -> anyhow::Resu
         .ok_or_else(|| anyhow::anyhow!("missing loaded entry at {}", jcamp_path.display()))?;
     assert!(loaded.is_1d());
     assert_eq!(loaded.source().format, "jcamp_dx");
+    let loaded_alias = bundle
+        .loaded_by_path(jcamp_path)
+        .ok_or_else(|| anyhow::anyhow!("missing loaded entry at {}", jcamp_path.display()))?;
+    assert_eq!(loaded_alias.source().format, loaded.source().format);
 
     let (carbon, carbon_source) = bundle
         .loaded_1d_by_source_path(jcamp_path)
         .ok_or_else(|| anyhow::anyhow!("missing 1D entry at {}", jcamp_path.display()))?;
     assert_eq!(carbon.metadata.nucleus, Some(Nucleus::Carbon13));
     assert_eq!(carbon_source.format, "jcamp_dx");
+    let (carbon_alias, carbon_source_alias) = bundle
+        .loaded_1d_by_path(jcamp_path)
+        .ok_or_else(|| anyhow::anyhow!("missing 1D entry at {}", jcamp_path.display()))?;
+    assert_eq!(carbon_alias.metadata.nucleus, carbon.metadata.nucleus);
+    assert_eq!(carbon_source_alias.format, carbon_source.format);
 
     let (hsqc, hsqc_source) = bundle
         .loaded_2d_by_source_path(hsqc_path)
         .ok_or_else(|| anyhow::anyhow!("missing 2D entry at {}", hsqc_path.display()))?;
     assert_eq!(hsqc.shape(), (1024, 32));
     assert_eq!(hsqc_source.format, "jeol_jdf");
+    let (hsqc_alias, hsqc_source_alias) = bundle
+        .loaded_2d_by_path(hsqc_path)
+        .ok_or_else(|| anyhow::anyhow!("missing 2D entry at {}", hsqc_path.display()))?;
+    assert_eq!(hsqc_alias.shape(), hsqc.shape());
+    assert_eq!(hsqc_source_alias.format, hsqc_source.format);
 
     assert!(bundle.loaded_by_source_path("missing").is_none());
+    assert!(bundle.loaded_by_path("missing").is_none());
     assert!(!bundle.has_source_path("missing"));
     assert!(bundle.loaded_2d_by_source_path(jcamp_path).is_none());
+    assert!(bundle.loaded_2d_by_path(jcamp_path).is_none());
 
     let no_sources = RSpinReader::new()
         .without_source_paths()
