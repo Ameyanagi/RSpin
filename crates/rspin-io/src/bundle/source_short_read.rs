@@ -463,6 +463,62 @@ set_bundle_aliases! {
 }
 
 single_bundle_aliases! {
+    what = "tracked source path";
+    reader = read_by_path;
+    reader_relative = read_by_path_relative_to;
+    reader_many = read_many_by_path;
+    reader_many_relative = read_many_by_path_relative_to;
+    target = read_by_source_path;
+    target_relative = read_by_source_path_relative_to;
+    target_many = read_many_by_source_path;
+    target_many_relative = read_many_by_source_path_relative_to;
+    value = source_path: impl AsRef<Path>;
+}
+
+set_bundle_aliases! {
+    what = "tracked source paths";
+    reader = read_by_paths;
+    reader_relative = read_by_paths_relative_to;
+    reader_many = read_many_by_paths;
+    reader_many_relative = read_many_by_paths_relative_to;
+    target = read_by_source_paths;
+    target_relative = read_by_source_paths_relative_to;
+    target_many = read_many_by_source_paths;
+    target_many_relative = read_many_by_source_paths_relative_to;
+    values = source_paths;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
+}
+
+single_bundle_aliases! {
+    what = "tracked source path prefix";
+    reader = read_by_path_prefix;
+    reader_relative = read_by_path_prefix_relative_to;
+    reader_many = read_many_by_path_prefix;
+    reader_many_relative = read_many_by_path_prefix_relative_to;
+    target = read_by_source_path_prefix;
+    target_relative = read_by_source_path_prefix_relative_to;
+    target_many = read_many_by_source_path_prefix;
+    target_many_relative = read_many_by_source_path_prefix_relative_to;
+    value = source_path_prefix: impl AsRef<Path>;
+}
+
+set_bundle_aliases! {
+    what = "tracked source path prefixes";
+    reader = read_by_path_prefixes;
+    reader_relative = read_by_path_prefixes_relative_to;
+    reader_many = read_many_by_path_prefixes;
+    reader_many_relative = read_many_by_path_prefixes_relative_to;
+    target = read_by_source_path_prefixes;
+    target_relative = read_by_source_path_prefixes_relative_to;
+    target_many = read_many_by_source_path_prefixes;
+    target_many_relative = read_many_by_source_path_prefixes_relative_to;
+    values = source_path_prefixes;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
+}
+
+single_bundle_aliases! {
     what = "source format in strict mode";
     reader = read_strict_by_format;
     reader_relative = read_strict_by_format_relative_to;
@@ -544,6 +600,62 @@ set_bundle_aliases! {
     values = data_kinds;
     generics = [J];
     where = { J: IntoIterator<Item = LoadedSourceDataKind>, };
+}
+
+single_bundle_aliases! {
+    what = "tracked source path in strict mode";
+    reader = read_strict_by_path;
+    reader_relative = read_strict_by_path_relative_to;
+    reader_many = read_many_strict_by_path;
+    reader_many_relative = read_many_strict_by_path_relative_to;
+    target = read_strict_by_source_path;
+    target_relative = read_strict_by_source_path_relative_to;
+    target_many = read_many_strict_by_source_path;
+    target_many_relative = read_many_strict_by_source_path_relative_to;
+    value = source_path: impl AsRef<Path>;
+}
+
+set_bundle_aliases! {
+    what = "tracked source paths in strict mode";
+    reader = read_strict_by_paths;
+    reader_relative = read_strict_by_paths_relative_to;
+    reader_many = read_many_strict_by_paths;
+    reader_many_relative = read_many_strict_by_paths_relative_to;
+    target = read_strict_by_source_paths;
+    target_relative = read_strict_by_source_paths_relative_to;
+    target_many = read_many_strict_by_source_paths;
+    target_many_relative = read_many_strict_by_source_paths_relative_to;
+    values = source_paths;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
+}
+
+single_bundle_aliases! {
+    what = "tracked source path prefix in strict mode";
+    reader = read_strict_by_path_prefix;
+    reader_relative = read_strict_by_path_prefix_relative_to;
+    reader_many = read_many_strict_by_path_prefix;
+    reader_many_relative = read_many_strict_by_path_prefix_relative_to;
+    target = read_strict_by_source_path_prefix;
+    target_relative = read_strict_by_source_path_prefix_relative_to;
+    target_many = read_many_strict_by_source_path_prefix;
+    target_many_relative = read_many_strict_by_source_path_prefix_relative_to;
+    value = source_path_prefix: impl AsRef<Path>;
+}
+
+set_bundle_aliases! {
+    what = "tracked source path prefixes in strict mode";
+    reader = read_strict_by_path_prefixes;
+    reader_relative = read_strict_by_path_prefixes_relative_to;
+    reader_many = read_many_strict_by_path_prefixes;
+    reader_many_relative = read_many_strict_by_path_prefixes_relative_to;
+    target = read_strict_by_source_path_prefixes;
+    target_relative = read_strict_by_source_path_prefixes_relative_to;
+    target_many = read_many_strict_by_source_path_prefixes;
+    target_many_relative = read_many_strict_by_source_path_prefixes_relative_to;
+    values = source_path_prefixes;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
 }
 
 single_summary_aliases! {
@@ -631,6 +743,62 @@ set_summary_aliases! {
 }
 
 single_summary_aliases! {
+    what = "tracked source path";
+    reader = read_summary_by_path;
+    reader_relative = read_summary_by_path_relative_to;
+    reader_many = read_summary_many_by_path;
+    reader_many_relative = read_summary_many_by_path_relative_to;
+    target = read_summary_by_source_path;
+    target_relative = read_summary_by_source_path_relative_to;
+    target_many = read_summary_many_by_source_path;
+    target_many_relative = read_summary_many_by_source_path_relative_to;
+    value = source_path: impl AsRef<Path>;
+}
+
+set_summary_aliases! {
+    what = "tracked source paths";
+    reader = read_summary_by_paths;
+    reader_relative = read_summary_by_paths_relative_to;
+    reader_many = read_summary_many_by_paths;
+    reader_many_relative = read_summary_many_by_paths_relative_to;
+    target = read_summary_by_source_paths;
+    target_relative = read_summary_by_source_paths_relative_to;
+    target_many = read_summary_many_by_source_paths;
+    target_many_relative = read_summary_many_by_source_paths_relative_to;
+    values = source_paths;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
+}
+
+single_summary_aliases! {
+    what = "tracked source path prefix";
+    reader = read_summary_by_path_prefix;
+    reader_relative = read_summary_by_path_prefix_relative_to;
+    reader_many = read_summary_many_by_path_prefix;
+    reader_many_relative = read_summary_many_by_path_prefix_relative_to;
+    target = read_summary_by_source_path_prefix;
+    target_relative = read_summary_by_source_path_prefix_relative_to;
+    target_many = read_summary_many_by_source_path_prefix;
+    target_many_relative = read_summary_many_by_source_path_prefix_relative_to;
+    value = source_path_prefix: impl AsRef<Path>;
+}
+
+set_summary_aliases! {
+    what = "tracked source path prefixes";
+    reader = read_summary_by_path_prefixes;
+    reader_relative = read_summary_by_path_prefixes_relative_to;
+    reader_many = read_summary_many_by_path_prefixes;
+    reader_many_relative = read_summary_many_by_path_prefixes_relative_to;
+    target = read_summary_by_source_path_prefixes;
+    target_relative = read_summary_by_source_path_prefixes_relative_to;
+    target_many = read_summary_many_by_source_path_prefixes;
+    target_many_relative = read_summary_many_by_source_path_prefixes_relative_to;
+    values = source_path_prefixes;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
+}
+
+single_summary_aliases! {
     what = "source format in strict mode";
     reader = read_summary_strict_by_format;
     reader_relative = read_summary_strict_by_format_relative_to;
@@ -712,4 +880,60 @@ set_summary_aliases! {
     values = data_kinds;
     generics = [J];
     where = { J: IntoIterator<Item = LoadedSourceDataKind>, };
+}
+
+single_summary_aliases! {
+    what = "tracked source path in strict mode";
+    reader = read_summary_strict_by_path;
+    reader_relative = read_summary_strict_by_path_relative_to;
+    reader_many = read_summary_many_strict_by_path;
+    reader_many_relative = read_summary_many_strict_by_path_relative_to;
+    target = read_summary_strict_by_source_path;
+    target_relative = read_summary_strict_by_source_path_relative_to;
+    target_many = read_summary_many_strict_by_source_path;
+    target_many_relative = read_summary_many_strict_by_source_path_relative_to;
+    value = source_path: impl AsRef<Path>;
+}
+
+set_summary_aliases! {
+    what = "tracked source paths in strict mode";
+    reader = read_summary_strict_by_paths;
+    reader_relative = read_summary_strict_by_paths_relative_to;
+    reader_many = read_summary_many_strict_by_paths;
+    reader_many_relative = read_summary_many_strict_by_paths_relative_to;
+    target = read_summary_strict_by_source_paths;
+    target_relative = read_summary_strict_by_source_paths_relative_to;
+    target_many = read_summary_many_strict_by_source_paths;
+    target_many_relative = read_summary_many_strict_by_source_paths_relative_to;
+    values = source_paths;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
+}
+
+single_summary_aliases! {
+    what = "tracked source path prefix in strict mode";
+    reader = read_summary_strict_by_path_prefix;
+    reader_relative = read_summary_strict_by_path_prefix_relative_to;
+    reader_many = read_summary_many_strict_by_path_prefix;
+    reader_many_relative = read_summary_many_strict_by_path_prefix_relative_to;
+    target = read_summary_strict_by_source_path_prefix;
+    target_relative = read_summary_strict_by_source_path_prefix_relative_to;
+    target_many = read_summary_many_strict_by_source_path_prefix;
+    target_many_relative = read_summary_many_strict_by_source_path_prefix_relative_to;
+    value = source_path_prefix: impl AsRef<Path>;
+}
+
+set_summary_aliases! {
+    what = "tracked source path prefixes in strict mode";
+    reader = read_summary_strict_by_path_prefixes;
+    reader_relative = read_summary_strict_by_path_prefixes_relative_to;
+    reader_many = read_summary_many_strict_by_path_prefixes;
+    reader_many_relative = read_summary_many_strict_by_path_prefixes_relative_to;
+    target = read_summary_strict_by_source_path_prefixes;
+    target_relative = read_summary_strict_by_source_path_prefixes_relative_to;
+    target_many = read_summary_many_strict_by_source_path_prefixes;
+    target_many_relative = read_summary_many_strict_by_source_path_prefixes_relative_to;
+    values = source_path_prefixes;
+    generics = [J, F];
+    where = { J: IntoIterator<Item = F>, F: AsRef<Path>, };
 }

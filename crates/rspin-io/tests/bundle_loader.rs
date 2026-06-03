@@ -1977,6 +1977,149 @@ fn reader_short_source_metadata_read_aliases_match_long_methods() -> anyhow::Res
 }
 
 #[test]
+fn reader_short_source_path_read_aliases_match_long_methods() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let proton_path = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    let carbon = RSpinReader::new().read_by_path(&root, carbon_path)?;
+    assert_eq!(
+        carbon.summary(),
+        RSpinReader::new()
+            .read_by_source_path(&root, carbon_path)?
+            .summary()
+    );
+    assert!(carbon.has_source_path(carbon_path));
+
+    let selected = RSpinReader::new().read_by_paths(&root, [proton_path, hsqc_path])?;
+    assert_eq!(
+        selected.summary(),
+        RSpinReader::new()
+            .read_by_source_paths(&root, [proton_path, hsqc_path])?
+            .summary()
+    );
+
+    let relative = RSpinReader::new().read_by_path_relative_to(&root, "jcamp", carbon_path)?;
+    assert_eq!(
+        relative.summary(),
+        RSpinReader::new()
+            .read_by_source_path_relative_to(&root, "jcamp", carbon_path)?
+            .summary()
+    );
+
+    let prefixes = RSpinReader::new().read_by_path_prefixes(&root, ["jcamp", "jeol"])?;
+    assert_eq!(
+        prefixes.summary(),
+        RSpinReader::new()
+            .read_by_source_path_prefixes(&root, ["jcamp", "jeol"])?
+            .summary()
+    );
+
+    let jeol_many = RSpinReader::new().read_many_by_path_prefix_relative_to(
+        &root,
+        ["jcamp", "jeol"],
+        "jeol",
+    )?;
+    assert_eq!(
+        jeol_many.summary(),
+        RSpinReader::new()
+            .read_many_by_source_path_prefix_relative_to(&root, ["jcamp", "jeol"], "jeol")?
+            .summary()
+    );
+
+    let strict = RSpinReader::new().read_strict_by_path(&root, carbon_path)?;
+    assert_eq!(
+        strict.summary(),
+        RSpinReader::new()
+            .read_strict_by_source_path(&root, carbon_path)?
+            .summary()
+    );
+
+    let strict_many = RSpinReader::new().read_many_strict_by_paths_relative_to(
+        &root,
+        ["jcamp", "jeol"],
+        [carbon_path, hsqc_path],
+    )?;
+    assert_eq!(
+        strict_many.summary(),
+        RSpinReader::new()
+            .read_many_strict_by_source_paths_relative_to(
+                &root,
+                ["jcamp", "jeol"],
+                [carbon_path, hsqc_path],
+            )?
+            .summary()
+    );
+    Ok(())
+}
+
+#[test]
+fn reader_short_source_path_summary_aliases_match_long_methods() -> anyhow::Result<()> {
+    let root = nmrxiv_fixture_root();
+    let proton_path = Path::new("jcamp/myrcene_1h_400mhz_jcamp_dx_6_link.jdx");
+    let carbon_path = Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
+    let hsqc_path = Path::new("jeol/myrcene_hsqc_400mhz.jdf");
+
+    assert_eq!(
+        RSpinReader::new().read_summary_by_path(&root, carbon_path)?,
+        RSpinReader::new().read_summary_by_source_path(&root, carbon_path)?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_by_paths(&root, [proton_path, hsqc_path])?,
+        RSpinReader::new().read_summary_by_source_paths(&root, [proton_path, hsqc_path])?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_by_path_prefix(&root, "jeol")?,
+        RSpinReader::new().read_summary_by_source_path_prefix(&root, "jeol")?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_by_path_prefixes(&root, ["jcamp", "jeol"])?,
+        RSpinReader::new().read_summary_by_source_path_prefixes(&root, ["jcamp", "jeol"])?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_by_path_relative_to(&root, "jcamp", carbon_path)?,
+        RSpinReader::new().read_summary_by_source_path_relative_to(&root, "jcamp", carbon_path)?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_many_by_path_prefix_relative_to(
+            &root,
+            ["jcamp", "jeol"],
+            "jeol",
+        )?,
+        RSpinReader::new().read_summary_many_by_source_path_prefix_relative_to(
+            &root,
+            ["jcamp", "jeol"],
+            "jeol",
+        )?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_strict_by_path(&root, carbon_path)?,
+        RSpinReader::new().read_summary_strict_by_source_path(&root, carbon_path)?
+    );
+
+    assert_eq!(
+        RSpinReader::new().read_summary_many_strict_by_paths_relative_to(
+            &root,
+            ["jcamp", "jeol"],
+            [carbon_path, hsqc_path],
+        )?,
+        RSpinReader::new().read_summary_many_strict_by_source_paths_relative_to(
+            &root,
+            ["jcamp", "jeol"],
+            [carbon_path, hsqc_path],
+        )?
+    );
+    Ok(())
+}
+
+#[test]
 fn reader_source_path_prefix_aliases_cover_directory_filters() -> anyhow::Result<()> {
     let base = fixture_root();
 

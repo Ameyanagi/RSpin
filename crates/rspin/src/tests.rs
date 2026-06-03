@@ -1235,6 +1235,7 @@ fn prelude_exports_source_filtered_reader_methods() -> Result<()> {
 fn prelude_exports_short_source_metadata_reader_aliases() -> Result<()> {
     let mixed = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../rspin-io/testdata/nmrxiv/cc0/myrcene");
+    let carbon_path = std::path::Path::new("jcamp/myrcene_13c_400mhz_jcamp_dx_6_link.jdx");
 
     let jcamp = RSpinReader::new().read_by_format(&mixed, LoadedSourceFormat::JcampDx)?;
     assert_eq!(jcamp.source_format_count(LoadedSourceFormat::JcampDx), 2);
@@ -1245,6 +1246,17 @@ fn prelude_exports_short_source_metadata_reader_aliases() -> Result<()> {
 
     let raw = RSpinReader::new().read_by_data_kind(&mixed, LoadedSourceDataKind::Raw)?;
     assert_eq!(raw.source_data_kind_count(LoadedSourceDataKind::Raw), 2);
+
+    let carbon = RSpinReader::new().read_by_path(&mixed, carbon_path)?;
+    assert!(carbon.has_source_path(carbon_path));
+    assert_eq!(
+        RSpinReader::new().read_summary_by_path(&mixed, carbon_path)?,
+        carbon.summary()
+    );
+    assert_eq!(
+        RSpinReader::new().read_summary_strict_by_path(&mixed, carbon_path)?,
+        carbon.summary()
+    );
 
     let strict_summary = RSpinReader::new().read_summary_strict_by_vendor_relative_to(
         &mixed,
